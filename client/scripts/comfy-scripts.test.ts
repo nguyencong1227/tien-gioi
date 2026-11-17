@@ -260,4 +260,68 @@ exit 3
       fs.rmSync(stubDir, { recursive: true, force: true });
     }
   });
+
+  it("gen-raw-lo1.mjs: đọc MAP_CARD_BATCH từ prompt-rules.mjs, cỡ 1216x832, SDXL base, không LoRA", async () => {
+    const lo1Script = path.join(repoRoot, "scripts", "art", "gen-raw-lo1.mjs");
+    expect(fs.existsSync(lo1Script)).toBe(true);
+    const src = fs.readFileSync(lo1Script, "utf-8");
+    expect(src).toContain("MAP_CARD_BATCH");
+    expect(src).toContain("NEGATIVE_PROMPT");
+    expect(src).toContain("../../client/scripts/art/prompt-rules.mjs");
+    expect(src).toContain('"http://127.0.0.1:8188"');
+    expect(src).toContain('"sd_xl_base_1.0.safetensors"');
+    expect(src).not.toMatch(/LoraLoader/i);
+
+    const mod = await import("../../scripts/art/gen-raw-lo1.mjs");
+    const wf = mod.buildWorkflow("pos", "neg", 20260401, "the_lac_ha_raw_1");
+    expect(wf[4].inputs.ckpt_name).toBe("sd_xl_base_1.0.safetensors");
+    expect(wf[5].inputs.width).toBe(1216);
+    expect(wf[5].inputs.height).toBe(832);
+    expect(wf[3].inputs.sampler_name).toBe("euler");
+    expect(wf[3].inputs.scheduler).toBe("normal");
+    expect(wf[3].inputs.steps).toBe(25);
+    expect(wf[3].inputs.cfg).toBe(7);
+    expect(wf[3].inputs.denoise).toBe(1);
+    expect(wf[3].inputs.seed).toBe(20260401);
+    expect(wf[9].inputs.filename_prefix).toBe("the_lac_ha_raw_1");
+  });
+
+  it("gen-raw-batch.mjs: hỗ trợ cả lô 1 (MAP_CARD_BATCH 1216x832) và lô 2 (BOSS_CARD_BATCH 1024x1024), SDXL base, không LoRA", async () => {
+    const batchScript = path.join(repoRoot, "scripts", "art", "gen-raw-batch.mjs");
+    expect(fs.existsSync(batchScript)).toBe(true);
+    const src = fs.readFileSync(batchScript, "utf-8");
+    expect(src).toContain("MAP_CARD_BATCH");
+    expect(src).toContain("BOSS_CARD_BATCH");
+    expect(src).toContain("NEGATIVE_PROMPT");
+    expect(src).toContain('"sd_xl_base_1.0.safetensors"');
+    expect(src).not.toMatch(/LoraLoader/i);
+
+    const mod = await import("../../scripts/art/gen-raw-batch.mjs");
+    expect(mod.BATCH_MAP.map.raw).toEqual({ w: 1216, h: 832 });
+    expect(mod.BATCH_MAP.lo1).toBe(mod.BATCH_MAP.map);
+    expect(mod.BATCH_MAP.boss.raw).toEqual({ w: 1024, h: 1024 });
+    expect(mod.BATCH_MAP.lo2).toBe(mod.BATCH_MAP.boss);
+    expect(mod.BATCH_MAP.boss.items).toHaveLength(4);
+    for (const item of mod.BATCH_MAP.boss.items) {
+      expect(item.seeds).toHaveLength(4);
+    }
+
+    const wfBoss = mod.buildWorkflow(
+      mod.BATCH_MAP.boss.items[0].prompt,
+      "neg",
+      2026111801,
+      "the_xich_mang_raw_1",
+      mod.BATCH_MAP.boss.raw.w,
+      mod.BATCH_MAP.boss.raw.h,
+    );
+    expect(wfBoss[4].inputs.ckpt_name).toBe("sd_xl_base_1.0.safetensors");
+    expect(wfBoss[5].inputs.width).toBe(1024);
+    expect(wfBoss[5].inputs.height).toBe(1024);
+    expect(wfBoss[3].inputs.sampler_name).toBe("euler");
+    expect(wfBoss[3].inputs.scheduler).toBe("normal");
+    expect(wfBoss[3].inputs.steps).toBe(25);
+    expect(wfBoss[3].inputs.cfg).toBe(7);
+    expect(wfBoss[3].inputs.denoise).toBe(1);
+    expect(wfBoss[9].inputs.filename_prefix).toBe("the_xich_mang_raw_1");
+  });
 });
