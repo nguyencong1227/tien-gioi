@@ -101,6 +101,7 @@ import {
   type AchievementsMsg,
 } from "@tien-gioi/shared";
 import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
+import { chatSpeaker } from "./chat-view";
 import {
   AskGate,
   achievementsView,
@@ -6261,19 +6262,20 @@ export const ui = {
     if (m.sys) {
       p.className = "sys";
       p.textContent = m.text;
-    } else if (m.channel === "party") {
-      p.className = "party";
-      const b = document.createElement("b");
-      b.textContent = `[Đội] ${m.from}: `;
-      p.append(b, document.createTextNode(m.text));
-    } else if (m.channel === "sect") {
-      p.className = "sect";
-      const b = document.createElement("b");
-      b.textContent = `[Tông môn] ${m.from}: `;
-      p.append(b, document.createTextNode(m.text));
     } else {
+      if (m.channel === "party") p.className = "party";
+      else if (m.channel === "sect") p.className = "sect";
+      // nhãn người nói: kênh + danh hiệu (chỉ khi cờ ?social=1, `chat-view.ts`) + tên; mọi chữ vào DOM bằng textContent
+      const sp = chatSpeaker(m, socialFlagOn());
       const b = document.createElement("b");
-      b.textContent = `${m.from}: `;
+      b.append(document.createTextNode(sp.tag));
+      if (sp.title !== "") {
+        const t = document.createElement("i");
+        t.className = "chat-title";
+        t.textContent = sp.title;
+        b.append(t, document.createTextNode(" "));
+      }
+      b.append(document.createTextNode(sp.name));
       p.append(b, document.createTextNode(m.text));
     }
     const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;

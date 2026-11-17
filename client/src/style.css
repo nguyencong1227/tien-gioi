@@ -8231,3 +8231,10 @@ body.ui-hidden
   background: #ffe08a;
   border: 2px solid #1d1a16;
 }
+
+/* Danh hiệu của người nói trong chat (M9, chat-view.ts): vàng nhạt, không in nghiêng như chữ nhấn khác */
+#chat-log .chat-title {
+  font-style: normal;
+  font-weight: 600;
+  color: #ffe08a;
+}
