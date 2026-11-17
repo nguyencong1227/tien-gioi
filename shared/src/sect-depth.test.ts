@@ -734,6 +734,13 @@ describe("cửa hàng tông môn (mục 12.6)", () => {
       }
     });
 
+    it("TRẦN GIÁ THEO CẤP: món cấp k không đắt hơn món đắt nhất đã duyệt của cấp k (không đưa đồ cấp cao xuống cấp thấp)", () => {
+      // món đắt nhất mỗi cấp trong bảng đã duyệt: da hổ 8 / kinh quyển 16 / Tụ Khí Đan 30 / kinh quyển 60 / kinh quyển 92
+      const cap: Record<number, number> = { 1: 8, 2: 16, 3: 30, 4: 60, 5: 92 };
+      for (const e of entries)
+        expect(e.cost, `${e.itemId} ở cấp ${e.minLevel}`).toBeLessThanOrEqual(cap[e.minLevel]!);
+    });
+
     it("hạn mức ngày trong khoảng mua một lượt (không bắt người chơi bấm hơn một lượt cho hạn mức)", () => {
       for (const e of entries) expect(e.limitDay, e.itemId).toBeLessThanOrEqual(SECT_SHOP_QTY_MAX);
     });

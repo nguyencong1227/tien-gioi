@@ -792,7 +792,7 @@ export interface SectShopEntry {
  * `THIET_KE_TONG_MON.md`); ba món đầu giữ nguyên thứ tự của khung cũ (test và giao diện tham chiếu `SECT_SHOP[0]`).
  *
  * GIÁ: `cost` = ceil(2 x `ITEM_VALUE` / `SECT_CH_VALUE_LT`) (2 = hệ số giá mua NPC; món NPC có bán thì `sectShopViolations` đòi `cost x 5 >= buyPrice`, nên giá luôn >= giá mua NPC quy
- * ra cống hiến). Ba món khung đầu giữ giá cũ (5 / 5 / 30; tu_khi_dan rẻ hơn công thức 6 cống hiến, chủ ý: đan tu luyện trung cấp là phần thưởng chính của cấp 3).
+ * ra cống hiến). Ba món khung đầu giữ giá cũ (5 / 5 / 30; tu_khi_dan rẻ hơn công thức 6 cống hiến, chủ ý: đan tu luyện trung cấp là phần thưởng chính của cấp 3). Bốn đan hồi phục cao (Đại Hồi / Thượng Hồi Huyết, Linh) làm tròn LÊN bội 5 so với công thức (25 thay 24, 75 thay 72): đắt hơn chút, vẫn đúng `cost x 5 >= buyPrice`.
  * `limitDay`: đan / nguyên liệu nhiều lượt; kinh quyển 1 / ngày (đã học thì `known` khoá luôn); đồ hiếm 2 / ngày.
  * KHÔNG bán trang bị (kiếm / bào / phù / giày / bội / ấn): trang bị rơi từ trùm và nghề nhỏ là mốc tiến độ của từng bậc, bán bằng cống hiến sẽ đi tắt qua chúng (A chốt, người dùng đổi được).
  */
