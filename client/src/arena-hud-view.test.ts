@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { AMBUSH_TIME_MS, sampleAmbushState, type AmbushStateMsg } from "@tien-gioi/shared";
+import {
+  AMBUSH_FLEE_CHANNEL_MS,
+  AMBUSH_TIME_MS,
+  sampleAmbushState,
+  type AmbushStateMsg,
+} from "@tien-gioi/shared";
 import { AMBUSH_RETRY_MS } from "./ambush-view";
 import {
   AMBUSH_FLEE_ARM_MS,
   ARENA_URGENT_MS,
+  arenaFleeLeftMs,
   arenaHudView,
   arenaRemainingMs,
   fleeArena,
@@ -230,5 +236,72 @@ describe("bỏ chạy giữa trận: xác nhận, khoá giá, gửi một lần"
     const closed = setFleeConfirm(ready(), false, READY_AT);
     expect(closed.confirming).toBe(false);
     expect(fleeArena(closed, "flee_coin", READY_AT + 9999).send).toBeNull();
+  });
+});
+
+describe("MỤC 53: vận bỏ chạy 1 giây (ambushState.fleeMs)", () => {
+  it("parse: giữ fleeMs hợp lệ (làm tròn xuống, kẹp [1, AMBUSH_FLEE_CHANNEL_MS]); hỏng thì coi như vắng và KHÔNG bỏ cả tin", () => {
+    const base = sampleAmbushState();
+    expect(parseAmbushState({ ...base, fleeMs: 640.9 })?.fleeMs).toBe(640);
+    expect(parseAmbushState({ ...base, fleeMs: 0.4 })?.fleeMs).toBe(1);
+    expect(parseAmbushState({ ...base, fleeMs: 99_999 })?.fleeMs).toBe(AMBUSH_FLEE_CHANNEL_MS);
+    for (const bad of [0, -5, NaN, Infinity, "640", null, {}, [], true]) {
+      const r = parseAmbushState({ ...base, fleeMs: bad });
+      expect(r, String(bad)).not.toBeNull(); // giá + đồng hồ vẫn dùng được
+      expect(r?.fleeMs, String(bad)).toBeUndefined();
+      expect(r?.price).toEqual(base.price);
+    }
+    expect(parseAmbushState(base)).toEqual(base); // tin cũ không có fleeMs: nguyên vẹn
+  });
+
+  it("tin có fleeMs: HUD vào trạng thái đang vận, đếm lùi theo đồng hồ cục bộ, đóng bảng xác nhận", () => {
+    const h = ready();
+    expect(h.confirming).toBe(true);
+    const f = updateArenaHud(h, st({ fleeMs: 1000 }), READY_AT + 50);
+    expect(f.confirming).toBe(false); // người chơi phải thấy trận (vận KHÔNG bất khả xâm phạm)
+    expect(arenaFleeLeftMs(f, READY_AT + 50)).toBe(1000);
+    expect(arenaFleeLeftMs(f, READY_AT + 550)).toBe(500);
+    expect(arenaFleeLeftMs(f, READY_AT + 5000)).toBe(0); // không âm
+    expect(arenaFleeLeftMs(hud0(), T0)).toBeNull();
+  });
+
+  it("view khi vận: chữ 'Đang thoát… N giây', thanh tiến độ 0 -> 1, nút Bỏ chạy KHÔNG mở lại được, đọc màn hình nói đang thoát", () => {
+    const f = updateArenaHud(hud0(), st({ fleeMs: 1000 }), T0);
+    const v0 = arenaHudView(f, T0);
+    expect(v0.fleeing).toBe(true);
+    expect(v0.fleeFrac).toBe(0);
+    expect(v0.note).toBe("Đang thoát… 1,0 giây");
+    expect(v0.canOpenFlee).toBe(false);
+    expect(v0.announce).toMatch(/Đang thoát, còn 1,0 giây/);
+    const v1 = arenaHudView(f, T0 + 600);
+    expect(v1.fleeFrac).toBeCloseTo(0.6, 5);
+    expect(v1.note).toBe("Đang thoát… 0,4 giây");
+    const v2 = arenaHudView(f, T0 + 2000);
+    expect(v2.fleeFrac).toBe(1);
+    expect(v2.note).toBe("Đang thoát… 0,0 giây");
+  });
+
+  it("đã gửi lựa chọn rồi mới có fleeMs: 'Đang thoát' đè 'Đang xử lý…'", () => {
+    let h = ready();
+    const r = fleeArena(h, "flee_coin", READY_AT);
+    h = r.hud;
+    expect(arenaHudView(h, READY_AT + 10).note).toBe("Đang xử lý…");
+    h = updateArenaHud(h, st({ fleeMs: 1000 }), READY_AT + 20);
+    expect(arenaHudView(h, READY_AT + 30).note).toMatch(/^Đang thoát…/);
+  });
+
+  it("tin kế tiếp VẮNG fleeMs = vận đã huỷ: thoát khỏi trạng thái vận, nút Bỏ chạy mở lại được khi không còn gì đang chờ", () => {
+    const f = updateArenaHud(hud0(), st({ fleeMs: 1000 }), T0);
+    const g = updateArenaHud(f, st(), T0 + 200);
+    expect(g.fleeAt).toBeNull();
+    const v = arenaHudView(g, T0 + 250);
+    expect(v.fleeing).toBe(false);
+    expect(v.canOpenFlee).toBe(true);
+  });
+
+  it("câu xác nhận nói rõ cần vận 1 giây và vẫn bị đánh (không bất khả xâm phạm)", () => {
+    const v = arenaHudView(ready(), READY_AT);
+    expect(v.confirmText).toMatch(/vận 1 giây/);
+    expect(v.confirmText).toMatch(/vẫn bị đánh/);
   });
 });

@@ -18,6 +18,7 @@ import {
   ambushNeedsSeen,
   ambushRemainingMs,
   chooseAmbush,
+  isDangerousTier,
   openAmbush,
   parseAmbushEnd,
   parseAmbushOffer,
@@ -367,5 +368,60 @@ describe("phím trong hộp thoại", () => {
       5,
     ];
     for (const k of others) expect(ambushChoiceForKey(k), String(k)).toBeNull();
+  });
+});
+
+describe("MỤC 53: chết thật trong đấu trường", () => {
+  it("parseAmbushEnd: `died` chỉ giữ khi đúng `true` VÀ kết cục là `lost`", () => {
+    expect(parseAmbushEnd({ result: "lost", died: true })).toEqual({ result: "lost", died: true });
+    for (const bad of ["true", 1, "yes", null, {}, [], false]) {
+      const r = parseAmbushEnd({ result: "lost", died: bad });
+      expect(r, String(bad)).toEqual({ result: "lost" });
+    }
+    // chết thật chỉ có nghĩa với `lost`: các kết cục khác bỏ trường
+    for (const res of ["won", "fled", "timeout", "dropped", "canceled"])
+      expect(parseAmbushEnd({ result: res, died: true })?.died, res).toBeUndefined();
+  });
+
+  it("lost + died: 'Ngươi đã gục', KHÔNG dòng 'Mất ...', KHÔNG còn câu 'không mất kiếp'; tone xấu, không im lặng", () => {
+    const v = ambushEndView({ result: "lost", died: true });
+    expect(v.silent).toBe(false);
+    expect(v.tone).toBe("bad");
+    expect(v.title).toBe("Ngươi đã gục");
+    expect(v.lines).toEqual(["Hoàng Tuyền đang chờ ngươi."]);
+    const text = `${v.title} ${v.lines.join(" ")} ${ambushEndToast({ result: "lost", died: true })}`;
+    expect(text).not.toMatch(/Mất /);
+    expect(text).not.toMatch(/không mất kiếp/i);
+    expect(ambushEndToast({ result: "lost", died: true })).toBe(
+      "Ngươi đã gục. Hoàng Tuyền đang chờ ngươi.",
+    );
+  });
+
+  it("lost KHÔNG died (luân hồi tắt: bản thử): vẫn 'Bị hạ' + giá đã trừ như cũ", () => {
+    const v = ambushEndView({ result: "lost", paid: { exp: 500 } });
+    expect(v.title).toBe("Bị hạ");
+    expect(v.lines).toEqual(["Mất 500 tu vi."]);
+  });
+
+  it("died thắng paid: nếu máy chủ gửi cả hai (không nên) thì vẫn nói chết thật, không in giá", () => {
+    const v = ambushEndView({ result: "lost", died: true, paid: { exp: 500 } });
+    expect(v.title).toBe("Ngươi đã gục");
+    expect(v.lines.join(" ")).not.toMatch(/500/);
+  });
+});
+
+describe("MỤC 53: nhãn NGUY HIỂM ở hộp thoại", () => {
+  it("chỉ tinh anh và cầm đầu là nguy hiểm", () => {
+    expect(isDangerousTier("normal")).toBe(false);
+    expect(isDangerousTier("elite")).toBe(true);
+    expect(isDangerousTier("leader")).toBe(true);
+  });
+  it("view: danger theo mức kẻ địch; câu đọc màn hình nhắc 'Nguy hiểm' đúng ở hai mức cao", () => {
+    for (const tier of ["normal", "elite", "leader"] as const) {
+      const d = openAmbush(null, sampleAmbushOffer(tier), T0).dialog;
+      const v = ambushDialogView(d, ARMED);
+      expect(v.danger, tier).toBe(tier !== "normal");
+      expect(/Nguy hiểm\./.test(v.announce), tier).toBe(tier !== "normal");
+    }
   });
 });

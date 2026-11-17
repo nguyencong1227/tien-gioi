@@ -1,4 +1,4 @@
-import { installMockAmbush, isMockAmbushEnabled } from "./ambush-mock";
+import { installMockAmbush, isMockAmbushEnabled, mockAmbushOutcome } from "./ambush-mock";
 import Phaser from "phaser";
 import { Client, type Room } from "colyseus.js";
 import {
@@ -454,7 +454,12 @@ if (
   if (isMockSkillsEnabled()) installMockSkills(mockRoom);
   // `?ambush=mock`: máy chủ giả chạy trọn luồng chặn đường (hộp thoại -> đấu trường -> kết quả) qua `room.emit`, đi ĐÚNG đường nhận tin của cảnh
   const ambushMock = isMockAmbushEnabled()
-    ? installMockAmbush(mockRoom, { onTravel: () => ui.hideAmbush() })
+    ? installMockAmbush(mockRoom, {
+        onTravel: () => ui.hideAmbush(),
+        outcome: mockAmbushOutcome(),
+        // chết thật (`?ambush=mock&die=1`): màn Hoàng Tuyền mẫu ngay sau `ambushEnd`, như tin `limbo` của máy chủ thật
+        onDied: () => (window as any).__debugLimbo?.(),
+      })
     : null;
   if (ambushMock) (window as any).__ambushMock = ambushMock;
   start(mockRoom, startMapId)
