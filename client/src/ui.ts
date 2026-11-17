@@ -51,7 +51,6 @@ import {
   buyPrice,
   sellPrice,
   SHOP_BY_NPC,
-  SHOP_MAX_QTY,
   type WalletMsg,
   UNLOCKS,
   ORIGINS,
@@ -279,6 +278,7 @@ import {
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
+import { buyQtyMax, sellQtyMax } from "./shop-qty";
 
 // `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
 export { fmt };
@@ -1911,6 +1911,48 @@ const shopBuyQuantities: Record<string, number> = {};
 const shopSellQuantities: Record<string, number> = {};
 let currentCoin = 0;
 
+/**
+ * Ô SỐ LƯỢNG của một thẻ cửa hàng NPC (mục 47): ô gõ số dùng chung (− / +, ×10 / ×100, Tối đa, giữ nút tăng nhanh dần, Enter xác nhận).
+ * Cả danh sách vẽ lại khi ví / túi đổi nên số chọn nhớ trong `store[key]` (chỉ ghi số HỢP LỆ: đang gõ dở / ô trống thì giữ số cũ); vẽ lại xong, ô dựng lại từ số đó.
+ * Đổi số chỉ cập nhật nút Mua / Bán tại chỗ (`onQty`), KHÔNG vẽ lại cả danh sách: vẽ lại sẽ làm mất con trỏ đang gõ. `nav` giữ `data-nav` cho điều hướng bằng mũi tên và
+ * `withFocusKept`; `onConfirm` = Enter trong ô (gọi nút Mua / Bán của chính thẻ).
+ */
+function createShopQty(args: {
+  idKey: string;
+  nav: string;
+  store: Record<string, number>;
+  key: string;
+  max: number;
+  label: string;
+  preview: (q: number) => string;
+  onQty: () => void;
+  onConfirm: () => void;
+}): QtyStepper {
+  const max = Math.max(1, Math.floor(args.max));
+  // `createQtyStepper` báo `onChange` ngay lúc dựng (số khởi đầu): chỉ chuyển tiếp cho nơi dùng SAU khi dựng xong (nơi dùng còn chưa có ô để đọc)
+  let ready = false;
+  const stepper = createQtyStepper({
+    label: args.label,
+    max,
+    initial: Math.min(max, Math.max(1, args.store[args.key] ?? 1)),
+    ids: { input: `shop-qty-${args.idKey}` },
+    preview: args.preview,
+    onChange: (q) => {
+      if (q !== null) args.store[args.key] = q;
+      if (ready) args.onQty();
+    },
+    onConfirm: args.onConfirm,
+  });
+  ready = true;
+  const q0 = stepper.getQty();
+  if (q0 !== null) args.store[args.key] = q0; // đã kẹp theo giới hạn hiện tại (ví / số đang có đổi)
+  const btns = stepper.el.querySelectorAll("button"); // thứ tự của `qty-stepper`: − + ×10 ×100 Tối đa
+  btns[0]!.dataset.nav = `${args.nav}:minus`;
+  btns[1]!.dataset.nav = `${args.nav}:plus`;
+  stepper.el.querySelector("input")!.dataset.nav = `${args.nav}:input`;
+  return stepper;
+}
+
 function renderShopModal() {
   const npc = NPC_BY_ID[shopNpcId];
   $("shop-title").textContent = npc ? `Cửa Hàng · ${npc.name}` : "Cửa Hàng Lão Dược Sư";
@@ -1958,10 +2000,8 @@ function renderShopBuyImpl() {
     if (!def) continue;
 
     const unitPrice = buyPrice(itemId);
-    const qty = Math.min(SHOP_MAX_QTY, Math.max(1, shopBuyQuantities[itemId] ?? 1));
-    shopBuyQuantities[itemId] = qty;
-    const totalPrice = unitPrice * qty;
-    const canAfford = currentCoin >= totalPrice;
+    // giới hạn = trần một lần của máy chủ, kẹp theo ví (tối thiểu 1: ví không đủ cả một cái thì nút Mua báo "Thiếu N")
+    const maxBuyQty = buyQtyMax(currentCoin, unitPrice);
 
     const card = document.createElement("div");
     card.className = "shop-card";
@@ -1998,75 +2038,59 @@ function renderShopBuyImpl() {
     info.append(nameRow, desc);
     left.append(icon, info);
 
-    // Cột phải: Chọn số lượng + Nút mua
+    // Cột phải: ô số lượng + nút mua
     const right = document.createElement("div");
     right.className = "shop-card-right";
-
-    const qtyBox = document.createElement("div");
-    qtyBox.className = "shop-qty-box";
-
-    const btnMinus = document.createElement("button");
-    btnMinus.type = "button";
-    btnMinus.className = "shop-qty-btn";
-    btnMinus.textContent = "−";
-    btnMinus.title = "Giảm số lượng";
-    btnMinus.dataset.nav = `buy:${itemId}:minus`;
-    btnMinus.disabled = qty <= 1;
-    onPress(
-      btnMinus,
-      () => {
-        if (qty > 1) {
-          shopBuyQuantities[itemId] = qty - 1;
-          renderShopBuy();
-        }
-      },
-      true,
-    );
-
-    const qtyVal = document.createElement("span");
-    qtyVal.className = "shop-qty-val";
-    qtyVal.textContent = `${qty}`;
-
-    const btnPlus = document.createElement("button");
-    btnPlus.type = "button";
-    btnPlus.className = "shop-qty-btn";
-    btnPlus.textContent = "+";
-    btnPlus.title = "Tăng số lượng";
-    btnPlus.dataset.nav = `buy:${itemId}:plus`;
-    btnPlus.disabled = qty >= SHOP_MAX_QTY;
-    onPress(
-      btnPlus,
-      () => {
-        if (qty < SHOP_MAX_QTY) {
-          shopBuyQuantities[itemId] = qty + 1;
-          renderShopBuy();
-        }
-      },
-      true,
-    );
-
-    qtyBox.append(btnMinus, qtyVal, btnPlus);
 
     const buyBtn = document.createElement("button");
     buyBtn.type = "button";
     buyBtn.className = "shop-act-btn buy";
-    buyBtn.disabled = !canAfford;
-
     const buyBtnText = document.createElement("span");
-    buyBtnText.textContent = canAfford
-      ? `Mua (${totalPrice} 💎)`
-      : `Thiếu ${totalPrice - currentCoin} 💎`;
     buyBtn.append(buyBtnText);
+
+    const qtyStepper = createShopQty({
+      idKey: `mua-${itemId}`,
+      nav: `buy:${itemId}`,
+      store: shopBuyQuantities,
+      key: itemId,
+      max: maxBuyQty,
+      label: `Số lượng ${def.name} muốn mua`,
+      preview: (q) =>
+        `Tổng ${(unitPrice * q).toLocaleString("vi-VN")} 💎, ví còn ${Math.max(0, currentCoin - unitPrice * q).toLocaleString("vi-VN")}.`,
+      onQty: () => refreshBuyBtn(),
+      onConfirm: () => buyBtn.click(),
+    });
+    /** Nút Mua theo số đang chọn: ô đang trống / sai thì mờ ("Nhập số lượng"), ví không đủ thì mờ kèm "Thiếu N 💎" */
+    const refreshBuyBtn = () => {
+      const q = qtyStepper.getQty();
+      if (q === null) {
+        buyBtn.disabled = true;
+        buyBtnText.textContent = "Nhập số lượng";
+        return;
+      }
+      const total = unitPrice * q;
+      const canAfford = currentCoin >= total;
+      buyBtn.disabled = !canAfford;
+      buyBtnText.textContent = canAfford ? `Mua (${total} 💎)` : `Thiếu ${total - currentCoin} 💎`;
+    };
+    refreshBuyBtn();
 
     buyBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!canAfford) return;
+      // đọc lại chữ ĐANG có trong ô (không tin số cũ); trống / sai thì không mua, đưa focus về ô
+      const qty = qtyStepper.read();
+      if (qty === null) {
+        ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+        qtyStepper.focus();
+        return;
+      }
+      if (currentCoin < unitPrice * qty) return;
       sound.pickup();
       callbacks?.onBuy?.(shopNpcId, itemId, qty);
     });
 
-    right.append(qtyBox, buyBtn);
+    right.append(qtyStepper.el, buyBtn);
     card.append(left, right);
     list.append(card);
   }
@@ -2092,11 +2116,9 @@ function renderShopSellImpl() {
     const canSell = unitPrice > 0;
     if (canSell) sellableCount++;
 
-    const maxQty = slot.qty;
+    // trần một lần của máy chủ (`SHOP_MAX_QTY`): ngăn xếp lớn hơn thì bán từng đợt
+    const maxQty = sellQtyMax(slot.qty);
     const sellKey = `${i}:${slot.itemId}`;
-    const qty = Math.min(maxQty, Math.max(1, shopSellQuantities[sellKey] ?? 1));
-    shopSellQuantities[sellKey] = qty;
-    const totalPrice = unitPrice * qty;
 
     const card = document.createElement("div");
     card.className = `shop-card${canSell ? "" : " unsellable"}`;
@@ -2135,69 +2157,49 @@ function renderShopSellImpl() {
     info.append(nameRow, desc);
     left.append(icon, info);
 
-    // Cột phải: Chọn số lượng + Nút bán
+    // Cột phải: ô số lượng + nút bán
     const right = document.createElement("div");
     right.className = "shop-card-right";
 
     if (canSell) {
-      const qtyBox = document.createElement("div");
-      qtyBox.className = "shop-qty-box";
-
-      const btnMinus = document.createElement("button");
-      btnMinus.type = "button";
-      btnMinus.className = "shop-qty-btn";
-      btnMinus.textContent = "−";
-      btnMinus.title = "Giảm số lượng";
-      btnMinus.dataset.nav = `sell:${i}:minus`;
-      btnMinus.disabled = qty <= 1;
-      onPress(
-        btnMinus,
-        () => {
-          if (qty > 1) {
-            shopSellQuantities[sellKey] = qty - 1;
-            renderShopSell();
-          }
-        },
-        true,
-      );
-
-      const qtyVal = document.createElement("span");
-      qtyVal.className = "shop-qty-val";
-      qtyVal.textContent = `${qty}`;
-
-      const btnPlus = document.createElement("button");
-      btnPlus.type = "button";
-      btnPlus.className = "shop-qty-btn";
-      btnPlus.textContent = "+";
-      btnPlus.title = "Tăng số lượng";
-      btnPlus.dataset.nav = `sell:${i}:plus`;
-      btnPlus.disabled = qty >= maxQty;
-      onPress(
-        btnPlus,
-        () => {
-          if (qty < maxQty) {
-            shopSellQuantities[sellKey] = qty + 1;
-            renderShopSell();
-          }
-        },
-        true,
-      );
-
-      qtyBox.append(btnMinus, qtyVal, btnPlus);
-
       const sellBtn = document.createElement("button");
       sellBtn.type = "button";
       sellBtn.className = "shop-act-btn sell";
-
       const sellBtnText = document.createElement("span");
-      sellBtnText.textContent = `Bán (+${totalPrice} 💎)`;
       sellBtn.append(sellBtnText);
+
+      const qtyStepper = createShopQty({
+        idKey: `ban-${i}`,
+        nav: `sell:${i}`,
+        store: shopSellQuantities,
+        key: sellKey,
+        max: maxQty,
+        label: `Số lượng ${def.name} muốn bán`,
+        preview: (q) =>
+          `Nhận ${(unitPrice * q).toLocaleString("vi-VN")} 💎, ví lên ${(currentCoin + unitPrice * q).toLocaleString("vi-VN")}.`,
+        onQty: () => refreshSellBtn(),
+        onConfirm: () => sellBtn.click(),
+      });
+      /** Nút Bán theo số đang chọn: ô đang trống / sai thì mờ ("Nhập số lượng") */
+      const refreshSellBtn = () => {
+        const q = qtyStepper.getQty();
+        sellBtn.disabled = q === null;
+        sellBtnText.textContent = q === null ? "Nhập số lượng" : `Bán (+${unitPrice * q} 💎)`;
+      };
+      refreshSellBtn();
 
       sellBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         // click "ma" sau khi vừa xác nhận / giữ lại ở hộp (cảm ứng): không mở lại hộp, không bán lần nữa
         if (ghostClick(e)) return;
+        // đọc lại chữ ĐANG có trong ô (không tin số cũ); trống / sai thì không bán, đưa focus về ô
+        const qty = qtyStepper.read();
+        if (qty === null) {
+          ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+          qtyStepper.focus();
+          return;
+        }
         // Đồ quý / trang bị: hộp xác nhận (issue #779); đồ thường bán thẳng
         const plan = sellPlan(invSlots, i, qty, unitPrice, {
           name: def.name,
@@ -2228,7 +2230,7 @@ function renderShopSellImpl() {
         actConfirmFromShop = true;
       });
 
-      right.append(qtyBox, sellBtn);
+      right.append(qtyStepper.el, sellBtn);
     } else {
       const lockLabel = document.createElement("span");
       lockLabel.className = "shop-lock-label";

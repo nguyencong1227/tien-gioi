@@ -1588,7 +1588,6 @@ html[data-input="touch"] .mm-foot small {
   }
   .dlg-opt-btn:focus-visible,
   .inv-slot:focus-visible,
-  .shop-qty-btn:focus-visible,
   .act-btn:focus-visible {
     outline: 2px solid #ffe08a;
     outline-offset: 2px;
@@ -3738,6 +3737,7 @@ html[data-input="touch"] #newbie-btn-keys {
 }
 .shop-card {
   display: flex;
+  flex-wrap: wrap; /* ô số lượng (một hàng: ô gõ + 5 nút) rộng: hẹp thì xuống dưới phần thông tin */
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -3754,7 +3754,7 @@ html[data-input="touch"] #newbie-btn-keys {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 0;
 }
 .shop-item-info {
@@ -3800,42 +3800,20 @@ html[data-input="touch"] #newbie-btn-keys {
 }
 .shop-card-right {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  flex-shrink: 0;
+  flex: 1 1 300px;
+  min-width: 0;
 }
-.shop-qty-box {
-  display: flex;
-  align-items: center;
-  border: 1px solid rgba(201, 162, 74, 0.4);
-  border-radius: 5px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
+/* ô số lượng dùng chung (mục 47) trong thẻ cửa hàng: ghi chú trống không chừa khoảng hở */
+.shop-card-right .qty-stepper {
+  flex: 1 1 260px;
+  min-width: 0;
 }
-.shop-qty-btn {
-  min-width: 44px;
-  min-height: 44px;
-  background: transparent;
-  border: 0;
-  color: #ffe08a;
-  font-size: var(--fs-18);
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-.shop-qty-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-.shop-qty-val {
-  min-width: 28px;
-  text-align: center;
-  font-size: var(--fs-13);
-  font-weight: bold;
-  color: #fff;
+.shop-card-right .qty-note {
+  min-height: 0;
 }
 .shop-act-btn {
   min-height: 44px;
@@ -3890,8 +3868,16 @@ html[data-input="touch"] #newbie-btn-keys {
     align-items: stretch;
     gap: 8px;
   }
+  /* cột dọc: `flex-basis` của hai cột (bề rộng ở bố cục ngang) không được thành chiều cao */
+  .shop-card-left,
+  .shop-card-right {
+    flex: 0 0 auto;
+  }
   .shop-card-right {
     justify-content: flex-end;
+  }
+  .shop-card-right .qty-stepper {
+    flex: 1 1 100%;
   }
   .shop-item-name {
     max-width: 100%;
