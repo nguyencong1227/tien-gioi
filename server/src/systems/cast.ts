@@ -28,7 +28,7 @@ import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
 import { fireBolts } from "./pbolt";
 import { syncPublicPos } from "./movement";
-import { cdrNow, sendSkills } from "./skills";
+import { cdrNow, creditMastery, sendSkills } from "./skills";
 import {
   applyMonsterStatus,
   applyPlayerStatus,
@@ -380,7 +380,7 @@ export function cast(w: World, sid: string, raw: unknown) {
         if (n > 0) hits.push({ id, n, scale: 1 });
       });
     }
-    const sk: StrikeCtx = { atk, crit: st.crit, mult, amp };
+    const sk: StrikeCtx = { atk, crit: st.crit, mult, amp, credited: false };
     for (const h of hits) strikeMonster(w, sid, def, sk, h.id, h.n, h.scale, x0, y0);
     if (def.shape === "bolt") {
       // CT3: quy hoạch đường bay + hẹn giờ trúng từng quái / đối thủ; trúng đòn nào thì đi CÙNG `strikeMonster` / `opponentAftermath` với chiêu tức thời
@@ -413,6 +413,8 @@ interface StrikeCtx {
   mult: number;
   /** Hệ số phù `amp_<hệ>` cùng hệ với chiêu (một lần mỗi lần dùng chiêu, không mỗi mục tiêu) */
   amp: number;
+  /** Đã cộng điểm luyện chiêu cho lần dùng này chưa (MỘT điểm mỗi lần dùng, dù trúng nhiều quái / nhiều viên đạn) */
+  credited: boolean;
 }
 
 /**
@@ -434,6 +436,10 @@ function strikeMonster(
   const mc = w.mctrl.get(id);
   const p = w.state.players.get(sid);
   if (!mon || !mc || !p) return;
+  if (!sk.credited) {
+    sk.credited = true;
+    creditMastery(w, sid, def); // trúng quái đầu tiên của lần dùng này: +1 điểm luyện (chỉ quái, không phải đối thủ thách đấu)
+  }
   const em =
     elementMult(def.element, mc.def.element ?? "none") *
     treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
