@@ -1,6 +1,7 @@
 // Chiêu MẪU cho giao diện (mục 51, CT1 #1046): B dựng sổ chiêu 48-80 chiêu (lọc theo hệ / phẩm / cảnh giới, tìm, biểu tượng theo `style`) khi dữ liệu thật CHƯA đủ. KHÔNG dùng ở máy chủ
 // (không vào `LEARNABLE_SKILLS`, không có kinh quyển). Tất định theo `n`; mọi chiêu mẫu đều qua `skillViolations`.
 import { ELEMENTS, SKILL_FX_IDS, SKILL_SHAPES, type SkillDef, type StatusId } from "./skills";
+import { hitsOf } from "./skill-violations";
 import { SKILL_GRADES, SKILL_STYLES, skillEffect } from "./skill-kit";
 
 const EFFECT_OF: Readonly<Record<string, StatusId>> = {
@@ -25,8 +26,25 @@ export function sampleSkills(n = 60): SkillDef[] {
     const rarity = Math.min(4, Math.max(grade, 0)) as 0 | 1 | 2 | 3 | 4; // grade g khớp rarity g
     const heal = shape === "self";
     const status = EFFECT_OF[el] ?? (heal ? "shield" : undefined); // chiêu tự thân luôn có hiệu ứng (hộ thể khi hệ không có trạng thái riêng)
-    const hits = shape === "fan" ? 3 : 1;
+    // trường riêng của hình mới (mục 51, CT1b) để mẫu qua `skillViolations`
+    const extra: Partial<SkillDef> =
+      shape === "chain"
+        ? { bounces: 2, chainReach: 160, falloff: 0.85 }
+        : shape === "bolt"
+          ? { count: 3, speed: 500, pierce: 1, bounce: 0, width: 20, arc: Math.PI / 4 }
+          : shape === "zone"
+            ? { durationMs: 4000, tickMs: 1000 }
+            : shape === "trap"
+              ? { armMs: 600, durationMs: 10_000 }
+              : shape === "aura"
+                ? { durationMs: 6000, tickMs: 1000 }
+                : shape === "totem"
+                  ? { durationMs: 5000, tickMs: 1000, taunt: true }
+                  : shape === "fan"
+                    ? { count: 3 }
+                    : {};
     const num = String(i + 1).padStart(2, "0");
+    const hits = hitsOf({ shape, ...extra } as SkillDef);
     out.push({
       id: `mau_${i + 1}`,
       name: `Chiêu Mẫu ${num}`,
@@ -39,9 +57,12 @@ export function sampleSkills(n = 60): SkillDef[] {
       range: shape === "self" ? 0 : 90 + (i % 5) * 30,
       arc: shape === "cone" || shape === "fan" ? Math.PI / 2 : undefined,
       width: shape === "line" || shape === "fan" ? 24 : undefined,
-      count: shape === "fan" ? hits : undefined,
-      reach: shape === "ground" || shape === "dash" ? 90 : undefined,
-      mult: heal || shape === "dash" ? 0 : Math.round(((1 + realm * 0.2) / hits) * 10) / 10, // fan chia đều cho số tia: tổng không vượt khung
+      ...extra,
+      reach: ["ground", "dash", "zone", "trap", "totem"].includes(shape) ? 90 : undefined,
+      mult:
+        heal || shape === "dash"
+          ? 0
+          : Math.max(0.1, Math.round(((1 + realm * 0.2) / hits) * 10) / 10), // fan chia đều cho số tia: tổng không vượt khung
       effects: status ? [skillEffect(status, 2, status === "regen" ? 0.05 : 0.2, 1)] : [],
       dodgeMs: shape === "dash" ? 300 : undefined,
       reqRealm: realm,

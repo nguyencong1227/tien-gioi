@@ -39,6 +39,13 @@ export const SHAPE_LABEL: Readonly<Record<SkillShape, string>> = {
   ground: "Vùng đặt xuống đất",
   dash: "Lao tới, né đòn",
   self: "Hộ thể quanh mình",
+  // hình mới (mục 51, CT1b)
+  chain: "Sét lan sang mục tiêu gần",
+  bolt: "Đạn bay",
+  zone: "Vùng duy trì",
+  trap: "Bẫy",
+  aura: "Hào quang quanh thân",
+  totem: "Tượng triệu hồi",
 };
 
 const seconds = (ms: number): string => fmtNum(ms / 1000, 1);
@@ -79,6 +86,10 @@ export function effectText(e: SkillEffect): string {
       body = ` (giảm ${pct(e.ratio)}% hồi chiêu)`;
       break;
     case "stun":
+      body = "";
+      break;
+    default:
+      // trạng thái mới của mục 51 (cường lực, suy yếu, dấu hệ, vận khí): không số liệu riêng ở bảng này; B bổ sung ở CT11a
       body = "";
       break;
   }
@@ -178,6 +189,15 @@ export function statLines(def: SkillDef, level: number, maxMp: number): string[]
       out.push(`Lao: ${tiles(def.reach ?? def.range)} ô`);
       break;
     case "self":
+      break;
+    // hình mới (mục 51, CT1b): hiện tầm cơ bản; B bổ sung số liệu riêng (số lần nảy, thời gian...) ở CT11a
+    case "chain":
+    case "bolt":
+    case "zone":
+    case "trap":
+    case "aura":
+    case "totem":
+      out.push(`Tầm: ${tiles(def.range)} ô`);
       break;
   }
   return out;

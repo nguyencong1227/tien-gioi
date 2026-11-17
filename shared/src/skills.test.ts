@@ -595,14 +595,18 @@ describe("kiểu hiệu ứng (SKILL_FX_IDS)", () => {
     expect(new Set(SKILL_FX_IDS).size).toBe(SKILL_FX_IDS.length);
     const used = new Set<string>(SKILLS_M7.map((s) => s.fx));
     for (const s of SKILLS_M7) expect(SKILL_FX_IDS as readonly string[], s.id).toContain(s.fx);
+    // Đợt thêm chiêu (mục 51, CT1b): id CHUNG của hình mới chờ chiêu đầu tiên dùng chúng (D / E / G, CT9); đến lúc đó được miễn kiểm "có chiêu dùng"
+    const RESERVED = ["bolt", "chain", "zone", "trap", "aura", "totem", "pull", "push", "windup"];
     for (const id of SKILL_FX_IDS)
-      expect(used.has(id), `id hiệu ứng không chiêu nào dùng: ${id}`).toBe(true);
+      if (!RESERVED.includes(id))
+        expect(used.has(id), `id hiệu ứng không chiêu nào dùng: ${id}`).toBe(true);
   });
 });
 
 describe("trạng thái trên quái: mặt nạ bit (STATUS_BIT)", () => {
   it("chỉ trạng thái CÓ HẠI có bit; bit là luỹ thừa của 2, không trùng, vừa một byte", () => {
-    const harmful = STATUSES.filter((st) => st.harmful).map((st) => st.id);
+    // DẤU hệ (`mark_<hệ>`, kind `mark`) có hại nhưng KHÔNG có bit: không đủ chỗ, lên đầu quái qua `Monster.mark` (mục 51)
+    const harmful = STATUSES.filter((st) => st.harmful && st.kind !== "mark").map((st) => st.id);
     expect(Object.keys(STATUS_BIT).sort()).toEqual([...harmful].sort());
     for (const st of STATUSES.filter((x) => !x.harmful)) expect(STATUS_BIT[st.id]).toBeUndefined();
     const bits = Object.values(STATUS_BIT) as number[];
@@ -616,8 +620,8 @@ describe("trạng thái trên quái: mặt nạ bit (STATUS_BIT)", () => {
     expect(statusMask([])).toBe(0);
     expect(statusMask(["burn"])).toBe(1);
     expect(statusMask(["burn", "stun", "burn"])).toBe(33);
-    expect(statusMask(all)).toBe(63);
-    expect(statusesOfMask(63)).toEqual(all);
+    expect(statusMask(all)).toBe(127);
+    expect(statusesOfMask(127)).toEqual(all);
     expect(statusesOfMask(statusMask(["chill", "poison"]))).toEqual(["poison", "chill"]);
     expect(statusMask(["shield", "haste", "regen", "constructor", "__proto__", "x", 5, null])).toBe(
       0,
@@ -627,7 +631,7 @@ describe("trạng thái trên quái: mặt nạ bit (STATUS_BIT)", () => {
   it("statusesOfMask: đầu vào xấu / bit lạ", () => {
     for (const bad of [0, -1, 1.5, Number.NaN, Infinity, "3", null, undefined, {}, []])
       expect(statusesOfMask(bad as unknown)).toEqual([]);
-    expect(statusesOfMask(64 | 1)).toEqual(["burn"]); // bit 64 không thuộc trạng thái nào
+    expect(statusesOfMask(128 | 1)).toEqual(["burn"]); // bit 128 (dành cho `root` của đợt 2) chưa thuộc trạng thái nào
   });
 });
 
@@ -648,7 +652,8 @@ describe("tốc độ di chuyển theo trạng thái (moveSpeedMul, StatusEntry.
         st.kind === "slow" ||
         st.kind === "breakAid" ||
         st.kind === "amp" ||
-        st.kind === "cdr",
+        st.kind === "cdr" ||
+        st.kind === "empower",
     ).map((st) => st.id);
     expect(ratioIds.sort()).toEqual(
       [
@@ -664,7 +669,9 @@ describe("tốc độ di chuyển theo trạng thái (moveSpeedMul, StatusEntry.
         "cdr_phu",
         "chill",
         "dao_ho",
+        "empower",
         "haste",
+        "windup", // vận khí = kind `slow` (client đoán tốc độ)
       ].sort(),
     );
     for (const st of STATUSES) expect(statusCarriesRatio(st.id)).toBe(ratioIds.includes(st.id));
@@ -763,7 +770,9 @@ describe("tốc độ di chuyển theo trạng thái (moveSpeedMul, StatusEntry.
       ["regen", 1500],
     ]);
     const many = sanitizeStatusList(STATUSES.map((st) => [st.id, 1000, 0.1]));
-    expect(many).toHaveLength(MAX_STATUSES);
+    // `windup` (vận khí) NGOÀI trần: MAX_STATUSES trạng thái đếm được + windup
+    expect(many).toHaveLength(MAX_STATUSES + 1);
+    expect(many.filter((e) => e[0] !== "windup")).toHaveLength(MAX_STATUSES);
     // luôn dùng được cho moveSpeedMul
     expect(Number.isFinite(moveSpeedMul(sanitizeStatusList([["haste", 1000, 5]])))).toBe(true);
   });
