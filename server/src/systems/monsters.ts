@@ -50,9 +50,23 @@ export function bossSpawnOk(w: World, def: MonsterKind, x: number, y: number): b
   );
 }
 
+/**
+ * Các loài cần dựng sẵn lưới tìm đường ở bản đồ của phòng: loài có ở đây theo `monsterCapOf` VÀ trùm thế giới của lịch (M9.4) sinh ở bản đồ này (loài đó thường KHÔNG có
+ * `monsterCapOf` > 0, nên nếu không thêm thì lần sinh trùm theo giờ phải dựng mặt nạ + vùng chính ngay trong tick: vài chục ms, vượt ngân sách 10 ms).
+ */
+export function navKindsOf(w: World): MonsterKind[] {
+  const kinds = MONSTERS.filter((d) => w.map.monsterCapOf(d.id) > 0);
+  for (const slot of w.hub.worldBoss.slots) {
+    if (slot.mapId !== w.map.def.id) continue;
+    const def = MONSTERS.find((d) => d.id === slot.boss);
+    if (def && !kinds.includes(def)) kinds.push(def);
+  }
+  return kinds;
+}
+
 /** Dựng sẵn lưới tìm đường cho các loài quái có ở bản đồ của phòng (một lần lúc tạo phòng, `nav.ts` `warmNav`). */
 function warmMonsterNav(w: World) {
-  const present = MONSTERS.filter((d) => w.map.monsterCapOf(d.id) > 0);
+  const present = navKindsOf(w);
   warmNav(
     w.map,
     present.map((d) => d.radius * 0.8),
@@ -126,7 +140,9 @@ export function spawnDungeonMonsters(w: World) {
 /** Bổ sung quái bị giết, mỗi lần tối đa vài con mỗi loại. */
 export function topUpMonsters(w: World) {
   const count: Record<string, number> = {};
-  for (const m of w.state.monsters.values()) count[m.kind] = (count[m.kind] ?? 0) + 1;
+  w.state.monsters.forEach((m, id) => {
+    if (id !== w.wbossId) count[m.kind] = (count[m.kind] ?? 0) + 1; // trùm thế giới (M9.4) là thêm, không thay một con thường
+  });
   for (const def of MONSTERS) {
     const missing = w.map.monsterCapOf(def.id) - (count[def.id] ?? 0);
     for (let i = 0; i < Math.min(missing, MAX_SPAWN_PER_TOPUP); i++) spawnMonster(w, def);

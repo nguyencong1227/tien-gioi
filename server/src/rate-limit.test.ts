@@ -12,8 +12,8 @@ describe("giới hạn tần suất tin nhắn", () => {
     expect(lim.check("attack", 1000 / perSec)).toBe("drop");
   });
 
-  it("danh hiệu / thành tựu (M9.5): titleSet và achievementsGet chặt hơn mặc định (mỗi tin có thể là một lần ghi tệp), người thật bấm vài lần vẫn qua", () => {
-    for (const type of ["titleSet", "achievementsGet"]) {
+  it("danh hiệu / thành tựu (M9.5) + trùm thế giới (M9.4): titleSet, achievementsGet và worldBossGet chặt hơn mặc định (mỗi tin có thể là một lần ghi tệp), người thật bấm vài lần vẫn qua", () => {
+    for (const type of ["titleSet", "achievementsGet", "worldBossGet"]) {
       const l = MESSAGE_LIMITS[type];
       expect(l, type).toBeDefined();
       expect(l.perSec).toBeLessThan(DEFAULT_LIMIT.perSec);

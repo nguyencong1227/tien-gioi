@@ -30,6 +30,7 @@ import { absorbShield, entriesOf, takenMult } from "./status-rules";
 import { ELITE_COIN_MULT } from "./elite";
 import { isEvading } from "./nav-chase";
 import { trackSocial } from "./social";
+import { worldBossCredit, worldBossKilled } from "./world-boss";
 
 /** Kiếm chém: hình quạt trước mặt. */
 export function slash(w: World, sid: string, angle: unknown) {
@@ -112,8 +113,10 @@ export function dealMonsterDamage(
   if (!mc) return;
   if (mc.st && mc.st.list.length > 0) dmg = Math.max(1, Math.round(dmg * takenMult(mc.st, w.now)));
   if (mc.boss) dmg = Math.max(1, Math.round(dmg * bossArmorMult(mc, w.now))); // giáp của trùm (`buff`, mục 42)
+  const hpBefore = mon.hp;
   mon.hp = Math.max(0, mon.hp - dmg);
   if (by) mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
+  if (mc.wboss && by) worldBossCredit(w, id, by, Math.min(dmg, hpBefore)); // trùm thế giới (M9.4): điểm đóng góp theo LINH HỒN, chỉ phần máu thật sự trừ
   if (aggro && by) {
     const bc = w.ctrl.get(by);
     if (bc) bc.lastDealtAt = w.now; // chặn đường (mục 52): vừa đánh thì chưa bị chặn
@@ -140,6 +143,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     w.mctrl.delete(id);
     return;
   }
+  if (mc.wboss) return worldBossKilled(w, id, mc); // trùm thế giới (M9.4): KHÔNG tu vi / đồ / Linh thạch theo đường quái thường, thưởng chia theo đóng góp ở `world-boss.ts`
   if (mc.boss) bossDespawnAdds(w, mc.boss); // trùm chết: quái con biến mất theo, không để chúng đứng lại
   if (mc.arena) {
     // Quái của đấu trường chặn đường (mục 52): KHÔNG tu vi / đồ / Linh thạch / nhiệm vụ (thưởng đi một đường riêng khi thắng, `arena.ts`); chỉ biến mất

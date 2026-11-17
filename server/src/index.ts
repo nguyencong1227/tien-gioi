@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
+import { defineRooms, ensureWorldBossRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
 import { portPolicy, startupWarnings } from "./startup";
 import { startAudit } from "./audit";
@@ -55,6 +55,10 @@ async function main() {
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
   // Bảng xếp hạng (M9.3): làm mới mỗi 5 phút ngoài tick; `LEADERBOARD=off` gỡ. Chế độ tài khoản: đạo hiệu nằm ở tài khoản.
   WorldRoom.achievements = process.env.ACHIEVEMENTS === "on"; // cấp thành tựu / Duyên / danh hiệu (M9.5): MẶC ĐỊNH TẮT cho tới khi M9 phát hành
+  // Trùm thế giới theo giờ (M9.4, `systems/world-boss.ts`): chỉ chạy khi `WORLD_BOSS_SCHEDULE` có khung giờ (dữ liệu của E, M9.10); `WORLD_BOSS=off` gỡ hẳn
+  WorldRoom.hub.worldBoss.enabled = process.env.WORLD_BOSS !== "off";
+  if (WorldRoom.hub.worldBoss.active)
+    console.log(`Trùm thế giới: bật (${WorldRoom.hub.worldBoss.slots.length} khung giờ mỗi ngày)`);
   if (process.env.LEADERBOARD !== "off") {
     const lb = new LeaderboardService({
       souls: stores.souls,
@@ -117,6 +121,7 @@ async function main() {
     return stores.close();
   });
   await gameServer.listen(PORT);
+  await ensureWorldBossRooms(); // bản đồ có trùm theo giờ phải có phòng sẵn để sinh trùm (không đợi người vào lần đầu)
   console.log(`Tiên Giới server: http://localhost:${PORT}`);
 }
 

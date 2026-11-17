@@ -33,6 +33,7 @@ import type {
   AmbushOfferMsg,
   AmbushEndMsg,
   AmbushStateMsg,
+  WorldBossMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -214,6 +215,8 @@ export interface MonsterCtrl {
   boss?: BossCtrl;
   /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
   addOf?: string;
+  /** TRÙM THẾ GIỚI theo giờ (M9.4, `systems/world-boss.ts`): KHÔNG tu vi / rơi đồ / Linh thạch theo đường quái thường; thưởng chia theo đóng góp khi chết (`worldBossKilled`). */
+  wboss?: true;
   /** Quái của ĐẤU TRƯỜNG chặn đường (`systems/arena.ts`): KHÔNG tu vi, KHÔNG rơi đồ / Linh thạch, KHÔNG tính nhiệm vụ (thưởng đi qua một đường riêng khi thắng); chỉ biến mất khi chết. */
   arena?: true;
   /** Tìm đường / phát hiện kẹt / rút về của quái đang đuổi (mục 48, `systems/nav-chase.ts`); dựng lười ở lần đuổi đầu tiên, quái không đuổi thì không có. */
@@ -297,6 +300,8 @@ export interface WorldEvents {
   ambushEnd(sessionId: string, msg: AmbushEndMsg): void;
   /** Trạng thái đấu trường chặn đường mỗi giây (thời gian còn, giá bỏ chạy giữa trận đã chốt; chỉ người trong trận nhận). */
   ambushState(sessionId: string, msg: AmbushStateMsg): void;
+  /** Trùm thế giới (M9.4, `systems/world-boss.ts`): báo trước / xuất hiện / kết thúc cho mọi người chơi, bảng đóng góp định kỳ cho người ở phòng đích (chỉ người nhận). */
+  worldBoss(sessionId: string, msg: WorldBossMsg): void;
 }
 
 export class World {
@@ -377,6 +382,8 @@ export class World {
   onDungeonExit: ((sid: string) => void) | null = null;
   /** Phòng bí cảnh: id của run mà phòng này phục vụ (`Hub.runs`); `null` ở mọi phòng thường. */
   runId: string | null = null;
+  /** Id quái của TRÙM THẾ GIỚI đang sống trong phòng này (M9.4), hoặc `null`: để `topUpMonsters` không tính nó vào số trùm thường của loài. */
+  wbossId: string | null = null;
   /** Id phòng Colyseus của thế giới này (nhãn cho `/metrics`); rỗng ở test / bench. */
   roomId = "";
   /** Thời gian xử lý mỗi tick của phòng này (M4 3.3); `WorldRoom.update` ghi, `/metrics` đọc. Bench / test không ghi. */

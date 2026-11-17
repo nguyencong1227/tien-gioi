@@ -30,6 +30,8 @@ export const MESSAGE_LIMITS: Record<string, Limit> = {
   // Danh hiệu / thành tựu (M9.5): mỗi `titleSet` hợp lệ có thể là MỘT lần ghi tệp chân linh, `achievementsGet` gửi lại cả sổ; người thật bấm vài lần / phút
   [SOCIAL_MSG.titleSet]: { perSec: 1, burst: 3 },
   [SOCIAL_MSG.achievementsGet]: { perSec: 1, burst: 3 },
+  // Trùm thế giới (M9.4): `worldBossGet` dựng bảng xếp hạng của phòng đích (sắp xếp mọi người đóng góp); client thật xin lại sau >= 6 giây (nút Tải lại) / 20 giây, nên 1 lần / giây là rộng
+  [SOCIAL_MSG.worldBossGet]: { perSec: 1, burst: 3 },
   // Gặp chặn đường (mục 52): người thật bấm 1-2 lần mỗi lần bị chặn (`ambushSeen` một lần, `ambushChoose` / `ambushFlee` vài lần nếu ví không đủ); chặn spam
   [AMBUSH_MSG.seen]: { perSec: 2, burst: 4 },
   [AMBUSH_MSG.choose]: { perSec: 2, burst: 4 },

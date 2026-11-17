@@ -9,6 +9,7 @@ import { Ambushes } from "./systems/arena";
 import { SectBook } from "./systems/sect";
 import { WriteGauge } from "./metrics";
 import { PkLedger } from "./systems/pk-ledger";
+import { WorldBossBook } from "./systems/world-boss-book";
 
 /** Nơi nhận chat toàn server của một phòng (thường là `room.broadcast("chat", msg)`). */
 export type ChatSink = (msg: ChatOut) => void;
@@ -37,6 +38,8 @@ export class Hub {
   readonly sects = new SectBook();
   /** Sổ chống đổi thắng PK của cả tiến trình (M9, `systems/pk-ledger.ts`): mỗi cặp (thắng, thua) tối đa `BOARD_PK_PAIR_DAY_CAP` trận thắng tính mỗi ngày. */
   readonly pkPairs = new PkLedger();
+  /** Sổ trùm thế giới theo giờ của cả tiến trình (M9.4, `systems/world-boss-book.ts`): lịch, sự kiện đang diễn ra, bảng đóng góp theo linh hồn. Lịch rỗng / `WORLD_BOSS=off` thì không chạy. */
+  readonly worldBoss = new WorldBossBook();
   /** Hàng đợi ghi hồ sơ nhân vật của cả tiến trình (đo ở `WorldRoom.persist`, đọc ở `/metrics`: M4 3.3). */
   readonly writes = new WriteGauge();
 
