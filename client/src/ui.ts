@@ -99,8 +99,16 @@ import {
   type BoardId,
   WORLD_BOSS_SCHEDULE,
   type WorldBossMsg,
+  type AchievementsMsg,
 } from "@tien-gioi/shared";
 import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
+import {
+  AskGate,
+  achievementsView,
+  sanitizeAchievementNewMsg,
+  sanitizeAchievementsMsg,
+  titleUnlockToast,
+} from "./achievement-view";
 import {
   SCHEDULE_TZ_NOTE,
   WB_OVERDUE_MS,
@@ -379,6 +387,9 @@ export interface UiCallbacks {
   onBoardsGet?: (board: BoardId) => void;
   /** Bảng Xã hội, tab Sự kiện (M9.7): xin sự kiện trùm thế giới đang diễn ra / sắp tới (máy chủ trả tin `worldBoss`) */
   onWorldBossGet?: () => void;
+  /** Bảng Xã hội, tab Thành tựu (M9.8): xin sổ thành tựu (máy chủ trả tin `achievements`) / đeo hoặc gỡ danh hiệu (`null` = gỡ; máy chủ LUÔN trả lại `achievements`) */
+  onAchievementsGet?: () => void;
+  onTitleSet?: (id: string | null) => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
   onSectShopBuy?: (itemId: string, qty?: number) => void;
@@ -835,6 +846,190 @@ function syncWbTick() {
     clearInterval(wbTickTimer);
     wbTickTimer = null;
   }
+}
+
+// ---- Thành tựu + danh hiệu (M9.8, #1027): tab Thành tựu, vẽ từ `achievement-view.ts` ----
+/** Sổ thành tựu MỚI NHẤT (đã làm sạch) của chính mình; `null` = chưa nhận. Danh hiệu đang đeo lấy từ đây, KHÔNG đoán trước khi bấm. */
+let achLast: AchievementsMsg | null = null;
+/** Thành tựu mới đạt mà chưa xem (đánh dấu "Mới" + chấm trên nút HUD); xoá khi rời tab Thành tựu / đóng bảng. */
+const achNew = new Set<string>();
+const achGate = new AskGate();
+let achTimer: ReturnType<typeof setTimeout> | null = null;
+/** Đang chờ máy chủ trả lời việc đổi danh hiệu (`undefined` = không chờ; `null` = đang gỡ). Hết `ACH_TITLE_WAIT_MS` mà chưa thấy thì thôi chờ. */
+let achPending: string | null | undefined;
+let achPendingTimer: ReturnType<typeof setTimeout> | null = null;
+/** Nhóm mở / đóng do NGƯỜI CHƠI chọn (vẽ lại không làm mất lựa chọn). */
+const achOpen = new Map<string, boolean>();
+const ACH_TITLE_WAIT_MS = 5_000;
+/** Đã hiện danh sách thành tựu cho người chơi thấy kể từ lúc vào tab (điều kiện để xoá dấu "Mới" khi rời). */
+let achViewed = false;
+
+function achEl(id: string): HTMLElement {
+  return $(id);
+}
+
+/** Chấm "có thành tựu mới" trên nút HUD Xã hội (hình tròn, không chỉ màu) + nhãn đọc màn hình. */
+function syncAchDot() {
+  const btn = $("btn-social");
+  const on = achNew.size > 0 && !(socialModalOpen && socialTab === "ach");
+  btn.classList.toggle("has-new", on);
+  const base = "Xã hội: xếp hạng, thành tựu, sự kiện (Phím Shift+G)";
+  btn.setAttribute("aria-label", on ? `${base}. Có thành tựu mới` : base);
+}
+
+/** Rời tab Thành tựu (đổi tab / đóng bảng): nếu người chơi ĐÃ thấy danh sách thì xoá dấu "Mới" + chấm trên nút HUD; chưa từng thấy (mới đạt lúc đang ở tab khác) thì giữ. */
+function leaveAch() {
+  if (!achViewed) return;
+  achViewed = false;
+  if (achNew.size === 0) return;
+  achNew.clear();
+  syncAchDot();
+}
+
+function requestAch(force = false) {
+  const now = performance.now();
+  if (!achGate.tryAsk(now, achLast !== null, force)) return;
+  callbacks?.onAchievementsGet?.();
+  if (achTimer !== null) clearTimeout(achTimer);
+  achTimer = null;
+  if (!achLast) {
+    achTimer = setTimeout(() => {
+      achTimer = null;
+      renderAch();
+    }, achGate.waitMsValue + 50);
+  }
+}
+
+/** Vẽ tab Thành tựu: tóm tắt, danh hiệu (radiogroup), thành tựu theo nhóm (details). Đổ chữ bằng `textContent`; vẽ lại giữ nhóm người chơi đã mở / đóng. */
+function renderAch() {
+  if (!socialModalOpen || socialTab !== "ach") return;
+  const status = achEl("ach-status");
+  const retry = achEl("ach-retry");
+  const body = achEl("ach-body");
+  if (!achLast) {
+    const stale = achGate.stale(performance.now(), false);
+    status.hidden = false;
+    status.textContent = stale
+      ? "Chưa nhận được sổ thành tựu. Thử tải lại nhé."
+      : "Đang tải sổ thành tựu…";
+    retry.hidden = !stale;
+    body.hidden = true;
+    achEl("ach-summary").textContent = "";
+    return;
+  }
+  status.hidden = true;
+  retry.hidden = true;
+  body.hidden = false;
+  const v = achievementsView(achLast, achNew);
+  achViewed = true;
+  achEl("ach-summary").textContent = v.summary;
+  achEl("ach-worn").textContent = achPending !== undefined ? "Đang đổi danh hiệu…" : v.wornText;
+  // danh hiệu: một nút "Không đeo" + mỗi danh hiệu một nút (khoá thì aria-disabled + nói cách mở bằng CHỮ)
+  const titles = achEl("ach-titles");
+  titles.textContent = "";
+  const mkTitle = (
+    id: string | null,
+    text: string,
+    checked: boolean,
+    locked: boolean,
+    hint: string,
+  ) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ach-title" + (checked ? " on" : "") + (locked ? " locked" : "");
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", checked ? "true" : "false");
+    if (locked) b.setAttribute("aria-disabled", "true");
+    const t = document.createElement("span");
+    t.className = "ach-title-text";
+    t.textContent = text;
+    b.append(t);
+    if (hint) {
+      const h = document.createElement("span");
+      h.className = "ach-title-hint";
+      h.textContent = hint;
+      b.append(h);
+    }
+    b.addEventListener("click", () => {
+      if (locked || checked || achPending !== undefined) return;
+      achPending = id;
+      if (achPendingTimer !== null) clearTimeout(achPendingTimer);
+      achPendingTimer = setTimeout(() => {
+        achPendingTimer = null;
+        achPending = undefined;
+        renderAch();
+      }, ACH_TITLE_WAIT_MS);
+      callbacks?.onTitleSet?.(id);
+      renderAch();
+    });
+    titles.append(b);
+  };
+  mkTitle(null, "Không đeo", v.worn === null, false, "");
+  for (const t of v.titles) mkTitle(t.id, t.text, t.worn, !t.unlocked, t.hint);
+  // thành tựu theo nhóm
+  const groups = achEl("ach-groups");
+  groups.textContent = "";
+  const few = v.total <= 12;
+  v.groups.forEach((g, gi) => {
+    const det = document.createElement("details");
+    det.className = "ach-group";
+    const hasNew = g.items.some((i) => i.isNew);
+    det.open = achOpen.get(g.id) ?? (few || gi === 0 || hasNew);
+    det.addEventListener("toggle", () => achOpen.set(g.id, det.open));
+    const sum = document.createElement("summary");
+    sum.textContent = `${g.label} (${g.done} / ${g.total})`;
+    det.append(sum);
+    const ul = document.createElement("ul");
+    ul.className = "ach-list";
+    for (const it of g.items) {
+      const li = document.createElement("li");
+      li.className = "ach-item" + (it.done ? " done" : "") + (it.isNew ? " new" : "");
+      const head = document.createElement("div");
+      head.className = "ach-head";
+      const name = document.createElement("b");
+      name.className = "ach-name";
+      name.textContent = it.name;
+      head.append(name);
+      if (it.isNew) {
+        const n = document.createElement("span");
+        n.className = "ach-badge";
+        n.textContent = "Mới";
+        head.append(n);
+      }
+      const st = document.createElement("span");
+      st.className = "ach-state";
+      st.textContent = it.done ? (it.at ? `Hoàn thành · ${it.at}` : "Hoàn thành") : it.progress;
+      head.append(st);
+      li.append(head);
+      const d = document.createElement("p");
+      d.className = "ach-desc";
+      d.textContent = it.desc;
+      li.append(d);
+      if (!it.done) {
+        const bar = document.createElement("div");
+        bar.className = "ach-bar";
+        bar.setAttribute("role", "progressbar");
+        bar.setAttribute("aria-label", `Tiến độ: ${it.name}`);
+        bar.setAttribute("aria-valuemin", "0");
+        bar.setAttribute("aria-valuemax", "100");
+        bar.setAttribute("aria-valuenow", String(it.pct));
+        bar.setAttribute("aria-valuetext", it.progress);
+        const fill = document.createElement("i");
+        fill.style.width = `${it.pct}%`;
+        bar.append(fill);
+        li.append(bar);
+      }
+      if (it.reward) {
+        const r = document.createElement("p");
+        r.className = "ach-reward";
+        r.textContent = it.reward;
+        li.append(r);
+      }
+      ul.append(li);
+    }
+    det.append(ul);
+    groups.append(det);
+  });
 }
 
 // ---- Nội vụ tông môn (M8.6, #843) ----
@@ -4207,6 +4402,10 @@ export const ui = {
       bindTap(`social-tab-btn-${t.id}`, () => this.switchSocialTab(t.id));
     for (const id of BOARD_IDS) bindTap(`social-board-btn-${id}`, () => this.switchSocialBoard(id));
     bindTap("social-board-retry", () => requestSocialBoard(socialBoard, true));
+    bindTap("ach-retry", () => {
+      requestAch(true);
+      renderAch();
+    });
     bindTap("wbt-retry", () => {
       requestWorldBoss(true);
       renderWbTab();
@@ -6751,6 +6950,11 @@ export const ui = {
       renderSocialRank();
       if (socialTab === "rank") requestSocialBoard(socialBoard);
       if (socialTab === "event") requestWorldBoss();
+      if (socialTab === "ach") {
+        requestAch();
+        renderAch();
+      }
+      syncAchDot();
       syncWbTick();
       focusModal($("social-modal"));
     } else {
@@ -6761,6 +6965,9 @@ export const ui = {
       clearSocialBoardTimer();
       if (wbTabTimer !== null) clearTimeout(wbTabTimer);
       wbTabTimer = null;
+      if (achTimer !== null) clearTimeout(achTimer);
+      achTimer = null;
+      if (socialTab === "ach") leaveAch();
       syncWbTick();
       returnFocus($("btn-social"));
     }
@@ -6772,13 +6979,22 @@ export const ui = {
 
   /** Đổi tab Xã hội; `focus` = đưa focus về nút tab (khi đổi bằng phím mũi tên). Id lạ về tab mặc định. */
   switchSocialTab(tab: string, focus = false) {
+    const prevTab = socialTab;
     socialTab = asSocialTab(tab);
+    if (prevTab === "ach" && socialTab !== "ach") leaveAch();
     renderSocialTabs();
     if (socialTab === "rank" && socialModalOpen) {
       renderSocialRank();
       requestSocialBoard(socialBoard);
     }
     if (socialTab === "event" && socialModalOpen) requestWorldBoss();
+    if (socialModalOpen) {
+      if (socialTab === "ach") {
+        requestAch();
+        renderAch();
+      }
+      syncAchDot();
+    }
     syncWbTick();
     if (focus) $(`social-tab-btn-${socialTab}`).focus();
   },
@@ -6839,6 +7055,38 @@ export const ui = {
       if (!dup) this.toast({ text: v.resultText, tone: v.tone });
     }
     syncWbTick();
+  },
+
+  /**
+   * Nhận tin `achievements` (M9.8): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Thành tựu. Đây cũng là câu trả lời của máy chủ cho `titleSet` (thành công
+   * hay bị từ chối): hết trạng thái "đang đổi". Cờ `?social=1` tắt thì BỎ tin; tin sai kiểu bị bỏ, không sập.
+   */
+  setAchievements(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeAchievementsMsg(raw);
+    if (msg === null) return;
+    achLast = msg;
+    achPending = undefined;
+    if (achPendingTimer !== null) clearTimeout(achPendingTimer);
+    achPendingTimer = null;
+    if (achTimer !== null) clearTimeout(achTimer);
+    achTimer = null;
+    renderAch();
+  },
+
+  /**
+   * Nhận tin `achievementNew` (M9.8): đánh dấu "Mới" + chấm trên nút HUD; máy chủ đã gửi toast "Đạt thành tựu: ..." riêng nên chỉ thêm toast khi thành tựu mở danh hiệu
+   * (mời mở bảng Xã hội để đeo). Cờ tắt / tin sai kiểu thì bỏ.
+   */
+  onAchievementNew(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeAchievementNewMsg(raw);
+    if (msg === null) return;
+    achNew.add(msg.id);
+    syncAchDot();
+    renderAch();
+    const t = titleUnlockToast(msg.id);
+    if (t) this.toast({ text: t, tone: "good" });
   },
 
   getSocialTab(): SocialTabId {

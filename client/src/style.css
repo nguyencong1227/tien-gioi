@@ -8004,3 +8004,130 @@ body.ui-hidden
   width: 1%;
   white-space: nowrap;
 }
+
+/* Tab Thành tựu + danh hiệu (M9.8, #1027): danh hiệu là radiogroup (nút >= 44 px), thành tựu theo nhóm <details> (summary >= 44 px), thanh tiến độ KÈM chữ. */
+.ach-titles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ach-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  border-radius: 6px;
+  color: #f3ecda;
+  font-size: var(--fs-13);
+  cursor: pointer;
+  text-align: left;
+}
+.ach-title.on {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: rgba(212, 175, 55, 0.7);
+  color: #ffe08a;
+}
+.ach-title.on .ach-title-text::before {
+  content: "✓ ";
+}
+.ach-title.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+.ach-title-hint {
+  font-size: var(--fs-12, 12px);
+  color: #9ca3af;
+}
+.ach-group {
+  margin: 0 0 8px;
+  border: 1px solid rgba(212, 175, 55, 0.18);
+  border-radius: 8px;
+}
+.ach-group > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: #ffe08a;
+  font-weight: 600;
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+.ach-list {
+  margin: 0;
+  padding: 0 12px 8px;
+  list-style: none;
+}
+.ach-item {
+  padding: 8px 0;
+  border-top: 1px solid rgba(212, 175, 55, 0.12);
+}
+.ach-item.done .ach-name {
+  color: #ffe08a;
+}
+.ach-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+.ach-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ach-state {
+  color: #9ca3af;
+  font-size: var(--fs-12, 12px);
+  white-space: nowrap;
+}
+.ach-badge {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #ffe08a;
+  color: #1d1a16;
+  font-size: var(--fs-12, 12px);
+  font-weight: 700;
+}
+.ach-desc,
+.ach-reward {
+  margin: 2px 0 0;
+  color: #d8d2c0;
+  font-size: var(--fs-12, 12px);
+  overflow-wrap: anywhere;
+}
+.ach-reward {
+  color: #ffe08a;
+}
+.ach-bar {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.ach-bar > i {
+  display: block;
+  height: 100%;
+  background: #c9a24a;
+}
+/* Chấm "có thành tựu mới" trên nút Xã hội: hình tròn có viền (không chỉ màu), nhãn đọc màn hình đã đổi ở ui.ts */
+.hud-btn.has-new {
+  position: relative;
+}
+.hud-btn.has-new::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffe08a;
+  border: 2px solid #1d1a16;
+}
