@@ -552,6 +552,7 @@ async function settleFlee(
       return;
     }
     o.settling = { choice, paid };
+    startCooldown(w, c); // đặt hồi TRƯỚC khi lưu: một lần lưu giữ cả số dư mới lẫn mốc hồi (sập máy sau đó không mất hồi)
   } else if (o.settling.choice !== choice) {
     return; // đang chờ lưu một cách trả khác: không đổi giữa chừng
   }

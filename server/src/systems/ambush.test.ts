@@ -658,6 +658,20 @@ describe("ambushChoose: bỏ chạy = trừ ĐÚNG giá chốt -> LƯU -> đóng
     expect(s.w.shielded.has(s.sid)).toBe(false);
   });
 
+  it("mốc hồi (ambushUntil) đã nằm trong hồ sơ ngay LÚC lưu, cùng lần lưu với số dư mới", async () => {
+    const s = ready();
+    let saved: { coin: number; until: number | undefined } | null = null;
+    s.w.onSaveNow = async () => {
+      saved = { coin: s.c.coin, until: s.c.save.ambushUntil };
+      return true;
+    };
+    await onAmbushChoose(s.w, s.sid, { id: s.o.id, choice: "flee_coin" });
+    expect(saved).toEqual({
+      coin: 5000 - s.o.price.coin.price,
+      until: s.w.now + AMBUSH_COOLDOWN_MS,
+    });
+  });
+
   it("flee_exp: trừ đúng giá chốt trong thanh tu vi; không bao giờ xuống dưới 0", async () => {
     const s = ready();
     const price = s.o.price.exp;
