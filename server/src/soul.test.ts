@@ -141,3 +141,27 @@ describe("FileSoulStore", () => {
     await expect(s.get("x")).rejects.toThrow();
   });
 });
+
+describe("FileSoulStore.all (M9: xếp hạng, chỉ đọc)", () => {
+  it("bỏ qua tệp hỏng / .tmp / .hong-*, KHÔNG đổi tên hay xoá tệp hỏng; thư mục chưa có -> []", async () => {
+    const store = fresh();
+    expect(await store.all()).toEqual([]);
+    await store.create("linh_a");
+    await store.create("linh_b");
+    const base = path.join(dir, `s${n}`);
+    writeFileSync(path.join(base, "hong.json"), "{ không phải json");
+    writeFileSync(path.join(base, "mang.json"), "[1, 2]");
+    writeFileSync(path.join(base, "x.json.tmp"), JSON.stringify({ id: "tmp" }));
+    writeFileSync(path.join(base, "y.json.hong-1-abc"), JSON.stringify({ id: "hong" }));
+    const before = readdirSync(base).sort();
+    expect((await store.all()).map((s) => s.id)).toEqual(["linh_a", "linh_b"]);
+    expect(readdirSync(base).sort()).toEqual(before); // không cách ly trong lúc liệt kê
+  });
+
+  it("tôn trọng limit và tất định theo id", async () => {
+    const store = fresh();
+    for (const id of ["c", "a", "b"]) await store.create(id);
+    expect((await store.all()).map((s) => s.id)).toEqual(["a", "b", "c"]);
+    expect((await store.all(2)).map((s) => s.id)).toEqual(["a", "b"]);
+  });
+});
