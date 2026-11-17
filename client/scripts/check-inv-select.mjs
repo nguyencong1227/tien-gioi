@@ -670,6 +670,22 @@ async function main() {
           `gõ "${bad}" rồi Enter: KHÔNG vứt, hộp vẫn mở (gửi ${st2.drops.length} tin)`,
         );
       }
+      // chữ / 0 / trống rồi bấm nút "Vứt" (chuột / chạm, không qua Enter của ô): cũng KHÔNG vứt, hộp vẫn mở, focus về ô để sửa (nếu không, nút sẽ vứt lại số hợp lệ cũ)
+      for (const bad of ["abc", "0", ""]) {
+        await typeQty(bad);
+        if (bad === "")
+          await evalJs(
+            `document.getElementById("inv-drop-qty-input").value = ""; document.getElementById("inv-drop-qty-input").dispatchEvent(new Event("input", { bubbles: true })); 1`,
+          );
+        const yesBtn = await center("#inv-drop-yes");
+        await tap(yesBtn.x, yesBtn.y);
+        await sleep(200);
+        st2 = await state();
+        check(
+          st2.confirmOpen && st2.drops.length === 0 && st2.active === "inv-drop-qty-input",
+          `gõ "${bad}" rồi bấm nút Vứt: KHÔNG vứt, hộp vẫn mở, focus về ô (${st2.drops.length} tin, focus "${st2.active}")`,
+        );
+      }
       // số hợp lệ rồi Enter trong ô: đúng MỘT dropItem với qty đã gõ
       await typeQty("3");
       await press("Enter");

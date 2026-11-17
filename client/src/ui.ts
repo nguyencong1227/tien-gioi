@@ -897,8 +897,6 @@ function askDropConfirm(all: boolean, opener: HTMLElement | null) {
   $("inv-detail").classList.add("dropping"); // hộp thế chỗ hàng nút hành động (không đẩy bố cục xuống dưới nút Đóng nổi của điện thoại)
   $("inv-drop-confirm").hidden = false;
   ($("inv-drop-no") as HTMLButtonElement).focus(); // mặc định "Giữ lại": Enter nhầm cũng không vứt
-  // hộp cao hơn hàng nút nó thế chỗ (có ô số lượng): cuộn vào tầm nhìn, chừa chỗ cho nút Đóng nổi của điện thoại (`scroll-padding-bottom` của tấm), để nút "Vứt" không nằm dưới nút Đóng
-  $("inv-drop-confirm").scrollIntoView({ block: "nearest" });
 }
 
 /** Đóng hộp xác nhận vứt; `refocus` = trả focus về nút đã mở hộp. `false` nếu hộp không mở. */
