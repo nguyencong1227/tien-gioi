@@ -722,6 +722,7 @@ function renderAmbush(): void {
   const v = ambushDialogView(d, now);
   const reconnecting = document.body.classList.contains("reconnecting");
   setTextIfChanged(document.getElementById("ambush-foe"), v.foe);
+  setTextIfChanged(document.getElementById("ambush-death-note"), v.deathNote); // mục 53: dòng cố định dưới nút Chiến
   const danger = document.getElementById("ambush-danger");
   if (danger && danger.hidden === v.danger) danger.hidden = !v.danger; // mức tinh anh / cầm đầu: nhãn NGUY HIỂM
   setTextIfChanged(document.getElementById("ambush-scene"), v.scene);

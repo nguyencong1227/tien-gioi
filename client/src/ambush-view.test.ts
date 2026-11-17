@@ -9,6 +9,7 @@ import {
   type AmbushOfferMsg,
 } from "@tien-gioi/shared";
 import {
+  AMBUSH_DEATH_NOTE,
   AMBUSH_RETRY_MS,
   ambushChoiceForKey,
   ambushDialogView,
@@ -423,5 +424,34 @@ describe("MỤC 53: nhãn NGUY HIỂM ở hộp thoại", () => {
       expect(v.danger, tier).toBe(tier !== "normal");
       expect(/Nguy hiểm\./.test(v.announce), tier).toBe(tier !== "normal");
     }
+  });
+});
+
+describe("MỤC 53: dòng 'Bị hạ trong trận là chết thật.' dưới nút Chiến (cả ba mức, luôn hiện)", () => {
+  it("hằng số đúng câu A chốt", () => {
+    expect(AMBUSH_DEATH_NOTE).toBe("Bị hạ trong trận là chết thật.");
+  });
+  it("view có dòng này ở MỌI mức, mọi trạng thái (đang khoá, đang xử lý, hết giờ cục bộ)", () => {
+    for (const tier of ["normal", "elite", "leader"] as const) {
+      const d = openAmbush(null, sampleAmbushOffer(tier), T0).dialog;
+      for (const at of [T0, ARMED, ARMED + AMBUSH_OFFER_MS]) {
+        const v = ambushDialogView(d, at);
+        expect(v.deathNote, `${tier} @${at - T0}`).toBe(AMBUSH_DEATH_NOTE);
+      }
+      const sent = chooseAmbush(d, "fight", ARMED).dialog;
+      expect(ambushDialogView(sent, ARMED + 10).deathNote, `${tier} đã gửi`).toBe(
+        AMBUSH_DEATH_NOTE,
+      );
+    }
+  });
+  it("người dùng màn hình đọc được: nằm trong câu đọc của hộp thoại và trong aria-label của nút Chiến", () => {
+    const v = ambushDialogView(open(), ARMED);
+    expect(v.announce).toContain(AMBUSH_DEATH_NOTE);
+    expect(v.buttons[0].aria).toContain(AMBUSH_DEATH_NOTE);
+  });
+  it("không làm lệch các nút khác (bỏ chạy không nhắc chết thật: bỏ chạy là cách tránh)", () => {
+    const v = ambushDialogView(open(), ARMED);
+    expect(v.buttons[1].aria).not.toContain("chết thật");
+    expect(v.buttons[2].aria).not.toContain("chết thật");
   });
 });

@@ -178,7 +178,7 @@ try {
         label: b.querySelector('.ab-label').textContent, h: Math.round(b.getBoundingClientRect().height), w: Math.round(b.getBoundingClientRect().width) }; };
       return { open: !m.hidden, inAmbush: document.body.classList.contains('in-ambush'), captured: window.__ui.isKeyboardCaptured(),
         focus: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : '', foe: q('ambush-foe').textContent,
-        scene: q('ambush-scene').textContent, danger: !q('ambush-danger').hidden, dangerText: q('ambush-danger').textContent, count: q('ambush-countdown').textContent, note: q('ambush-note').textContent,
+        scene: q('ambush-scene').textContent, death: q('ambush-death-note').textContent, deathShown: getComputedStyle(q('ambush-death-note')).display !== 'none' && q('ambush-death-note').getBoundingClientRect().height > 0, danger: !q('ambush-danger').hidden, dangerText: q('ambush-danger').textContent, count: q('ambush-countdown').textContent, note: q('ambush-note').textContent,
         fight: btn('ambush-fight'), coin: btn('ambush-flee-coin'), exp: btn('ambush-flee-exp') };
     })()`);
   const layout = () =>
@@ -208,6 +208,10 @@ try {
   );
   check(s.foe === "Sói Hoang · Thường × 2", `tên kẻ chặn đường kèm mức và số lượng ('${s.foe}')`);
   check(!s.danger, "mức Thường: KHÔNG có nhãn NGUY HIỂM");
+  check(
+    s.deathShown && s.death === "Bị hạ trong trận là chết thật.",
+    `mức Thường: dòng 'Bị hạ trong trận là chết thật.' dưới nút Chiến, luôn hiện ('${s.death}')`,
+  );
   check(s.scene.startsWith("Đường đi bỗng vắng hẳn"), "văn mẫu hiện đúng");
   check(
     s.coin.sub === "30 Linh thạch" && s.exp.sub === "420 tu vi",
@@ -747,6 +751,10 @@ try {
     check(
       s.danger === want && (!want || s.dangerText === "NGUY HIỂM"),
       `mức ${tier}: nhãn NGUY HIỂM ${want ? "HIỆN" : "ẨN"} ('${s.danger ? s.dangerText : ""}')`,
+    );
+    check(
+      s.deathShown && s.death === "Bị hạ trong trận là chết thật.",
+      `mức ${tier}: dòng 'Bị hạ trong trận là chết thật.' hiện`,
     );
     if (tier === "leader") await shot("chan-duong-nguy-hiem");
   }
