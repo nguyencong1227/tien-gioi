@@ -73,6 +73,13 @@
           <path d="M5.5 21.5V3" />
           <path d="M5.5 4.5h13l-3.2 4 3.2 4h-13" />
         </symbol>
+        <symbol id="i-social" viewBox="0 0 24 24">
+          <path d="M9 20V9.5h6V20" />
+          <path d="M3.5 20v-6H9" />
+          <path d="M15 20v-3.5h5.5V20" />
+          <path d="M3 20.5h18" />
+          <path d="M12 3.5v3.5" />
+        </symbol>
         <symbol id="i-pickup" viewBox="0 0 24 24">
           <path d="M12 3.5v10" />
           <path d="M7.5 9.5l4.5 4.5 4.5-4.5" />
@@ -656,6 +663,19 @@
               <span class="ico"
                 ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
               ><small>Tông môn</small>
+            </button>
+            <button
+              type="button"
+              id="btn-social"
+              class="hud-btn"
+              hidden
+              title="Xã hội (Shift+G)"
+              aria-label="Xã hội: xếp hạng, thành tựu, sự kiện (Phím Shift+G)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-social" /></svg></span
+              ><small>Xã hội</small>
             </button>
             <button
               type="button"
@@ -1427,6 +1447,97 @@
               <span><i class="lg pin"></i> Đích nhiệm vụ đang theo dõi</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Bảng Xã hội (M9, #1025 / #1026 / #1027): MỘT bảng ba tab; thân từng tab nối dữ liệu ở M9.6-M9.8 -->
+      <section
+        id="social-modal"
+        class="panel modal-box sheet"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="social-head-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="social-head-title">Xã Hội</h2>
+            <small id="social-head-sub">Xếp hạng, thành tựu, sự kiện</small>
+          </div>
+          <button
+            type="button"
+            id="social-close"
+            class="modal-close"
+            title="Đóng (Shift+G / Esc)"
+            aria-label="Đóng bảng xã hội (Phím Shift+G hoặc Esc)"
+          >
+            ✕
+          </button>
+        </header>
+        <div id="social-tabs" class="sect-tabs" role="tablist" aria-label="Mục xã hội">
+          <button
+            type="button"
+            id="social-tab-btn-rank"
+            class="sect-tab active"
+            role="tab"
+            aria-selected="true"
+            aria-controls="social-tab-rank"
+            tabindex="0"
+          >
+            Xếp hạng
+          </button>
+          <button
+            type="button"
+            id="social-tab-btn-ach"
+            class="sect-tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="social-tab-ach"
+            tabindex="-1"
+          >
+            Thành tựu
+          </button>
+          <button
+            type="button"
+            id="social-tab-btn-event"
+            class="sect-tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="social-tab-event"
+            tabindex="-1"
+          >
+            Sự kiện
+          </button>
+        </div>
+        <div
+          id="social-tab-rank"
+          class="social-pane"
+          role="tabpanel"
+          aria-labelledby="social-tab-btn-rank"
+          tabindex="0"
+        >
+          <p class="social-empty">Bảng xếp hạng đang được dựng.</p>
+        </div>
+        <div
+          id="social-tab-ach"
+          class="social-pane"
+          role="tabpanel"
+          aria-labelledby="social-tab-btn-ach"
+          tabindex="0"
+          hidden
+        >
+          <p class="social-empty">Sổ thành tựu đang được dựng.</p>
+        </div>
+        <div
+          id="social-tab-event"
+          class="social-pane"
+          role="tabpanel"
+          aria-labelledby="social-tab-btn-event"
+          tabindex="0"
+          hidden
+        >
+          <p class="social-empty">Lịch sự kiện đang được dựng.</p>
         </div>
       </section>
 

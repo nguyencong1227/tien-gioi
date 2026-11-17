@@ -1319,6 +1319,7 @@ export class WorldScene extends Phaser.Scene {
         ui.isMapModalOpen() ||
         ui.isSettingsModalOpen() ||
         ui.isSkillsModalOpen() ||
+        ui.isSocialModalOpen() ||
         ui.isDialogOpen()
       )
         return;
@@ -1458,6 +1459,9 @@ export class WorldScene extends Phaser.Scene {
         break;
       case "panel.sect":
         ui.toggleSectModal();
+        break;
+      case "panel.social":
+        ui.toggleSocialModal();
         break;
       case "panel.skills":
         ui.toggleSkillsModal();
