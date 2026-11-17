@@ -19,6 +19,9 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - trùm thế giới (M9.7): tab Sự kiện (đang tải + nút Tải lại, đồng hồ GIẢM theo thời gian, chưa có sự kiện, sự kiện cách 3 giờ chỉ ở tab, đang diễn ra),
  *     banner (trọn khung, không tràn, KHÔNG chặn chạm, thanh trùm nằm dưới và theo --wb-h, nút >= 44 px, danh sách đóng góp mở / thu gọn theo khung),
  *     chưa đủ ngưỡng, bốn kết quả (+ toast cùng tông, không toast lần hai, tự ẩn sau ~10 s), tin sai kiểu bị bỏ, cờ tắt thì không hiện.
+ *   - thành tựu + danh hiệu (M9.8): tab Thành tựu (đang tải + Tải lại, nhóm <details> / danh hiệu radiogroup >= 44 px, thanh tiến độ có chữ, thưởng bằng chữ),
+ *     đeo / gỡ danh hiệu CHỈ đổi khi máy chủ trả lại `achievements` (khóa / đang chờ không gửi, từ chối về đúng trạng thái máy chủ, im 5 s thì thôi chờ),
+ *     thành tựu mới (chấm trên nút HUD khi ở tab khác, dấu 'Mới' + toast mời đeo, mất khi rời tab), tin sai kiểu / id lạ bị bỏ, danh hiệu trên đầu nhân vật (lạ thì không lộ id).
  * `--shots`: lưu ảnh bảng đang mở mỗi khung nhìn (và bảng Tu vi / Tông môn đầy dòng).
  */
 import http from "node:http";
@@ -227,6 +230,13 @@ async function main() {
       check(
         await evalJs(`document.getElementById("wb-banner").hidden`),
         "không có ?social=1: tin trùm thế giới KHÔNG làm hiện banner",
+      );
+      await evalJs(
+        `window.__ui.onAchievementNew({ id: "kiep_2" }); window.__ui.setAchievements(window.__sample.achievements()); 1`,
+      );
+      check(
+        await evalJs(`!document.getElementById("btn-social").classList.contains("has-new")`),
+        "không có ?social=1: thành tựu mới KHÔNG tạo chấm trên nút HUD",
       );
 
       // ---- 2. cờ BẬT ----
@@ -821,6 +831,253 @@ async function main() {
         `document.getElementById("boss-bar").hidden = true; window.__ui.toggleSocialModal(true); 1`,
       );
       await sleep(700);
+
+      // ---- 4d. thành tựu + danh hiệu (M9.8, #1027) ----
+      const ach = () =>
+        evalJs(`(() => {
+          const q = (id) => document.getElementById(id);
+          const r = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, h: b.height, w: b.width }; };
+          const radios = [...q("ach-titles").querySelectorAll('[role="radio"]')];
+          const groups = [...q("ach-groups").querySelectorAll("details")];
+          const items = [...q("ach-groups").querySelectorAll(".ach-item")];
+          const pane = q("social-tab-ach");
+          const btn = q("btn-social");
+          return {
+            status: q("ach-status").textContent, statusHidden: q("ach-status").hidden, retryHidden: q("ach-retry").hidden, retryH: r(q("ach-retry")).h,
+            bodyHidden: q("ach-body").hidden, summary: q("ach-summary").textContent, worn: q("ach-worn").textContent,
+            radios: radios.map((b) => ({ t: b.querySelector(".ach-title-text").textContent, checked: b.getAttribute("aria-checked"), dis: b.getAttribute("aria-disabled"), hint: (b.querySelector(".ach-title-hint") || {}).textContent || "", h: r(b).h })),
+            groups: groups.map((g) => ({ s: g.querySelector("summary").textContent, open: g.open, h: r(g.querySelector("summary")).h })),
+            items: items.map((li) => ({ name: li.querySelector(".ach-name").textContent, state: li.querySelector(".ach-state").textContent, isNew: !!li.querySelector(".ach-badge"),
+              bar: li.querySelector(".ach-bar") ? { now: li.querySelector(".ach-bar").getAttribute("aria-valuenow"), text: li.querySelector(".ach-bar").getAttribute("aria-valuetext") } : null,
+              reward: (li.querySelector(".ach-reward") || {}).textContent || "" })),
+            paneOverflow: pane.scrollWidth - pane.clientWidth, pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+            dot: btn.classList.contains("has-new"), btnLabel: btn.getAttribute("aria-label"),
+            toasts: [...document.querySelectorAll("#toast p")].map((p) => p.className + ":" + p.textContent),
+            sent: (window.__sent || []).map((x) => x[0] + ":" + JSON.stringify(x[1])),
+          };
+        })()`);
+      const setAch = (patch = "") =>
+        evalJs(
+          `(() => { const m = window.__sample.achievements(); ${patch} window.__ui.setAchievements(m); return 1; })()`,
+        );
+      // bắt tin gửi đi (đè room.send như check-sect-hall)
+      await evalJs(
+        `(() => { window.__sent = []; const rm = window.__scene.room; if (!rm.__origSend) rm.__origSend = rm.send; rm.send = (t, m) => { window.__sent.push([t, m]); }; return 1; })()`,
+      );
+
+      // chưa có sổ: "Đang tải…" + đã gửi achievementsGet; im ~6 s -> nút Tải lại >= 44 px
+      await evalJs(`document.getElementById("social-tab-btn-ach").click(); 1`);
+      await sleep(200);
+      let a = await ach();
+      check(
+        a.status === "Đang tải sổ thành tựu…" && a.bodyHidden && a.retryHidden,
+        `tab Thành tựu chưa có sổ: "${a.status}", thân ẩn`,
+      );
+      check(
+        a.sent.some((x) => x.startsWith("achievementsGet:")),
+        "mở tab: gửi achievementsGet",
+      );
+      await sleep(6300);
+      a = await ach();
+      check(
+        !a.retryHidden && a.retryH >= 44 - 0.5 && a.status.startsWith("Chưa nhận được sổ"),
+        `máy chủ im quá 6 s: nút Tải lại (${Math.round(a.retryH)} px), "${a.status}"`,
+      );
+      await evalJs(`window.__sent.length = 0; document.getElementById("ach-retry").click(); 1`);
+      check(
+        (await ach()).sent.some((x) => x.startsWith("achievementsGet:")),
+        "bấm Tải lại: gửi lại achievementsGet",
+      );
+
+      // có sổ (tin mẫu của shared)
+      await setAch();
+      await sleep(150);
+      a = await ach();
+      check(
+        !a.bodyHidden && a.statusHidden && a.retryHidden,
+        "có sổ: thân hiện, hết trạng thái tải",
+      );
+      check(/^Đã đạt 1 \/ \d+ thành tựu\.$/.test(a.summary), `tóm tắt: "${a.summary}"`);
+      check(a.worn === "Danh hiệu đang đeo: Tái Sinh", `danh hiệu đang đeo: "${a.worn}"`);
+      check(
+        a.radios.length === 5 &&
+          a.radios.filter((x) => x.checked === "true").length === 1 &&
+          a.radios[1].checked === "true",
+        `danh hiệu: Không đeo + ${a.radios.length - 1} danh hiệu, đúng MỘT cái được chọn (${a.radios.map((x) => x.t + (x.checked === "true" ? "*" : "")).join(" | ")})`,
+      );
+      check(
+        a.radios.filter((x) => x.dis === "true").length === 3 &&
+          a.radios
+            .filter((x) => x.dis === "true")
+            .every((x) => /^Mở bằng thành tựu: /.test(x.hint)),
+        "3 danh hiệu khoá: aria-disabled + nói cách mở bằng CHỮ",
+      );
+      check(
+        a.radios.every((x) => x.h >= 44 - 0.5),
+        `mọi nút danh hiệu cao >= 44 px (${a.radios.map((x) => Math.round(x.h)).join(" / ")})`,
+      );
+      check(
+        a.groups.length >= 1 && a.groups.every((g) => g.h >= 44 - 0.5),
+        `mỗi nhóm thành tựu có tiêu đề cao >= 44 px (${a.groups.length} nhóm)`,
+      );
+      const itDone = a.items.find((x) => x.name === "Luân Hồi Lần Đầu");
+      const itDoing = a.items.find((x) => x.name === "Mười Trận Thắng");
+      check(
+        itDone &&
+          /^Hoàn thành/.test(itDone.state) &&
+          itDone.bar === null &&
+          itDone.reward === "Thưởng: danh hiệu Tái Sinh, +2 Duyên",
+        "thành tựu đã đạt: Hoàn thành, không thanh tiến độ, thưởng bằng chữ",
+      );
+      check(
+        itDoing &&
+          itDoing.state === "6 / 10" &&
+          itDoing.bar &&
+          itDoing.bar.now === "60" &&
+          itDoing.bar.text === "6 / 10",
+        "thành tựu dở: '6 / 10', thanh tiến độ 60% có aria-valuetext",
+      );
+      check(
+        a.paneOverflow <= 1 && a.pageOverflow <= 1,
+        `tab Thành tựu không tràn ngang (${a.paneOverflow} / ${a.pageOverflow})`,
+      );
+      if (shotsDir) {
+        const shot = await send("Page.captureScreenshot", { format: "png" });
+        fs.writeFileSync(
+          path.join(shotsDir, `xa-hoi-thanh-tuu-${vp.name}.png`),
+          Buffer.from(shot.result.data, "base64"),
+        );
+      }
+
+      // đeo / gỡ: KHÔNG đoán trước, chỉ đổi khi máy chủ trả lại achievements; bấm cái khoá không làm gì
+      await evalJs(
+        `window.__sent.length = 0; [...document.querySelectorAll('#ach-titles [role="radio"]')].find((b) => b.getAttribute("aria-disabled") === "true").click(); 1`,
+      );
+      a = await ach();
+      check(
+        a.sent.every((x) => !x.startsWith("titleSet:")) &&
+          a.worn === "Danh hiệu đang đeo: Tái Sinh",
+        "bấm danh hiệu KHÓA: không gửi titleSet, không đổi",
+      );
+      await evalJs(
+        `window.__sent.length = 0; document.querySelectorAll('#ach-titles [role="radio"]')[0].click(); 1`,
+      ); // Không đeo
+      a = await ach();
+      check(
+        a.sent.includes('titleSet:{"id":null}'),
+        `bấm "Không đeo": gửi titleSet {id:null} (${a.sent.join(",")})`,
+      );
+      check(
+        a.worn === "Đang đổi danh hiệu…" && a.radios[1].checked === "true",
+        "chờ máy chủ: hiện 'Đang đổi…', CHƯA đổi lựa chọn",
+      );
+      await evalJs(
+        `window.__sent.length = 0; document.querySelectorAll('#ach-titles [role="radio"]')[0].click(); 1`,
+      );
+      check((await ach()).sent.length === 0, "đang chờ trả lời: bấm nữa không gửi thêm");
+      await setAch(`m.title = null;`);
+      a = await ach();
+      check(
+        a.worn === "Chưa đeo danh hiệu." &&
+          a.radios[0].checked === "true" &&
+          a.radios[1].checked === "false",
+        "máy chủ trả lại title null: đổi sang 'Không đeo'",
+      );
+      await evalJs(
+        `window.__sent.length = 0; document.querySelectorAll('#ach-titles [role="radio"]')[1].click(); 1`,
+      ); // đeo lại Tái Sinh
+      a = await ach();
+      check(a.sent.includes('titleSet:{"id":"lh2"}'), "bấm 'Tái Sinh': gửi titleSet {id:'lh2'}");
+      await setAch(); // máy chủ chấp nhận (title lh2)
+      a = await ach();
+      check(
+        a.worn === "Danh hiệu đang đeo: Tái Sinh" && a.radios[1].checked === "true",
+        "máy chủ xác nhận: đang đeo Tái Sinh",
+      );
+      // máy chủ TỪ CHỐI (trả lại sổ cũ với title null): UI về đúng trạng thái máy chủ, không kẹt 'Đang đổi…'
+      await evalJs(`document.querySelectorAll('#ach-titles [role="radio"]')[0].click(); 1`);
+      await setAch(`m.title = "lh2";`);
+      a = await ach();
+      check(
+        a.worn === "Danh hiệu đang đeo: Tái Sinh" && a.radios[1].checked === "true",
+        "máy chủ từ chối (trả lại title cũ): UI theo máy chủ, hết 'Đang đổi…'",
+      );
+      if (vp.name === VIEWPORTS[0].name) {
+        await evalJs(`document.querySelectorAll('#ach-titles [role="radio"]')[0].click(); 1`);
+        await sleep(5300);
+        a = await ach();
+        check(
+          a.worn === "Danh hiệu đang đeo: Tái Sinh",
+          "máy chủ im 5 s sau khi bấm: thôi chờ, về trạng thái cũ (không kẹt)",
+        );
+      }
+
+      // thành tựu MỚI: đang ở tab khác thì có chấm trên nút HUD; mở tab Thành tựu thấy 'Mới' và chấm tắt; rời tab thì dấu 'Mới' mất
+      await evalJs(`document.getElementById("social-tab-btn-event").click(); 1`);
+      await setAch(`m.ach.pk_thang_10 = "2026-11-17T09:00:00.000Z"; m.counters.pk_won = 10;`);
+      await evalJs(`window.__ui.onAchievementNew({ id: "pk_thang_10" }); 1`);
+      a = await ach();
+      check(
+        a.dot && /Có thành tựu mới/.test(a.btnLabel),
+        `thành tựu mới lúc ở tab khác: chấm trên nút HUD + nhãn đọc màn hình ("${a.btnLabel}")`,
+      );
+      check(
+        a.toasts.some((t) => t.startsWith("good:Mở danh hiệu Đấu Sĩ")),
+        "thành tựu mở danh hiệu: có toast mời đeo (máy chủ đã có toast tên thành tựu riêng)",
+      );
+      await evalJs(`document.getElementById("social-tab-btn-ach").click(); 1`);
+      await sleep(150);
+      a = await ach();
+      const itNew = a.items.find((x) => x.name === "Mười Trận Thắng");
+      check(
+        itNew && itNew.isNew && !a.dot,
+        "mở tab Thành tựu: dấu 'Mới' ở đúng mục, chấm trên nút HUD tắt",
+      );
+      check(a.items.filter((x) => x.isNew).length === 1, "chỉ MỘT mục có dấu 'Mới'");
+      await evalJs(
+        `document.getElementById("social-tab-btn-rank").click(); document.getElementById("social-tab-btn-ach").click(); 1`,
+      );
+      await sleep(150);
+      a = await ach();
+      check(a.items.every((x) => !x.isNew) && !a.dot, "rời rồi vào lại tab: dấu 'Mới' đã mất");
+
+      // tin sai kiểu bị bỏ; id lạ không tạo chấm
+      await evalJs(
+        `window.__ui.setAchievements(null); window.__ui.setAchievements("x"); window.__ui.setAchievements([]); window.__ui.onAchievementNew(null); window.__ui.onAchievementNew({ id: "__proto__" }); window.__ui.onAchievementNew({ id: "khong_co_thanh_tuu" }); 1`,
+      );
+      a = await ach();
+      check(
+        !a.bodyHidden && /^Đã đạt 2 \//.test(a.summary) && !a.dot,
+        "tin sai kiểu bị bỏ; id lạ KHÔNG tạo dấu / chấm: giao diện giữ nguyên",
+      );
+      await evalJs(`window.__scene.room.send = window.__scene.room.__origSend; 1`);
+
+      // danh hiệu hiện cạnh đạo hiệu trên đầu nhân vật (nhãn Phaser): chỉ khi cờ bật
+      await evalJs(
+        `(() => { const sc = window.__scene; const me = sc.room.state.players.get(sc.room.sessionId); me.title = "lh2"; return 1; })()`,
+      );
+      await sleep(600);
+      const lab = await evalJs(
+        `(() => { const sc = window.__scene; const e = sc.players.get(sc.room.sessionId); return e && e.label ? e.label.text : null; })()`,
+      );
+      check(
+        typeof lab === "string" && lab.includes("«Tái Sinh»"),
+        `nhãn trên đầu nhân vật có danh hiệu ("${String(lab).replace(/\n/g, " / ")}")`,
+      );
+      await evalJs(
+        `(() => { const sc = window.__scene; const me = sc.room.state.players.get(sc.room.sessionId); me.title = "zz99"; return 1; })()`,
+      );
+      await sleep(600);
+      const lab2 = await evalJs(
+        `(() => { const sc = window.__scene; const e = sc.players.get(sc.room.sessionId); return e && e.label ? e.label.text : null; })()`,
+      );
+      check(
+        typeof lab2 === "string" && !lab2.includes("zz99") && !lab2.includes("«"),
+        `danh hiệu LẠ không lộ id, không hiện ngoặc ("${String(lab2).replace(/\n/g, " / ")}")`,
+      );
+      await evalJs(
+        `(() => { const sc = window.__scene; const me = sc.room.state.players.get(sc.room.sessionId); me.title = ""; return 1; })()`,
+      );
 
       // ---- 5. Esc đóng, trả focus; Shift+G đóng / mở lại ----
       await press("Escape", "Escape", 27);
