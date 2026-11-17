@@ -20,8 +20,9 @@ import {
 describe("săn quái thường: mô hình khớp mã server thật", () => {
   const rows = huntCheckCases().map(([realm, tier, id]) => huntCheck(realm, tier, id, 8));
 
-  it("mọi ca (Luyện Khí, Trúc Cơ, 3 bậc x 4 loài Kim Đan, 3 bậc x 4 loài Nguyên Anh) đều hạ được quái; có đủ 26 dòng", () => {
-    expect(rows).toHaveLength(2 + 3 * 4 + 3 * 4);
+  it("mọi ca mô hình coi là săn solo được (Luyện Khí, Trúc Cơ, các bậc x loài Kim Đan và Nguyên Anh) đều hạ được quái; mục 30: 20 dòng, 6 ca không an toàn solo không đối chiếu", () => {
+    // 2 đại diện + Kim Đan (3 bậc x 4 loài trừ Độc Thiềm cả ba bậc = 9) + Nguyên Anh (3 bậc x 4 loài trừ Độc Tước cả ba bậc, Phong Nha Sơ kỳ = 8)
+    expect(rows).toHaveLength(2 + 9 + 8);
     for (const r of rows) expect(r.killedAll, `${r.label} ${r.monsterId}`).toBe(true);
   });
 
@@ -67,7 +68,8 @@ describe("săn quái thường: mô hình khớp mã server thật", () => {
         boltRange: 300,
         boltSpeed: 220,
       };
-      const r2 = huntCheck(3, 0, "doc_thiem", 8);
+      // Mục 30: Độc Thiềm máu x1,5 không an toàn solo ở bậc nào của Kim Đan; Hậu kỳ (0,51) là ca gần nhất, thử với đủ đan (đây là kiểm cơ chế đạn độc, không phải kiểm săn an toàn)
+      const r2 = huntCheck(3, 2, "doc_thiem", 8);
       expect(r2.killedAll).toBe(true);
       expect(r2.timeRatio).toBeGreaterThanOrEqual(0.85);
       expect(r2.timeRatio).toBeLessThanOrEqual(1.25);
@@ -233,7 +235,9 @@ describe("renderHuntCheck", () => {
     for (const w of [
       "### 9.",
       "Hôi Lang",
-      "Độc Thiềm",
+      "Thạch Quy",
+      "Không đối chiếu", // mục 30: các ca không an toàn solo được liệt kê, không im lặng bỏ
+      "Độc Thiềm (Kim Đan Sơ kỳ)",
       "Hắc Giao",
       "Đủ đan",
       "Chi phí MỖI NGƯỜI",

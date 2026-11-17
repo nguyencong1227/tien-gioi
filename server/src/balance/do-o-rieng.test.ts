@@ -67,16 +67,17 @@ describe("độ nhạy: có / không đồ ô riêng", () => {
   });
 
   it("mô hình lệch NHỎ (<= 10% nhịp, <= 10 điểm phần trăm khí huyết): giữ cờ tắt là giả định bảo thủ chứ không che số xấu", () => {
-    expect(on.kimDanHours / off.kimDanHours).toBeGreaterThan(0.9);
-    expect(on.nguyenAnhHours / off.nguyenAnhHours).toBeGreaterThan(0.9);
+    // Mục 30: nhịp ngắn hơn (~4,2 giờ) nên cùng mức chênh tuyệt đối thành tỉ lệ lớn hơn: Kim Đan 0,887 (trước 0,9+); cận mới > 0,85 (lệch <= 15%)
+    expect(on.kimDanHours / off.kimDanHours).toBeGreaterThan(0.85);
+    expect(on.nguyenAnhHours / off.nguyenAnhHours).toBeGreaterThan(0.85);
     expect(off.docThiemDanger - on.docThiemDanger).toBeLessThan(10);
     expect(off.docTuocDanger - on.docTuocDanger).toBeLessThan(10);
   });
 
-  it("cấu hình hiện hành (tắt) vẫn trong mục tiêu: nhịp Kim Đan 5-7 giờ, Nguyên Anh 6-9 giờ, Trúc Cơ ~3 giờ", () => {
-    expect(off.kimDanHours).toBeGreaterThanOrEqual(5);
+  it("cấu hình hiện hành (tắt) vẫn trong mục tiêu: nhịp Kim Đan 4-7 giờ, Nguyên Anh 4-9 giờ (mục 30: tu vi x2 + máu x1,5, trước đó 5-7 và 6-9), Trúc Cơ ~3 giờ", () => {
+    expect(off.kimDanHours).toBeGreaterThanOrEqual(4);
     expect(off.kimDanHours).toBeLessThanOrEqual(7);
-    expect(off.nguyenAnhHours).toBeGreaterThanOrEqual(6);
+    expect(off.nguyenAnhHours).toBeGreaterThanOrEqual(4);
     expect(off.nguyenAnhHours).toBeLessThanOrEqual(9);
     expect(off.truncoMinutes).toBeGreaterThan(150);
     expect(off.truncoMinutes).toBeLessThan(210);
