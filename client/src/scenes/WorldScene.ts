@@ -687,7 +687,7 @@ export class WorldScene extends Phaser.Scene {
         else if (action.kind === "trade") this.room.send("trade", { tradeId: action.tradeId });
         else if (action.kind === "dungeon") {
           if (isMockDungeonEnabled()) {
-            ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite(this.me()?.name || "Trương Tiểu Phàm"));
+            ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite(this.me()?.name || "Tô Vân Hạc"));
           } else {
             this.room.send(DUNGEON_MSG.open, { dungeonId: action.dungeonId });
           }

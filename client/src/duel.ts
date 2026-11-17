@@ -130,10 +130,10 @@ export function isMockDuelEnabled(
 
 /** Mẫu dữ liệu giả lập cho chế độ DEV / thử nghiệm giao diện PK. */
 export const MOCK_DUEL_SAMPLES = {
-  invited(from = "Diệp Phàm", ttlMs = DUEL_INVITE_TTL_MS): DuelInvitedMsg {
+  invited(from = "Ngô Tử Khiêm", ttlMs = DUEL_INVITE_TTL_MS): DuelInvitedMsg {
     return { from, ttlMs };
   },
-  stateCountdown(opponent = "Diệp Phàm", startsInMs = DUEL_COUNTDOWN_MS): DuelStateMsg {
+  stateCountdown(opponent = "Ngô Tử Khiêm", startsInMs = DUEL_COUNTDOWN_MS): DuelStateMsg {
     return {
       phase: "countdown",
       opponent,
@@ -141,7 +141,7 @@ export const MOCK_DUEL_SAMPLES = {
       endsInMs: DUEL_MAX_MS,
     };
   },
-  stateFighting(opponent = "Diệp Phàm", endsInMs = 150_000): DuelStateMsg {
+  stateFighting(opponent = "Ngô Tử Khiêm", endsInMs = 150_000): DuelStateMsg {
     return {
       phase: "fight",
       opponent,
@@ -149,13 +149,13 @@ export const MOCK_DUEL_SAMPLES = {
       endsInMs,
     };
   },
-  endWon(_opponent = "Diệp Phàm", reason: DuelEndReason = "ko"): DuelEndMsg {
+  endWon(_opponent = "Ngô Tử Khiêm", reason: DuelEndReason = "ko"): DuelEndMsg {
     return {
       result: "won",
       reason,
     };
   },
-  endLost(_opponent = "Diệp Phàm", reason: DuelEndReason = "ko"): DuelEndMsg {
+  endLost(_opponent = "Ngô Tử Khiêm", reason: DuelEndReason = "ko"): DuelEndMsg {
     return {
       result: "lost",
       reason,

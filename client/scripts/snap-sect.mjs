@@ -228,7 +228,7 @@ for (const sz of SIZES) {
       window.__ui.closeSectInviteBox();
       window.__mockSect.showLeader();
       window.__mockSect.closeModal();
-      window.__ui.openPlayerMenu("Hàn Lập", 1, 3, ${sz.w < 600 ? 50 : 250}, ${sz.w < 600 ? 120 : 180}, undefined, "Tiêu Dao");
+      window.__ui.openPlayerMenu("Giang Tĩnh Uyên", 1, 3, ${sz.w < 600 ? 50 : 250}, ${sz.w < 600 ? 120 : 180}, undefined, "Tiêu Dao");
     `);
     await snap(`sect-menu-${sz.name}.png`);
 
