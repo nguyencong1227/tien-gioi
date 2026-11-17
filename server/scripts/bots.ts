@@ -139,6 +139,8 @@ interface CliArgs {
   sect: boolean;
   skills: boolean;
   evade: boolean;
+  boss: boolean;
+  reflexMs: number;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -176,6 +178,8 @@ function parseArgs(argv: string[]): CliArgs {
   let sect = false;
   let skills = false;
   let evade = false;
+  let boss = false;
+  let reflexMs = 400;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -186,7 +190,17 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--die") die = true;
     else if (arg === "--skills") skills = true;
     else if (arg === "--evade") evade = true;
-    else if (arg === "--dungeon") dungeon = true;
+    else if (arg === "--no-evade" || arg === "--evade=false") evade = false;
+    else if (arg === "--boss" || arg === "--boss-hunt") {
+      boss = true;
+      if (!argv.includes("--no-evade") && !argv.includes("--evade=false")) {
+        evade = true;
+      }
+      if (!argv.some((a) => a.startsWith("--map="))) map = "hac_phong";
+    } else if (arg.startsWith("--reflex-ms=") || arg.startsWith("--reflex=")) {
+      const v = Number(arg.split("=")[1]);
+      if (!isNaN(v) && v >= 0) reflexMs = v;
+    } else if (arg === "--dungeon") dungeon = true;
     else if (arg === "--dungeon-fall") {
       dungeon = true;
       dungeonFall = true;
@@ -305,6 +319,8 @@ function parseArgs(argv: string[]): CliArgs {
     sect,
     skills,
     evade,
+    boss,
+    reflexMs,
   };
 }
 
@@ -949,8 +965,10 @@ export interface BotState {
   skillsCastCount: number;
   skillsMsgsCount: number;
   skillsSent: number;
-  // Các trường cho thử tải né đòn báo trước (--evade, #511)
+  // Các trường cho thử tải né đòn báo trước (--evade, #511, M42 #876)
   evade?: boolean;
+  bossHunt?: boolean;
+  reflexMs?: number;
   warns: ActiveWarnZone[];
   evadeCount: number;
   warnsTargetedCount: number;
@@ -1389,6 +1407,10 @@ export interface ActiveWarnZone {
   /** Bán kính trong (px), CHỈ dùng với circle (vành khuyên của trùm, mục 42 #876) */
   r0?: number;
   expiresAt: number;
+  /** Thời điểm nhận cảnh báo (ms, performance.now()) */
+  warnAt?: number;
+  /** Thời gian trễ phản xạ trước khi bot bắt đầu chạy né (ms, mặc định 400 ms, mục 42 #876) */
+  reflexMs?: number;
   /** Bot có nằm trong vùng nguy hiểm của đòn này lúc nhận cảnh báo hay không */
   targeted?: boolean;
   /** Đã kiểm tra kết quả né/trúng tại thời điểm đòn đáp xuống hay chưa */
@@ -1396,13 +1418,14 @@ export interface ActiveWarnZone {
 }
 
 /**
- * Trích xuất vùng báo trước nguy hiểm từ tin nhắn fx (M7.10 #511).
- * Lưu ý: expiresAt phải tính theo cùng đồng hồ với vòng lặp bot (performance.now()),
+ * Trích xuất vùng báo trước nguy hiểm từ tin nhắn fx (M7.10 #511, M42 #876).
+ * Lưu ý: expiresAt và warnAt phải tính theo cùng đồng hồ với vòng lặp bot (performance.now()),
  * không dùng Date.now() để tránh lệch thang đo thời gian.
  */
 export function parseWarnZoneFromFx(
   msg?: FxMsg,
   now: number = performance.now(),
+  reflexMs = 0,
 ): ActiveWarnZone | null {
   if (!msg) return null;
   if (msg.kind === "warn" && msg.shape) {
@@ -1421,6 +1444,8 @@ export function parseWarnZoneFromFx(
       angle,
       arc,
       r0,
+      warnAt: now,
+      reflexMs,
       expiresAt: now + ms,
     };
   }
@@ -1439,6 +1464,8 @@ export function parseWarnZoneFromFx(
       w: 2 * BOLT_RADIUS,
       angle,
       arc: 0,
+      warnAt: now,
+      reflexMs,
       expiresAt: now + ms,
     };
   }
@@ -1555,8 +1582,27 @@ export function isPointInWarnZone(
 }
 
 /**
+ * Kiểm tra xem điểm (px, py) có nằm trong bất kỳ vùng cảnh báo nào còn hiệu lực (chưa nổ) không.
+ */
+export function isPointInAnyActiveWarn(
+  px: number,
+  py: number,
+  warns: ActiveWarnZone[],
+  now: number,
+  buffer = 8,
+): boolean {
+  for (const w of warns) {
+    if (w.expiresAt > now && isPointInWarnZone(px, py, w, buffer)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Tính vector di chuyển né tránh { dx, dy } (đã chuẩn hoá) nếu bot đang nằm trong vùng nguy hiểm của một hoặc nhiều cảnh báo.
- * Trả về null nếu bot an toàn.
+ * Chờ đúng `warn.reflexMs` (mặc định 400 ms) kể từ lúc nhận cảnh báo trước khi bắt đầu chạy né (M42 #876).
+ * Trả về null nếu bot an toàn hoặc chưa hết thời gian phản xạ.
  */
 export function computeEvadeVector(
   px: number,
@@ -1576,20 +1622,52 @@ export function computeEvadeVector(
   }
   if (warns.length === 0) return null;
 
-  // Tìm warn nguy hiểm nhất đe doạ bot (sắp đáp đòn nhất)
+  // Tìm warn nguy hiểm nhất đe doạ bot (sắp đáp đòn nhất và đã qua thời gian phản xạ)
   let urgentWarn: ActiveWarnZone | null = null;
   let minExpires = Number.POSITIVE_INFINITY;
 
   for (const w of warns) {
     if (isPointInWarnZone(px, py, w, buffer)) {
-      if (w.expiresAt < minExpires) {
-        minExpires = w.expiresAt;
-        urgentWarn = w;
+      // Chỉ né khi đã qua thời gian phản xạ (nếu có cấu hình warnAt + reflexMs)
+      const reflexMs = typeof w.reflexMs === "number" ? w.reflexMs : 0;
+      const warnAt = typeof w.warnAt === "number" ? w.warnAt : 0;
+      if (now >= warnAt + reflexMs) {
+        if (w.expiresAt < minExpires) {
+          minExpires = w.expiresAt;
+          urgentWarn = w;
+        }
       }
     }
   }
 
   if (!urgentWarn) return null;
+
+  // Tính vector hướng thoát hiểm ngắn nhất đưa bot ra ngoài vùng nguy hiểm theo từng dạng hình học
+  if (urgentWarn.shape === "circle") {
+    const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
+    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
+      // Vành khuyên: so sánh khoảng cách tới lõi an toàn (d - r0) và rìa ngoài an toàn (r - d)
+      const distToCore = Math.max(0, d - urgentWarn.r0);
+      const distToOuter = Math.max(0, urgentWarn.r - d);
+      if (distToCore < distToOuter) {
+        // Gần lõi an toàn hơn: chạy thẳng vào tâm
+        if (d > 0.001) {
+          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
+        }
+        return { dx: 0, dy: 0 };
+      }
+      // Gần rìa ngoài hơn: chạy thẳng ra ngoài
+      if (d > 0.001) {
+        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+      }
+      return { dx: 1, dy: 0 };
+    }
+    // Hình tròn đặc: chạy thẳng ra xa tâm
+    if (d > 0.001) {
+      return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+    }
+    return { dx: 1, dy: 0 };
+  }
 
   if (urgentWarn.shape === "line") {
     const ax = urgentWarn.x;
@@ -1600,41 +1678,21 @@ export function computeEvadeVector(
     return { dx: nx, dy: ny };
   }
 
-  if (urgentWarn.shape === "circle") {
-    const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
-    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
-      // Vành khuyên: bot đang ở trong vùng nguy hiểm. So sánh khoảng cách tới tâm an toàn và rìa ngoài
-      const mid = (urgentWarn.r0 + urgentWarn.r) / 2;
-      if (d < mid) {
-        // Gần tâm hơn -> chạy vào vùng lõi an toàn của tâm
-        if (d > 0.001) {
-          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
-        }
-        return { dx: 0, dy: 0 };
-      }
-      // Gần rìa ngoài hơn -> chạy ra ngoài vòng bán kính r
-      if (d > 0.001) {
-        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
-      }
-      return { dx: 1, dy: 0 };
-    }
-    if (d > 0.001) {
-      return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
-    }
-    return { dx: 1, dy: 0 };
-  }
-
   if (urgentWarn.shape === "cone") {
     const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
     const a = Math.atan2(py - urgentWarn.y, px - urgentWarn.x);
-    if (d > urgentWarn.r * 0.7) {
+    const diff = normalizeAngle(a - urgentWarn.angle);
+    const distToOuter = Math.max(0, urgentWarn.r - d);
+    const distToSide = d * Math.sin(Math.max(0, urgentWarn.arc / 2 - Math.abs(diff)));
+    if (distToOuter <= distToSide || d > urgentWarn.r * 0.8) {
+      // Gần rìa ngoài hơn: chạy thẳng theo hướng tia từ tâm ra rìa
       return { dx: Math.cos(a), dy: Math.sin(a) };
     }
-    const diff = normalizeAngle(a - urgentWarn.angle);
+    // Thoát ra cạnh bên nón gần nhất: vuông góc với tia cạnh nón hướng ra phía ngoài
     const escapeAngle =
       diff >= 0
-        ? urgentWarn.angle + urgentWarn.arc / 2 + 0.3
-        : urgentWarn.angle - urgentWarn.arc / 2 - 0.3;
+        ? urgentWarn.angle + urgentWarn.arc / 2 + Math.PI / 2
+        : urgentWarn.angle - urgentWarn.arc / 2 - Math.PI / 2;
     return { dx: Math.cos(escapeAngle), dy: Math.sin(escapeAngle) };
   }
 
@@ -1658,7 +1716,7 @@ function bindRoomEvents(
 
   room.onMessage("fx", (msg?: FxMsg) => {
     if (isMeasuring()) b.fxCount++;
-    const zone = parseWarnZoneFromFx(msg, performance.now());
+    const zone = parseWarnZoneFromFx(msg, performance.now(), b.reflexMs ?? 400);
     if (zone) {
       if (isPointInWarnZone(b.predX, b.predY, zone, 0)) {
         zone.targeted = true;
@@ -1941,6 +1999,8 @@ async function runLoadTest(
   sect = false,
   skills = false,
   evade = false,
+  boss = false,
+  reflexMs = 400,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -1960,14 +2020,15 @@ async function runLoadTest(
   const sectSuffix = sect ? ", tông môn (--sect)" : "";
   const skillsSuffix = skills ? ", chiêu thức (--skills)" : "";
   const evadeSuffix = evade ? ", né đòn (--evade)" : "";
+  const bossSuffix = boss ? `, săn trùm (--boss, reflex=${reflexMs}ms)` : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -2299,6 +2360,8 @@ async function runLoadTest(
       skillsMsgsCount: 0,
       skillsSent: 0,
       evade,
+      bossHunt: boss,
+      reflexMs,
       warns: [],
       evadeCount: 0,
       warnsTargetedCount: 0,
@@ -2858,13 +2921,21 @@ async function runLoadTest(
       } else {
         let targetMon: any = null;
         let bestScore = Number.POSITIVE_INFINITY;
-        const maxSearchDist = mode === "realistic" ? 280 : 420;
+        const maxSearchDist = b.bossHunt ? 2500 : mode === "realistic" ? 280 : 420;
         if (state?.monsters && typeof state.monsters.forEach === "function") {
           state.monsters.forEach((m: any) => {
             if (!m || m.hp <= 0) return;
             const dist = Math.hypot(m.x - b.predX, m.y - b.predY);
             if (dist > maxSearchDist) return;
-            const penalty = m.kind === "mang" ? 250 : m.kind === "ho" ? 80 : 0;
+            const penalty = b.bossHunt
+              ? m.kind === "mang"
+                ? -2000
+                : 500
+              : m.kind === "mang"
+                ? 250
+                : m.kind === "ho"
+                  ? 80
+                  : 0;
             const score = dist + penalty;
             if (score < bestScore) {
               bestScore = score;
@@ -2891,12 +2962,17 @@ async function runLoadTest(
             dy = 0;
           }
 
+          const inEvadeDanger =
+            b.evade &&
+            b.warns.length > 0 &&
+            isPointInAnyActiveWarn(b.predX, b.predY, b.warns, now, 16);
           if (
+            !inEvadeDanger &&
             b.skills &&
             tryCastLearnedSkill(b, me, dist, angle, now, measuring, targetMon.def?.element)
           ) {
             // Đã thi triển chiêu thức thành công
-          } else {
+          } else if (!inEvadeDanger) {
             if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
               const msg: AttackMsg = { angle };
               b.room.send("attack", msg);
@@ -2963,13 +3039,24 @@ async function runLoadTest(
     // Cập nhật cảnh báo: giải quyết kết quả trúng/né và dọn dẹp warn hết hạn (M7.10 #511)
     updateBotWarns(b, now, measuring);
 
-    // Nếu bot bật --evade và đang nằm trong vùng nguy hiểm của báo trước: ghi đè dx, dy để thoát hiểm
+    // Nếu bot bật --evade và đang có cảnh báo: né thoát hoặc giữ khoảng cách an toàn ngoài vùng
     if (b.evade && b.warns.length > 0) {
-      const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now);
+      const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now, 12);
       if (evadeVec) {
         dx = evadeVec.dx;
         dy = evadeVec.dy;
         b.evadeCount++;
+      } else {
+        // Bot đã ở ngoài vùng nguy hiểm. Kiểm tra xem vector di chuyển thông thường (dx, dy)
+        // có đưa bot bước vào lại vùng cảnh báo đang đếm ngược chưa nổ không?
+        const stepPx = statsFor(me.realm ?? 0, me.tier ?? 0).speed * (TICK_MS / 1000);
+        const nextX = b.predX + dx * stepPx;
+        const nextY = b.predY + dy * stepPx;
+        if (isPointInAnyActiveWarn(nextX, nextY, b.warns, now, 16)) {
+          // Ngăn không cho bot bước vào vùng nguy hiểm đang chờ nổ! Đứng yên ở vị trí an toàn.
+          dx = 0;
+          dy = 0;
+        }
       }
     }
 
@@ -4032,6 +4119,8 @@ async function main() {
           args.sect,
           args.skills,
           args.evade,
+          args.boss,
+          args.reflexMs,
         ),
       );
     }

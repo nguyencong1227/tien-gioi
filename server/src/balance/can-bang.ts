@@ -24,6 +24,7 @@ import { renderNguyenAnhSau } from "./nguyen-anh-kinh-te";
 import { renderOwnerGearSensitivity } from "./do-o-rieng";
 import { renderTinhAnh } from "./tinh-anh";
 import { renderBotHuntSection } from "./bot-hunt";
+import { renderSectEconomy } from "./tong-mon";
 import { renderSkillBalanceMarkdown } from "./skills-model";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
@@ -468,6 +469,8 @@ ${renderNguyenAnhSau()}
 ${renderOwnerGearSensitivity()}
 ${renderTinhAnh()}
 ${renderBotHuntSection()}
+
+${renderSectEconomy()}
 
 ${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
   );

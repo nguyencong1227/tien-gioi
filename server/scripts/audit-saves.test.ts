@@ -29,6 +29,7 @@ import {
   SECT_CONTRIB_CAP,
   SECT_EARN_DAY_CAP,
   SECT_DEPOSIT_DAY_CAP,
+  SECT_LEVELS,
   SECT_SHOP,
   SKILLS_M7,
   sanitizeSkillBook,
@@ -1749,6 +1750,40 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditSectSaveData(rawBadBuysQty, rawBadBuysQty.length).map((e) => e.code)).toContain(
         "invalid_sect_member_today_buy_qty",
       );
+    });
+
+    it("M8.10: today.buys món mở ở cấp tông cao hơn cấp HIỆN TẠI -> sect_member_today_buy_level_too_high (quét MỌI món SECT_SHOP thật, đúng cấp hợp lệ, liền dưới cấp thì lỗi)", () => {
+      const levelPoints = (lv: number) => SECT_LEVELS.find((l) => l.level === lv)!.points;
+      const rawAt = (itemId: string, qty: number, points: number) =>
+        JSON.stringify({
+          ...validSect,
+          points,
+          members: [
+            {
+              ...validSect.members[0],
+              today: { day: "2026-11-17", earned: 0, buys: { [itemId]: qty } },
+            },
+          ],
+        });
+      const codesOf = (raw: string) => auditSectSaveData(raw, raw.length).map((e) => e.code);
+      let lowered = 0;
+      for (const e of SECT_SHOP) {
+        // đúng cấp mở món: hợp lệ (không lỗi nào)
+        expect(codesOf(rawAt(e.itemId, 1, levelPoints(e.minLevel))), e.itemId).toEqual([]);
+        // một điểm dưới ngưỡng cấp mở món: cấp tông còn thấp hơn minLevel -> lỗi (cấp 1 không có cấp dưới)
+        if (e.minLevel > 1) {
+          lowered++;
+          expect(codesOf(rawAt(e.itemId, 1, levelPoints(e.minLevel) - 1)), e.itemId).toContain(
+            "sect_member_today_buy_level_too_high",
+          );
+          // qty = 0 (khoá có mặt nhưng chưa mua) không phải bằng chứng mua: không lỗi cấp
+          expect(codesOf(rawAt(e.itemId, 0, levelPoints(e.minLevel) - 1)), e.itemId).not.toContain(
+            "sect_member_today_buy_level_too_high",
+          );
+        }
+      }
+      // bảng thật phải có món mở sau cấp 1, không thì vòng lặp trên chẳng kiểm gì
+      expect(lowered).toBeGreaterThan(10);
     });
 
     it("M8: today.earned vượt quá tổng cống hiến các nguồn đã ghi nhận -> sect_member_today_earned_exceeds_sources (kèm các ca ranh giới nguồn)", () => {
