@@ -1,9 +1,10 @@
 // Test tích hợp Trùm nhiều chiêu (T6 #875, docs/THIET_KE_TRUM.md mục 2, 4):
 // Chạy trên máy chủ Colyseus THẬT với `BOSS_MOVES=on` và dữ liệu `BOSSES` thật (Xích Mãng ở Hắc Phong Cốc).
 // Kiểm chứng:
-//   1. Client gần trùm nhận `fx` `bossCast` và `warn` qua `sendNear`; Client xa ngoài vùng nhìn KHÔNG nhận.
-//   2. Client đứng yên trong vùng cảnh báo bị mất khí huyết đúng sau `ms`; nếu né ra ngoài vùng thì KHÔNG mất khí huyết.
-//   3. Người chơi trong Hoàng Tuyền (limbo / dead) nằm trong vùng đáp chiêu KHÔNG bị trúng đòn thêm, không mất kiếp lần hai.
+//   1. Client gần trùm nhận `fx` `bossCast` và `warn` qua `sendNear`; Client xa ngoài vùng nhìn KHÔNG nhận (đối chứng cùng lượt).
+//   2. Đối chứng cùng lượt: Client đứng yên trong vùng cảnh báo bị mất khí huyết; Client né ra ngoài thì KHÔNG mất khí huyết.
+//   3. Người chơi trong Hoàng Tuyền (limbo / dead) nằm trong vùng đáp chiêu KHÔNG bị trúng thêm, không mất kiếp lần hai (đối chứng với người sống đứng cạnh).
+//   4. Đột biến và biên an toàn: bossCanTarget từ chối người chết; fxReachOf tính đúng tầm phủ.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,7 +23,7 @@ import {
 import { fxReachOf, type WorldRoom } from "./WorldRoom";
 import type { WorldState } from "../schema";
 import { listenWithRetry } from "../test-port";
-import { bossCanTarget, bossInZone } from "../systems/boss";
+import { bossCanTarget } from "../systems/boss";
 import { hurtPlayer } from "../systems/combat";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-boss-room-"));
@@ -134,183 +135,208 @@ async function spawnInHacPhong(name: string, x?: number, y?: number): Promise<He
   return spawn(name, roomNameOf(HAC_PHONG_ID));
 }
 
+function getBoss(w: any, kind = "mang") {
+  for (const [id, m] of w.state.monsters) {
+    if (m.kind === kind) {
+      return { id, m, mc: w.mctrl.get(id)! };
+    }
+  }
+  return null;
+}
+
+/** Khóa đòn thường của mọi quái trong phòng và ép trùm vận chiêu nón quat_duoi (r: 150 px, arc: 120 độ) nhắm vào targetSid */
+function forceQuatDuoi(w: any, boss: NonNullable<ReturnType<typeof getBoss>>, targetSid: string) {
+  // Khử nhiễu: không quái nào trong phòng (trùm và quái thường xung quanh) được đánh thường
+  for (const mc of w.mctrl.values()) {
+    mc.nextAttack = Number.MAX_SAFE_INTEGER;
+  }
+  boss.mc.target = targetSid;
+  boss.mc.boss.engaged = true;
+  // Khóa mọi chiêu khác, chỉ để quat_duoi sẵn sàng
+  boss.mc.boss.cds.set("phun_doc", w.now + 1_000_000);
+  boss.mc.boss.cds.set("cuon_minh", w.now + 1_000_000);
+  boss.mc.boss.cds.set("goi_ran_con", w.now + 1_000_000);
+  boss.mc.boss.cds.delete("quat_duoi");
+  boss.mc.boss.nextCastAt = w.now;
+}
+
 describe("Trùm nhiều chiêu trên máy chủ Colyseus thật (T6 #875)", () => {
-  it("Client gần nhận bossCast và fx warn; Client xa ngoài vùng nhìn KHÔNG nhận (sendNear)", async () => {
+  it("Client gần nhận bossCast và fx warn; Client xa ngoài vùng nhìn KHÔNG nhận (sendNear đối chứng cùng lượt)", async () => {
     // 1. Tạo phòng Hắc Phong Cốc và tìm trùm Xích Mãng
     const nameNear = `Near ${++seq}`;
     const near = await spawnInHacPhong(nameNear);
     const w = worldOf(near.room);
     expect(w.bossMoves).toBe(true);
 
-    // Tìm con trùm mang trong phòng
-    let bossId: string | null = null;
-    let bossObj: any = null;
-    for (const [id, m] of w.state.monsters) {
-      if (m.kind === "mang") {
-        bossId = id;
-        bossObj = m;
-        break;
-      }
-    }
-    expect(bossId).not.toBeNull();
-    const bossCtrl = w.mctrl.get(bossId!);
-    expect(bossCtrl?.boss).toBeDefined();
+    const boss = getBoss(w, "mang");
+    expect(boss).not.toBeNull();
+    expect(boss!.mc?.boss).toBeDefined();
 
-    // 2. Client Alpha (gần): đặt cách trùm 80 px (trong tầm nhìn và aggro của trùm)
+    // 2. Client Near (gần): đặt cách trùm 80 px (trong tầm nhìn và aggro của trùm)
     const pNear = serverState(near.room).players.get(near.room.sessionId)!;
-    pNear.x = bossObj.x + 80;
-    pNear.y = bossObj.y;
+    pNear.x = boss!.m.x + 80;
+    pNear.y = boss!.m.y;
 
-    // 3. Client Bravo (xa): tạo ở trấn Hắc Phong Cốc (cách trùm > 1000 px, ngoài vùng nhìn)
+    // 3. Client Far (xa): tạo ở trấn Hắc Phong Cốc (cách trùm > 1000 px, ngoài vùng nhìn)
     const nameFar = `Far ${++seq}`;
     const far = await spawnInHacPhong(nameFar, w.map.townPx.x, w.map.townPx.y);
     const pFar = serverState(far.room).players.get(far.room.sessionId)!;
-    const distToFar = Math.hypot(pFar.x - bossObj.x, pFar.y - bossObj.y);
+    const distToFar = Math.hypot(pFar.x - boss!.m.x, pFar.y - boss!.m.y);
     expect(distToFar).toBeGreaterThan(600); // Ngoài vùng nhìn
 
-    // 4. Chờ trùm phát hiện người chơi gần và vận chiêu
+    // Xóa mọi fx nhận được trong quá trình kết nối ban đầu để đo chính xác đòn ép
+    near.fxList.length = 0;
+    far.fxList.length = 0;
+
+    // 4. Khử nhiễu đòn thường và ép trùm vận chiêu quat_duoi ngay vào Near
+    forceQuatDuoi(w, boss!, near.room.sessionId);
+
+    // 5. Đối chứng dương: Near nhận đủ cả warn và bossCast
     const warnReceived = await waitFor(
-      () =>
-        near.fxList.find(
-          (f) => f.kind === "warn" || (f.kind === "bossCast" && (f as any).by === bossId),
-        ),
-      7000,
-      "Alpha nhận tin nhắn cảnh báo hoặc bossCast từ trùm",
+      () => near.fxList.find((f) => f.kind === "warn"),
+      4000,
+      "Near nhận fx warn từ trùm",
+    );
+    const castReceived = await waitFor(
+      () => near.fxList.find((f) => f.kind === "bossCast" && (f as any).by === boss!.id),
+      4000,
+      "Near nhận bossCast từ trùm",
     );
     expect(warnReceived).toBeDefined();
+    expect(castReceived).toBeDefined();
+    expect(near.fxList.filter((f) => f.kind === "warn").length).toBeGreaterThan(0);
+    expect(
+      near.fxList.filter((f) => f.kind === "bossCast" && (f as any).by === boss!.id).length,
+    ).toBeGreaterThan(0);
 
-    // 5. Kiểm chứng Client xa KHÔNG nhận được bất kỳ warn hay bossCast nào từ con trùm này
+    // 6. Chờ theo điều kiện: trùm bắt đầu gồng và hoàn tất đòn chiêu
+    await waitFor(() => boss!.mc.boss.cast != null, 2000, "trùm bắt đầu gồng");
+    await waitFor(() => boss!.mc.boss.cast == null, 5000, "trùm hoàn tất đòn chiêu");
+
+    // 7. Đối chứng âm cùng lượt: Client xa KHÔNG nhận được bất kỳ warn hay bossCast nào
     const farBossFx = far.fxList.filter(
-      (f) => f.kind === "warn" || (f.kind === "bossCast" && (f as any).by === bossId),
+      (f) => f.kind === "warn" || (f.kind === "bossCast" && (f as any).by === boss!.id),
     );
     expect(farBossFx.length).toBe(0);
   });
 
-  it("Client đứng yên trong vùng cảnh báo bị mất khí huyết đúng sau ms", async () => {
-    const name = `Stand ${++seq}`;
-    const hero = await spawnInHacPhong(name);
-    const w = worldOf(hero.room);
+  it("Đối chứng cùng lượt: Client đứng yên mất khí huyết vs Client né ra ngoài KHÔNG mất khí huyết (cùng một đòn chiêu)", async () => {
+    // 1. Tạo 2 hero: Stand (đứng yên) và Dodge (né thoát) cùng trong Hắc Phong Cốc
+    const nameStand = `Stand ${++seq}`;
+    const stand = await spawnInHacPhong(nameStand);
+    const w = worldOf(stand.room);
 
-    let bossId: string | null = null;
-    let bossObj: any = null;
-    for (const [id, m] of w.state.monsters) {
-      if (m.kind === "mang") {
-        bossId = id;
-        bossObj = m;
-        break;
-      }
-    }
-    expect(bossId).not.toBeNull();
-    const p = serverState(hero.room).players.get(hero.room.sessionId)!;
+    const boss = getBoss(w, "mang");
+    expect(boss).not.toBeNull();
+    const pStand = serverState(stand.room).players.get(stand.room.sessionId)!;
 
-    // Đặt người chơi cạnh trùm để trùm vận chiêu
-    p.x = bossObj.x + 60;
-    p.y = bossObj.y;
-    const hpInitial = p.hp;
+    const nameDodge = `Dodge ${++seq}`;
+    const dodge = await spawnInHacPhong(nameDodge);
+    const pDodge = serverState(dodge.room).players.get(dodge.room.sessionId)!;
 
-    // Đợi trùm bắt đầu gồng chiêu (phát bossCast và warn)
+    // Đặt máu đủ lớn để không bị hạ gục ngay
+    pStand.hp = pStand.maxHp = 1000;
+    pDodge.hp = pDodge.maxHp = 1000;
+
+    // 2. Đặt cả 2 ban đầu cùng trong vùng quất đuôi (nón 150 px phía trước trùm)
+    pStand.x = boss!.m.x + 80;
+    pStand.y = boss!.m.y;
+    pDodge.x = boss!.m.x + 80;
+    pDodge.y = boss!.m.y + 20;
+
+    stand.fxList.length = 0;
+    dodge.fxList.length = 0;
+
+    // 3. Khử hoàn toàn đòn thường và ép trùm gồng chiêu quat_duoi vào Stand
+    forceQuatDuoi(w, boss!, stand.room.sessionId);
+
+    // 4. Chờ nhận bossCast gồng chiêu và xác nhận trùm đang trong trạng thái gồng
     const castFx = await waitFor(
-      () => hero.fxList.find((f) => f.kind === "bossCast" && (f as any).by === bossId) as any,
-      7000,
+      () => stand.fxList.find((f) => f.kind === "bossCast" && (f as any).by === boss!.id) as any,
+      4000,
       "nhận bossCast",
     );
-    expect(castFx.ms).toBeGreaterThanOrEqual(800); // Lời hứa công bằng: báo trước >= 800ms
+    expect(castFx.ms).toBeGreaterThanOrEqual(800); // Báo trước >= 800 ms
+    await waitFor(() => boss!.mc.boss.cast != null, 2000, "trùm đang cast");
 
-    // ĐỨNG YÊN trong vùng cảnh báo -> mất khí huyết sau khi ms trôi qua
-    await waitFor(() => p.hp < hpInitial, castFx.ms + 600, "mất khí huyết sau khi đòn đáp");
-    expect(p.hp).toBeLessThan(hpInitial);
+    // Ghi nhận khí huyết trước khi đòn nổ
+    const hpStandBefore = pStand.hp;
+    const hpDodgeBefore = pDodge.hp;
+
+    // 5. Trong thời gian gồng: Stand đứng nguyên, Dodge né luồn ra sau lưng trùm (cách trùm 80 px phía sau, hoàn toàn ngoài nón)
+    pDodge.x = boss!.m.x - 80;
+    pDodge.y = boss!.m.y;
+
+    // 6. Chờ theo điều kiện đòn chiêu hoàn tất (cast null)
+    await waitFor(() => boss!.mc.boss.cast == null, 5000, "trùm hoàn tất đòn chiêu");
+
+    // 7. Khẳng định đối chứng song song:
+    // Stand đứng yên -> chắc chắn mất khí huyết
+    expect(pStand.hp).toBeLessThan(hpStandBefore);
+    // Dodge đã né ra sau lưng ngoài vùng nón -> chắc chắn KHÔNG mất khí huyết
+    expect(pDodge.hp).toBe(hpDodgeBefore);
   });
 
-  it("Client né ra ngoài vùng cảnh báo trong lúc trùm gồng chiêu thì KHÔNG mất khí huyết", async () => {
-    const name = `Dodge ${++seq}`;
-    const hero = await spawnInHacPhong(name);
-    const w = worldOf(hero.room);
+  it("Người chơi trong Hoàng Tuyền (limbo/dead) nằm trong vùng đáp chiêu KHÔNG bị trúng thêm, không mất kiếp lần hai (đối chứng với người sống)", async () => {
+    // 1. Tạo 2 hero: một người sống (Alive) và một người đưa vào Hoàng Tuyền (Dead)
+    const nameDead = `Limbo ${++seq}`;
+    const deadHero = await spawnInHacPhong(nameDead);
+    const w = worldOf(deadHero.room);
+    const sidDead = deadHero.room.sessionId;
+    const pDead = serverState(deadHero.room).players.get(sidDead)!;
+    const ctrlDead = w.ctrl.get(sidDead)!;
 
-    let bossId: string | null = null;
-    let bossObj: any = null;
-    for (const [id, m] of w.state.monsters) {
-      if (m.kind === "mang") {
-        bossId = id;
-        bossObj = m;
-        break;
-      }
-    }
-    expect(bossId).not.toBeNull();
-    const p = serverState(hero.room).players.get(hero.room.sessionId)!;
+    const boss = getBoss(w, "mang");
+    expect(boss).not.toBeNull();
 
-    // Đặt người chơi cạnh trùm
-    p.x = bossObj.x + 60;
-    p.y = bossObj.y;
+    const nameAlive = `Alive ${++seq}`;
+    const aliveHero = await spawnInHacPhong(nameAlive);
+    const sidAlive = aliveHero.room.sessionId;
+    const pAlive = serverState(aliveHero.room).players.get(sidAlive)!;
 
-    // Chờ trùm gồng chiêu
-    const castFx = await waitFor(
-      () => hero.fxList.find((f) => f.kind === "bossCast" && (f as any).by === bossId) as any,
-      7000,
-      "nhận bossCast để né",
-    );
+    // 2. Đưa deadHero vào Hoàng Tuyền bằng sát thương quái
+    ctrlDead.life = { playMs: 600_000, kills: 10, bossKills: 1 };
+    pDead.realm = 1;
+    pDead.tier = 5;
+    hurtPlayer(w, sidDead, pDead, 1e9, boss!.m);
 
-    // Ghi nhận máu ngay lúc trùm gồng (có thể đã chịu 1 đòn đánh thường ban đầu)
-    const hpWhenCast = p.hp;
+    expect(pDead.dead).toBe(true);
+    expect(ctrlDead.limbo).not.toBeNull();
+    const limboSummaryBefore = { ...ctrlDead.limbo!.summary };
+    const endedLifeIdBefore = ctrlDead.limbo!.endedLifeId;
+    const hpAtDead = pDead.hp;
 
-    // NÉ THOÁT - dịch chuyển tức thời người chơi ra xa khỏi vùng chiêu trong lúc trùm đang gồng
-    p.x = bossObj.x + 500;
-    p.y = bossObj.y + 500;
+    // 3. Đặt cả xác Dead lẫn Alive tại cùng toạ độ trong vùng đáp đòn của trùm
+    pDead.x = boss!.m.x + 80;
+    pDead.y = boss!.m.y;
+    pAlive.x = boss!.m.x + 80;
+    pAlive.y = boss!.m.y;
+    pAlive.hp = pAlive.maxHp = 1000;
 
-    // Chờ đòn đáp xong
-    await sleep(castFx.ms + 400);
+    aliveHero.fxList.length = 0;
+    deadHero.fxList.length = 0;
 
-    // Khí huyết KHÔNG bị trừ thêm bởi đòn chiêu của trùm vì đã thoát khỏi vùng đáp đòn
-    expect(p.hp).toBe(hpWhenCast);
-  });
+    const hpAliveBefore = pAlive.hp;
 
-  it("Người chơi trong Hoàng Tuyền (limbo/dead) nằm trong vùng đáp chiêu KHÔNG bị trúng thêm, không mất kiếp lần hai", async () => {
-    const name = `Limbo ${++seq}`;
-    const hero = await spawnInHacPhong(name);
-    const w = worldOf(hero.room);
-    const sid = hero.room.sessionId;
-    const p = serverState(hero.room).players.get(sid)!;
-    const ctrl = w.ctrl.get(sid)!;
+    // 4. Khử đòn thường, ép trùm tung chiêu quat_duoi nhắm vào Alive
+    forceQuatDuoi(w, boss!, sidAlive);
 
-    let bossObj: any = null;
-    for (const [, m] of w.state.monsters) {
-      if (m.kind === "mang") {
-        bossObj = m;
-        break;
-      }
-    }
+    // 5. Chờ trùm bắt đầu gồng và hoàn tất đòn chiêu
+    await waitFor(() => boss!.mc.boss.cast != null, 4000, "trùm bắt đầu gồng chiêu lên Alive");
+    await waitFor(() => boss!.mc.boss.cast == null, 5000, "trùm hoàn tất đòn chiêu");
 
-    // 1. Đưa người chơi vào Hoàng Tuyền bằng sát thương quái
-    ctrl.life = { playMs: 600_000, kills: 10, bossKills: 1 };
-    p.realm = 1;
-    p.tier = 5;
-    hurtPlayer(w, sid, p, 1e9, bossObj);
-
-    expect(p.dead).toBe(true);
-    expect(ctrl.limbo).not.toBeNull();
-    const limboSummaryBefore = { ...ctrl.limbo!.summary };
-    const endedLifeIdBefore = ctrl.limbo!.endedLifeId;
-    const hpAtDead = p.hp;
-
-    // 2. Đặt xác người chơi ngay tại tâm trùm (nằm chắc chắn trong mọi vùng đáp đòn)
-    p.x = bossObj.x;
-    p.y = bossObj.y;
-
-    // 3. Cho trùm đáp một đòn sát thương trực tiếp lên vùng chứa xác người chơi
-    const z = { t: "circle" as const, x: bossObj.x, y: bossObj.y, r: 200, r0: 0 };
-    expect(bossInZone(z, p.x, p.y)).toBe(true);
-
-    // Chờ 1 chiêu nổ qua vòng lặp phòng hoặc gọi trực tiếp qua bossStep
-    await sleep(500);
-
-    // 4. Bất biến: người trong Hoàng Tuyền không bị trúng thêm
-    expect(p.hp).toBe(hpAtDead);
-    expect(ctrl.limbo!.summary).toEqual(limboSummaryBefore);
-    expect(ctrl.limbo!.endedLifeId).toBe(endedLifeIdBefore);
+    // 6. Khẳng định đối chứng:
+    // Người sống Alive đứng tại toạ độ đó chắc chắn bị trúng đòn và mất máu (chứng minh đòn trùm thực sự đã nổ trúng toạ độ này)
+    expect(pAlive.hp).toBeLessThan(hpAliveBefore);
+    // Người chết trong Hoàng Tuyền nằm cùng toạ độ TUYỆT ĐỐI KHÔNG bị trúng thêm, không mất kiếp lần 2
+    expect(pDead.hp).toBe(hpAtDead);
+    expect(ctrlDead.limbo!.summary).toEqual(limboSummaryBefore);
+    expect(ctrlDead.limbo!.endedLifeId).toBe(endedLifeIdBefore);
   });
 });
 
 describe("Đột biến và biên an toàn của trùm (T6 #875)", () => {
-  it("bossCanTarget từ chối người chết / Hoàng Tuyền (đột biến bỏ kiểm p.dead -> ĐỎ)", () => {
+  it("bossCanTarget từ chối người chết / Hoàng Tuyền (đơn vị: đột biến bỏ kiểm p.dead -> ĐỎ)", () => {
     const fakeWorld = {
       map: { inSafe: () => false },
       ghosts: new Set<string>(),
@@ -325,7 +351,7 @@ describe("Đột biến và biên an toàn của trùm (T6 #875)", () => {
     expect(bossCanTarget(fakeWorld, "sid2", deadPlayer)).toBe(false);
   });
 
-  it("fxReachOf tính đúng tầm phủ của cảnh báo trùm (không tràn cả phòng)", () => {
+  it("fxReachOf tính đúng tầm phủ của cảnh báo trùm (đơn vị: warn trả đúng r, không tràn cả phòng)", () => {
     const circleWarn: FxMsg = { kind: "warn", shape: "circle", x: 100, y: 100, r: 150, ms: 1000 };
     const reach = fxReachOf(circleWarn);
     expect(reach).toBe(150); // Tầm vươn đúng bằng bán kính vùng
