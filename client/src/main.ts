@@ -15,6 +15,9 @@ import {
   RECIPES,
   SHOPS,
   sampleSectHall,
+  sampleBoards,
+  sampleWorldBossEvent,
+  sampleAchievements,
   SKILLS_M7,
   getMap,
   isDungeonMap,
@@ -720,6 +723,12 @@ async function start(room: Room, mapId: string) {
     (window as any).__craftData = { NPC_BY_ID, ITEM_BY_ID, RECIPES };
     // Cho `check-sect-hall.mjs` (M8.6, #843): ảnh chụp "Nội vụ" MẪU khớp kiểu thật (`sampleSectHall` của `shared/`) để nạp vào bảng Tông môn
     (window as any).__sampleSectHall = sampleSectHall;
+    // Cho `check-social-shell.mjs` (M9): tin MẪU khớp kiểu thật (`shared/src/social.ts`) để nạp vào bảng Xã hội khi chưa có máy chủ M9
+    (window as any).__sample = {
+      boards: sampleBoards,
+      worldBoss: sampleWorldBossEvent,
+      achievements: sampleAchievements,
+    };
     (window as any).__catalog = () => ({
       recipes: RECIPES.map((r) => ({
         id: r.id,
