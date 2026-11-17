@@ -107,6 +107,8 @@ describe("thành tựu qua phòng thật", () => {
   it("MẶC ĐỊNH TẮT: bộ đếm vẫn ghi vào chân linh nhưng không cấp thành tựu / Duyên / tin; BẬT thì thành tựu đến hạn được CẤP BÙ ở lần ghi kế", async () => {
     const h = await spawn();
     expect(WorldRoomCls.achievements).toBe(false);
+    await sleep(400); // vào phòng khi TẮT: không ghi theo dõi (bản đồ / kiếp / cảnh giới) nên chân linh không có phần xã hội
+    expect((await soulOf(h))?.social).toBeUndefined();
     trackSocial(serverRoom(h.room).world, h.room.sessionId, ["boss:mang", 1]);
     const s1 = await until(
       async () => {
