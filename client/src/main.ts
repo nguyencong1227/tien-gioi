@@ -24,6 +24,7 @@ import {
 } from "@tien-gioi/shared";
 import { WorldScene } from "./scenes/WorldScene";
 import { ui } from "./ui";
+import { setBossCardOverride } from "./boss-card";
 import { setMapCardOverride } from "./map-card";
 import { setNpcPortraitOverride } from "./npc-portrait";
 import {
@@ -709,6 +710,8 @@ async function start(room: Room, mapId: string) {
     (window as any).__ui = ui;
     // Cho `check-map-card.mjs`: thử thẻ minh hoạ của màn chuyển cảnh với ảnh thế chỗ (bản chạy thật không có mục ghi đè)
     (window as any).__mapCardOverride = setMapCardOverride;
+    // Cho `check-boss-card.mjs`: thử thẻ trùm trên thanh máu với gói giả (bản chạy thật không có mục ghi đè)
+    (window as any).__bossCardOverride = setBossCardOverride;
     // Cho `check-npc-portrait.mjs`: thử chân dung NPC ở hộp thoại với gói giả (bản chạy thật không có mục ghi đè)
     (window as any).__npcPortraitOverride = setNpcPortraitOverride;
     // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
