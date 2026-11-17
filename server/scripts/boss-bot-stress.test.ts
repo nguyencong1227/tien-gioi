@@ -66,6 +66,8 @@ async function createTestBot(
   startX = 1000,
   startY = 1080,
   targetRoomId?: string,
+  reflexMs = 400,
+  ignoreWarn = false,
 ): Promise<{
   room: Room;
   bot: BotState;
@@ -100,6 +102,7 @@ async function createTestBot(
     predX: startX,
     predY: startY,
     evade,
+    reflexMs,
     warns: [],
     evadeCount: 0,
     warnsTargetedCount: 0,
@@ -114,13 +117,15 @@ async function createTestBot(
   room.onMessage("fx", (msg: any) => {
     if (msg.kind === "warn") {
       receivedWarns.push(msg);
-      const zone = parseWarnZoneFromFx(msg, performance.now());
-      if (zone) {
-        zone.targeted = isPointInWarnZone(bot.predX, bot.predY, zone, 0);
-        if (zone.targeted) {
-          bot.warnsTargetedCount++;
+      if (!ignoreWarn) {
+        const zone = parseWarnZoneFromFx(msg, performance.now(), bot.reflexMs ?? 400);
+        if (zone) {
+          zone.targeted = isPointInWarnZone(bot.predX, bot.predY, zone, 0);
+          if (zone.targeted) {
+            bot.warnsTargetedCount++;
+          }
+          bot.warns.push(zone);
         }
-        bot.warns.push(zone);
       }
     }
   });
@@ -153,8 +158,8 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm trên máy ch
   });
 
   it("2. Đối chứng tỉ lệ né: Bot bật evade né thoát 100%, Bot không né dính đòn 100% trong vành khuyên trùm", async () => {
-    const { room: r1, bot: botEvade } = await createTestBot(true, 1000, 1080);
-    const { room: _r2, bot: botStand } = await createTestBot(false, 1000, 1080, r1.roomId);
+    const { room: r1, bot: botEvade } = await createTestBot(true, 1000, 1070);
+    const { room: _r2, bot: botStand } = await createTestBot(false, 1000, 1070, r1.roomId);
     const sr = serverRoom(r1);
 
     const warnDurationMs = 800; // Báo trước 800 ms chuẩn thiết kế
@@ -178,11 +183,11 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm trên máy ch
 
     const warnZone = botEvade.warns[0];
     const expiresAt = warnZone.expiresAt;
-    const t0 = expiresAt - warnDurationMs;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
     const speed = 150; // px/s
 
-    // 14 tick (700 ms) di chuyển trước khi đòn đáp
-    for (let tick = 0; tick < 14; tick++) {
+    // 16 tick (800 ms) di chuyển trước khi đòn đáp
+    for (let tick = 0; tick < 16; tick++) {
       const curT = t0 + tick * 50;
       updateBotWarns(botEvade, curT, true);
       updateBotWarns(botStand, curT, true);
@@ -380,5 +385,148 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm trên máy ch
     const totalStandEvaded = standBots.reduce((s, b) => s + b.warnsEvadedCount, 0);
     expect(totalStandHit).toBe(5);
     expect(totalStandEvaded).toBe(0);
+  });
+
+  it("6. Lời hứa công bằng: Bot phản xạ 400 ms vẫn né thoát 100% trước đòn báo trước 800 ms", async () => {
+    // Bot đứng ở vị trí (1000, 1070) trong vành khuyên trùm
+    const { room, bot } = await createTestBot(true, 1000, 1070, undefined, 400);
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn");
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].targeted).toBe(true);
+
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150; // 150 px/s
+
+    // 14 tick (700 ms) di chuyển
+    for (let tick = 0; tick < 14; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Đòn đáp xuống
+    updateBotWarns(bot, expiresAt, true);
+    // Dù chờ 400 ms phản xạ (chỉ còn 400 ms để chạy = 8 tick = 60 px), bot vẫn thoát hiểm thành công
+    expect(bot.warnsEvadedCount).toBe(1);
+    expect(bot.warnsHitCount).toBe(0);
+    expect(bot.evadeCount).toBeGreaterThan(0);
+  });
+
+  it("7. Đột biến 1: Bot phản xạ chậm 900 ms (lớn hơn thời gian báo trước 800 ms) -> dính đòn (ĐỎ)", async () => {
+    // Phản xạ 900 ms > 800 ms: khi đòn đáp thì bot vẫn chưa bắt đầu chạy né
+    const { room, bot } = await createTestBot(true, 1000, 1070, undefined, 900);
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn");
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].targeted).toBe(true);
+
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // Trong 800 ms đầu (16 tick), vì reflexMs = 900 ms nên bot không cử động
+    for (let tick = 0; tick < 16; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Đòn đáp xuống tại 800 ms
+    updateBotWarns(bot, expiresAt, true);
+    // Khẳng định bot bị dính đòn vì phản xạ quá chậm
+    expect(bot.warnsHitCount).toBe(1);
+    expect(bot.warnsEvadedCount).toBe(0);
+    expect(bot.evadeCount).toBe(0); // Chưa kịp chạy một bước nào
+  });
+
+  it("8. Đột biến 2: Bỏ qua tin nhắn fx warn -> bot không nhận diện được đòn và dính đòn 100% (ĐỎ)", async () => {
+    // ignoreWarn = true: bot nhận tin fx warn từ server nhưng bỏ qua (không phân tích vào danh sách warns)
+    const { room, bot, receivedWarns } = await createTestBot(
+      true,
+      1000,
+      1070,
+      undefined,
+      400,
+      true,
+    );
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => receivedWarns.length > 0, 2000, "bot nhận được tin fx");
+    // Vì bỏ qua phân tích warn nên bot.warns rỗng
+    expect(bot.warns).toHaveLength(0);
+
+    const warnZone = parseWarnZoneFromFx(receivedWarns[0], performance.now(), 0)!;
+    const expiresAt = warnZone.expiresAt;
+    const t0 = expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // Trong 800 ms báo trước, bot không hề có ý niệm né (computeEvadeVector luôn trả về null)
+    for (let tick = 0; tick < 16; tick++) {
+      const curT = t0 + tick * 50;
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Bot không di chuyển bước nào
+    expect(bot.evadeCount).toBe(0);
+    expect(bot.predX).toBe(1000);
+    expect(bot.predY).toBe(1070);
+
+    // Môi trường chấm điểm trúng đòn: bot vẫn ở trong vùng sát thương
+    const hit = isPointInWarnZone(bot.predX, bot.predY, warnZone, 0);
+    expect(hit).toBe(true);
   });
 });
