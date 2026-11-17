@@ -60,10 +60,22 @@ export interface SavedPlayer {
    * nhận lượt nào. Đọc bằng `sanitizeDungeonDaily` (systems/dungeon.ts), không tin giá trị trong file.
    */
   dungeonDaily?: DungeonDaily;
+  /**
+   * Số lần bị chặn đường hôm nay (`dayKey` UTC+7; tối đa `AMBUSH_DAY_CAP`, mục 52). Thiếu = chưa bị lần nào. Đọc bằng `sanitizeAmbushDaily` (systems/ambush.ts), không tin giá trị trong file.
+   */
+  ambushDaily?: AmbushDaily;
+  /** Mốc (ms, `Date.now()`) tới khi chưa bị chặn đường nữa (hồi sau lần trước): đăng nhập lại / qua cổng không xoá hồi. Đọc bằng `sanitizeAmbushUntil`. */
+  ambushUntil?: number;
   /** Lần đi qua cổng gần nhất (ms, `Date.now()`): hồi chiêu `TRAVEL_COOLDOWN_MS` tính qua cả các phòng */
   travelAt?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Bộ đếm chặn đường theo ngày trong hồ sơ: `day` là `dayKey`, `n` là số lần đã bị chặn hôm đó. */
+export interface AmbushDaily {
+  day: string;
+  n: number;
 }
 
 /** Bản ghi Hoàng Tuyền trong hồ sơ nhân vật. */

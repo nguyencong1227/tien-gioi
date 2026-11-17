@@ -151,7 +151,7 @@ try {
       const rows = [...document.querySelectorAll('#skills-list .sk-row')].map((r) => {
         const line = r.querySelector('.sk-line'), detail = r.querySelector('.sk-detail');
         return {
-        id: r.dataset.skill, name: r.querySelector('.sk-row-name').textContent, pips: r.querySelector('.sk-row-pips').textContent.trim(),
+        id: r.dataset.skill, name: r.querySelector('.sk-row-name').firstChild.textContent, pips: r.querySelector('.sk-row-pips').textContent.trim(),
         badge: r.querySelector('.sk-row-badge')?.textContent ?? '', need: r.querySelector('.sk-row-need')?.textContent ?? '', sub: r.querySelector('.sk-line .sk-row-tag').textContent,
         aria: line.getAttribute('aria-label'), expanded: line.getAttribute('aria-expanded'), detailHidden: detail.hidden, h: Math.round(line.getBoundingClientRect().height),
         stats: [...r.querySelectorAll('.sk-row-stats li')].map((l) => l.textContent),
@@ -212,7 +212,7 @@ try {
   check(
     hoa0.badge === "Ô 2" &&
       /^Hỏa · tầng \d$/.test(hoa0.sub) &&
-      /Hỏa Vân Kiếm, hệ Hỏa, tầng \d trên 3, đang ở ô 2/.test(hoa0.aria),
+      /Hỏa Vân Kiếm, hệ Hỏa, phẩm \S+, tầng \d trên 3, đang ở ô 2/.test(hoa0.aria),
     `hàng Hỏa Vân Kiếm: tên + hệ + ô đang giữ ("${hoa0.name}" | "${hoa0.sub}" | "${hoa0.badge}" | aria "${hoa0.aria}")`,
   );
   check(
@@ -508,7 +508,12 @@ try {
     await shot(`cong-phap-gon-18-${f.id}`);
 
     // mũi tên Xuống 17 lần từ hàng đầu: tới đúng hàng cuối và hàng đó nằm TRONG vùng nhìn của danh sách
-    await focusNav("skillrow:hoa_van_kiem");
+    // từ 8 chiêu trở lên bảng xếp "đang gắn trước, phẩm cao trước" (CT11a): hàng đầu / hàng cuối lấy theo THỨ TỰ ĐÃ VẼ, không còn cố định
+    const order = await J(
+      `[...document.querySelectorAll('#skills-list .sk-row')].map((r) => r.dataset.skill)`,
+    );
+    const lastId = order[order.length - 1];
+    await focusNav(`skillrow:${order[0]}`);
     const seq = [];
     for (let k = 0; k < 17; k++) {
       await press("ArrowDown");
@@ -518,7 +523,7 @@ try {
       const list = document.getElementById('skills-list'), a = document.activeElement, lr = list.getBoundingClientRect(), ar = a.getBoundingClientRect();
       return { nav: a.dataset.nav, inView: ar.top >= lr.top - 1 && ar.bottom <= lr.bottom + 1 }; })()`);
     check(
-      last.nav === "skillrow:gia_5" && last.inView,
+      last.nav === `skillrow:${lastId}` && last.inView,
       `Xuống 17 lần: tới chiêu cuối và cuộn vào tầm nhìn (${JSON.stringify(last)}; đường đi ${seq.join(" > ")})`,
     );
     await shot(`cong-phap-gon-18-cuoi-${f.id}`);
@@ -527,7 +532,7 @@ try {
     await press("Enter");
     const det = await J(`(() => {
       const list = document.getElementById('skills-list'), lr = list.getBoundingClientRect();
-      const row = document.querySelector('.sk-row[data-skill="gia_5"]');
+      const row = document.querySelector('.sk-row[data-skill="${lastId}"]');
       const btns = [...row.querySelectorAll('.sk-slot-btn')];
       return { n: btns.length, small: btns.filter((b) => b.getBoundingClientRect().height < 43.5 || b.getBoundingClientRect().width < 43.5).length,
         below: btns.filter((b) => b.getBoundingClientRect().bottom > lr.bottom + 1).length, sw: row.scrollWidth, cw: row.clientWidth,

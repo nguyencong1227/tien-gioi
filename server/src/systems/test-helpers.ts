@@ -27,6 +27,8 @@ import {
   type SectHallMsg,
   type SectVaultMsg,
   type NetShieldMsg,
+  type AmbushOfferMsg,
+  type AmbushEndMsg,
   type SectMsg,
   type SectPresenceMsg,
   type DuelInvitedMsg,
@@ -73,6 +75,8 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const sectVaults: { sid: string; msg: SectVaultMsg }[] = [];
   const sectHalls: { sid: string; msg: SectHallMsg }[] = [];
   const netShields: { sid: string; msg: NetShieldMsg }[] = [];
+  const ambushOffers: { sid: string; msg: AmbushOfferMsg }[] = [];
+  const ambushEnds: { sid: string; msg: AmbushEndMsg }[] = [];
   const dmgs: DmgMsg[] = [];
   /** Số sát thương gửi RIÊNG cho chủ (sát thương theo giây): tách khỏi `dmgs` (gửi gần). */
   const dmgsTo: { sid: string; msg: DmgMsg }[] = [];
@@ -110,6 +114,8 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       sectVault: (sid, msg) => sectVaults.push({ sid, msg }),
       sectHall: (sid, msg) => sectHalls.push({ sid, msg }),
       netShield: (sid, msg) => netShields.push({ sid, msg }),
+      ambushOffer: (sid, msg) => ambushOffers.push({ sid, msg }),
+      ambushEnd: (sid, msg) => ambushEnds.push({ sid, msg }),
     },
     map,
     hub,
@@ -145,6 +151,8 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     sectVaults,
     sectHalls,
     netShields,
+    ambushOffers,
+    ambushEnds,
     dmgs,
     dmgsTo,
   };
