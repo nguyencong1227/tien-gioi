@@ -11,6 +11,21 @@ import { cancelSlam, slamStep } from "./slam";
 import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
 import { applyPlayerStatus } from "./status";
 import { isStunned, speedMult } from "./status-rules";
+import { inMainRegion, squareFree, warmNav } from "./nav";
+import {
+  EVADE_HOME_PX,
+  NAV_OUT,
+  NAV_SEARCHES_PER_TICK,
+  STUCK_EVADE_MS,
+  isEvading,
+  isShunned,
+  navIdle,
+  navPause,
+  navSteer,
+  resetNav,
+  snapHome,
+  startEvade,
+} from "./nav-chase";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
 export { placeMonster, WANDER_STRIDE };
@@ -24,14 +39,38 @@ const MAX_SPAWN_PER_TOPUP = 3;
  */
 export const MONSTER_WAKE_DIST = 900;
 
+/** Trùm sinh cách ô chặn ít nhất chừng này (px) ngoài bán kính thân: không sát cây để khỏi kẹt ngay lúc sinh (mục 48). */
+export const BOSS_SPAWN_MARGIN = 32;
+
+/** Chỗ sinh của trùm đủ rộng: không sát cây / đá và nằm trong vùng chính của bản đồ cho cỡ thân của trùm (không nằm trong túi kín). */
+export function bossSpawnOk(w: World, def: MonsterKind, x: number, y: number): boolean {
+  return (
+    squareFree(w.map, x, y, def.radius + BOSS_SPAWN_MARGIN) &&
+    inMainRegion(w.map, def.radius * 0.8, x, y)
+  );
+}
+
+/** Dựng sẵn lưới tìm đường cho các loài quái có ở bản đồ của phòng (một lần lúc tạo phòng, `nav.ts` `warmNav`). */
+function warmMonsterNav(w: World) {
+  const present = MONSTERS.filter((d) => w.map.monsterCapOf(d.id) > 0);
+  warmNav(
+    w.map,
+    present.map((d) => d.radius * 0.8),
+    present.filter((d) => d.boss).map((d) => d.radius * 0.8),
+  );
+}
+
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
-  for (let i = 0; i < 40; i++) {
+  // Trùm khó tìm chỗ hơn (vòng ngoài xa trấn + rộng + nối được với trấn): thử nhiều lần hơn
+  const tries = def.boss ? 200 : 40;
+  for (let i = 0; i < tries; i++) {
     const x = rand(64, map.worldW - 64),
       y = rand(64, map.worldH - 64);
     const d = map.dangerAt(x, y);
     if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
     if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
+    if (def.boss && !bossSpawnOk(w, def, x, y)) continue;
     placeMonster(w, def, x, y, rollElite(w, def));
     return;
   }
@@ -39,6 +78,7 @@ export function spawnMonster(w: World, def: MonsterKind) {
 
 /** Sinh đủ số quái mỗi loại khi tạo thế giới (số lượng theo bản đồ của phòng: `GameMap.monsterCapOf`). */
 export function spawnInitial(w: World) {
+  warmMonsterNav(w);
   for (const def of MONSTERS)
     for (let i = 0; i < w.map.monsterCapOf(def.id); i++) spawnMonster(w, def);
 }
@@ -49,6 +89,7 @@ export function spawnInitial(w: World) {
  * (phòng bí cảnh không gọi `topUpMonsters`).
  */
 export function spawnDungeonMonsters(w: World) {
+  warmMonsterNav(w);
   const lair = w.map.lairPx;
   for (const def of MONSTERS) {
     const cap = w.map.monsterCapOf(def.id);
@@ -76,6 +117,7 @@ export function forgetTarget(w: World, sid: string) {
 }
 
 export function tickMonsters(w: World, dt: number) {
+  w.navBudget = NAV_SEARCHES_PER_TICK; // tìm đường của quái thường chia chung từng này lần mỗi tick (trùm không giới hạn), `nav-chase.ts`
   w.state.monsters.forEach((m, id) => {
     const mc = w.mctrl.get(id);
     if (mc) updateMonster(w, id, m, mc, dt);
@@ -87,6 +129,14 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   // Trạng thái (M7.2b): choáng = đứng im và không ra đòn, tê cóng làm chậm. Quái không dính gì thì `mc.st` là undefined (không tốn gì).
   const st = mc.st !== undefined && mc.st.list.length > 0 ? mc.st : undefined;
   const stunned = st !== undefined && isStunned(st, w.now);
+  // Rút về (mục 48, `nav-chase.ts`): đang rút thì không nhắm ai, về chỗ sinh; rút quá lâu thì đặt thẳng về chỗ sinh
+  if (mc.nav !== undefined && mc.nav.evadeUntil > 0 && w.now >= mc.nav.evadeUntil)
+    snapHome(w, m, mc);
+  const evading = isEvading(w, mc);
+  if (evading && mc.target) {
+    mc.target = null;
+    mc.damageBy.clear();
+  }
   let tx = mc.wanderX,
     ty = mc.wanderY,
     speed = def.speed * 0.35;
@@ -108,10 +158,11 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   }
   // Không có mục tiêu: tìm người chơi gần nhất (để gây hấn, và để biết có nên "ngủ" không)
   let nearest = Infinity;
-  if (!target) {
+  if (!target && !evading) {
     let best = def.aggro; // aggro 0 (quái hiền) thì không bao giờ chọn mục tiêu
     w.state.players.forEach((p, sid) => {
       if (p.dead) return;
+      if (mc.nav !== undefined && isShunned(w, mc, sid)) return; // vừa kẹt vì người này (đứng chỗ không tới được): không nhắm lại ngay (mục 48)
       if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: quái không thấy
       if (w.shielded.size > 0 && w.shielded.has(sid)) return; // đang hộ thể: quái không nhắm (mục 33)
       if (w.duels.active && w.duels.has(sid)) return; // đang thách đấu: quái không thấy
@@ -125,8 +176,10 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     });
   }
 
+  let inReach = false; // đã trong tầm đánh gần của mục tiêu (đứng đánh, không phải kẹt)
   if (target) {
     const d = Math.hypot(target.x - m.x, target.y - m.y);
+    inReach = d <= def.attackRange + PLAYER_RADIUS;
     tx = target.x;
     ty = target.y;
     speed = def.speed;
@@ -176,11 +229,13 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     mc.ai = undefined; // mất mục tiêu giữa lúc gồng / thở: bỏ đòn đang dở
     cancelSlam(mc);
     if (mc.boss) bossReset(w, m, mc); // trùm đang trong trận mà hết mục tiêu: reset (hồi đầy, giai đoạn 0, bỏ quái con)
-    // Đang đi về nhà hoặc lang thang
-    if (Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > RETURN_HOME_DIST) {
+    // Đang đi về nhà hoặc lang thang. Đang RÚT (mục 48) thì về tới sát chỗ sinh, chạy hết tốc độ.
+    const homeD = Math.hypot(m.x - mc.homeX, m.y - mc.homeY);
+    if (evading && homeD <= EVADE_HOME_PX) resetNav(mc, m, w.now); // về tới nơi: hết rút
+    if (evading ? homeD > EVADE_HOME_PX : homeD > RETURN_HOME_DIST) {
       tx = mc.homeX;
       ty = mc.homeY;
-      speed = def.speed * 0.8;
+      speed = def.speed * (evading ? 1 : 0.8);
     } else if (nearest > MONSTER_WAKE_DIST) {
       // Ngủ: đứng yên tại chỗ, không ghi gì vào state ngoài hồi máu
       tx = m.x;
@@ -202,7 +257,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
 
   // Không có mục tiêu: chỉ áp bước di chuyển mỗi WANDER_STRIDE tick (bước dài gấp WANDER_STRIDE lần)
   let stride = 1;
-  if (target) {
+  if (target || evading) {
     mc.strideLeft = 0;
   } else if (mc.strideLeft > 0) {
     mc.strideLeft--;
@@ -210,6 +265,33 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   } else {
     mc.strideLeft = WANDER_STRIDE - 1;
     stride = WANDER_STRIDE;
+  }
+
+  // Tìm đường / phát hiện kẹt (mục 48, `nav-chase.ts`): chỉ khi quái đang đi tới người (đuổi) hoặc về chỗ sinh; đường thẳng thông thì không đổi gì
+  if (speed > 0) {
+    const chasing = target !== undefined && tx === target.x && ty === target.y;
+    const homing = target === undefined && tx === mc.homeX && ty === mc.homeY;
+    if (chasing || homing) {
+      const goalR = chasing ? Math.max(8, def.attackRange + PLAYER_RADIUS - 6) : 24;
+      const stuck = navSteer(w, id, m, mc, tx, ty, goalR);
+      if (stuck >= STUCK_EVADE_MS) {
+        if (chasing) {
+          // Kẹt quá lâu (người đứng chỗ không tới được, hoặc không có lối): RÚT về chỗ sinh, trùm hồi đầy (mất mục tiêu -> `bossReset`)
+          startEvade(w, mc, mc.target);
+          mc.target = null;
+          mc.damageBy.clear();
+          mc.ai = undefined;
+          cancelSlam(mc);
+        } else snapHome(w, m, mc); // về nhà mà vẫn kẹt: đặt thẳng về
+        return;
+      }
+      tx = NAV_OUT.x;
+      ty = NAV_OUT.y;
+    } else if (mc.nav !== undefined) navIdle(mc, m, w.now); // đi nhưng không phải tới người / về nhà (lui, lang thang): đang di chuyển, đo kẹt lại từ đầu
+  } else if (mc.nav !== undefined) {
+    // Đứng yên: đã tới tầm đánh thì đo kẹt lại từ đầu; còn lại (gồng, vận chiêu, gầm, choáng) thì chỉ TẠM DỪNG đo, không đặt lại
+    if (inReach) navIdle(mc, m, w.now);
+    else navPause(mc, m, w.now);
   }
 
   const dx = tx - m.x,
