@@ -33,6 +33,9 @@ const ORIG_INTROS: Record<string, string> = {
   // Lò đan (nghề nhỏ lát 1, #763): chốt chặn giữ dòng giới thiệu của NPC mới không đổi khi mở rộng lời thoại
   lao_dan:
     "Lò ta nhóm lửa luyện đan, nhất là đan hộ đạo trợ giúp đạo hữu vượt ải đột phá cảnh giới.",
+  // Trạm úy Thanh Lộ (D7 #755): NPC mới giao việc hằng ngày Hắc Phong, chốt chặn giữ dòng giới thiệu
+  tran_uy:
+    "Thanh Lộ Trạm là cửa ngõ duy nhất xuyên Hắc Phong Cốc, ta giữ con đường này bao năm bằng máu và nanh thú.",
 };
 
 /** Phạm vi chữ Hán (CJK) — lời thoại Tiên Giới tiếng Việt, KHÔNG được có. */
