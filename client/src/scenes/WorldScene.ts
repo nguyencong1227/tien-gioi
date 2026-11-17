@@ -151,6 +151,8 @@ import {
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import { playerLabelText } from "../player-label";
+import { socialEnabled } from "../social-tabs";
 import { StatusTracker } from "../status-track";
 import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
 import { SkillBarDom } from "../skill-bar-dom";
@@ -443,6 +445,9 @@ export class WorldScene extends Phaser.Scene {
   private facing = Math.PI / 2;
   private moving = false;
   private isReconnecting = false;
+  /** Cờ `?social=1` (M9, đến khi phát hành): bật thì hiện danh hiệu cạnh đạo hiệu. Đọc MỘT lần (đổi cờ phải tải lại trang). */
+  private readonly socialOn =
+    typeof window !== "undefined" && socialEnabled(window.location.search);
   private duelKoUntil = 0;
   private dungeonFallUntil = 0;
 
@@ -766,6 +771,9 @@ export class WorldScene extends Phaser.Scene {
       onBoardsGet: (board) =>
         !this.isReconnecting && this.room.send(SOCIAL_MSG.boardsGet, { board }),
       onWorldBossGet: () => !this.isReconnecting && this.room.send(SOCIAL_MSG.worldBossGet, {}),
+      onAchievementsGet: () =>
+        !this.isReconnecting && this.room.send(SOCIAL_MSG.achievementsGet, {}),
+      onTitleSet: (id) => !this.isReconnecting && this.room.send(SOCIAL_MSG.titleSet, { id }),
       onSectQuestAccept: (questId) =>
         !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
       onSectQuestTurnIn: (questId) =>
@@ -2397,6 +2405,9 @@ export class WorldScene extends Phaser.Scene {
     reg(SOCIAL_MSG.boards, (m: unknown) => ui.setBoards(m));
     // Trùm thế giới (M9.7): thông báo trước / xuất hiện / kết thúc (mọi phòng) + cập nhật máu / đóng góp (phòng đích); `setWorldBoss` tự làm sạch + tôn trọng cờ ?social=1
     reg(SOCIAL_MSG.worldBoss, (m: unknown) => ui.setWorldBoss(m));
+    // Thành tựu + danh hiệu (M9.8): sổ (cũng là câu trả lời của `titleSet`) + thông báo mới đạt; `ui` tự làm sạch + tôn trọng cờ ?social=1
+    reg(SOCIAL_MSG.achievements, (m: unknown) => ui.setAchievements(m));
+    reg(SOCIAL_MSG.achievementNew, (m: unknown) => ui.onAchievementNew(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
@@ -3450,12 +3461,14 @@ export class WorldScene extends Phaser.Scene {
       this.syncShadow(e);
       e.label!.setVisible(showLabel);
       if (showLabel) {
-        const isDuel = Boolean((p as any).duel);
-        const duelPrefix = isDuel ? "⚔ " : "";
-        const sectTag = (p as any).sect ? `[${(p as any).sect}]` : "";
-        const label = sectTag
-          ? `${sectTag}\n${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`
-          : `${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        const label = playerLabelText({
+          name: p.name,
+          realm: realmLabel(p.realm, p.tier),
+          sect: (p as any).sect,
+          title: (p as any).title, // danh hiệu (M9.8, `Player.title` id ngắn); chỉ hiện khi cờ ?social=1
+          duel: Boolean((p as any).duel),
+          showTitle: this.socialOn,
+        });
         if (label !== e.lastLabel) {
           e.label!.setText(label);
           e.lastLabel = label;
