@@ -27,6 +27,7 @@ import {
   moveSpeedMul,
   sanitizeStatusList,
   skillEffect,
+  skillStyleOf,
   skillViolations,
   statusCarriesRatio,
   statusEmpowerMult,
@@ -432,5 +433,21 @@ describe("FxMsg mới (kiểm lúc biên dịch bằng `satisfies`)", () => {
     expect(msgs.length).toBe(7);
     expect(CHAIN_FX_POINTS_MAX).toBe(1 + SKILL_LIMITS.chainBouncesMax + 1);
     for (const m of msgs) expect(typeof (m as { x: number }).x).toBe("number"); // mọi tin có (x, y) cho `sendNear`
+  });
+});
+
+describe("phong cách mặc định của hình mới (skillStyleOf)", () => {
+  it("chain / bolt -> chi, zone -> phu, trap / totem -> tran, aura -> ho_the", () => {
+    const want: Record<string, string> = {
+      chain: "chi",
+      bolt: "chi",
+      zone: "phu",
+      trap: "tran",
+      aura: "ho_the",
+      totem: "tran",
+    };
+    for (const [shape, style] of Object.entries(want))
+      expect(skillStyleOf({ shape }), shape).toBe(style);
+    expect(skillStyleOf({ shape: "chain", style: "an" })).toBe("an");
   });
 });
