@@ -158,6 +158,12 @@ function prime(h: Hero, opts: { coin?: number; exp?: number } = {}) {
   c.coin = opts.coin ?? 5000;
   ambushOf(w, c).cooldownUntil = 0;
   c.lastHitAt = 0;
+  // Dọn quái sinh NGẪU NHIÊN ở phòng thật: một trùm sinh trong 900 px quanh chỗ đứng (hoặc quái đang nhắm) làm `ambushBlocked` trả `boss` / `combat` đúng luật nhưng làm cả tệp
+  // đỏ chập chờn (cả sáu ca dùng chung một phòng Lạc Hà). Phòng KHÔNG có quái thì phép thử chỉ phụ thuộc vào đúng thứ test muốn kiểm.
+  for (const id of [...w.mctrl.keys()]) {
+    w.state.monsters.delete(id);
+    w.mctrl.delete(id);
+  }
   return { w, sid, p, c };
 }
 
