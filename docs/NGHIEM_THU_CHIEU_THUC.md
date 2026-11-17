@@ -41,7 +41,7 @@ Số chiêu: **30** (main, gồm 6 chiêu CT9 lát 1 của #1148 đã merge 18/1
 - `taunt` của tượng chưa nối vào AI quái (#1119): chiêu Hồn Phiên Tượng chưa khai `taunt`, nên không ảnh hưởng.
 - CT13 bot đo DPS thật ngoài mô phỏng (C): chưa làm (C không còn chạy); CT10 bằng mô phỏng máy chủ thật thay phần lớn.
 - Quái dùng "lang" không phải trùm khi đo; trùm miễn một số trạng thái (choáng) nên chiêu khống chế giá trị thấp hơn ở trùm.
-- Giao diện: các hình mới CHƯA từng hiện ở bản thật (chưa chiêu nào dùng trước #1148): #1148 đã vào `main`: B sẽ chạy e2e / ảnh thật với 6 chiêu mới.
+- Giao diện: các hình mới CHƯA từng hiện ở bản thật (chưa chiêu nào dùng trước #1148). B ĐÃ chạy THẬT sáu chiêu mới bằng `npm run e2e:chieu-moi -w server` (#1156: máy chủ thật + Chrome + phím thật L U I O): cả sáu vẽ và tắt đúng (bẫy chưa kích hoạt -> kích hoạt -> nổ `fxEnd pop`, đạn ba viên, vùng 4 s + tượng 6 s tự tắt, sét lan vẽ đủ đoạn, chiêu vận vòng tụ khí tiến dần rồi đòn đáp), không phát hiện lỗi hình ở client; A chạy lại 2 / 2 lần xanh. Còn chưa kiểm bằng mắt: ảnh chụp thật từng hình ở bản chạy thật sau khi phát hành.
 
 ## 6. Câu hỏi cho người dùng
 1. Cắt v0.5.0 với **30-37 chiêu** (không chờ đủ 48), phần còn lại vào v0.5.x? A nghiêng về cắt: mục 54 đã đồng ý, và 6 chiêu dạng mới là phần người chơi cảm nhận rõ nhất.
