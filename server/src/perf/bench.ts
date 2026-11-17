@@ -171,6 +171,7 @@ export function runBench(
         ambushOffer: () => {},
         ambushEnd: () => {},
         ambushState: () => {},
+        worldBoss: () => {},
       },
       map,
     );
@@ -450,6 +451,7 @@ export function runMultiMapBench(
           ambushOffer: () => {},
           ambushEnd: () => {},
           ambushState: () => {},
+          worldBoss: () => {},
         },
         map,
       );

@@ -1,8 +1,8 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, process */
 // Kiểm DANH HIỆU TRONG CHAT (M9, #1027) trong Chrome THẬT qua CDP, chế độ `?skills=mock&n=2`, KHÔNG cần máy chủ: tin `chat` mẫu đổ vào `__ui.chat` (đường vào của `reg("chat")`).
-// Có cờ `?social=1`: tin có `titleId` hiện «Danh hiệu» trước tên ở chat chung / đội / tông môn, trong thẻ `<i class="chat-title">`; id lạ KHÔNG hiện và không lộ id; tin không có
-// `titleId` y hệt cũ. KHÔNG có cờ: không hiện danh hiệu nào (M9 chưa phát hành). Chữ đi vào DOM bằng textContent (tên chứa thẻ HTML không thành thẻ).
+// Mặc định BẬT (`?social=1` vẫn nhận): tin có `titleId` hiện «Danh hiệu» trước tên ở chat chung / đội / tông môn, trong thẻ `<i class="chat-title">`; id lạ KHÔNG hiện và không lộ id; tin không có
+// `titleId` y hệt cũ. Có `?social=0`: không hiện danh hiệu nào (công tắc khẩn). Chữ đi vào DOM bằng textContent (tên chứa thẻ HTML không thành thẻ).
 //   node client/scripts/check-chat-title.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
 import fs from "node:fs";
 import os from "node:os";
@@ -174,8 +174,8 @@ try {
   );
   check(color.startsWith("normal|"), `danh hiệu không in nghiêng như chữ nhấn khác (${color})`);
 
-  console.log("--- KHÔNG có cờ ?social=1 ---");
-  await open("");
+  console.log("--- công tắc khẩn ?social=0 (mặc định đã BẬT) ---");
+  await open("&social=0");
   await say({ from: "Vân Hạc", text: "tái sinh rồi", titleId: "lh2" });
   r = await last();
   check(

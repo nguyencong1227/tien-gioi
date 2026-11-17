@@ -18,6 +18,7 @@ import { tickTreasure } from "./treasure";
 import { tickNetGuard } from "./net-guard";
 import { tickAmbush, trackAmbushWalk } from "./ambush";
 import { tickArena } from "./arena";
+import { tickWorldBoss } from "./world-boss";
 
 export function tickWorld(w: World, dtMs: number) {
   const dt = dtMs / 1000;
@@ -51,6 +52,7 @@ export function tickWorld(w: World, dtMs: number) {
   tickDuels(w);
   tickSect(w);
   tickArena(w, dtMs); // đấu trường chặn đường (mục 52): chỉ phòng đấu trường, phòng thường thoát ngay
+  tickWorldBoss(w); // trùm thế giới theo giờ (M9.4): mọi phòng gọi, sổ chỉ cho một lần mỗi nhịp làm việc; không có lịch thì thoát ngay
   tickAmbush(w, dtMs); // hộp thoại chặn đường: hết giờ / huỷ / đóng băng khi hồn lìa xác (không có hộp thoại nào thì thoát ngay)
   w.interest.update(w); // sau cùng: dựa trên vị trí mới của tick này
   w.tick++;

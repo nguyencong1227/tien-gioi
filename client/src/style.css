@@ -578,7 +578,13 @@ body.reduced-motion .st-badge.urgent {
     max-width: calc(100vw - 20px);
   }
 }
-/* Cờ ?social=1 bật nút Xã hội: hàng thành 8 nút (~386 px) nên mốc chuyển sang ☰ nâng từ 620 lên 670 (cần >= 12 + 240 + 8 + 386 + 12 = 658 px mới đứng cạnh bảng Tổ đội). */
+/* Nút Xã hội bật mặc định (M9): 8 nút xếp 4 + 4 ở màn hẹp (360 px: một hàng 7 + 1 nút lẻ trông như thiếu nút) thay vì 7 + 1; mỗi nút >= 44 px nên hộp rộng ~196 px. */
+@media (max-width: 669px) {
+  body.social-on .hud-menu-items {
+    max-width: min(200px, calc(100vw - 20px));
+  }
+}
+/* Nút Xã hội (mặc định BẬT; `?social=0` tắt): hàng thành 8 nút (~386 px) nên mốc chuyển sang ☰ nâng từ 620 lên 670 (cần >= 12 + 240 + 8 + 386 + 12 = 658 px mới đứng cạnh bảng Tổ đội). */
 @media (min-width: 620px) and (max-width: 669px) {
   body.social-on .menu-toggle {
     display: inline-flex;

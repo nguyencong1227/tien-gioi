@@ -259,7 +259,7 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
     );
     expect(slackOf(pooled, "nhan")).toBeGreaterThan(1);
     expect(slackOf(pooled, "cong")).toBeGreaterThan(0);
-  }, 60_000);
+  }, 120_000); // chạy riêng ~18 s; cả bộ test song song trên máy chung (nhiều dev + CI) đã quá 60 s một lần: trần nới 2x, thước đo không đổi
 
   it("ngưỡng hoà vốn của Xích Mãng: mô hình (90 giây) đạt nên ngưỡng không cao hơn; đạt ở ngưỡng, KHÔNG đạt ngay dưới ngưỡng; khôi phục ASSUME.searchSec", () => {
     const before = { ...ASSUME.searchSec };

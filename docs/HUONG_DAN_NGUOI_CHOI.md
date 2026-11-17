@@ -48,6 +48,7 @@ Bạn điều khiển nhân vật bằng bàn phím. Mặc định:
 | Sổ nhiệm vụ | **N** (hoặc **Q**) |
 | Tông môn | **G** |
 | Công pháp (gắn / gỡ chiêu vào ô) | **Shift + K** |
+| Xã hội (xếp hạng, thành tựu, sự kiện) | **Shift + G** |
 | Bản đồ lớn | **M** |
 | Bật / tắt bản đồ nhỏ | **Shift + M** |
 | Cài đặt và phím tắt | **E** |
@@ -321,6 +322,16 @@ Chi tiết thiết kế: [docs/THIET_KE_TONG_MON.md](THIET_KE_TONG_MON.md).
 Chat trong tông môn: gõ **`/s`** rồi nội dung. Chat đội: gõ **`/p`** rồi nội dung (đi theo đội, kể cả khi thành viên sang bản đồ khác). Chat thường (không tiền tố) gửi cho cả server.
 
 ---
+
+## Xã hội: xếp hạng, thành tựu, trùm thế giới
+
+Bấm nút **Xã hội** trên HUD (điện thoại: trong menu ☰) hoặc phím **Shift + G** để mở bảng ba tab; **Esc** đóng.
+
+- **Xếp hạng:** bốn bảng **Tu vi**, **Linh hồn**, **Tông môn**, **Thách đấu**. Dòng của bạn được tô sáng; nếu bạn ngoài top, dòng của bạn hiện ở cuối kèm số liệu. Không có hạng thì bảng nói lý do (tài khoản thử nghiệm, chưa đủ số trận thách đấu, chưa thuộc tông môn nào...). Bảng làm mới định kỳ nên con số có thể chậm vài phút; ô "tuổi bản chụp" cho biết số liệu cũ đến đâu.
+- **Thành tựu:** sổ theo nhóm (luân hồi, trùm, bản đồ...) với thanh tiến độ và phần thưởng bằng chữ. Hoàn thành thành tựu có thể mở **danh hiệu**: chọn **đeo** hoặc **gỡ** ở đầu tab; danh hiệu hiện cạnh tên trên đầu nhân vật và trong chat. Thành tựu mới có dấu **Mới** và một chấm nhỏ trên nút Xã hội cho tới khi bạn mở tab. Thành tựu và danh hiệu thuộc về **linh hồn** nên giữ nguyên qua các kiếp.
+- **Sự kiện:** lịch **trùm thế giới** (giờ Việt Nam). Trước giờ trùm xuất hiện có báo trước; khi trùm đang ở bản đồ đích, đầu màn hình hiện **banner** đếm ngược, máu trùm, phần đóng góp của bạn và danh sách người đóng góp nhiều nhất (bấm để mở / thu gọn). Cần đóng góp đủ ngưỡng mới nhận thưởng; banner cho biết bạn đã đủ điều kiện chưa. Hết sự kiện, banner đổi thành kết quả ít giây.
+
+Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối địa chỉ trang để tắt tạm (nút, phím tắt, banner và danh hiệu cùng ẩn) rồi báo cho nhóm.
 
 ## Phụ lục: quái theo bậc và bản đồ
 

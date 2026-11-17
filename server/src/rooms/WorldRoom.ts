@@ -214,6 +214,7 @@ import { testExpMultFor } from "../test-exp";
 import type { LeaderboardService } from "../leaderboard";
 import { achievementsMsgOf, grantDue, unlockedTitles, wornTitle } from "../systems/achievements";
 import { trackSocial } from "../systems/social";
+import { worldBossStatus } from "../systems/world-boss";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -342,6 +343,7 @@ export class WorldRoom extends Room<WorldState> {
         ambushOffer: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.offer, msg),
         ambushEnd: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.end, msg),
         ambushState: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.state, msg),
+        worldBoss: (sid, msg) => this.sendTo(sid, SOCIAL_MSG.worldBoss, msg),
       },
       map,
       this.hub,
@@ -535,6 +537,10 @@ export class WorldRoom extends Room<WorldState> {
       };
       this.sendTo(sid, SOCIAL_MSG.boards, view);
     });
+    // Trùm thế giới (M9.4): trả MỘT tin trạng thái (đang diễn ra / sắp tới / không có lịch) cho người ở BẤT KỲ phòng nào; không tải, chỉ đọc sổ trong bộ nhớ
+    this.on(SOCIAL_MSG.worldBossGet, (sid) =>
+      this.sendTo(sid, SOCIAL_MSG.worldBoss, worldBossStatus(this.world, sid)),
+    );
     this.on(SECT_MSG.questAccept, (sid, m) => void sectQuestAccept(w, sid, m));
     this.on(SECT_MSG.questTurnIn, (sid, m) => void sectQuestTurnIn(w, sid, m));
     this.on(SECT_MSG.shopBuy, (sid, m) => void sectShopBuy(w, sid, m));
@@ -800,6 +806,7 @@ export class WorldRoom extends Room<WorldState> {
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
+    this.sendWorldBoss(client.sessionId); // trùm thế giới (M9.4): vào giữa lúc báo trước / đang diễn ra thì biết ngay
     if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
     if (inRun) {
       const run = runOfWorld(this.world);
@@ -857,6 +864,7 @@ export class WorldRoom extends Room<WorldState> {
         sendWallet(this.world, sid);
         ambushResend(this.world, sid); // đang giữa hộp thoại chặn đường: gửi LẠI (cùng id, thời gian còn thật) cho Room mới
         arenaResend(this.world, sid); // đang giữa trận ở đấu trường: gửi LẠI trạng thái (hoặc kết cục) cho Room mới
+        this.sendWorldBoss(sid); // trùm thế giới (M9.4): sự kiện bắt đầu / kết thúc lúc rớt mạng thì Room mới vẫn biết (thưởng + `ended` không bị lỡ)
         resolveDone();
         return;
       } catch {
@@ -876,6 +884,12 @@ export class WorldRoom extends Room<WorldState> {
       this.world.ghosts.delete(sid);
       resolveDone();
     }
+  }
+
+  /** Gửi cho `sid` trạng thái trùm thế giới hiện tại (chỉ khi có lịch và chưa tắt): lúc vào phòng và lúc nối lại sau rớt mạng. */
+  private sendWorldBoss(sid: string) {
+    if (!this.world.hub.worldBoss.active) return;
+    this.sendTo(sid, SOCIAL_MSG.worldBoss, worldBossStatus(this.world, sid));
   }
 
   /**
@@ -1451,6 +1465,30 @@ export class WorldRoom extends Room<WorldState> {
     const t0 = performance.now();
     tickWorld(this.world, dtMs);
     this.world.tickStats.record(performance.now() - t0); // chưa gồm mã hoá patch của Colyseus (xem docs/TRIEN_KHAI.md mục 5)
+  }
+}
+
+/**
+ * Tạo sẵn phòng thế giới của các bản đồ có trùm theo giờ trong lịch (M9.4). Phòng Colyseus chỉ sinh khi có người vào lần đầu; bản đồ chưa ai vào thì không có phòng để sinh
+ * trùm, mà tin "xuất hiện" đã gửi cho cả máy chủ (sự kiện kết thúc "bỏ chạy" dù trùm chưa từng có). Gọi sau `defineRooms` + `listen`; chỉ tạo bản đồ CHƯA có phòng thường
+ * (không phải bí cảnh / đấu trường), nên gọi lại không tạo thêm; phòng chính `autoDispose = false` nên sống tiếp. Không có lịch / `WORLD_BOSS=off` thì không làm gì.
+ */
+export async function ensureWorldBossRooms(): Promise<void> {
+  const book = WorldRoom.hub.worldBoss;
+  if (!book.active) return;
+  for (const mapId of new Set(book.slots.map((s) => s.mapId))) {
+    const has = [...WorldRoom.hub.worlds].some(
+      (w) => w.map.def.id === mapId && w.runId === null && w.arena === null,
+    );
+    if (has) continue;
+    try {
+      await matchMaker.createRoom(roomNameOf(mapId), {});
+    } catch (e) {
+      console.error(
+        `[trùm thế giới] không tạo được phòng ${mapId}:`,
+        e instanceof Error ? e.message : e,
+      );
+    }
   }
 }
 

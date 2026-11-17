@@ -99,6 +99,7 @@ export const EXPECTED_MESSAGE_TYPES = [
   SOCIAL_MSG.boardsGet, // M9.3: xin bảng xếp hạng (chỉ đọc, tra bản chụp trong bộ nhớ)
   SOCIAL_MSG.achievementsGet, // M9.5: xin sổ thành tựu (chỉ đọc)
   SOCIAL_MSG.titleSet, // M9.5: đeo / gỡ danh hiệu (kiểm đã mở trong kho)
+  SOCIAL_MSG.worldBossGet, // M9.4: xin trạng thái trùm thế giới (chỉ đọc, sổ trong bộ nhớ, không tải)
   SECT_MSG.questAccept, // M8.4: nhận nhiệm vụ tông môn
   SECT_MSG.questTurnIn, // M8.4: trả nhiệm vụ tông môn
   SECT_MSG.shopBuy, // M8.5: mua ở cửa hàng tông môn

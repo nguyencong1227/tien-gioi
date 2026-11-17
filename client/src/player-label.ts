@@ -22,7 +22,7 @@ export interface PlayerLabelIn {
   title?: string;
   /** Đang thách đấu PK (tiền tố ⚔). */
   duel?: boolean;
-  /** Cờ `?social=1` (đến khi M9 phát hành): tắt thì không hiện danh hiệu. */
+  /** Cờ Xã hội (mặc định bật; `?social=0` tắt): tắt thì không hiện danh hiệu. */
   showTitle?: boolean;
 }
 
