@@ -118,6 +118,12 @@ describe("skillViolations", () => {
     ["range quá lớn", { range: 5000 }, /range/],
     ["mult vượt khung một lần trúng", { mult: 9 }, /vượt khung/],
     ["mult âm", { mult: -1 }, /mult/],
+    // một lần trúng vượt khung MỘT HIT dù chưa vượt khung TỔNG (cone realm 2: hit 2,8 < total 4): 3,5 chỉ bị luật một-hit bắt
+    [
+      "mult một lần trúng vượt khung hit nhưng không vượt tổng",
+      { reqRealm: 2, mult: 3.5 },
+      /mult 3\.5 vượt khung 2\.8/,
+    ],
     ["cone thiếu arc", { arc: undefined }, /cone cần arc/],
     ["cone arc quá lớn", { arc: 7 }, /cone cần arc/],
     [
