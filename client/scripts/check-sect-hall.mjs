@@ -357,6 +357,231 @@ async function main() {
       );
       await hallOf(1);
 
+      // ---- mua nhiều (mục 47): ô số lượng dùng chung trong một khung ngay dưới hàng; "Đổi" vẫn mua nhanh MỘT cái ----
+      {
+        const NOW_ROWS = `window.__hv`;
+        const many = (patch = "") => hallOf(5, `v.me.contrib = 100000; window.__hv = v; ${patch}`);
+        // giới hạn mong đợi của từng món, tính độc lập từ dữ liệu (không dùng hàm của client): trần 10, lượt còn lại, cống hiến / giá
+        const expectMax = (id) =>
+          evalJs(
+            `(() => { const v = ${NOW_ROWS}; const e = v.shop.find((x) => x.itemId === ${JSON.stringify(id)}); if (!e || e.locked) return 0; return Math.max(0, Math.min(10, e.left, Math.floor(v.me.contrib / e.cost))); })()`,
+          );
+        const panels = () =>
+          evalJs(
+            `[...document.querySelectorAll("#sect-tab-hall .sect-hall-buy")].map((p) => p.closest("li").getAttribute("data-item-id"))`,
+          );
+        const moreRows = () =>
+          evalJs(
+            `[...document.querySelectorAll("#sect-tab-hall button.sect-hall-more")].map((b) => b.closest("li").getAttribute("data-item-id"))`,
+          );
+        const clickMore = (id) =>
+          evalJs(
+            `(() => { const b = document.querySelector('#sect-tab-hall li[data-item-id="${id}"] button.sect-hall-more'); if (!b) return false; b.click(); return true; })()`,
+          );
+        const qtyState = () =>
+          evalJs(
+            `(() => { const i = document.getElementById("sect-shop-qty"); if (!i) return null; const note = i.closest(".qty-stepper")?.querySelector(".qty-note"); return { value: i.value, focused: document.activeElement === i, invalid: i.getAttribute("aria-invalid") === "true", note: note ? note.textContent : "", mode: i.getAttribute("inputmode"), parent: i.closest("li")?.getAttribute("data-item-id") ?? null }; })()`,
+          );
+        const typeInto = async (text) => {
+          await evalJs(
+            `(() => { const i = document.getElementById("sect-shop-qty"); i.focus(); i.select(); return 1; })()`,
+          );
+          await send("Input.insertText", { text });
+          await sleep(60);
+        };
+        const pressKey = async (k, code, vk, text) => {
+          await send("Input.dispatchKeyEvent", {
+            type: text ? "keyDown" : "rawKeyDown",
+            key: k,
+            code,
+            windowsVirtualKeyCode: vk,
+            nativeVirtualKeyCode: vk,
+            text,
+          });
+          await send("Input.dispatchKeyEvent", {
+            type: "keyUp",
+            key: k,
+            code,
+            windowsVirtualKeyCode: vk,
+            nativeVirtualKeyCode: vk,
+          });
+          await sleep(60);
+        };
+
+        await many();
+        await sleep(150);
+        const ids = await moreRows();
+        const allItems = await evalJs(`${NOW_ROWS}.shop.map((e) => e.itemId)`);
+        let wantIds = [];
+        for (const id of allItems) if ((await expectMax(id)) >= 2) wantIds.push(id);
+        check(
+          wantIds.length >= 2 &&
+            ids.length === wantIds.length &&
+            wantIds.every((id) => ids.includes(id)),
+          `nút 'Nhiều…' chỉ ở món mua được từ 2 cái trở lên (${ids.length} / ${wantIds.length} món)`,
+        );
+        const lockedMore = await evalJs(
+          `[...document.querySelectorAll("#sect-tab-hall li.sect-hall-row")].filter((li) => li.querySelector("button.sect-hall-more") && [...li.querySelectorAll("button")].some((b) => b.textContent === "Đổi" && b.disabled)).length`,
+        );
+        check(lockedMore === 0, "món khoá (Đổi mờ) không có nút 'Nhiều…'");
+        check((await panels()).length === 0, "chưa bấm gì: không có khung mua nhiều nào");
+
+        // mở khung ở món thứ nhất: đúng MỘT khung, trong đúng hàng, ô số = 1, đang focus, bàn phím số
+        const [idA, idB] = ids;
+        check(await clickMore(idA), `bấm 'Nhiều…' ở ${idA}`);
+        await sleep(120);
+        let st = await qtyState();
+        check(
+          JSON.stringify(await panels()) === JSON.stringify([idA]) &&
+            st?.parent === idA &&
+            st.value === "1" &&
+            st.focused &&
+            st.mode === "numeric",
+          `khung mở đúng hàng, ô = 1, đang focus, bàn phím số: ${JSON.stringify(st)}`,
+        );
+        const lab = await evalJs(
+          `(() => { const b = document.querySelector('#sect-tab-hall li[data-item-id="${idA}"] button.sect-hall-more'); return { t: b.textContent, e: b.getAttribute("aria-expanded") }; })()`,
+        );
+        check(
+          lab.t === "Gấp lại" && lab.e === "true",
+          `nút đổi thành 'Gấp lại', aria-expanded: ${JSON.stringify(lab)}`,
+        );
+
+        // sang món khác: khung CHUYỂN (vẫn chỉ một), ô đặt lại 1
+        await typeInto("4");
+        check(await clickMore(idB), `bấm 'Nhiều…' ở ${idB}`);
+        await sleep(120);
+        st = await qtyState();
+        check(
+          JSON.stringify(await panels()) === JSON.stringify([idB]) && st?.value === "1",
+          `khung chuyển sang món khác, chỉ còn một, ô đặt lại 1: ${JSON.stringify([await panels(), st?.value])}`,
+        );
+
+        // gõ 9999 -> kẹp đúng giới hạn của món (tính độc lập), vùng báo nói rõ giới hạn; số hợp lệ thì vùng báo là xem trước tổng giá
+        const maxB = await expectMax(idB);
+        await typeInto("9999");
+        st = await qtyState();
+        check(
+          st?.value === String(maxB) && new RegExp(`Chỉ có tối đa ${maxB}`).test(st.note),
+          `gõ 9999 kẹp về ${maxB}, vùng báo nêu giới hạn: ${JSON.stringify([st?.value, st?.note])}`,
+        );
+        await typeInto("2");
+        st = await qtyState();
+        const price = await evalJs(
+          `(() => { const e = window.__hv.shop.find((x) => x.itemId === ${JSON.stringify(idB)}); return e.cost * 2; })()`,
+        );
+        check(
+          st?.value === "2" &&
+            st.note.startsWith(`Mất ${price.toLocaleString("vi-VN")} cống hiến, còn `),
+          `số hợp lệ: xem trước tổng giá (${price}): ${JSON.stringify(st?.note)}`,
+        );
+        // chữ / số sai: đánh dấu sai kèm lời nhắc, không bao giờ gửi
+        await clearSent();
+        await typeInto("abc");
+        st = await qtyState();
+        check(
+          st?.invalid === true && st.note.length > 0,
+          `gõ chữ: ô đánh dấu sai kèm lời nhắc: ${JSON.stringify([st?.invalid, st?.note])}`,
+        );
+        await pressKey("Enter", "Enter", 13, "\r");
+        check(
+          !(await sent()).some((m) => m[0] === "sectShopBuy"),
+          "Enter khi ô sai / trống: KHÔNG gửi gì",
+        );
+        await typeInto("0");
+        await pressKey("Enter", "Enter", 13, "\r");
+        check(!(await sent()).some((m) => m[0] === "sectShopBuy"), "gõ 0 rồi Enter: KHÔNG gửi gì");
+
+        // vẽ lại (ảnh chụp mới về) khi đang gõ: GIỮ số, focus, vị trí khung
+        await typeInto("2");
+        await many();
+        await sleep(120);
+        st = await qtyState();
+        check(
+          st?.value === "2" && st.focused && st.parent === idB && (await panels()).length === 1,
+          `ảnh chụp mới về lúc đang gõ: giữ số '2', giữ focus, giữ khung: ${JSON.stringify(st)}`,
+        );
+        // Enter gửi MỘT tin với đúng số lượng, khung đóng
+        await clearSent();
+        await typeInto("3");
+        await pressKey("Enter", "Enter", 13, "\r");
+        await sleep(100);
+        const bought = (await sent()).filter((m) => m[0] === "sectShopBuy");
+        check(
+          bought.length === 1 &&
+            bought[0][1].itemId === idB &&
+            bought[0][1].qty === Math.min(3, maxB),
+          `Enter gửi đúng MỘT sectShopBuy {itemId, qty}: ${JSON.stringify(bought)}`,
+        );
+        check((await panels()).length === 0, "gửi xong: khung đóng");
+        await many();
+
+        // nút 'Đổi số này' trong khung cũng gửi đúng số đang gõ; 'Huỷ' đóng không gửi
+        await clickMore(idA);
+        await sleep(100);
+        await typeInto("2");
+        await clearSent();
+        check(await click("Đổi số này"), "bấm 'Đổi số này'");
+        await sleep(100);
+        const viaBtn = (await sent()).filter((m) => m[0] === "sectShopBuy");
+        check(
+          viaBtn.length === 1 &&
+            viaBtn[0][1].itemId === idA &&
+            viaBtn[0][1].qty === Math.min(2, await expectMax(idA)),
+          `'Đổi số này' gửi đúng số: ${JSON.stringify(viaBtn)}`,
+        );
+        await many();
+        await clickMore(idA);
+        await sleep(100);
+        await clearSent();
+        check(await click("Huỷ"), "bấm 'Huỷ'");
+        await sleep(100);
+        check(
+          (await panels()).length === 0 && !(await sent()).some((m) => m[0] === "sectShopBuy"),
+          "'Huỷ': khung đóng, không gửi gì",
+        );
+
+        // Esc trong ô: huỷ khung, bảng KHÔNG đóng (lần Esc kế mới đóng bảng)
+        await clickMore(idA);
+        await sleep(100);
+        await typeInto("5");
+        await pressKey("Escape", "Escape", 27);
+        const stillOpen = await evalJs(`!document.getElementById("sect-modal").hidden`);
+        check(
+          (await panels()).length === 0 && stillOpen,
+          `Esc trong ô: khung đóng, bảng Tông môn vẫn mở (${stillOpen})`,
+        );
+
+        // món bị khoá / hết lượt khi ảnh chụp mới về: khung đóng, không giữ khung cho món không mua được
+        await clickMore(idA);
+        await sleep(100);
+        await many(`v.shop.find((e) => e.itemId === ${JSON.stringify(idA)}).left = 0`);
+        await sleep(120);
+        check(
+          (await panels()).length === 0 && !(await moreRows()).includes(idA),
+          "món hết lượt khi ảnh chụp mới về: khung đóng, không còn nút 'Nhiều…' ở món đó",
+        );
+        // sang ngày mới (món có lượt lại): khung đã đóng KHÔNG tự bật lên lại với số cũ
+        await many();
+        await sleep(120);
+        check(
+          (await panels()).length === 0 && (await moreRows()).includes(idA),
+          "món có lượt lại sau đó: nút 'Nhiều…' về, nhưng khung KHÔNG tự bật lại",
+        );
+        // đã gục: mọi nút mờ, không còn nút 'Nhiều…'
+        await evalJs(`window.__scene.me().dead = true; 1`);
+        await many();
+        await sleep(120);
+        check((await moreRows()).length === 0, "đã gục: không còn nút 'Nhiều…'");
+        await evalJs(`window.__scene.me().dead = false; 1`);
+        await many();
+        check(
+          (await overflow()).modal <= 0 && (await overflow()).tab <= 0,
+          `không tràn ngang sau khi mở khung: ${JSON.stringify(await overflow())}`,
+        );
+        await hallOf(1);
+      }
+
       // ---- mới vào tông: chờ sang ngày + Trả mờ kèm lý do ----
       await hallOf(2, "v.me.earnFromAt = v.now + 3 * 3600000");
       await sleep(100);
@@ -774,6 +999,15 @@ async function main() {
         if (hasGroup) {
           await sleep(200);
           await snap("-cua-hang-nhom");
+        }
+        // khung "mua nhiều" đang mở (ô số lượng + xem trước + nút): ảnh để người duyệt xem bố cục ở từng khung nhìn
+        await hallOf(5, "v.me.contrib = 100000");
+        const opened = await evalJs(
+          `(() => { const b = document.querySelector("#sect-tab-hall button.sect-hall-more"); if (!b) return false; b.click(); document.querySelector("#sect-tab-hall .sect-hall-buy")?.scrollIntoView({ block: "center" }); return true; })()`,
+        );
+        if (opened) {
+          await sleep(250);
+          await snap("-mua-nhieu");
         }
       }
       await evalJs(`window.__ui.toggleSectModal(false); 1`);

@@ -8,6 +8,7 @@ import {
   SECT_LEVEL_MAX,
   SECT_QUESTS,
   SECT_SHOP,
+  SECT_SHOP_QTY_MAX,
   sampleSectHall,
   sectFailMessage,
   sectQuestFor,
@@ -28,6 +29,8 @@ import {
   hallShopGroups,
   hallShopRows,
   sanitizeHallView,
+  shopBuyMax,
+  shopBuyPreviewText,
   shopLockText,
 } from "./sect-hall";
 
@@ -534,5 +537,44 @@ describe("depositPreviewText (xem trước góp Linh thạch vào quỹ, ô số
   it("ví hỏng (NaN) hoặc góp nhiều hơn ví: ví còn lại không âm, không NaN", () => {
     expect(depositPreviewText(500, 100, null)).toBe("Ví còn lại 0 Linh thạch.");
     expect(depositPreviewText(5, Number.NaN, null)).toBe("Ví còn lại 0 Linh thạch.");
+  });
+});
+
+describe("shopBuyMax / shopBuyPreviewText (mua nhiều ở cửa hàng tông, ô số lượng dùng chung)", () => {
+  it("nhỏ nhất của trần một lần (SECT_SHOP_QTY_MAX), lượt còn lại hôm nay, và số cống hiến mua nổi", () => {
+    expect(shopBuyMax({ cost: 1, left: 999 }, 999)).toBe(SECT_SHOP_QTY_MAX); // trần một lần
+    expect(shopBuyMax({ cost: 5, left: 3 }, 500)).toBe(3); // hết lượt trước
+    expect(shopBuyMax({ cost: 30, left: 10 }, 95)).toBe(3); // 95 / 30 = 3 (làm tròn xuống)
+    expect(shopBuyMax({ cost: 30, left: 10 }, 29)).toBe(0); // thiếu một cống hiến thì 0
+    expect(shopBuyMax({ cost: 30, left: 10 }, 30)).toBe(1); // vừa đủ
+  });
+
+  it("số hỏng / giá không dương / âm: 0, không ném, không NaN, không Infinity", () => {
+    const bad = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -5, 0];
+    for (const x of bad) {
+      expect(shopBuyMax({ cost: x, left: 5 }, 100), `giá ${x}`).toBe(0);
+      expect(shopBuyMax({ cost: 5, left: x }, 100), `lượt ${x}`).toBe(0);
+      expect(shopBuyMax({ cost: 5, left: 5 }, x), `cống hiến ${x}`).toBe(0);
+    }
+    expect(shopBuyMax({ cost: 5, left: 2.9 }, 100)).toBe(2); // lượt lẻ làm tròn xuống
+  });
+
+  it("hallShopRows: hàng mở có maxBuy khớp shopBuyMax, hàng khoá và đã gục thì 0 (không mua nổi thì không có nút Nhiều…)", () => {
+    const v = clone(sample(5));
+    v.me.contrib = 100_000;
+    const open = hallShopRows(v, { down: false }).filter((r) => r.locked === null);
+    expect(open.length).toBeGreaterThan(0);
+    for (const r of open) expect(r.maxBuy, r.itemId).toBe(shopBuyMax(r, v.me.contrib));
+    const locked = hallShopRows(v, { down: false }).filter((r) => r.locked !== null);
+    for (const r of locked) expect(r.maxBuy, r.itemId).toBe(0);
+    const down = hallShopRows(v, { down: true });
+    expect(down.every((r) => r.maxBuy === 0)).toBe(true);
+  });
+
+  it("xem trước: tổng cống hiến mất và số còn lại, không âm, không NaN", () => {
+    expect(shopBuyPreviewText(3, 30, 100)).toBe("Mất 90 cống hiến, còn 10.");
+    expect(shopBuyPreviewText(4, 30, 100)).toBe("Mất 120 cống hiến, còn 0."); // quá thì kẹp 0, không âm
+    expect(shopBuyPreviewText(2, 1000, 5000)).toBe("Mất 2.000 cống hiến, còn 3.000.");
+    expect(shopBuyPreviewText(1, 30, Number.NaN)).toBe("Mất 30 cống hiến, còn 0.");
   });
 });
