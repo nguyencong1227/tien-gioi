@@ -232,6 +232,7 @@ export function renderHall(root: HTMLElement, st: HallUiState, h: HallUiHandlers
   } else {
     const shopRow = (r: HallShopRow) => {
       const li = make(doc, "li", `sect-hall-row ${r.canBuy ? "" : "locked"}`.trim());
+      li.setAttribute("data-item-id", r.itemId); // móc cho kiểm thử Chrome thật / E2E: ghép hàng DOM với món trong bảng
       const head = make(doc, "div", "sect-hall-row-head");
       head.append(make(doc, "b", undefined, r.name), make(doc, "span", "sect-hall-tag", r.price));
       const foot = make(doc, "div", "sect-hall-row-foot");
