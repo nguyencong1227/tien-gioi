@@ -19,6 +19,7 @@ import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
 import { dungeonFall } from "./dungeon";
+import { arenaFall } from "./arena";
 import { isShielded, spareFromNetDeath } from "./net-guard";
 import { beginLimbo } from "./reincarnation";
 import { rollDamage } from "./damage";
@@ -131,6 +132,12 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
     return;
   }
   if (mc.boss) bossDespawnAdds(w, mc.boss); // trùm chết: quái con biến mất theo, không để chúng đứng lại
+  if (mc.arena) {
+    // Quái của đấu trường chặn đường (mục 52): KHÔNG tu vi / đồ / Linh thạch / nhiệm vụ (thưởng đi một đường riêng khi thắng, `arena.ts`); chỉ biến mất
+    w.state.monsters.delete(id);
+    w.mctrl.delete(id);
+    return;
+  }
   // Hệ số tu vi của từng người (đội chia đều có thưởng, người lẻ theo sát thương: xem killShares)
   const shares = killShares(w, mc.damageBy, mon?.x ?? 0, mon?.y ?? 0);
   for (const [sid, frac] of shares) {
@@ -260,6 +267,8 @@ function damagePlayer(
     if (spareFromNetDeath(w, sid, p, c)) return;
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
     if (dungeonFall(w, sid, p, c)) return;
+    // Trong ĐẤU TRƯỜNG chặn đường (mục 52): gục cũng KHÔNG mất kiếp (`arenaFall`)
+    if (arenaFall(w, sid, p, c)) return;
     // Chết thật = luân hồi (docs/THIET_KE_LUAN_HOI.md): nhân vật của kiếp mất hẳn, linh hồn vào Hoàng Tuyền
     if (w.reincarnate) return beginLimbo(w, sid, p, c);
     // Nhánh hồi sinh (chết không mất kiếp, vd PK thách đấu ở bước 5): nằm tại chỗ RESPAWN_MS rồi hồi sinh ở trấn, không mất gì
