@@ -206,4 +206,74 @@ describe("thành tựu qua phòng thật", () => {
     expect(m.ach.kiep_2).toBeTruthy();
     expect(m.counters.kiep).toBe(3);
   });
+
+  it("riêng tư: sổ thành tựu CHỈ gửi cho chủ (cả khi cấp, achievementsGet, titleSet): người thứ hai trong phòng không nhận achievements", async () => {
+    WorldRoomCls.achievements = true;
+    const a = await spawn();
+    const b = await spawn();
+    await sleep(300); // tin lúc VÀO phòng của cả hai đã đến nơi
+    const baseline = b.ach.length;
+    trackSocial(serverRoom(a.room).world, a.room.sessionId, ["boss:mang", 1]);
+    await waitFor(() => a.news.includes("trum_mang_1"), 4000, "A mở tr1");
+    a.room.send(SOCIAL_MSG.achievementsGet, {});
+    a.room.send(SOCIAL_MSG.titleSet, { id: "tr1" });
+    await waitFor(() => me(a).title === "tr1", 3000, "A đeo tr1");
+    await sleep(400);
+    expect(a.ach.length).toBeGreaterThan(2); // A thật sự nhận các tin (ca dương: không phải thử nhầm một hướng không có tin nào)
+    expect(b.ach.length).toBe(baseline); // B không nhận thêm tin achievements nào
+    expect(b.news).toEqual([]); // cũng không nhận achievementNew của A
+  });
+
+  it("tần suất ghi: đeo lại cái đang đeo, gỡ khi chưa đeo, đeo cái CHƯA mở -> KHÔNG ghi chân linh (vẫn trả achievements); đổi thật thì ghi đúng một lần", async () => {
+    WorldRoomCls.achievements = true;
+    const h = await spawn();
+    trackSocial(serverRoom(h.room).world, h.room.sessionId, ["boss:mang", 1]);
+    await waitFor(() => h.news.includes("trum_mang_1"), 4000, "mở tr1");
+    await sleep(300);
+    const store = serverRoom(h.room).souls;
+    const orig = store.update.bind(store);
+    let writes = 0;
+    store.update = (id, fn) => {
+      writes++;
+      return orig(id, fn);
+    };
+    try {
+      const reply = async (send: () => void) => {
+        const n = h.ach.length;
+        send();
+        await waitFor(() => h.ach.length > n, 3000, "trả lời titleSet");
+      };
+      await reply(() => h.room.send(SOCIAL_MSG.titleSet, { id: "tr1" })); // đổi thật: ghi
+      expect(writes).toBe(1);
+      await reply(() => h.room.send(SOCIAL_MSG.titleSet, { id: "tr1" })); // đã đeo đúng: không ghi
+      await reply(() => h.room.send(SOCIAL_MSG.titleSet, { id: "lh2" })); // chưa mở: không ghi
+      expect(writes).toBe(1);
+      expect(h.ach.at(-1)!.title).toBe("tr1"); // vẫn trả sổ hiện tại
+      await sleep(1100); // token hồi lại (giới hạn 1 tin / giây)
+      await reply(() => h.room.send(SOCIAL_MSG.titleSet, { id: null })); // gỡ thật: ghi
+      expect(writes).toBe(2);
+      await sleep(1100);
+      await reply(() => h.room.send(SOCIAL_MSG.titleSet, { id: null })); // gỡ khi chưa đeo: không ghi
+      expect(writes).toBe(2);
+      expect(me(h).title).toBe("");
+    } finally {
+      delete (store as { update?: unknown }).update; // trả về hàm gốc của lớp
+    }
+  });
+
+  it("giới hạn tần suất: dồn 15 titleSet / achievementsGet trong một nhịp chỉ được trả lời chừng burst (3) + vài lượt hồi, không bị ngắt kết nối", async () => {
+    WorldRoomCls.achievements = true;
+    const h = await spawn();
+    await sleep(300);
+    const n = h.ach.length;
+    for (let i = 0; i < 15; i++) {
+      h.room.send(SOCIAL_MSG.titleSet, { id: "tr1" });
+      h.room.send(SOCIAL_MSG.achievementsGet, {});
+    }
+    await sleep(700);
+    const got = h.ach.length - n;
+    expect(got).toBeGreaterThanOrEqual(3);
+    expect(got).toBeLessThanOrEqual(8); // mỗi loại tối đa burst 3 + ~1 hồi: dưới 8; không giới hạn riêng thì tới 30
+    expect(h.room.connection.isOpen).toBe(true);
+  });
 });

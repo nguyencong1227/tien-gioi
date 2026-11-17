@@ -1068,6 +1068,16 @@ export class WorldRoom extends Room<WorldState> {
     const msg = parseTitleSet(m);
     const c = this.world.ctrl.get(sid);
     if (!msg || !c) return;
+    // Mỗi `SoulStore.update` là MỘT lần ghi tệp (kể cả khi không đổi gì): bỏ qua khi bản đang giữ cho thấy việc này vô ích, khỏi biến tin rác hợp lệ thành tải ghi đĩa.
+    // Giới hạn tần suất của tin này đã chặt (`rate-limit.ts`); phần dưới chỉ là lớp thứ hai và KHÔNG thay việc kiểm "đã mở" trong `update` (bản mới nhất là bản quyết định).
+    const held = c.soul.social;
+    const noop =
+      (held?.title ?? null) === msg.id || // đã đeo đúng cái này (hoặc đã gỡ rồi mà gỡ tiếp)
+      (msg.id !== null && !unlockedTitles(held).has(msg.id)); // rõ ràng chưa mở: chắc chắn bị từ chối
+    if (noop) {
+      this.sendAchievements(sid);
+      return;
+    }
     try {
       c.soul = await this.souls.update(c.identity.soulKey, (s) => {
         if (msg.id !== null && !unlockedTitles(s.social).has(msg.id)) return s; // chưa mở: giữ nguyên
