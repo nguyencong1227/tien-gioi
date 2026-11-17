@@ -32,6 +32,14 @@ export function foreignNamesIn(text: string): string[] {
 }
 
 const CLIENT_ROOT = resolve(__dirname, "..");
+const REPO_ROOT = resolve(CLIENT_ROOT, "..");
+/** Thư mục nguồn cần quét: client (cả scripts, index.html, public) và phần mã / test của server và shared (dữ liệu mẫu trong test cũng không được mượn tên truyện khác). */
+const SCAN_ROOTS = [
+  CLIENT_ROOT,
+  join(REPO_ROOT, "server", "src"),
+  join(REPO_ROOT, "server", "scripts"),
+  join(REPO_ROOT, "shared", "src"),
+];
 const SCAN_EXT = /\.(ts|mjs|js|html|css|json)$/;
 const SKIP_DIR = new Set(["node_modules", "dist", ".vite"]);
 
@@ -55,14 +63,14 @@ describe("client không dùng tên nhân vật của truyện khác", () => {
     expect(foreignNamesIn("Tô Vân Hạc, Hạ Thanh Linh, Tiêu Dao Phái, Thanh Vân Môn")).toEqual([]);
   });
 
-  it("không tệp nào trong client/ (src, scripts, index.html, public) chứa tên bị cấm", () => {
+  it("không tệp nào trong client/ (src, scripts, index.html, public), server/src, server/scripts, shared/src chứa tên bị cấm", () => {
     const self = join(CLIENT_ROOT, "src", "no-foreign-names.test.ts");
-    const files = walk(CLIENT_ROOT).filter((f) => f !== self);
-    expect(files.length).toBeGreaterThan(100); // quét thật, không quét hụt thư mục
+    const files = SCAN_ROOTS.flatMap((r) => walk(r)).filter((f) => f !== self);
+    expect(files.length).toBeGreaterThan(300); // quét thật, không quét hụt thư mục (~700 tệp: client, server, shared)
     const hits: string[] = [];
     for (const f of files) {
       for (const n of foreignNamesIn(readFileSync(f, "utf8"))) {
-        hits.push(`${relative(CLIENT_ROOT, f)}: ${n}`);
+        hits.push(`${relative(REPO_ROOT, f)}: ${n}`);
       }
     }
     expect(hits).toEqual([]);
