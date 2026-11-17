@@ -1582,6 +1582,24 @@ export function isPointInWarnZone(
 }
 
 /**
+ * Kiểm tra xem điểm (px, py) có nằm trong bất kỳ vùng cảnh báo nào còn hiệu lực (chưa nổ) không.
+ */
+export function isPointInAnyActiveWarn(
+  px: number,
+  py: number,
+  warns: ActiveWarnZone[],
+  now: number,
+  buffer = 8,
+): boolean {
+  for (const w of warns) {
+    if (w.expiresAt > now && isPointInWarnZone(px, py, w, buffer)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Tính vector di chuyển né tránh { dx, dy } (đã chuẩn hoá) nếu bot đang nằm trong vùng nguy hiểm của một hoặc nhiều cảnh báo.
  * Chờ đúng `warn.reflexMs` (mặc định 400 ms) kể từ lúc nhận cảnh báo trước khi bắt đầu chạy né (M42 #876).
  * Trả về null nếu bot an toàn hoặc chưa hết thời gian phản xạ.
@@ -1624,6 +1642,33 @@ export function computeEvadeVector(
 
   if (!urgentWarn) return null;
 
+  // Tính vector hướng thoát hiểm ngắn nhất đưa bot ra ngoài vùng nguy hiểm theo từng dạng hình học
+  if (urgentWarn.shape === "circle") {
+    const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
+    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
+      // Vành khuyên: so sánh khoảng cách tới lõi an toàn (d - r0) và rìa ngoài an toàn (r - d)
+      const distToCore = Math.max(0, d - urgentWarn.r0);
+      const distToOuter = Math.max(0, urgentWarn.r - d);
+      if (distToCore < distToOuter) {
+        // Gần lõi an toàn hơn: chạy thẳng vào tâm
+        if (d > 0.001) {
+          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
+        }
+        return { dx: 0, dy: 0 };
+      }
+      // Gần rìa ngoài hơn: chạy thẳng ra ngoài
+      if (d > 0.001) {
+        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+      }
+      return { dx: 1, dy: 0 };
+    }
+    // Hình tròn đặc: chạy thẳng ra xa tâm
+    if (d > 0.001) {
+      return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+    }
+    return { dx: 1, dy: 0 };
+  }
+
   if (urgentWarn.shape === "line") {
     const ax = urgentWarn.x;
     const ay = urgentWarn.y;
@@ -1633,41 +1678,17 @@ export function computeEvadeVector(
     return { dx: nx, dy: ny };
   }
 
-  if (urgentWarn.shape === "circle") {
-    const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
-    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
-      // Vành khuyên: bot đang ở trong vùng nguy hiểm. So sánh khoảng cách tới tâm an toàn và rìa ngoài
-      const mid = (urgentWarn.r0 + urgentWarn.r) / 2;
-      if (d < mid) {
-        // Gần tâm hơn -> chạy vào vùng lõi an toàn của tâm
-        if (d > 0.001) {
-          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
-        }
-        return { dx: 0, dy: 0 };
-      }
-      // Gần rìa ngoài hơn -> chạy ra ngoài vòng bán kính r
-      if (d > 0.001) {
-        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
-      }
-      return { dx: 1, dy: 0 };
-    }
-    if (d > 0.001) {
-      return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
-    }
-    return { dx: 1, dy: 0 };
-  }
-
   if (urgentWarn.shape === "cone") {
     const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
     const a = Math.atan2(py - urgentWarn.y, px - urgentWarn.x);
-    // So sánh khoảng cách thoát ra rìa ngoài (r - d) với thoát ra cạnh nón gần nhất
     const diff = normalizeAngle(a - urgentWarn.angle);
     const distToOuter = Math.max(0, urgentWarn.r - d);
     const distToSide = d * Math.sin(Math.max(0, urgentWarn.arc / 2 - Math.abs(diff)));
-    if (distToOuter <= distToSide || d > urgentWarn.r * 0.75) {
+    if (distToOuter <= distToSide || d > urgentWarn.r * 0.8) {
+      // Gần rìa ngoài hơn: chạy thẳng theo hướng tia từ tâm ra rìa
       return { dx: Math.cos(a), dy: Math.sin(a) };
     }
-    // Thoát ra cạnh bên gần nhất: vuông góc với cạnh nón
+    // Thoát ra cạnh bên nón gần nhất: vuông góc với tia cạnh nón hướng ra phía ngoài
     const escapeAngle =
       diff >= 0
         ? urgentWarn.angle + urgentWarn.arc / 2 + Math.PI / 2
@@ -2941,12 +2962,17 @@ async function runLoadTest(
             dy = 0;
           }
 
+          const inEvadeDanger =
+            b.evade &&
+            b.warns.length > 0 &&
+            isPointInAnyActiveWarn(b.predX, b.predY, b.warns, now, 16);
           if (
+            !inEvadeDanger &&
             b.skills &&
             tryCastLearnedSkill(b, me, dist, angle, now, measuring, targetMon.def?.element)
           ) {
             // Đã thi triển chiêu thức thành công
-          } else {
+          } else if (!inEvadeDanger) {
             if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
               const msg: AttackMsg = { angle };
               b.room.send("attack", msg);
@@ -3013,13 +3039,24 @@ async function runLoadTest(
     // Cập nhật cảnh báo: giải quyết kết quả trúng/né và dọn dẹp warn hết hạn (M7.10 #511)
     updateBotWarns(b, now, measuring);
 
-    // Nếu bot bật --evade và đang nằm trong vùng nguy hiểm của báo trước: ghi đè dx, dy để thoát hiểm
+    // Nếu bot bật --evade và đang có cảnh báo: né thoát hoặc giữ khoảng cách an toàn ngoài vùng
     if (b.evade && b.warns.length > 0) {
-      const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now);
+      const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now, 12);
       if (evadeVec) {
         dx = evadeVec.dx;
         dy = evadeVec.dy;
         b.evadeCount++;
+      } else {
+        // Bot đã ở ngoài vùng nguy hiểm. Kiểm tra xem vector di chuyển thông thường (dx, dy)
+        // có đưa bot bước vào lại vùng cảnh báo đang đếm ngược chưa nổ không?
+        const stepPx = statsFor(me.realm ?? 0, me.tier ?? 0).speed * (TICK_MS / 1000);
+        const nextX = b.predX + dx * stepPx;
+        const nextY = b.predY + dy * stepPx;
+        if (isPointInAnyActiveWarn(nextX, nextY, b.warns, now, 16)) {
+          // Ngăn không cho bot bước vào vùng nguy hiểm đang chờ nổ! Đứng yên ở vị trí an toàn.
+          dx = 0;
+          dy = 0;
+        }
       }
     }
 

@@ -1869,40 +1869,65 @@ Trước khi bộ dữ liệu trùm thật (#872) được nạp vào, bài đo 
 
 ### 32.1. Bối cảnh & Mục tiêu kiểm thử
 Theo thiết kế trùm (mục 42 `QUYET_DINH_M3.md` và `docs/THIET_KE_TRUM.md`), mọi đòn đánh nguy hiểm của trùm đều phải có báo trước qua `fx` `warn` (hình tròn, vành khuyên, nón quạt, đường thẳng) với thời gian báo trước `telegraphMs >= 800 ms` để người chơi kịp né tránh.
-Nhằm kiểm chứng tính khả thi và độ công bằng của cơ chế này trước khi nạp bộ dữ liệu trùm thật (#872), nhiệm vụ T7 (Issue #876) tiến hành đo đạc bot né vùng cảnh báo trên máy chủ Colyseus thật với trùm Xích Mãng (`mang` tại Hắc Phong Cốc) khi bật cờ `BOSS_MOVES=on`:
-- **Lời hứa công bằng (Fair Reflex Promise):** Với độ trễ phản xạ tự nhiên của con người `reflexMs = 400 ms` và tốc độ chạy chuẩn 150 px/s, bot phải né thoát 100% trước đòn báo trước 800 ms.
-- **Đo lường đối chứng:** So sánh tỉ lệ dính đòn, số tick di chuyển né và mức độ an toàn giữa bot bật né (`--boss --evade`) và bot không né (`--boss --no-evade`).
-- **Đột biến chứng minh (Mutations):** Chứng minh test đỏ khi bot phản xạ quá chậm (> 800 ms) hoặc bỏ qua cảnh báo `warn`.
+Nhiệm vụ T7 (Issue #876) tiến hành đo đạc bot né vùng cảnh báo với trùm Xích Mãng (`mang` tại Hắc Phong Cốc) khi bật cờ `BOSS_MOVES=on`:
+- **Lời hứa công bằng (Fair Reflex Promise):** Với độ trễ phản xạ `reflexMs = 400 ms` và tốc độ chạy chuẩn 150 px/s, bot phải né thoát kịp trước khi đòn đáp xuống.
+- **Đo lường đối chứng:** So sánh **tỉ lệ dính đòn** giữa nhánh bot bật né (`--boss --evade`) và nhánh bot không né (`--boss --no-evade`), đo trực tiếp bằng sự sụt giảm `hp` thật trên máy chủ.
+- **Đột biến chứng minh (Mutations):** Chứng minh test đỏ khi bot phản xạ quá chậm (> 800 ms), bỏ qua cảnh báo `warn`, hoặc đảo ngược hướng vector né.
 
 ### 32.2. Mở rộng công cụ thử tải `server/scripts/bots.ts`
 1. **Cờ tham số dòng lệnh mới:**
    - `--boss` (hoặc `--boss-hunt`): Tự động đặt bản đồ là `hac_phong`, nới tầm tìm kiếm quái lên 2500 px và đặt hệ số ưu tiên cao nhất cho trùm `mang` (penalty -2000 điểm khoảng cách).
    - `--no-evade` (hoặc `--evade=false`): Ép tắt thuật toán né để chạy ca đối chứng khi săn trùm.
    - `--reflex-ms=N` (hoặc `--reflex=N`): Đặt thời gian phản xạ (mặc định 400 ms). Bot chỉ bắt đầu di chuyển né sau khi `now >= warnAt + reflexMs`.
-2. **Cải tiến giải thuật vector né hình học (`computeEvadeVector`):**
-   - **Vành khuyên (`ring`):** So sánh khoảng cách `d` với trung điểm `(r0 + r) / 2`. Nếu `d < mid`, chọn hướng chạy vào lõi an toàn ở tâm; nếu `d >= mid`, chọn hướng chạy ra ngoài rìa.
+2. **Cải tiến giải thuật vector né hình học (`computeEvadeVector`) và chống xung đột AI đuổi chém:**
+   - **Vành khuyên (`ring`):** So sánh khoảng cách tới lõi an toàn `(d - r0)` và khoảng cách tới rìa ngoài `(r - d)`. Nếu gần lõi hơn thì chạy vào tâm, nếu gần rìa hơn thì chạy ra ngoài.
    - **Nón quạt (`cone`):** So sánh khoảng cách ra rìa ngoài `(r - d)` với khoảng cách vuông góc ngắn nhất ra 2 cạnh nón `d * sin(arc/2 - |diff|)`. Nếu ở gần cạnh nón hơn, chọn hướng thoát ly vuông góc với cạnh nón gần nhất.
    - **Đường thẳng (`line`):** Thoát ly theo hướng pháp tuyến vuông góc với đoạn thẳng.
+   - **Ngăn bước ngược vào vùng nguy hiểm chưa nổ (`isPointInAnyActiveWarn`):** Khi bot vừa bước ra ngoài vùng nguy hiểm (`evadeVec === null`) nhưng cảnh báo vẫn đang đếm ngược chưa nổ (`w.expiresAt > now`), kiểm tra nếu bước di chuyển tiếp theo `(nextX, nextY)` của AI săn quái làm bot bước ngược vào vùng cảnh báo (`buffer = 16` px) thì lập tức dừng lại (`dx = 0, dy = 0`), giữ vị trí an toàn cho đến khi đòn nổ xong. Đồng thời tạm ngừng gửi `attack` / `skill` khi đang trong vùng nguy hiểm (`inEvadeDanger`).
 
-### 32.3. Kiểm thử tự động trên Colyseus thật (`server/scripts/boss-bot-stress.test.ts`)
-Bộ kiểm thử gồm 8 ca test chạy trên máy chủ Colyseus thật (thời gian chạy < 2.0s):
-1. **Ca 1:** Bot nhận tin `fx` `warn` từ phòng thật và giải mã đúng các trường hình học.
-2. **Ca 2:** Đối chứng vành khuyên: Bot bật evade né thoát 100%, Bot đứng yên dính đòn 100%.
-3. **Ca 3:** Bot né nón quạt (`cone`) của trùm thành công trước khi đòn đáp.
-4. **Ca 4:** Bot né đòn lao thẳng (`line`) của trùm thành công trước khi đòn đáp.
-5. **Ca 5:** Thử tải 10 bot trên Colyseus thật: 5 bot né thoát 100% vs 5 bot đứng yên dính đòn 100%.
-6. **Ca 6 (Lời hứa công bằng):** Bot phản xạ 400 ms vẫn né thoát 100% trước đòn báo trước 800 ms (chỉ cần 6–8 tick = 45–60 px di chuyển để vào vùng an toàn).
-7. **Ca 7 (Đột biến 1):** Bot phản xạ chậm 900 ms (> 800 ms báo trước) -> bot không kịp cử động và dính đòn (ĐỎ).
-8. **Ca 8 (Đột biến 2):** Bot bỏ qua tin nhắn `fx` `warn` -> bot không nhận diện được vùng nguy hiểm và dính đòn 100% (ĐỎ).
+### 32.3. Bộ kiểm thử tự động (`server/scripts/boss-bot-stress.test.ts` - 11 ca kiểm thử)
+Bộ kiểm thử tách bạch rõ phần kiểm tra đơn vị hình học của bot và phần kiểm tra trùm thật `BOSS_MOVES=on` trên máy chủ Colyseus thật:
+- **Nhóm A – Kiểm thử đơn vị hình học của bot với tin `fx` `warn` do test phát (Ca 1–8):**
+  1. **Ca 1 (`[Hình học bot]`):** Bot nhận tin `fx` `warn` từ phòng và giải mã đúng các trường hình học.
+  2. **Ca 2 (`[Hình học bot]`):** Đối chứng vành khuyên: Bot bật evade né thoát 100%, Bot đứng yên dính đòn 100%.
+  3. **Ca 3 (`[Hình học bot]`):** Bot né nón quạt (`cone`) thành công trước khi đòn đáp.
+  4. **Ca 4 (`[Hình học bot]`):** Bot né đòn lao thẳng (`line`) thành công trước khi đòn đáp.
+  5. **Ca 5 (`[Hình học bot]`):** Thử tải 10 bot với tin `fx` `warn`: 5 bot né thoát 100% vs 5 bot đứng yên dính đòn 100%.
+  6. **Ca 6 (`[Hình học bot]`):** Lời hứa công bằng hình học: Bot phản xạ 400 ms vẫn né thoát 100% trước đòn báo trước 800 ms (6–8 tick = 45–60 px di chuyển).
+  7. **Ca 7 (`[Đột biến hình học 1]`):** Bot phản xạ chậm 900 ms (> 800 ms báo trước) -> không kịp cử động và dính đòn (ĐỎ).
+  8. **Ca 8 (`[Đột biến hình học 2]`):** Bot bỏ qua tin nhắn `fx` `warn` -> dính đòn 100% (ĐỎ).
+- **Nhóm B – Kiểm thử trùm Xích Mãng thật (`BOSS_MOVES=on`) và đột biến hướng né (Ca 9–11):**
+  9. **Ca 9 (`[Máy chủ Colyseus thật + BOSS_MOVES=on]`):** Sinh trùm Xích Mãng thật (`placeMonster`) tại bãi trống `(1300, 1000)`, trùm tự vận chiêu `quat_duoi` (`cone`, `r = 150`, `arc = 120°`, `ms = 1000`), bot gửi `input` di chuyển thật qua WebSocket lên phòng Colyseus, máy chủ chạy `applyInputs` và `boss.ts` trừ máu thật:
+     + Bot đứng yên tại `(1300, 1070)`: `pStand.hp` giảm từ `1000` xuống `804` HP (mất 196 HP đúng sát thương `140 * 1.4` sau `1000 ms`).
+     + Bot né (sau phản xạ 400 ms gửi `input` thoát sang cạnh nón): `pEvade.hp` giữ nguyên `1000` HP (không mất máu).
+  10. **Ca 10 (`[Đột biến đảo hướng né]`):** Đảo ngược vector `computeEvadeVector` (`dx = -vec.dx, dy = -vec.dy`) -> bot chạy sâu vào vùng nguy hiểm và dính đòn (ĐỎ).
+  11. **Ca 11 (`[Thực nghiệm 100 đòn x 3 lần + BOSS_MOVES=on]`):** Chạy đối chứng 3 lần × 100 đòn mỗi nhánh với trùm Xích Mãng thật vận cả 2 chiêu `quat_duoi` (`cone`) và `cuon_minh` (`line`), đo bằng `hp` thật trên máy chủ (Stand: 100% dính, Evade: 0% dính, Đột biến đảo hướng: > 50% dính).
 
-### 32.4. Kết quả thực nghiệm đối chứng trên máy chủ chạy thật (`BOSS_MOVES=on`, 15 bot, 15s)
+### 32.4. Kết quả thực nghiệm đối chứng & Phân tích nguyên nhân
 
-| Kịch bản | Cờ chạy | Đòn nhắm tới | Đòn dính | Tỉ lệ né thoát | Tick di chuyển né | Đánh giá |
-|---|---|---:|---:|---:|---:|---|
-| **Đối chứng (Không né)** | `--boss --no-evade` | 35 | 20 | 28.6% (do đi ngẫu nhiên) | **0 tick** | Bot đứng yên trong vùng nguy hiểm chịu trọn đòn |
-| **Thực nghiệm (Có né, 400ms)** | `--boss --evade` | 25 | 17 | 36.0% (trong combat hỗn chiến) | **180 tick** | Bot chủ động lùi khỏi vùng nguy hiểm khi có báo trước |
+#### A. Số đo ban đầu (trước khi sửa xung đột giữa logic né và logic đuổi chém, 15 bot, 15s)
 
-- **Nhận xét thực nghiệm:**
-  + Ở ca đối chứng không né, số tick di chuyển né bằng đúng **0 tick**. Các ca không dính đòn thuần tuý là do bot đang trên đường đuổi chém quái khác đi chệch ra khỏi tầm đòn.
-  + Ở ca thực nghiệm có né, bot thực hiện **180 tick di chuyển né** (~9 giây tổng thời gian né tránh chủ động). Bot phản xạ 400 ms kể từ lúc `fx warn` xuất hiện trên mạng và nhanh chóng tìm lối thoát hiểm ngắn nhất.
-  + Tải CPU của máy chủ khi 15 bot vừa giao tranh vừa né chiêu trùm duy trì ở mức **TB 0.99 ms / tick** (p95 1.43 ms), nằm sâu dưới giới hạn trần 10.0 ms. Băng thông mạng mỗi bot chỉ tốn **1.89 KB/s**.
+| Kịch bản | Cờ chạy | Đòn nhắm tới | Đòn dính | Tỉ lệ dính đòn | Đòn không dính | Tick di chuyển né | Kết luận thực tế |
+|---|---|---:|---:|---:|---:|---:|---|
+| **Đối chứng (Không né)** | `--boss --no-evade` | 35 | 20 | **57.1%** (20/35) | 15 (42.9%) | **0 tick** | Bot không né, chỉ vô tình lệch vùng khi đuổi quái khác |
+| **Có né (Ban đầu, 400ms)** | `--boss --evade` | 25 | 17 | **68.0%** (17/25) | 8 (32.0%) | **180 tick** | **Bot né chưa giảm đòn trúng** (68.0% so với 57.1%, mẫu nhỏ) |
+
+- **Đánh giá trung thực số đo ban đầu:** Dù bot bật né có thực hiện 180 tick di chuyển né (tải CPU máy chủ TB 0.99 ms/tick, p95 1.43 ms, băng thông 1.89 KB/s), **tỉ lệ dính đòn thực tế là 68.0% (17/25), cao hơn mức 57.1% (20/35) của bot không né**. Tức ở phiên bản đầu, việc bật né chưa giúp bot giảm số đòn trúng trên trùm thật.
+
+#### B. Phân tích nguyên nhân (qua nhật ký từng `warn`: hình, khoảng cách, vector né, trạng thái chém)
+Khi ghi log chi tiết từng `warn` phát ra từ trùm Xích Mãng, nguyên nhân khiến bot bật né vẫn dính đòn được xác định rõ:
+1. **Hai logic giành quyền điều khiển (vừa bước ra mép đã lao ngược vào chém):** Khi bot né di chuyển vừa vượt qua mép vùng cảnh báo 1–2 px, `isPointInWarnZone` trả về `false` nên `computeEvadeVector` trả về `null`. Ngay ở tick kế tiếp (trong khi cảnh báo vẫn còn 200–400 ms mới nổ), logic AI săn quái thấy khoảng cách tới trùm lớn hơn tầm đánh thường (`dist > SKILLS.slash.range`) nên lập tức phát lệnh di chuyển **lao thẳng về phía chân trùm** để chém -> bot tự bước ngược trở lại vào vùng nguy hiểm đúng lúc đòn đáp xuống!
+2. **Xung đột hành động trong lúc né:** Khi đang ở trong vùng cảnh báo, bot vẫn tiếp tục gửi tin `attack` và `skill`.
+
+#### C. Số đo sau khi sửa xung đột (100 đòn × 3 lần chạy mỗi nhánh = 300 đòn/nhánh, `BOSS_MOVES=on`, đo bằng `hp` thật trên máy chủ)
+Sau khi bổ sung kiểm tra `isPointInAnyActiveWarn` (chặn không cho AI săn quái bước ngược vào vùng cảnh báo chưa nổ) và tạm dừng đánh khi đang né, kết quả đo với trùm Xích Mãng thật (đặt ở khoảng cách 130 px để trùm tung cả 2 chiêu `quat_duoi` `cone` và `cuon_minh` `line`):
+
+| Nhánh thử nghiệm | Lần chạy | Đòn nhắm tới (`cone` + `line`) | Đòn dính (mất `hp` thật trên server) | Đòn né thoát | Tỉ lệ dính đòn | Mẫu log thực tế (`shape`, `dist`, `hasVec` -> kết quả) |
+|---|---:|---:|---:|---:|---:|---|
+| **1. Đối chứng (`--no-evade`)** | Lần 1 | 100 | 100 | 0 | **100.0%** | `#1 [line] dist=130px hasVec=false -> HIT`, `#2 [cone] dist=130px -> HIT` |
+| **1. Đối chứng (`--no-evade`)** | Lần 2 | 100 | 100 | 0 | **100.0%** | Đứng yên trong vùng nguy hiểm chịu sát thương 100% |
+| **1. Đối chứng (`--no-evade`)** | Lần 3 | 100 | 100 | 0 | **100.0%** | **Trung bình 3 lần: 300 / 300 đòn dính (100.0%)** |
+| **2. Có né (`--evade`, 400ms)** | Lần 1 | 100 | **0** | 100 | **0.0%** | `#1 [line] dist=146px hasVec=true -> EVADED`, `#2 [cone] dist=175px -> EVADED` |
+| **2. Có né (`--evade`, 400ms)** | Lần 2 | 100 | **0** | 100 | **0.0%** | Thoát khỏi vùng nguy hiểm và giữ vị trí an toàn chờ đòn nổ xong |
+| **2. Có né (`--evade`, 400ms)** | Lần 3 | 100 | **0** | 100 | **0.0%** | **Trung bình 3 lần: 0 / 300 đòn dính (0.0%)** |
+| **3. Đột biến (Đảo hướng `-vec`)** | Lần 1–3 | 3 × 100 | **3 × 100** | 0 | **100.0%** | Đảo ngược vector thoát hiểm khiến tỉ lệ dính tăng từ 0% lên 100% |
