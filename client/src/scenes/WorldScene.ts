@@ -766,8 +766,8 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
       onSectQuestTurnIn: (questId) =>
         !this.isReconnecting && this.room.send(SECT_MSG.questTurnIn, { questId }),
-      onSectShopBuy: (itemId) =>
-        !this.isReconnecting && this.room.send(SECT_MSG.shopBuy, { itemId, qty: 1 }),
+      onSectShopBuy: (itemId, qty) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.shopBuy, { itemId, qty: qty ?? 1 }),
       isSectDown: () => Boolean(this.me()?.dead) || ui.isLimboOpen(),
     });
 

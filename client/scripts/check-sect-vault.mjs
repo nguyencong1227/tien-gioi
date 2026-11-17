@@ -305,7 +305,7 @@ async function main() {
             selBag: [...document.querySelectorAll("#sect-vault-bag .inv-slot.selected")].map(idx),
             act: act.textContent, actDisabled: act.disabled,
             why: g("sect-vault-why").textContent, selText: g("sect-vault-sel").textContent,
-            draw: g("sect-vault-draw").textContent, qty: g("sect-vault-qty").textContent,
+            draw: g("sect-vault-draw").textContent, qty: g("sect-vault-qty").value,
             qtyHidden: g("sect-vault-qty-box").hidden, policyHidden: g("sect-vault-policy").hidden,
             count: g("sect-vault-count").textContent,
             vaultCells: g("sect-vault-grid").children.length, bagCells: g("sect-vault-bag").children.length,
