@@ -18,6 +18,7 @@ Mục lục:
 - [Luân hồi và Hoàng Tuyền](#luân-hồi-và-hoàng-tuyền)
 - [PK thách đấu](#pk-thách-đấu)
 - [Tông môn](#tông-môn)
+- [Xã hội: xếp hạng, thành tựu, trùm thế giới](#xã-hội-xếp-hạng-thành-tựu-trùm-thế-giới)
 - [Phụ lục: quái theo bậc và bản đồ](#phụ-lục-quái-theo-bậc-và-bản-đồ)
 
 ---
@@ -88,6 +89,47 @@ Chiêu và yêu thú mang một trong mười hệ: **Kim, Mộc, Thủy, Hỏa,
 ### Trạng thái
 
 Chiêu có thể gắn các trạng thái: **Bỏng, Độc, Chảy máu** (sát thương theo thời gian), **Tê cóng** (chậm), **Vỡ giáp** (nhận thêm sát thương), **Choáng** (không làm gì được), và các buff **Hộ thể, Tăng tốc, Hồi phục**. Mỗi mục tiêu tối đa 4 trạng thái; cùng loại thì làm mới, không cộng dồn. Một số bộ phù và phù tốc chiêu có thể tăng sát thương chiêu hoặc giảm hồi chiêu.
+
+### Hình đòn của chiêu
+
+Bảng **Công pháp (Shift + K)** ghi **kiểu đánh** của từng chiêu. Ngoài các hình quen thuộc (**quạt trước mặt, tia thẳng, toả nhiều tia, vòng nổ quanh mình, vùng đặt xuống đất, lao tới né đòn, hộ thể quanh mình**), bản 0.5.0 thêm sáu hình mới:
+
+| Hình | Cách hoạt động |
+|---|---|
+| **Sét lan** | Đánh trúng một mục tiêu rồi nhảy sang mục tiêu gần đó. |
+| **Đạn bay** | Bắn một hoặc nhiều viên bay thẳng; có viên xuyên qua kẻ địch, có viên nảy. |
+| **Vùng duy trì** | Đặt một vùng dưới đất, tác dụng theo nhịp lên những gì đứng trong đó cho tới khi tan. |
+| **Bẫy** | Đặt xuống đất, nằm im; quái bước vào thì bẫy mới kích hoạt. |
+| **Hào quang quanh thân** | Bám theo bạn và tác dụng theo nhịp quanh bạn. |
+| **Tượng triệu hồi** | Dựng một bức tượng đứng yên, tác dụng theo nhịp quanh nó. |
+
+Vùng, bẫy, hào quang và tượng gọi chung là **vật thể bền**; chúng tan sau một thời gian. Giới hạn: mỗi người tối đa **3 vùng, 3 bẫy, 1 hào quang, 2 tượng** và **4 vật thể cùng lúc**; đặt thêm thì vật thể **cũ nhất** tan trước. Vật thể bền **không đặt được trong khu an toàn** (trấn) và tan khi chủ chết, rời phòng, qua cổng hoặc vào bí cảnh.
+
+> **Ví dụ:** Phi Kiếm Tam Liên (đạn bay, ba viên hình quạt hẹp), Độc Đằng Phục (bẫy), Liệt Diễm Trận (vùng), Liên Châu Lôi (sét lan), Hồn Phiên Tượng (tượng).
+
+### Chiêu vận
+
+Một số chiêu phải **vận khí** một lúc rồi mới đáp (ví dụ **Phá Sơn Nhất Kích**, vận 1,2 giây). Khi đang vận:
+
+- Linh lực bị trừ và hồi chiêu bắt đầu tính **ngay lúc bắt đầu vận**; có vòng tụ khí quanh người để mọi người thấy.
+- Bạn đi **chậm một nửa** và **không dùng được chiêu khác**.
+- Chiêu đáp ở **vị trí bạn đang đứng lúc đáp**, theo hướng lúc bắt đầu vận.
+- Vận bị **huỷ, không đáp và không hoàn linh lực** nếu bạn bị **choáng**, **ngã xuống**, hồn lìa xác, vào Hoàng Tuyền, hoặc có một trận **thách đấu bắt đầu** trong lúc vận. Vì vậy hãy vận khi quái chưa kịp áp sát.
+
+### Phẩm, tầng và luyện chiêu
+
+Mỗi chiêu có **phẩm cấp**: **Hoàng, Huyền, Địa, Thiên** (từ thấp tới cao). Phẩm quyết định **tầng tối đa** của chiêu:
+
+| Phẩm | Hoàng | Huyền | Địa | Thiên |
+|---|---|---|---|---|
+| Tầng tối đa | 3 | 4 | 5 | 6 |
+
+Có hai cách lên tầng:
+
+- **Đọc thêm kinh quyển trùng** (nhặt được khi hạ quái, bán và mua được): mỗi quyển trùng nâng một tầng, tới tầng tối đa.
+- **Luyện chiêu:** mỗi lần dùng chiêu **trúng ít nhất một mục tiêu** được **1 điểm luyện** (tối đa **60 điểm mỗi phút**, nên đứng đánh bù nhìn không cày nhanh được). Đủ điểm thì chiêu tự lên tầng: tầng 1 lên 2 cần **60** điểm, tầng 2 lên 3 cần **150**, tầng 3 lên 4 cần **300**, tầng 4 lên 5 cần **600**. Luyện chỉ đưa chiêu tới **tầng tối đa trừ một**; **tầng cuối chỉ có bằng kinh quyển trùng**. Bảng Công pháp có thanh luyện và chấm tầng cho từng chiêu.
+
+Tầng cao hơn thì sát thương mạnh hơn và hồi chiêu ngắn hơn. Lên tầng bằng kinh quyển thì **điểm luyện dở dang của tầng cũ mất** (luyện lại từ 0 ở tầng mới). Khi luân hồi, chiêu của kiếp cũ mất theo kiếp; chỉ chiêu đã **khắc vào chân linh** trở lại, ở **tầng 1** và với điểm luyện trắng.
 
 ---
 
