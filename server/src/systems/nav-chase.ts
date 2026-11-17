@@ -15,7 +15,7 @@ import { findPath, lineClear, NAV_CELL } from "./nav";
 /** Quái thường được tìm đường tối đa chừng này lần MỖI TICK (cả phòng); trùm không bị giới hạn. */
 export const NAV_SEARCHES_PER_TICK = 3;
 /** Giãn cách tối thiểu giữa hai lần tìm của một con (ms). */
-export const NAV_REPATH_MS = 400;
+export const NAV_REPATH_MS = 500;
 /** Tới cách điểm đường chừng này (px) thì sang điểm kế. */
 export const NAV_ARRIVE_PX = 12;
 /** Cửa sổ đo quãng đường thực đi (ms). */
@@ -46,8 +46,6 @@ export interface NavCtrl {
   /** Đích lúc tìm đường (để biết đích đã dịch xa chưa). */
   gx: number;
   gy: number;
-  /** Đường chỉ tới nút gần đích nhất (không tới được vùng đích). */
-  partial: boolean;
   /** Sớm nhất được tìm lại (ms của `World.now`). */
   repathAt: number;
   losAt: number;
@@ -72,7 +70,6 @@ function newNav(m: Monster, now: number): NavCtrl {
     i: 0,
     gx: 0,
     gy: 0,
-    partial: false,
     repathAt: 0,
     losAt: -1,
     los: true,
@@ -144,7 +141,7 @@ export function navIdle(mc: MonsterCtrl, m: Monster, now: number) {
 export function navPause(mc: MonsterCtrl, m: Monster, now: number) {
   const nav = mc.nav;
   if (!nav) return;
-  nav.pts = null;
+  // Giữ nguyên đường đang đi (còn hiệu lực sau lúc gồng / vận chiêu; đích dịch xa thì `navSteer` tự tìm lại): khỏi tìm đường lại sau MỖI chiêu
   nav.chkX = m.x;
   nav.chkY = m.y;
   nav.chkAt = now;
@@ -202,7 +199,11 @@ export function navSteer(
   }
 
   // Bị chặn: cần đường. Tìm lại khi chưa có, đích dịch xa, hoặc vừa kẹt đủ lâu để thử lối khác
-  const goalMoved = nav.pts !== null && Math.hypot(tx - nav.gx, ty - nav.gy) > 2 * NAV_CELL;
+  // Đích dịch xa mới tìm lại; ngưỡng tăng theo khoảng cách còn lại (đích xa 400 px dịch 64 px thì đường cũ vẫn đúng hướng)
+  const goalMoved =
+    nav.pts !== null &&
+    Math.hypot(tx - nav.gx, ty - nav.gy) >
+      Math.max(2 * NAV_CELL, 0.25 * Math.hypot(nav.gx - m.x, nav.gy - m.y));
   const reroute = nav.stuckMs >= STUCK_REROUTE_MS && !nav.rerouted && nav.pts !== null;
   if ((nav.pts === null || goalMoved || reroute) && w.now >= nav.repathAt) {
     if (mc.boss || w.navBudget > 0) {
@@ -224,7 +225,6 @@ export function navSteer(
       if (res) {
         nav.pts = res.pts;
         nav.i = 0;
-        nav.partial = !res.reached;
       } else nav.pts = null; // không có nút thông gần chỗ đứng: đi thẳng như cũ
       nav.gx = tx;
       nav.gy = ty;

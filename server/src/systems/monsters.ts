@@ -62,17 +62,19 @@ function warmMonsterNav(w: World) {
 
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
-  // Trùm khó tìm chỗ hơn (vòng ngoài xa trấn + rộng + nối được với trấn): thử nhiều lần hơn
-  const tries = def.boss ? 200 : 40;
-  for (let i = 0; i < tries; i++) {
-    const x = rand(64, map.worldW - 64),
-      y = rand(64, map.worldH - 64);
-    const d = map.dangerAt(x, y);
-    if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
-    if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
-    if (def.boss && !bossSpawnOk(w, def, x, y)) continue;
-    placeMonster(w, def, x, y, rollElite(w, def));
-    return;
+  // Trùm khó tìm chỗ hơn (vòng ngoài xa trấn + rộng + thuộc vùng chính): thử nhiều lần; không thấy chỗ rộng nào thì quay về luật cũ (còn hơn thiếu trùm: bản đồ thật còn > 1000 chỗ rộng, test giữ)
+  for (const strict of def.boss ? [true, false] : [false]) {
+    const tries = strict ? 200 : 40;
+    for (let i = 0; i < tries; i++) {
+      const x = rand(64, map.worldW - 64),
+        y = rand(64, map.worldH - 64);
+      const d = map.dangerAt(x, y);
+      if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
+      if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
+      if (strict && !bossSpawnOk(w, def, x, y)) continue;
+      placeMonster(w, def, x, y, rollElite(w, def));
+      return;
+    }
   }
 }
 
@@ -177,11 +179,13 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   }
 
   let inReach = false; // đã trong tầm đánh gần của mục tiêu (đứng đánh, không phải kẹt)
+  let seeking = false; // đang đi tới người (đuổi) hoặc về chỗ sinh: nơi áp tìm đường / đo kẹt (đặt ở chỗ chọn đích, không dò lại bằng so sánh số thực)
   if (target) {
     const d = Math.hypot(target.x - m.x, target.y - m.y);
     inReach = d <= def.attackRange + PLAYER_RADIUS;
     tx = target.x;
     ty = target.y;
+    seeking = true;
     speed = def.speed;
     if (mc.boss) {
       // Trùm nhiều chiêu (mục 42, `boss.ts`): bộ chiêu bằng dữ liệu thay hẳn đập đất / lao của loài đó (một chiêu một lúc). Đang gầm / vận chiêu thì đứng yên, không đánh thường.
@@ -209,6 +213,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       // Tầm xa (M7.3, `bolt.ts`): đứng bắn / lùi / đuổi tới tầm bắn; không đánh gần
       const mv = rangedStep(w, m, mc, target, d, stunned);
       tx = mv.tx;
+      seeking = mv.tx === target.x && mv.ty === target.y; // tầm xa: chỉ khi đang TIẾN tới người (lui / đứng bắn thì không)
       ty = mv.ty;
       speed = mv.speed;
     } else if (d <= def.attackRange + PLAYER_RADIUS) {
@@ -235,6 +240,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     if (evading ? homeD > EVADE_HOME_PX : homeD > RETURN_HOME_DIST) {
       tx = mc.homeX;
       ty = mc.homeY;
+      seeking = true;
       speed = def.speed * (evading ? 1 : 0.8);
     } else if (nearest > MONSTER_WAKE_DIST) {
       // Ngủ: đứng yên tại chỗ, không ghi gì vào state ngoài hồi máu
@@ -269,9 +275,8 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
 
   // Tìm đường / phát hiện kẹt (mục 48, `nav-chase.ts`): chỉ khi quái đang đi tới người (đuổi) hoặc về chỗ sinh; đường thẳng thông thì không đổi gì
   if (speed > 0) {
-    const chasing = target !== undefined && tx === target.x && ty === target.y;
-    const homing = target === undefined && tx === mc.homeX && ty === mc.homeY;
-    if (chasing || homing) {
+    const chasing = seeking && target !== undefined;
+    if (seeking) {
       const goalR = chasing ? Math.max(8, def.attackRange + PLAYER_RADIUS - 6) : 24;
       const stuck = navSteer(w, id, m, mc, tx, ty, goalR);
       if (stuck >= STUCK_EVADE_MS) {

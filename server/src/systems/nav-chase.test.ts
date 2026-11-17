@@ -198,6 +198,26 @@ describe("trùm vòng qua tường, phát hiện kẹt và rút về", () => {
   });
 });
 
+describe("quái bị kéo xa tự về chỗ sinh bằng đường vòng (không đứng ngơ ở tường)", () => {
+  it("về nhà phải vòng qua lối ở cuối tường: tới gần nhà, đi bộ (không nhảy cóc quá 60 px mỗi tick)", () => {
+    const { w } = setup({ gapFrom: 24, gapTo: 28 });
+    const { m, mc } = addMonster(w, "hac_giao", 400, 400); // nhà (400, 400), bên trái tường cột 20
+    m.x = 900; // bị kéo sang bên phải tường, không còn người nào để đuổi
+    m.y = 400;
+    let maxJump = 0;
+    let px = m.x;
+    let py = m.y;
+    run(w, 60_000, () => {
+      maxJump = Math.max(maxJump, Math.hypot(m.x - px, m.y - py));
+      px = m.x;
+      py = m.y;
+      return Math.hypot(m.x - mc.homeX, m.y - mc.homeY) <= 200;
+    });
+    expect(Math.hypot(m.x - mc.homeX, m.y - mc.homeY)).toBeLessThanOrEqual(200);
+    expect(maxJump).toBeLessThan(60);
+  });
+});
+
 describe("quái vòng qua khu an toàn (không bước vào trấn)", () => {
   it("trấn chắn giữa quái và người: quái tới được người bằng đường vòng ngoài trấn, không kẹt, không rút", () => {
     const map = flatMap(40, 30, { cx: 20, cy: 15, r: 3 }); // trấn tâm (656, 496), bán kính 96 px
