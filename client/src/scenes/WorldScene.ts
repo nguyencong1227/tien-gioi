@@ -13,6 +13,10 @@ import {
 } from "../monster-status";
 import { parseChainPts, planChainFx, planComboBurst } from "../gfx/fx/ct2-fx";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
+import { PBoltLayer } from "../gfx/fx/pbolt-layer";
+import { WindupLayer, type WindupWatchResult } from "../gfx/fx/windup-layer";
+import { planWindup, type WindupPlan } from "../gfx/fx/windup-fx";
+import { parsePBolt, pboltEnd, pboltPlan, planPBoltEnd } from "../gfx/fx/pbolt-fx";
 import { recipeIds } from "../gfx/fx/recipes";
 import {
   planSlashEdges,
@@ -529,6 +533,10 @@ export class WorldScene extends Phaser.Scene {
   fx!: FxSystem;
   /** Báo trước đòn + đạn tầm xa của quái (M7.7, #508): Graphics từ pool, không tốn ngân sách hạt */
   telegraphs!: TelegraphLayer;
+  /** Đạn bay của người chơi (`fx` `pbolt`, CT11b bước 2): vẽ theo từng đoạn máy chủ gửi, không mô phỏng */
+  pbolts!: PBoltLayer;
+  /** Vòng tụ khí của chiêu vận (`SkillDef.windupMs`, CT11b bước 3): hiệu ứng đáp hoãn tới hết `windupMs`, bỏ nếu người vận bị huỷ */
+  windups!: WindupLayer;
   /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
   dangerCues = 0;
   /**
@@ -634,6 +642,18 @@ export class WorldScene extends Phaser.Scene {
         sound.warn();
       },
     });
+    this.pbolts = new PBoltLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+    });
+    this.windups = new WindupLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+      watch: (by, mine) => this.windupWatch(by, mine),
+      onRelease: (plan, x, y) => this.onWindupRelease(plan, x, y),
+    });
     ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
@@ -649,6 +669,8 @@ export class WorldScene extends Phaser.Scene {
       offQuality();
       this.fx.destroy();
       this.telegraphs.destroy();
+      this.pbolts.destroy();
+      this.windups.destroy();
     });
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
@@ -2196,6 +2218,8 @@ export class WorldScene extends Phaser.Scene {
     }
     this.activeSlashes.length = 0;
     this.telegraphs.clear();
+    this.pbolts.clear();
+    this.windups.clear();
 
     for (const it of this.activeSwords) {
       it.img.setVisible(false);
@@ -4059,6 +4083,8 @@ export class WorldScene extends Phaser.Scene {
   private stepTransientFx(now: number) {
     // 0. Báo trước đòn + đạn của quái: vẽ lại theo đồng hồ cảnh (vị trí đạn tính từ lúc bắn, không từ khung)
     this.telegraphs.update(now);
+    this.pbolts.update(now);
+    this.windups.update(now);
 
     // 1. Vệt chém (180ms)
     for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
@@ -4165,30 +4191,14 @@ export class WorldScene extends Phaser.Scene {
         // Dùng chiêu (M7.7, #508): hạt theo hình / hệ của chiêu (`cast-fx.ts`); client chỉ vẽ, kết quả đánh do máy chủ quyết định
         const def = skillOf(m.skill);
         if (!def) return; // id lạ: bỏ qua
-        const mine = m.by === this.sid;
-        if (mine) {
-          // đòn của mình: số sát thương trúng quái trong tầm được tô như đòn của mình (như chém / kiếm khí)
-          this.lastAttack = { at: this.time.now, range: m.range };
-          const me = this.players.get(this.sid);
-          if (me) me.slashUntil = this.time.now + SLASH_MS;
-        } else {
-          const other = this.players.get(m.by);
-          if (other) other.slashUntil = this.time.now + SLASH_MS;
+        // CHIÊU VẬN (`windupMs`, CT5 lát 2): `fx cast` là lúc BẮT ĐẦU vận; máy chủ đáp (sát thương + hiệu ứng hình) sau `windupMs`. Vẽ vòng tụ khí ngay, hoãn tiếng + hạt đáp
+        // tới hết `windupMs` (WindupLayer gọi `onWindupRelease`), bỏ nếu người vận chết / rời vùng nhìn / (của mình) bị choáng.
+        const wind = planWindup(m, def, m.by === this.sid);
+        if (wind !== null) {
+          this.windups.begin(wind, this.time.now);
+          return;
         }
-        // Tiếng chiêu (#508 (a), tổng hợp bằng mã): của mình luôn nghe; của người khác chỉ khi trong tầm nhìn (nhỏ hơn)
-        if (mine || this.inView(m.x, m.y, m.range + 96)) sound.cast(def.element, def.shape, mine);
-        if (!this.inView(m.x, m.y, m.range + 96)) return;
-        return this.playFxPoints(
-          planCastFx({
-            skill: def,
-            x: m.x,
-            y: m.y,
-            angle: m.angle,
-            range: m.range,
-            mine,
-            emitterBudget: getQuality().emitterBudget,
-          }),
-        );
+        return this.castVisuals(def, m.by, m.x, m.y, m.angle, m.range);
       }
       case "chain": {
         // Sét lan (mục 51, CT11b): tia nối tiếp từng đoạn giữa các mục tiêu máy chủ đã chọn, màu theo hệ; client chỉ vẽ, sát thương đã có `dmg`. Tin hỏng: bỏ cả tin
@@ -4204,6 +4214,19 @@ export class WorldScene extends Phaser.Scene {
             emitterBudget: getQuality().emitterBudget,
           }),
         );
+      }
+      case "pbolt": {
+        // Đạn của người chơi (mục 51, CT11b bước 2): MỖI tin là một đoạn thẳng máy chủ đã tính (tới ô chặn / trúng / hết tầm); nảy là một tin MỚI từ chỗ nảy. Client chỉ
+        // bay hình theo `speed` / `angle` trong `ms` rồi bụi ở cuối đoạn; sát thương đã có `dmg`. Tin hỏng / chiêu lạ / ngoài tầm nhìn: bỏ, không lỗi.
+        const def = skillOf(m.skill);
+        const p = parsePBolt(m);
+        if (!def || !p) return;
+        const end = pboltEnd(p);
+        // nhìn thấy khi điểm đầu HOẶC điểm cuối trong tầm (đạn bay ngang màn hình)
+        if (!this.inView(p.x, p.y, 480) && !this.inView(end.x, end.y, 480)) return;
+        const plan = pboltPlan(p, def.element, p.by === this.sid);
+        this.pbolts.add(plan, this.time.now);
+        return this.playFxPoints(planPBoltEnd(plan));
       }
       case "warn":
         // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
@@ -4306,6 +4329,64 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Phát các điểm hạt của một kế hoạch (có trễ thì hẹn giờ theo đồng hồ cảnh; đóng cảnh thì tự huỷ). */
+  /**
+   * Hình + tiếng của MỘT lần dùng chiêu (hạt theo hình / hệ, tô số sát thương đòn của mình, hoạt ảnh chém): chiêu tức thời gọi ngay khi nhận `fx cast`; chiêu vận gọi lúc ĐÁP
+   * (hết `windupMs`) với vị trí HIỆN TẠI của người vận (máy chủ đáp từ đó) và hướng lúc bắt đầu.
+   */
+  private castVisuals(
+    def: SkillDef,
+    by: string,
+    x: number,
+    y: number,
+    angle: number,
+    range: number,
+  ) {
+    const mine = by === this.sid;
+    if (mine) {
+      // đòn của mình: số sát thương trúng quái trong tầm được tô như đòn của mình (như chém / kiếm khí)
+      this.lastAttack = { at: this.time.now, range };
+      const me = this.players.get(this.sid);
+      if (me) me.slashUntil = this.time.now + SLASH_MS;
+    } else {
+      const other = this.players.get(by);
+      if (other) other.slashUntil = this.time.now + SLASH_MS;
+    }
+    // Tiếng chiêu (#508 (a), tổng hợp bằng mã): của mình luôn nghe; của người khác chỉ khi trong tầm nhìn (nhỏ hơn)
+    if (mine || this.inView(x, y, range + 96)) sound.cast(def.element, def.shape, mine);
+    if (!this.inView(x, y, range + 96)) return;
+    return this.playFxPoints(
+      planCastFx({
+        skill: def,
+        x,
+        y,
+        angle,
+        range,
+        mine,
+        emitterBudget: getQuality().emitterBudget,
+      }),
+    );
+  }
+
+  /** Người đang vận khí: vị trí hiện tại (của mình: vị trí đoán trước) và cờ chết / choáng (choáng chỉ biết với chính mình); `null` khi không còn trong state. */
+  private windupWatch(by: string, mine: boolean): WindupWatchResult | null {
+    const e = this.players.get(by);
+    const p = this.state?.players?.get(by);
+    if (!e || !p) return null;
+    const self = by === this.sid && this.hasMe;
+    return {
+      x: self ? this.predX : e.root.x,
+      y: self ? this.predY : e.root.y,
+      dead: p.dead,
+      stunned: mine && this.status.stunned(performance.now()),
+    };
+  }
+
+  /** Vận xong không bị huỷ: hiệu ứng + tiếng đáp tại chỗ người vận đứng LÚC NÀY (như máy chủ). Chiêu đã bị gỡ khỏi bảng giữa chừng thì bỏ. */
+  private onWindupRelease(plan: WindupPlan, x: number, y: number) {
+    const def = skillOf(plan.skill);
+    if (def) this.castVisuals(def, plan.by, x, y, plan.angle, plan.range);
+  }
+
   private playFxPoints(points: FxPoint[]) {
     for (const p of points) {
       const play = () =>
