@@ -58,6 +58,15 @@ export const TIER_LABEL: Readonly<Record<AmbushTier, string>> = {
 
 // ---------- Đọc tin từ mạng ----------
 
+/** Giá `{ exp, coin: { price, enough } }` đã làm sạch (dùng chung cho `ambushOffer` và `ambushState`); sai dạng thì `null`. Số làm tròn xuống, không âm. */
+export function parseAmbushPrice(raw: unknown): AmbushPrice | null {
+  if (!isObj(raw) || !isObj(raw.coin)) return null;
+  const exp = wholeOf(raw.exp);
+  const coin = wholeOf(raw.coin.price);
+  if (exp === undefined || coin === undefined || typeof raw.coin.enough !== "boolean") return null;
+  return { exp, coin: { price: coin, enough: raw.coin.enough } };
+}
+
 /** Tin `ambushOffer` đã làm sạch; sai dạng thì `null` (bỏ). `ms` kẹp trong [0, `AMBUSH_OFFER_MS`] (một lời đề nghị không dài hơn hạn của nó). */
 export function parseAmbushOffer(raw: unknown): AmbushOfferMsg | null {
   if (!isObj(raw)) return null;
@@ -69,11 +78,10 @@ export function parseAmbushOffer(raw: unknown): AmbushOfferMsg | null {
   const name = textOf(foe.name, 60);
   const tier = typeof foe.tier === "string" && AMBUSH_TIERS.includes(foe.tier as AmbushTier);
   const count = wholeOf(foe.count);
-  const exp = wholeOf(price.exp);
-  const coin = wholeOf(price.coin.price);
+  const priceOk = parseAmbushPrice(price);
   const ms = raw.ms;
-  if (name === undefined || !tier || count === undefined || exp === undefined) return null;
-  if (coin === undefined || typeof price.coin.enough !== "boolean" || !isNum(ms)) return null;
+  if (name === undefined || !tier || count === undefined || priceOk === null) return null;
+  if (!isNum(ms)) return null;
   return {
     id: raw.id,
     scene,
@@ -82,7 +90,7 @@ export function parseAmbushOffer(raw: unknown): AmbushOfferMsg | null {
       tier: foe.tier as AmbushTier,
       count: Math.min(Math.max(1, count), AMBUSH_FOE_COUNT_MAX * 3),
     },
-    price: { exp, coin: { price: coin, enough: price.coin.enough } },
+    price: priceOk,
     ms: Math.min(AMBUSH_OFFER_MS, Math.max(0, ms)),
   };
 }
