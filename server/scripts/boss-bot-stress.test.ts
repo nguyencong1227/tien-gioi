@@ -360,11 +360,20 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm (M42 T7, Issu
     );
 
     const speed = 150;
+    // Giả lập thời điểm tick `tick`: lấy mốc `warnAt` (khi nhận cảnh báo) + tick*50. Cảnh báo có ms ==
+    // warnDurationMs nên `warnAt` và `expiresAt - warnDurationMs` bằng nhau về toán, NHƯNG hiệu `expiresAt -
+    // warnDurationMs` trừ khử hai số lớn (performance.now() ~ triệu ms) làm mất chữ số thừa floating-point:
+    // `curT` tại tick ranh giới phản xạ (tick 8, curT == warnAt + reflexMs) đôi khi rơi một chút dưới mốc →
+    // điều kiện `now >= warnAt + reflexMs` trong computeEvadeVector trả false → bot THIẾU tick né đầu tiên,
+    // dừng ở d=42.5 > 39 (r0 - PLAYER_RADIUS) → dính đòn. Đó là flake #1115 (tái hiện được dưới tải full-suite,
+    // ~1/10 ca), KHÔNG phải lỗi mã game. Dùng warnAt trực tiếp loại bỏ sự trừ khử, tick ranh giới luôn kích hoạt.
+    const simTickT = (b: BotState, tick: number) =>
+      (b.warns[0]!.warnAt ?? b.warns[0]!.expiresAt - warnDurationMs) + tick * 50;
 
     // 14 tick (700 ms) mô phỏng vòng lặp game
     for (let tick = 0; tick < 14; tick++) {
       for (const b of evadeBots) {
-        const curT = b.warns[0].expiresAt - warnDurationMs + tick * 50;
+        const curT = simTickT(b, tick);
         updateBotWarns(b, curT, true);
         if (b.evade && b.warns.length > 0) {
           const vec = computeEvadeVector(b.predX, b.predY, b.warns, curT);
@@ -376,7 +385,7 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm (M42 T7, Issu
         }
       }
       for (const b of standBots) {
-        const curT = b.warns[0].expiresAt - warnDurationMs + tick * 50;
+        const curT = simTickT(b, tick);
         updateBotWarns(b, curT, true);
       }
     }
