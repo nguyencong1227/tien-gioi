@@ -917,7 +917,7 @@ Thời gian thật = giây mô phỏng / 0.6 (né làm đánh chậm đi; `ASSUM
 
 | Trùm | Bậc người chơi | 1 người | 2 người | 3 người | 4 người |
 |---|---|---|---|---|---|
-| Xích Mãng | bậc 12 (khí huyết 1.147) | 0,4 phút, 2 chiêu (100% thắng, 0 chết) | 0,2 phút, 2 chiêu (100% thắng, 0 chết) | 0,1 phút, 1 chiêu (100% thắng, 0 chết) | 0,1 phút, 0,9 chiêu (100% thắng, 0 chết) |
+| Xích Mãng | bậc 12 (khí huyết 1.147) | 0,4 phút, 3 chiêu (100% thắng, 0 chết) | 0,2 phút, 2 chiêu (100% thắng, 0 chết) | 0,1 phút, 1,4 chiêu (100% thắng, 0 chết) | 0,1 phút, 0,9 chiêu (100% thắng, 0 chết) |
 
 ### 2. Sát thương mỗi đòn và cuồng nộ
 
