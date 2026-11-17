@@ -30,7 +30,7 @@
  */
 
 /**
- * Mọi chiêu học được (12 đợt 1 + 6 Nguyên Anh đợt 2 #722 + 6 Kim / Thổ CT6 lát 1 = 24) của kế hoạch `*-cast`. Test `fx-driver.test.ts` đòi danh sách này TRÙNG đúng các chiêu trong `SKILLS` của `shared/`
+ * Mọi chiêu học được (12 đợt 1 + 6 Nguyên Anh đợt 2 #722 + 6 Kim / Thổ CT6 lát 1 + 6 dạng mới CT9 lát 1 = 30) của kế hoạch `*-cast`. Test `fx-driver.test.ts` đòi danh sách này TRÙNG đúng các chiêu trong `SKILLS` của `shared/`
  * (thêm chiêu mà quên ở đây là test đỏ), nên hiệu năng của chiêu mới luôn được đo.
  */
 export const FX_CAST_SKILLS = [
@@ -59,6 +59,13 @@ export const FX_CAST_SKILLS = [
   "liet_dia_nhat_quyen",
   "phan_nhac_tram",
   "van_kiem_quy_tong",
+  // Dạng mới (CT9 lát 1)
+  "doc_dang_phuc",
+  "phi_kiem_tam_lien",
+  "liet_diem_tran",
+  "loi_lien_chau",
+  "hon_phien_tuong",
+  "pha_son_nhat_kich",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
