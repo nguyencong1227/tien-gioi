@@ -17,6 +17,7 @@ import {
   type BossShape,
   type FxMsg,
   type GameMap,
+  SUMMON_ONLY_KINDS,
 } from "@tien-gioi/shared";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { bossCanTarget, bossInZone } from "./boss";
@@ -882,6 +883,31 @@ describe("quái con của trùm", () => {
     expect(c.life.kills).toBe(kills0);
     expect(w.state.loot.size).toBe(loot0);
   });
+
+  it.each(SUMMON_ONLY_KINDS)(
+    "loài chỉ-triệu-hồi %s (#887): dựng được, hạ nó KHÔNG tu vi / đồ / Linh thạch / kiếp (dữ liệu thật, không phải loài hoang)",
+    (kind) => {
+      const { w, mon, p, c, until } = scene(
+        def([ab("goi", { t: "summon", kind, count: 1 }, { dmgMult: 0 })]),
+      );
+      until(() => bossLiveAdds(w, mon.mc.boss!) > 0);
+      const aid = [...mon.mc.boss!.adds][0]!;
+      const amc = w.mctrl.get(aid)!;
+      expect(amc.def.id).toBe(kind);
+      expect(amc.addOf).toBe(mon.id);
+      amc.damageBy.set("a", 50);
+      const exp0 = p.exp;
+      const coin0 = c.coin;
+      const kills0 = c.life.kills;
+      const loot0 = w.state.loot.size;
+      killMonster(w, aid, amc);
+      expect(w.mctrl.has(aid)).toBe(false);
+      expect(p.exp).toBe(exp0);
+      expect(c.coin).toBe(coin0);
+      expect(c.life.kills).toBe(kills0);
+      expect(w.state.loot.size).toBe(loot0);
+    },
+  );
 
   it("trùm chết: quái con biến mất theo (không để chúng đứng lại)", () => {
     const { w, mon, until } = scene(

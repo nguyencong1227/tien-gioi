@@ -48,6 +48,18 @@ button {
 }
 
 /* Đăng nhập */
+/*
+ * Nền màn đăng nhập: ẢNH AI ĐẦU TIÊN của game (SDXL base, nhóm Tiên Giới tự sinh; nguồn gốc ở `docs/art/nguon/login_bg.json`, #513). Chỉ hiện khi tấm đăng nhập đang hiện; tấm giữa có nền giấy riêng
+ * nên chữ đăng nhập không nằm trên ảnh. Màu `--ink` giữ làm lớp dưới cùng: ảnh chưa kịp tải / lỗi / trình duyệt cũ không có `:has` thì màn đăng nhập y như trước. Lớp phủ tối nhẹ ở dưới
+ * để tấm đăng nhập nổi lên; ảnh vuông, `cover` căn lệch trái để tháp (chủ thể) không nằm sau tấm giữa trên màn ngang.
+ */
+body:has(#login:not([hidden])) {
+  background:
+    linear-gradient(rgba(29, 26, 22, 0.15), rgba(29, 26, 22, 0.5)),
+    url("/assets/ai/login_bg.webp") 32% 42% / cover no-repeat,
+    var(--ink);
+}
+
 #login {
   position: fixed;
   z-index: 20;

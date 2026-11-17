@@ -60,7 +60,7 @@ export const ASSUME_DUNGEON = {
 } as const;
 
 /** Bộ sinh số ngẫu nhiên có hạt giống (mulberry32), thay `Math.random` trong lúc mô phỏng. */
-function seeded(seed: number) {
+export function seeded(seed: number) {
   let s = seed | 0;
   return () => {
     s = (s + 0x6d2b79f5) | 0;

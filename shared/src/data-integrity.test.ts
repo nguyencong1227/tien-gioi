@@ -24,6 +24,7 @@ import {
   TRADE_BY_ID,
   DEFAULT_MAP_ID,
   getMap,
+  SUMMON_ONLY_KINDS,
 } from "./index";
 
 describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
@@ -41,6 +42,8 @@ describe("nhất quán dữ liệu game (Issue #112 - data-integrity)", () => {
     it("mọi quái trong MONSTERS đều có bảng rơi đồ và bảng rơi tiền", () => {
       expect(MONSTERS.length).toBeGreaterThan(0);
       for (const m of MONSTERS) {
+        // Quái con do trùm triệu hồi (#887): KHÔNG rơi đồ / tiền theo quy ước, `boss-adds.test.ts` giữ phần đó
+        if (SUMMON_ONLY_KINDS.includes(m.id)) continue;
         expect(
           DROP_TABLES[m.id],
           `Quái "${m.id}" thiếu bảng rơi đồ trong DROP_TABLES`,

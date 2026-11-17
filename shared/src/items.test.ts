@@ -8,6 +8,7 @@ import {
   rollDrops,
   emptyInventory,
   addToInventory,
+  SUMMON_ONLY_KINDS,
 } from "./index";
 
 describe("dữ liệu vật phẩm", () => {
@@ -33,7 +34,10 @@ describe("dữ liệu vật phẩm", () => {
   });
 
   it("mỗi loại quái có bảng rơi đồ, mỗi dòng trỏ tới vật phẩm có thật", () => {
-    for (const m of MONSTERS) expect(DROP_TABLES[m.id]?.length).toBeGreaterThan(0);
+    for (const m of MONSTERS) {
+      if (SUMMON_ONLY_KINDS.includes(m.id)) continue; // quái con của trùm (#887): không rơi đồ theo quy ước
+      expect(DROP_TABLES[m.id]?.length).toBeGreaterThan(0);
+    }
     for (const [kind, table] of Object.entries(DROP_TABLES)) {
       expect(MONSTERS.some((m) => m.id === kind)).toBe(true);
       for (const e of table) {
