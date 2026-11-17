@@ -1,10 +1,10 @@
 // Lưu nhân vật: các lần lưu chồng nhau cùng một nhân vật không hỏng file và bản gọi sau thắng.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DEFAULT_MAP_ID, DUNGEON_MAPS, MAPS, getMap } from "@tien-gioi/shared";
-import { sanitizeLimbo, type SavedPlayer } from "./store";
+import { profileRowOf, sanitizeLimbo, type SavedPlayer } from "./store";
 
 const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-store-"));
 let store: typeof import("./store");
@@ -174,5 +174,78 @@ describe("sanitizeLimbo: chiêu có thể khắc (M7.2c) không tin file", () =>
     const ids = ["hoa_van_kiem", "bon_thach_quyen", "ung_trao", "me_tung_bo"];
     const r2 = sanitizeLimbo({ ...base, engravable: [...ids, ...ids, ...ids] })!;
     expect(r2.engravable).toEqual(ids);
+  });
+});
+
+describe("profileRowOf / listPlayerProfiles (M9: xếp hạng, chỉ đọc)", () => {
+  it("profileRowOf: chỉ rút trường xếp hạng, không tin kiểu, nhận ra Hoàng Tuyền", () => {
+    expect(
+      profileRowOf({ name: "A", realm: 2, tier: 1, exp: 9, secretHash: "x", inventory: {} }),
+    ).toEqual({
+      name: "A",
+      realm: 2,
+      tier: 1,
+      exp: 9,
+      limbo: false,
+    });
+    expect(profileRowOf({ name: "A", realm: "2", tier: Number.NaN, exp: null })).toEqual({
+      name: "A",
+      realm: 0,
+      tier: 0,
+      exp: 0,
+      limbo: false,
+    });
+    expect(profileRowOf({ name: "A", limbo: { at: "t" } })!.limbo).toBe(true);
+    for (const bad of [null, undefined, 5, "x", [], {}, { name: "" }, { name: 7 }])
+      expect(profileRowOf(bad), JSON.stringify(bad)).toBeNull();
+  });
+
+  it("listPlayerProfiles: bỏ qua tệp hỏng / không phải .json / thư mục souls, giữ đúng limit, KHÔNG xoá hay đổi tên tệp hỏng", async () => {
+    const d = mkdtempSync(path.join(tmpdir(), "tien-gioi-profiles-"));
+    const keep = process.env.DATA_DIR;
+    try {
+      process.env.DATA_DIR = d;
+      const fresh = await import("./store"); // cùng module đã nạp: DATA_DIR đọc lại mỗi lần gọi `getDir`
+      writeFileSync(path.join(d, "a.json"), JSON.stringify(mk("Ng A", 5, { realm: 1 })));
+      writeFileSync(path.join(d, "b.json"), JSON.stringify(mk("Ng B", 9)));
+      writeFileSync(path.join(d, "hong.json"), "{ không phải json");
+      writeFileSync(path.join(d, "c.json.tmp"), JSON.stringify(mk("Ng C", 1)));
+      writeFileSync(path.join(d, "mang.json"), "[1,2]");
+      mkdirSync(path.join(d, "souls"));
+      writeFileSync(
+        path.join(d, "souls", "s.json"),
+        JSON.stringify({ name: "Linh Hon", realm: 9 }),
+      );
+      const rows = await fresh.listPlayerProfiles();
+      expect(rows.map((r) => r.name)).toEqual(["Ng A", "Ng B"]);
+      expect(rows[0].realm).toBe(1);
+      expect((await fresh.listPlayerProfiles(1)).map((r) => r.name)).toEqual(["Ng A"]);
+      expect(readdirSync(d).sort()).toEqual([
+        "a.json",
+        "b.json",
+        "c.json.tmp",
+        "hong.json",
+        "mang.json",
+        "souls",
+      ]);
+      expect(await fresh.listPlayerProfiles()).toEqual(rows); // tất định
+      // limit cắt theo TÊN (tên tệp thật là băm): nhiều nhân vật lưu qua savePlayer rồi lấy 2 đầu theo tên
+      for (const nm of ["Zeta", "Alpha", "Mid"]) await fresh.savePlayer(mk(nm, 1));
+      expect((await fresh.listPlayerProfiles(2)).map((r) => r.name)).toEqual(["Alpha", "Mid"]);
+    } finally {
+      if (keep === undefined) delete process.env.DATA_DIR;
+      else process.env.DATA_DIR = keep;
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("thư mục dữ liệu chưa tồn tại -> []", async () => {
+    const keep = process.env.DATA_DIR;
+    try {
+      process.env.DATA_DIR = path.join(dir, "khong-co-thu-muc");
+      expect(await store.listPlayerProfiles()).toEqual([]);
+    } finally {
+      process.env.DATA_DIR = keep;
+    }
   });
 });
