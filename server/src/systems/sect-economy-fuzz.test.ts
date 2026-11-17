@@ -569,6 +569,12 @@ describe("Kiểm kinh tế đồng thời tông môn (M8.8 - Fuzz & Oracle)", ()
 
     rig.advanceTime(2 * DAY);
 
+    // Alpha và Bravo cùng góp tiền ở ngày đầu
+    await oracleDepositCoin(rig, "Alpha", 2000, cov);
+    const aDay1 = await getMemberData(rig, "Alpha");
+    expect(aDay1?.depositToday).toBe(20);
+    expect(aDay1?.earnedToday).toBe(20);
+
     // Bravo góp 2.000 LT -> nhận 20 cống hiến
     await oracleDepositCoin(rig, "Bravo", 2000, cov);
     let m = await getMemberData(rig, "Bravo");
@@ -584,6 +590,12 @@ describe("Kiểm kinh tế đồng thời tông môn (M8.8 - Fuzz & Oracle)", ()
 
     // Sang ngày mới: vừa qua hồi chiêu SECT_REJOIN_COOLDOWN_MS vừa sang ngày mới (BẮT M7!)
     rig.advanceTime(DAY);
+
+    // Alpha ở lại tông môn nhưng sổ ngày BẮT BUỘC reset về 0 (BẮT M7!)
+    const aDay2 = await getMemberData(rig, "Alpha");
+    expect(aDay2?.depositToday).toBe(0); // BẮT M7!
+    expect(aDay2?.earnedToday).toBe(0); // BẮT M7!
+    expect(aDay2?.contrib).toBe(20); // Cống hiến của Alpha vẫn giữ nguyên
 
     // Alpha mời Bravo vào lại tông môn
     await sectInvite(rig.lh.w, "Alpha", { name: "Bravo" });
