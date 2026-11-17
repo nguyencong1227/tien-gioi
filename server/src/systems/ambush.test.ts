@@ -11,6 +11,7 @@ import {
   AMBUSH_MIN_HP_PCT,
   AMBUSH_MIN_PROTOCOL,
   AMBUSH_OFFER_MS,
+  AMBUSH_RETURN_GRACE_MS,
   AMBUSH_SEEN_MS,
   AMBUSH_STRIDE_PX,
   DEFAULT_MAP,
@@ -33,6 +34,8 @@ import {
   ambushPause,
   ambushPriceOf,
   ambushResend,
+  applyReturnGrace,
+  AMBUSH_RETURN_WINDOW_MS,
   createAmbushRuntime,
   onAmbushChoose,
   onAmbushSeen,
@@ -919,5 +922,47 @@ describe("số đo: giá đọc từ nhân vật THẬT", () => {
     expect(ambushPriceOf(s.p, s.c, "offer").coin.enough).toBe(false);
     s.p.exp = 10;
     expect(ambushPriceOf(s.p, s.c, "offer").exp).toBe(10); // kẹp theo tu vi đang có
+  });
+});
+
+describe("bảo hộ sau khi được đưa về từ đấu trường (applyReturnGrace)", () => {
+  it("vừa về: bảo hộ AMBUSH_RETURN_GRACE_MS kể từ lúc VÀO; trường được xoá (lần vào sau không còn)", () => {
+    const s = setup();
+    s.c.save.ambushReturnAt = s.w.now - 1000;
+    expect(applyReturnGrace(s.w, s.sid, s.c)).toBe(true);
+    expect(s.w.shielded.has(s.sid)).toBe(true);
+    expect(s.c.shieldUntil).toBe(s.w.now + AMBUSH_RETURN_GRACE_MS);
+    expect(s.c.save.ambushReturnAt).toBeUndefined();
+    expect(applyReturnGrace(s.w, s.sid, s.c)).toBe(false); // dùng một lần
+  });
+
+  it("quá AMBUSH_RETURN_WINDOW_MS, ở tương lai, sai kiểu: KHÔNG bảo hộ (nhưng trường vẫn bị xoá)", () => {
+    for (const at of [
+      0,
+      -1,
+      Number.NaN,
+      Infinity,
+      "x" as never,
+      null as never,
+      T0 + 60_000,
+      T0 - AMBUSH_RETURN_WINDOW_MS,
+    ]) {
+      const s = setup();
+      s.c.save.ambushReturnAt = at as number;
+      expect(applyReturnGrace(s.w, s.sid, s.c), String(at)).toBe(false);
+      expect(s.w.shielded.has(s.sid)).toBe(false);
+      expect(s.c.save.ambushReturnAt).toBeUndefined();
+    }
+    const t = setup();
+    expect(applyReturnGrace(t.w, t.sid, t.c)).toBe(false); // chưa từng ở đấu trường
+  });
+
+  it("quái đang nhắm bỏ mục tiêu khi vào", () => {
+    const s = setup();
+    const { mc } = addMonster(s.w, "tho", s.p.x + 100, s.p.y);
+    mc.target = s.sid;
+    s.c.save.ambushReturnAt = s.w.now;
+    applyReturnGrace(s.w, s.sid, s.c);
+    expect(mc.target).toBeNull();
   });
 });

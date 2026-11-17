@@ -29,6 +29,7 @@ import {
   type NetShieldMsg,
   type AmbushOfferMsg,
   type AmbushEndMsg,
+  type AmbushStateMsg,
   type SectMsg,
   type SectPresenceMsg,
   type DuelInvitedMsg,
@@ -77,6 +78,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const netShields: { sid: string; msg: NetShieldMsg }[] = [];
   const ambushOffers: { sid: string; msg: AmbushOfferMsg }[] = [];
   const ambushEnds: { sid: string; msg: AmbushEndMsg }[] = [];
+  const ambushStates: { sid: string; msg: AmbushStateMsg }[] = [];
   const dmgs: DmgMsg[] = [];
   /** Số sát thương gửi RIÊNG cho chủ (sát thương theo giây): tách khỏi `dmgs` (gửi gần). */
   const dmgsTo: { sid: string; msg: DmgMsg }[] = [];
@@ -117,6 +119,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       netShield: (sid, msg) => netShields.push({ sid, msg }),
       ambushOffer: (sid, msg) => ambushOffers.push({ sid, msg }),
       ambushEnd: (sid, msg) => ambushEnds.push({ sid, msg }),
+      ambushState: (sid, msg) => ambushStates.push({ sid, msg }),
     },
     map,
     hub,
@@ -154,6 +157,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     netShields,
     ambushOffers,
     ambushEnds,
+    ambushStates,
     dmgs,
     dmgsTo,
   };

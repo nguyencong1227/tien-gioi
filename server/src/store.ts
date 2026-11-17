@@ -66,6 +66,8 @@ export interface SavedPlayer {
   ambushDaily?: AmbushDaily;
   /** Mốc (ms, `Date.now()`) tới khi chưa bị chặn đường nữa (hồi sau lần trước): đăng nhập lại / qua cổng không xoá hồi. Đọc bằng `sanitizeAmbushUntil`. */
   ambushUntil?: number;
+  /** Lúc (ms, `Date.now()`) người chơi vừa được đưa về từ đấu trường chặn đường: phòng nhận người chơi (lần vào kế tiếp trong `AMBUSH_RETURN_WINDOW_MS`) cho bảo hộ `AMBUSH_RETURN_GRACE_MS` rồi xoá trường này. Chỉ có nghĩa ngắn hạn. */
+  ambushReturnAt?: number;
   /** Lần đi qua cổng gần nhất (ms, `Date.now()`): hồi chiêu `TRAVEL_COOLDOWN_MS` tính qua cả các phòng */
   travelAt?: number;
   createdAt: string;

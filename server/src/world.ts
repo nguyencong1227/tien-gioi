@@ -32,6 +32,7 @@ import type {
   SectPresenceMsg,
   AmbushOfferMsg,
   AmbushEndMsg,
+  AmbushStateMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -59,6 +60,7 @@ import type { BossCtrl } from "./systems/boss-state";
 import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
 import type { AmbushCtrl, AmbushRuntime } from "./systems/ambush";
+import type { ArenaCtrl } from "./systems/arena";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -203,6 +205,8 @@ export interface MonsterCtrl {
   boss?: BossCtrl;
   /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
   addOf?: string;
+  /** Quái của ĐẤU TRƯỜNG chặn đường (`systems/arena.ts`): KHÔNG tu vi, KHÔNG rơi đồ / Linh thạch, KHÔNG tính nhiệm vụ (thưởng đi qua một đường riêng khi thắng); chỉ biến mất khi chết. */
+  arena?: true;
   /** Tìm đường / phát hiện kẹt / rút về của quái đang đuổi (mục 48, `systems/nav-chase.ts`); dựng lười ở lần đuổi đầu tiên, quái không đuổi thì không có. */
   nav?: NavCtrl;
 }
@@ -282,6 +286,8 @@ export interface WorldEvents {
   ambushOffer(sessionId: string, msg: AmbushOfferMsg): void;
   /** Kết cục chặn đường (mục 52; chỉ người bị chặn nhận). */
   ambushEnd(sessionId: string, msg: AmbushEndMsg): void;
+  /** Trạng thái đấu trường chặn đường mỗi giây (thời gian còn, giá bỏ chạy giữa trận đã chốt; chỉ người trong trận nhận). */
+  ambushState(sessionId: string, msg: AmbushStateMsg): void;
 }
 
 export class World {
@@ -393,6 +399,13 @@ export class World {
    * đường nóng không tốn gì). `WorldRoom` đặt từ `AMBUSH` (`server/src/systems/ambush-config.ts`); test đơn vị dựng bằng `createAmbushRuntime`.
    */
   ambush: AmbushRuntime | null = null;
+  /**
+   * Đấu trường chặn đường (mục 52, `systems/arena.ts`): có ở phòng ĐẤU TRƯỜNG (vé, đồng hồ trận, bầy kẻ địch), `null` ở mọi phòng thường. `WorldRoom.onCreate` đặt khi nhận vé; tắt
+   * thì mọi hàm của `arena.ts` thoát ngay.
+   */
+  arena: ArenaCtrl | null = null;
+  /** Phòng đấu trường đăng ký: đưa một người từ đấu trường về CHỖ CŨ của vé (lưu rồi `travelTo`); thử lại mỗi 2 giây nếu lỗi. Không có hook (test đơn vị): không làm gì. */
+  onArenaExit: ((sid: string) => void) | null = null;
   /** Nhật ký kiểm toán (`server/src/audit.ts`): `WorldRoom` đặt; null (test, bench) = không ghi. Chỉ gọi khi có sự kiện nhạy cảm, không trong tick nóng. */
   audit: AuditFn | null = null;
   /** Đổi ví từ ngần này trở lên (cộng hoặc trừ) thì ghi `wallet.big`. Infinity = không ghi. */

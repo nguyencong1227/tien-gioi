@@ -5,6 +5,7 @@ import type { Player } from "./schema";
 import type { World } from "./world";
 import { Parties } from "./systems/party";
 import { Runs } from "./systems/dungeon";
+import { Ambushes } from "./systems/arena";
 import { SectBook } from "./systems/sect";
 import { WriteGauge } from "./metrics";
 import { PkLedger } from "./systems/pk-ledger";
@@ -30,6 +31,8 @@ export class Hub {
   readonly parties = new Parties();
   /** Sổ lần chạy bí cảnh của cả tiến trình (docs/THIET_KE_BI_CANH.md mục 4.2); khoá thành viên theo đạo hiệu viết thường như `parties`. */
   readonly runs = new Runs();
+  /** Vé vào đấu trường chặn đường (mục 52, `systems/arena.ts`): mỗi người tối đa một, tổng tối đa `MAX_AMBUSH_ROOMS`. */
+  readonly ambushes = new Ambushes();
   /** Lời mời tông môn đang chờ, thành viên trực tuyến và bản ghi nhớ của cả tiến trình (systems/sect.ts). */
   readonly sects = new SectBook();
   /** Sổ chống đổi thắng PK của cả tiến trình (M9, `systems/pk-ledger.ts`): mỗi cặp (thắng, thua) tối đa `BOARD_PK_PAIR_DAY_CAP` trận thắng tính mỗi ngày. */
