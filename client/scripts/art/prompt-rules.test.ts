@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { MAP_STYLES } from "../../src/gfx/map-style";
-import { validateAiSource } from "../check-credits.mjs";
+import { CJK_REGEX, validateAiSource } from "../check-credits.mjs";
 import {
   BANNED_PROMPT_TERMS,
   MAP_CARD_BATCH,
@@ -222,6 +222,6 @@ describe("lô 1 (thẻ bản đồ) và tài liệu khớp mã", () => {
   });
 
   it("tài liệu không chứa chữ Hán", () => {
-    expect(/[㐀-鿿豈-﫿]/.test(DOC)).toBe(false);
+    expect(CJK_REGEX.test(DOC)).toBe(false);
   });
 });
