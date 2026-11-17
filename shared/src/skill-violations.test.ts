@@ -15,7 +15,9 @@ import {
   bookIdOf,
   sampleSkills,
   skillEffect,
+  skillGradeOf,
   skillOf,
+  skillStyleOf,
   skillViolations,
   type SkillDef,
 } from "./index";
@@ -276,5 +278,47 @@ describe("sampleSkills (chiêu mẫu cho giao diện)", () => {
     expect(sampleSkills(10_000).length).toBe(200);
     expect(sampleSkills(Number.NaN).length).toBe(60);
     expect(skillViolations(sampleSkills(200))).toEqual([]);
+  });
+});
+
+describe("skillGradeOf / skillStyleOf: suy khi chiêu không khai (18 chiêu gốc không có grade / style)", () => {
+  it("phẩm: dùng grade hợp lệ; thiếu thì CHẶN DƯỚI khoảng độ hiếm = clamp(rarity - 1, 0, 3)", () => {
+    expect(skillGradeOf({ rarity: 0 })).toBe(0);
+    expect(skillGradeOf({ rarity: 1 })).toBe(0);
+    expect(skillGradeOf({ rarity: 2 })).toBe(1);
+    expect(skillGradeOf({ rarity: 3 })).toBe(2);
+    expect(skillGradeOf({ rarity: 4 })).toBe(3);
+    expect(skillGradeOf({ rarity: 4, grade: 1 })).toBe(1); // grade khai thì thắng độ hiếm
+    expect(skillGradeOf({ rarity: 0, grade: 3 })).toBe(3);
+    // grade rác -> bỏ qua, suy theo độ hiếm
+    for (const g of [7, -1, 1.5, "1", null, Number.NaN])
+      expect(skillGradeOf({ rarity: 2, grade: g as never }), String(g)).toBe(1);
+    // độ hiếm rác kẹp 0..3
+    expect(skillGradeOf({ rarity: Number.NaN as never })).toBe(0);
+    expect(skillGradeOf({ rarity: 99 as never })).toBe(3);
+    expect(skillGradeOf({ rarity: -5 as never })).toBe(0);
+  });
+  it("phẩm suy ra luôn khớp luật `grade` <-> `rarity` của skillViolations (không sinh chiêu 'sai phẩm')", () => {
+    for (const s of SKILLS_M7) {
+      const g = skillGradeOf(s);
+      expect(skillViolations([{ ...s, grade: g }]), s.id).toEqual([]);
+    }
+  });
+  it("phong cách: dùng style hợp lệ; thiếu thì theo hình; hình lạ -> khac; phủ kín mọi hình hiện có", () => {
+    expect(skillStyleOf({ shape: "cone" })).toBe("kiem");
+    expect(skillStyleOf({ shape: "line" })).toBe("chi");
+    expect(skillStyleOf({ shape: "fan" })).toBe("kiem");
+    expect(skillStyleOf({ shape: "nova" })).toBe("quyet");
+    expect(skillStyleOf({ shape: "ground" })).toBe("an");
+    expect(skillStyleOf({ shape: "self" })).toBe("ho_the");
+    expect(skillStyleOf({ shape: "dash" })).toBe("than_phap");
+    expect(skillStyleOf({ shape: "cone", style: "dao" })).toBe("dao"); // style khai thì thắng
+    for (const bad of ["constructor", "__proto__", "", 5, null, undefined, {}])
+      expect(skillStyleOf({ shape: bad }), String(bad)).toBe("khac");
+    // style rác -> bỏ qua, suy theo hình
+    for (const st of ["nhat_chi_thien", 3, null, "constructor"])
+      expect(skillStyleOf({ shape: "line", style: st }), String(st)).toBe("chi");
+    for (const shape of SKILL_SHAPES)
+      expect(SKILL_STYLES, shape).toContain(skillStyleOf({ shape }));
   });
 });
