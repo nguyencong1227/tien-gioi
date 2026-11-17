@@ -1,6 +1,5 @@
 // Kho lưu nhân vật (M3 bước 3b, docs/THIET_KE_TAI_KHOAN.md mục 6): giao diện để thay backend (file JSON hôm nay,
 // PostgreSQL ở bước 3e) mà `WorldRoom` không biết. Cùng kiểu với `SoulStore` (`soul.ts`).
-import { BOARD_SCAN_MAX } from "@tien-gioi/shared";
 import {
   deletePlayer,
   listPlayerProfiles,
@@ -23,7 +22,7 @@ export interface PlayerStore {
   /** Xoá nhân vật theo đạo hiệu; trả về true nếu có và đã xoá, false nếu không tìm thấy. */
   delete(name: string): Promise<boolean>;
   /**
-   * Liệt kê hồ sơ để XẾP HẠNG (M9): tối đa `limit` nhân vật (mặc định `BOARD_SCAN_MAX`), sắp theo tên chuẩn hoá để tất định. CHỈ ĐỌC, bản ghi hỏng bị bỏ qua. Không dùng ở đường nóng. TUỲ CHỌN trong kiểu (kho giả của test); mọi kho THẬT có, `store-contract.ts` kiểm.
+   * Liệt kê hồ sơ để XẾP HẠNG (M9): tối đa `limit` nhân vật (mặc định `BOARD_SCAN_MAX`), sắp theo tên chuẩn hoá để tất định. CHỈ ĐỌC, bản ghi hỏng bị bỏ qua. Không dùng ở đường nóng. LƯU Ý: quá `BOARD_SCAN_MAX` nhân vật thì cắt theo THỨ TỰ TÊN (không phải top theo tu vi) nên các tên cuối bảng chữ cái không được xét; quy mô thật là vài chục người, chấp nhận (docs/PHAN_CONG_M9.md mục 7). TUỲ CHỌN trong kiểu (kho giả của test); mọi kho THẬT có, `store-contract.ts` kiểm.
    */
   listProfiles?(limit?: number): Promise<ProfileRow[]>;
 }

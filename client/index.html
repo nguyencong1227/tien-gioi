@@ -1526,7 +1526,74 @@
           aria-labelledby="social-tab-btn-rank"
           tabindex="0"
         >
-          <p class="social-empty">Bảng xếp hạng đang được dựng.</p>
+          <div
+            id="social-board-tabs"
+            class="social-subtabs"
+            role="tablist"
+            aria-label="Chọn bảng xếp hạng"
+          >
+            <button
+              type="button"
+              id="social-board-btn-tuvi"
+              class="social-subtab active"
+              role="tab"
+              aria-selected="true"
+              aria-controls="social-board-panel"
+              tabindex="0"
+            >
+              Tu vi
+            </button>
+            <button
+              type="button"
+              id="social-board-btn-linhhon"
+              class="social-subtab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="social-board-panel"
+              tabindex="-1"
+            >
+              Linh hồn
+            </button>
+            <button
+              type="button"
+              id="social-board-btn-tongmon"
+              class="social-subtab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="social-board-panel"
+              tabindex="-1"
+            >
+              Tông môn
+            </button>
+            <button
+              type="button"
+              id="social-board-btn-pk"
+              class="social-subtab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="social-board-panel"
+              tabindex="-1"
+            >
+              Thách đấu
+            </button>
+          </div>
+          <div id="social-board-panel" role="tabpanel" aria-labelledby="social-board-btn-tuvi">
+            <p id="social-board-mine" class="social-mine" aria-live="polite"></p>
+            <p id="social-board-status" class="social-empty" role="status"></p>
+            <div id="social-board-wrap" class="social-table-wrap" hidden>
+              <table id="social-board-table" class="social-table">
+                <caption id="social-board-caption" class="sr-only"></caption>
+                <thead>
+                  <tr id="social-board-head"></tr>
+                </thead>
+                <tbody id="social-board-body"></tbody>
+              </table>
+            </div>
+            <p id="social-board-age" class="social-age"></p>
+            <button type="button" id="social-board-retry" class="social-retry" hidden>
+              Tải lại bảng
+            </button>
+          </div>
         </div>
         <div
           id="social-tab-ach"
