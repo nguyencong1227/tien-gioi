@@ -67,8 +67,12 @@ declare module "*check-credits.mjs" {
     file: string;
     detail: string;
   }
+  export const PACKS_DIR: string;
+  export function aiAssetDirs(packsDir?: string, aiDir?: string): string[];
   export function auditAiImages(opts?: {
     aiDir?: string;
+    aiDirs?: string[];
+    packsDir?: string;
     sourceDir?: string;
     creditsPath?: string;
     rootDir?: string;

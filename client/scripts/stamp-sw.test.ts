@@ -79,6 +79,56 @@ describe("M7.15: stamp-sw (Đóng dấu Service Worker và chỉ precache gói c
     }
   });
 
+  it("gói ảnh minh hoạ AI `art` (art-trum, art-npc, art/boss) KHÔNG vào PRECACHE_URLS: thêm gói art không làm đổi danh sách precache", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stamp-art-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, "packs"), { recursive: true });
+      const sha = "5".repeat(64);
+      const core = {
+        id: "core",
+        kind: "core",
+        files: [{ path: "core/ui.png", bytes: 10, sha256: sha }],
+        bytes: 10,
+      };
+      const art = (id: string, p: string) => ({
+        id,
+        kind: "art",
+        files: [{ path: p, bytes: 28_000, sha256: "6".repeat(64) }],
+        bytes: 28_000,
+      });
+      const base = [
+        "/index.html",
+        "/assets/ai/login_bg.webp",
+        "/packs/manifest.json",
+        "/packs/core/ui.png",
+      ];
+      const write = (m: object) =>
+        fs.writeFileSync(path.join(tmpDir, "packs/manifest.json"), JSON.stringify(m));
+      write({ packs: [core] });
+      const before = buildPrecacheUrls(tmpDir, base);
+      write({
+        packs: [
+          core,
+          art("art:trum", "art-trum/the_xich_mang.webp"),
+          art("art:npc", "art-npc/ha_lao.webp"),
+          art("art:boss", "art/boss/x.webp"),
+        ],
+      });
+      const withArt = buildPrecacheUrls(tmpDir, [
+        ...base,
+        "/packs/art-trum/the_xich_mang.webp",
+        "/packs/art-npc/ha_lao.webp",
+        "/packs/art/boss/x.webp",
+      ]);
+      expect(withArt).toEqual(before); // danh sách precache KHÔNG đổi một byte
+      expect(withArt.some((u) => u.includes("art"))).toBe(false);
+      // ảnh tải NGAY ở assets/ai vẫn được precache như cũ (đó là phần ngân sách 300 KB)
+      expect(withArt).toContain("/assets/ai/login_bg.webp");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("stampServiceWorker: ghi đúng CACHE_NAME và PRECACHE_URLS vào sw.js", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stamp-run-"));
     try {
