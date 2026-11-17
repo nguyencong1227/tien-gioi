@@ -52,6 +52,9 @@ beforeAll(async () => {
 afterEach(async () => {
   vi.useRealTimers();
   WorldRoomCls.hub.worldBoss.slots = [];
+  // Sổ nhớ mốc làm việc cuối (đồng hồ GIẢ của ca trước): ca sau đặt giờ sớm hơn thì sổ coi là "đồng hồ đi lùi" và lỡ giờ bắt đầu. Đặt lại cho mỗi ca.
+  (WorldRoomCls.hub.worldBoss as unknown as { lastTickMs: number | null }).lastTickMs = null;
+  WorldRoomCls.hub.worldBoss.current = null;
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
   await sleep(100);
 });
@@ -203,4 +206,54 @@ describe("trùm thế giới qua phòng thật", () => {
       fake = false;
     }
   });
+  it("nối lại sau rớt mạng: Room MỚI nhận lại trạng thái trùm thế giới (không lỡ sự kiện đã bắt đầu lúc rớt)", async () => {
+    WorldRoomCls.hub.worldBoss.slots = [SLOT];
+    const h = await spawn();
+    const world = serverRoom(h.room).world;
+    vi.useFakeTimers({ toFake: ["Date"], now: at(11, 59, 50) });
+    fake = true;
+    try {
+      await sleep(200);
+      // rớt mạng TRƯỚC giờ: sự kiện bắt đầu khi người chơi đang là hồn lìa xác
+      (h.room.connection.transport as any).ws.close();
+      budget = 200;
+      await waitFor(() => !h.room.connection.isOpen, 4000, "socket đóng");
+      await waitFor(
+        () => (serverRoom(h.room) as any).ghosts.has(h.room.sessionId),
+        4000,
+        "thành hồn lìa xác",
+      );
+      await setClock(at(12, 0, 1));
+      budget = 100;
+      await waitFor(() => world.wbossId !== null, 4000, "trùm sinh ra lúc rớt mạng");
+      const r2 = await new Client(`ws://localhost:${PORT}`).reconnect(h.room.reconnectionToken);
+      rooms.push(r2);
+      const got: WorldBossMsg[] = [];
+      r2.onMessage(SOCIAL_MSG.worldBoss, (m: WorldBossMsg) => got.push(m));
+      for (const t of [
+        "inv",
+        "wallet",
+        "quests",
+        "dialog",
+        "chat",
+        "fx",
+        "dmg",
+        "soul",
+        "party",
+        "toast",
+        "skills",
+        "status",
+      ])
+        r2.onMessage(t, () => {});
+      budget = 200;
+      const live = await waitFor(
+        () => got.find((m) => m.phase === "live"),
+        4000,
+        "nhận LẠI tin live sau nối lại",
+      );
+      expect(live).toMatchObject({ id: "thu_trua", mapId: DEFAULT_MAP_ID });
+    } finally {
+      fake = false;
+    }
+  }, 25_000);
 });

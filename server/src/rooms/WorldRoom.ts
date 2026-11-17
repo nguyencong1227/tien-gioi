@@ -806,12 +806,7 @@ export class WorldRoom extends Room<WorldState> {
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
-    if (this.world.hub.worldBoss.active)
-      this.sendTo(
-        client.sessionId,
-        SOCIAL_MSG.worldBoss,
-        worldBossStatus(this.world, client.sessionId),
-      ); // trùm thế giới (M9.4): vào giữa lúc báo trước / đang diễn ra thì biết ngay
+    this.sendWorldBoss(client.sessionId); // trùm thế giới (M9.4): vào giữa lúc báo trước / đang diễn ra thì biết ngay
     if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
     if (inRun) {
       const run = runOfWorld(this.world);
@@ -869,6 +864,7 @@ export class WorldRoom extends Room<WorldState> {
         sendWallet(this.world, sid);
         ambushResend(this.world, sid); // đang giữa hộp thoại chặn đường: gửi LẠI (cùng id, thời gian còn thật) cho Room mới
         arenaResend(this.world, sid); // đang giữa trận ở đấu trường: gửi LẠI trạng thái (hoặc kết cục) cho Room mới
+        this.sendWorldBoss(sid); // trùm thế giới (M9.4): sự kiện bắt đầu / kết thúc lúc rớt mạng thì Room mới vẫn biết (thưởng + `ended` không bị lỡ)
         resolveDone();
         return;
       } catch {
@@ -888,6 +884,12 @@ export class WorldRoom extends Room<WorldState> {
       this.world.ghosts.delete(sid);
       resolveDone();
     }
+  }
+
+  /** Gửi cho `sid` trạng thái trùm thế giới hiện tại (chỉ khi có lịch và chưa tắt): lúc vào phòng và lúc nối lại sau rớt mạng. */
+  private sendWorldBoss(sid: string) {
+    if (!this.world.hub.worldBoss.active) return;
+    this.sendTo(sid, SOCIAL_MSG.worldBoss, worldBossStatus(this.world, sid));
   }
 
   /**
