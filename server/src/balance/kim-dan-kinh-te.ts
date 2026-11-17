@@ -117,8 +117,12 @@ export function kimDanBo(): BoGear[] {
         bossHours += (((BOSS_PARTY * qty) / avgDrop(drop)) * h.secPerKill) / 3600;
       } else {
         const h = withKimDan(() => huntRate(m, KD, tier));
-        // Quái chưa an toàn solo ở bậc này: coi là cày ở bậc kế (mô hình chỉ cần số đo gần đúng)
-        const at = h ?? withKimDan(() => huntRate(m, KD, Math.min(2, tier + 1)))!;
+        // Quái chưa an toàn solo ở bậc này: coi là cày ở bậc kế (mô hình chỉ cần số đo gần đúng). Chưa an toàn solo ở MỌI bậc Kim Đan (Độc Thiềm sau mục 30: máu x1,5):
+        // coi là cày theo ĐỘI 2 người ở bậc cao nhất (số giờ là của mỗi người, giống cách tính trùm theo đội)
+        const at =
+          h ??
+          withKimDan(() => huntRate(m, KD, Math.min(2, tier + 1))) ??
+          withKimDan(() => huntRate(m, KD, 2, 2))!;
         soloHours += (qty / avgDrop(drop)) * (at.secPerKill / 3600);
       }
       return { itemId, qty, source };

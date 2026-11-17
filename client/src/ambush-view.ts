@@ -56,6 +56,11 @@ export const TIER_LABEL: Readonly<Record<AmbushTier, string>> = {
   leader: "Cầm đầu",
 };
 
+/** Mức nào phải hiện nhãn NGUY HIỂM (mục 53: tinh anh, cầm đầu; mức thường thì không). */
+export function isDangerousTier(tier: AmbushTier): boolean {
+  return tier === "elite" || tier === "leader";
+}
+
 // ---------- Đọc tin từ mạng ----------
 
 /** Giá `{ exp, coin: { price, enough } }` đã làm sạch (dùng chung cho `ambushOffer` và `ambushState`); sai dạng thì `null`. Số làm tròn xuống, không âm. */
@@ -102,6 +107,8 @@ export function parseAmbushEnd(raw: unknown): AmbushEndMsg | null {
   if (typeof result !== "string" || !(AMBUSH_RESULTS as readonly string[]).includes(result))
     return null;
   const out: AmbushEndMsg = { result: result as AmbushResult };
+  // CHẾT THẬT (mục 53): chỉ có nghĩa với `lost`; chỉ nhận đúng `true` (giá trị khác = như vắng)
+  if (raw.died === true && result === "lost") out.died = true;
   if (isObj(raw.paid)) {
     const exp = wholeOf(raw.paid.exp);
     const coin = wholeOf(raw.paid.coin);
@@ -201,6 +208,8 @@ export interface AmbushDialogView {
   countdown: string;
   /** Hết giờ cục bộ, chưa chọn: máy chủ sắp quyết (Chiến), KHÔNG tự chọn ở client. */
   waitingServer: boolean;
+  /** Kẻ chặn đường mức tinh anh / cầm đầu: hiện nhãn NGUY HIỂM (mục 53: bị hạ trong đấu trường là chết thật, nên mức cao phải cảnh báo rõ). */
+  danger: boolean;
   /** Còn khoá `AMBUSH_ARM_MS` (nút mờ chưa nhận). */
   arming: boolean;
   /** Đã gửi lựa chọn, đang chờ máy chủ (nút mờ, hiện "Đang xử lý…"). */
@@ -256,6 +265,7 @@ export function ambushDialogView(d: AmbushDialog, now: number): AmbushDialogView
     (offer.foe.count > 1 ? ` × ${offer.foe.count}` : "");
   const coinTxt = priceText(offer.price.coin.price, "Linh thạch");
   const expTxt = priceText(offer.price.exp, "tu vi");
+  const danger = isDangerousTier(offer.foe.tier);
   const en = (c: AmbushChoice) => enabledOf(d, c, now);
 
   const coinSub = offer.price.coin.enough ? coinTxt : `${coinTxt} (không đủ)`;
@@ -299,12 +309,13 @@ export function ambushDialogView(d: AmbushDialog, now: number): AmbushDialogView
     foe,
     countdown: waitingServer ? "Đang chờ máy chủ…" : countdownText(remaining),
     waitingServer,
+    danger,
     arming,
     busy,
     note,
     buttons,
     announce:
-      `Bị chặn đường. ${offer.scene} Kẻ chặn đường: ${foe}. ` +
+      `Bị chặn đường. ${offer.scene} Kẻ chặn đường: ${foe}.${danger ? " Nguy hiểm." : ""} ` +
       `Còn ${secs} giây, hết giờ là Chiến. ${fleeOptions(offer.price, coinTxt, expTxt)}`,
   };
 }
@@ -381,6 +392,14 @@ export function ambushEndView(msg: AmbushEndMsg): AmbushEndView {
       return { silent: false, tone: "good", title: "Chiến thắng", lines };
     }
     case "lost":
+      // CHẾT THẬT (mục 53): không trừ giá (cái chết thay giá) nên KHÔNG có dòng "Mất ..."; màn Hoàng Tuyền hiện ngay sau đó (tin `limbo`). Không còn câu "không mất kiếp".
+      if (msg.died === true)
+        return {
+          silent: false,
+          tone: "bad",
+          title: "Ngươi đã gục",
+          lines: ["Hoàng Tuyền đang chờ ngươi."],
+        };
       return { silent: false, tone: "bad", title: "Bị hạ", lines: loss };
     case "timeout":
       return { silent: false, tone: "bad", title: "Hết giờ", lines: loss };
