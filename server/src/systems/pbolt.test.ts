@@ -680,6 +680,17 @@ describe("cast bolt: thách đấu (PK)", () => {
     expect(t.b.p.hp).toBe(hp);
   });
 
+  it("trận CHƯA vào pha `fight` (đếm ngược): đối thủ đứng trên đường bay KHÔNG chặn đạn, đạn bay qua trúng quái phía sau", () => {
+    const t = duel(300, "ready");
+    vi.spyOn(t.w.map, "isBlockedPx").mockReturnValue(false); // bản đồ thật có ô chặn trên đường: gỡ để đạn bay tới quái phía sau
+    const m = mon(t, 1450, 1000);
+    cast(t.w, "a", { slot: 2, angle: 0 });
+    const hp = t.b.p.hp;
+    advance(t, 5000);
+    expect(t.b.p.hp).toBe(hp);
+    expect(dmgTo(t, m.id)).toHaveLength(1);
+  });
+
   it("người chơi KHÁC (không phải đối thủ) đứng trên đường bay không bị trúng; PK đạn xuyên qua người ngoài", () => {
     const t = duel(400);
     const c = addPlayer(t.w, "c", 4, 0);
