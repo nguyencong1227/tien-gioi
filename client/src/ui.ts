@@ -466,6 +466,8 @@ let sectTab: "overview" | "members" | "treasury" | "vault" | "hall" = "overview"
 let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: number } | null = null;
 /** Thao tác đang chờ máy chủ trả lời (khoá nút): `quest:<id>` / `shop:<itemId>`; mở khoá khi có ảnh chụp mới / toast / hết `HALL_BUSY_MS`. */
 const hallBusy = new Set<string>();
+/** Trạng thái mở / thu của các nhóm cửa hàng tông môn do người chơi đổi (khác mặc định); xoá khi rời / hết tông môn */
+const hallGroupOpen = new Map<string, boolean>();
 let hallBusyTimer: ReturnType<typeof setTimeout> | null = null;
 const HALL_BUSY_MS = 5000;
 /** Đồng hồ đếm ngược của tab Nội vụ (mỗi giây, chỉ chạy khi tab đang xem) và mốc đặt lại đã xin ảnh chụp mới (mỗi mốc xin MỘT lần). */
@@ -3383,6 +3385,7 @@ function hallUiState(): HallUiState {
     nowClient: Date.now(),
     down: callbacks?.isSectDown?.() ?? false,
     busy: hallBusy,
+    groupOpen: hallGroupOpen,
   };
 }
 
@@ -3399,6 +3402,11 @@ function renderSectHallTab() {
     onBuy: (itemId) => {
       beginHallBusy(`shop:${itemId}`);
       callbacks?.onSectShopBuy?.(itemId);
+    },
+    onGroupToggle: (key, open, defaultOpen) => {
+      // chỉ nhớ lựa chọn KHÁC mặc định (mặc định đổi theo cấp tông thì nhóm theo mặc định mới)
+      if (open === defaultOpen) hallGroupOpen.delete(key);
+      else hallGroupOpen.set(key, open);
     },
   });
 }
@@ -6193,6 +6201,7 @@ export const ui = {
       vaultQty = 1;
       endVaultBusy();
       sectHall = null;
+      hallGroupOpen.clear();
       scheduleHallRefresh(); // bỏ hẹn giờ: không còn tông môn thì không xin gì
       endHallBusy();
     }

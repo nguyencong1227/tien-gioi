@@ -9,7 +9,9 @@ import {
   hallProgress,
   hallQuestRows,
   hallResetInMs,
+  hallShopGroups,
   hallShopRows,
+  type HallShopRow,
 } from "./sect-hall";
 
 export interface HallUiState {
@@ -22,12 +24,19 @@ export interface HallUiState {
   down: boolean;
   /** Các thao tác đang chờ máy chủ trả lời (khoá nút tương ứng): `quest:<id>` / `shop:<itemId>` */
   busy: ReadonlySet<string>;
+  /**
+   * Trạng thái mở / thu của các nhóm cửa hàng do NGƯỜI CHƠI đổi (khoá `HallShopSection.key`; chỉ có khoá khi khác mặc định). Vẽ lại toàn bộ tab mỗi khi dữ liệu đổi,
+   * nên trạng thái phải sống ngoài DOM: không thì mua một món là các nhóm vừa mở lại gập về mặc định.
+   */
+  groupOpen?: ReadonlyMap<string, boolean>;
 }
 
 export interface HallUiHandlers {
   onAccept(questId: string): void;
   onTurnIn(questId: string): void;
   onBuy(itemId: string): void;
+  /** Người chơi mở / thu một nhóm cửa hàng (`defaultOpen` để bên gọi chỉ nhớ khi khác mặc định) */
+  onGroupToggle?(key: string, open: boolean, defaultOpen: boolean): void;
 }
 
 /** Giờ máy chủ ước tính từ ảnh chụp: `view.now` cộng thời gian máy khách đã trôi kể từ lúc nhận (không âm). */
@@ -210,37 +219,51 @@ export function renderHall(root: HTMLElement, st: HallUiState, h: HallUiHandlers
   if (!sRows.length) {
     shop.append(make(doc, "p", "sect-hall-empty", "Cửa hàng tông môn chưa có món nào."));
   } else {
-    for (const hall of ["baoKho", "tangKinh"] as const) {
-      const rows = sRows.filter((r) => r.hall === hall);
-      if (!rows.length) continue;
-      shop.append(make(doc, "h5", "sect-hall-sub", rows[0]!.hallLabel));
-      const ul = make(doc, "ul", "sect-hall-list");
-      for (const r of rows) {
-        const li = make(doc, "li", `sect-hall-row ${r.canBuy ? "" : "locked"}`.trim());
-        const head = make(doc, "div", "sect-hall-row-head");
-        head.append(make(doc, "b", undefined, r.name), make(doc, "span", "sect-hall-tag", r.price));
-        const foot = make(doc, "div", "sect-hall-row-foot");
-        foot.append(make(doc, "span", "sect-hall-state", r.leftLabel));
-        const whyId = `sect-hall-swhy-${r.itemId}`;
-        foot.append(
-          actionButton(
-            doc,
-            "Đổi",
-            r.canBuy,
-            st.busy.has(`shop:${r.itemId}`),
-            r.why ? whyId : null,
-            () => h.onBuy(r.itemId),
-          ),
-        );
-        li.append(head, foot);
-        if (r.why) {
-          const why = make(doc, "p", "sect-hall-why", r.why);
-          why.id = whyId;
-          li.append(why);
-        }
-        ul.append(li);
+    const shopRow = (r: HallShopRow) => {
+      const li = make(doc, "li", `sect-hall-row ${r.canBuy ? "" : "locked"}`.trim());
+      const head = make(doc, "div", "sect-hall-row-head");
+      head.append(make(doc, "b", undefined, r.name), make(doc, "span", "sect-hall-tag", r.price));
+      const foot = make(doc, "div", "sect-hall-row-foot");
+      foot.append(make(doc, "span", "sect-hall-state", r.leftLabel));
+      const whyId = `sect-hall-swhy-${r.itemId}`;
+      foot.append(
+        actionButton(
+          doc,
+          "Đổi",
+          r.canBuy,
+          st.busy.has(`shop:${r.itemId}`),
+          r.why ? whyId : null,
+          () => h.onBuy(r.itemId),
+        ),
+      );
+      li.append(head, foot);
+      if (r.why) {
+        const why = make(doc, "p", "sect-hall-why", r.why);
+        why.id = whyId;
+        li.append(why);
       }
-      shop.append(ul);
+      return li;
+    };
+    // Hai gian (Bảo khố: đồ; Tàng Kinh Các: kinh quyển); trong mỗi gian: món đã mở theo cấp tông, rồi các nhóm "Mở ở cấp tông N" (chỉ cấp kế tiếp mở sẵn, `hallShopGroups`)
+    for (const g of hallShopGroups(sRows, v.level)) {
+      shop.append(make(doc, "h5", "sect-hall-sub", g.hallLabel));
+      for (const sec of g.sections) {
+        const ul = make(doc, "ul", "sect-hall-list");
+        for (const r of sec.rows) ul.append(shopRow(r));
+        if (sec.level === null) {
+          shop.append(ul);
+          continue;
+        }
+        const det = make(doc, "details", "sect-hall-group");
+        det.open = st.groupOpen?.get(sec.key) ?? sec.defaultOpen;
+        det.append(make(doc, "summary", "sect-hall-group-title", sec.title), ul);
+        // `toggle` bắn cả khi ta đặt `open` lúc dựng: chỉ báo khi khác trạng thái đã vẽ (bên gọi lại so với mặc định để chỉ nhớ lựa chọn thật của người chơi)
+        const drawn = det.open;
+        det.addEventListener("toggle", () => {
+          if (det.open !== drawn) h.onGroupToggle?.(sec.key, det.open, sec.defaultOpen);
+        });
+        shop.append(det);
+      }
     }
   }
   kids.push(shop);
