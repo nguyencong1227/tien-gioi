@@ -105,6 +105,7 @@ export function validateProdSh(content: string): { valid: boolean; errors: strin
     "backup",
     "restore",
     "rollback",
+    "check",
     "smoke",
     "xoa-tai-khoan",
   ];
@@ -112,6 +113,38 @@ export function validateProdSh(content: string): { valid: boolean; errors: strin
     const fnName = `cmd_${cmd.replace(/-/g, "_")}`;
     if (!content.includes(fnName) || !content.includes(`${cmd})`)) {
       errors.push(`prod.sh thiếu lệnh '${cmd}' (cần cả ${fnName} và ${cmd}))`);
+    }
+  }
+
+  // 4b. Lệnh up phải gợi ý chạy '$0 check' (không gợi ý riêng smoke làm gián đoạn)
+  const upBlock = content.match(/cmd_up\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  if (!upBlock.includes("$0 check")) {
+    errors.push("cmd_up phải gợi ý chạy '$0 check' sau khi triển khai");
+  }
+
+  // 4c. Lệnh check (Issue #1001): phải CHỈ ĐỌC, tuyệt đối không dừng / khởi động lại / ghi container
+  const checkBlock = content.match(/cmd_check\(\)\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
+  if (!checkBlock) {
+    errors.push("prod.sh thiếu định nghĩa hàm cmd_check");
+  } else {
+    const codeOnly = checkBlock
+      .split("\n")
+      .map((l) => l.replace(/#.*$/, ""))
+      .join("\n");
+    if (
+      /\b(docker_cmd|compose_cmd|docker|docker-compose)\s+(stop|restart|down|up|kill|rm|run|exec)\b/.test(
+        codeOnly,
+      )
+    ) {
+      errors.push(
+        "cmd_check phải CHỈ ĐỌC: tuyệt đối không gọi docker/compose stop, restart, down, up, kill, rm, run, exec",
+      );
+    }
+    if (!codeOnly.includes("/health") || !codeOnly.includes("/metrics")) {
+      errors.push("cmd_check phải kiểm tra cả /health và /metrics");
+    }
+    if (!codeOnly.includes("--since 3m") || !codeOnly.includes("analyze_check_logs")) {
+      errors.push("cmd_check phải đọc log --since 3m và phân tích qua analyze_check_logs");
     }
   }
 
@@ -365,6 +398,118 @@ describe("Hàng rào bảo vệ môi trường dev và kiểm tra triển khai (
       expect(res.valid).toBe(false);
       expect(res.errors.some((e) => e.includes("chmod 600"))).toBe(true);
     });
+
+    it("Đột biến 15: prod.sh check thêm 'docker stop' hoặc 'docker_cmd stop' -> KHÔNG ĐẠT", () => {
+      const mutated1 = prodShContent.replace(/cmd_check\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace("local has_fail=0", 'docker stop "$GAME_CONTAINER"\n  local has_fail=0'),
+      );
+      expect(mutated1).not.toBe(prodShContent);
+      const res1 = validateProdSh(mutated1);
+      expect(res1.valid).toBe(false);
+      expect(res1.errors.some((e) => e.includes("cmd_check phải CHỈ ĐỌC"))).toBe(true);
+
+      const mutated2 = prodShContent.replace(/cmd_check\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace("local has_fail=0", 'docker_cmd stop "$GAME_CONTAINER"\n  local has_fail=0'),
+      );
+      const res2 = validateProdSh(mutated2);
+      expect(res2.valid).toBe(false);
+      expect(res2.errors.some((e) => e.includes("cmd_check phải CHỈ ĐỌC"))).toBe(true);
+    });
+
+    it("Đột biến 16: prod.sh up bỏ gợi ý '$0 check' -> KHÔNG ĐẠT", () => {
+      const mutated = prodShContent.replace(/cmd_up\(\)\s*\{[\s\S]*?\n\}/, (block) =>
+        block.replace("$0 check", "$0 smoke"),
+      );
+      expect(mutated).not.toBe(prodShContent);
+      const res = validateProdSh(mutated);
+      expect(res.valid).toBe(false);
+      expect(res.errors.some((e) => e.includes("cmd_up phải gợi ý chạy '$0 check'"))).toBe(true);
+    });
+  });
+
+  describe("Đơn vị hàm thuần analyze_check_logs trong prod.sh (#1001)", () => {
+    function runAnalyzeLogs(logInput: string): { code: number | null; out: string } {
+      const r = spawnSync("bash", ["-c", 'source "$PROD_SH" && analyze_check_logs "$LOG_INPUT"'], {
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          PROD_SH: prodShPath,
+          LOG_INPUT: logInput,
+        },
+      });
+      return { code: r.status, out: `${r.stdout}${r.stderr}` };
+    }
+
+    it("log rỗng hoặc chỉ có dòng khởi động thường -> mã 0 (ĐẠT), 0 lỗi, 0 cảnh báo", () => {
+      const empty = runAnalyzeLogs("");
+      expect(empty.code).toBe(0);
+      expect(empty.out).toContain("0 dòng lỗi, 0 dòng [CẢNH BÁO]");
+      expect(empty.out).toContain("[ĐẠT]");
+
+      const normal = runAnalyzeLogs(
+        "tien-gioi  | Lưu trữ: PostgreSQL\ntien-gioi  | Tiên Giới server: http://localhost:2567",
+      );
+      expect(normal.code).toBe(0);
+      expect(normal.out).toContain("0 dòng lỗi, 0 dòng [CẢNH BÁO]");
+    });
+
+    it("log có dòng cờ BOSS_MOVES bật (không phải [CẢNH BÁO]) -> in dòng cờ và vẫn trả mã 0 (ĐẠT)", () => {
+      const res = runAnalyzeLogs(
+        "Lưu trữ: PostgreSQL\nTrùm nhiều chiêu: BẬT (BOSS_MOVES): xich_mang, hac_giao, thien_han, linh_hu",
+      );
+      expect(res.code).toBe(0);
+      expect(res.out).toContain("Trùm nhiều chiêu: BẬT (BOSS_MOVES)");
+      expect(res.out).toContain("0 dòng lỗi, 0 dòng [CẢNH BÁO]");
+    });
+
+    it("log có dòng [CẢNH BÁO] (TEST_EXP_MULT, BOSS_MOVES sai, giám sát) -> in dòng cảnh báo, trả mã 2 (CÓ CẢNH BÁO)", () => {
+      const res = runAnalyzeLogs(
+        "[CẢNH BÁO] TEST_EXP_MULT đang BẬT (chỉ để thử nghiệm): nhân tu vi của Han x3.\n" +
+          "[CẢNH BÁO] BOSS_MOVES='onnn' không hợp lệ (coi như TẮT, không có lỗi nghiêm trọng).",
+      );
+      expect(res.code).toBe(2);
+      expect(res.out).toContain("TEST_EXP_MULT đang BẬT");
+      expect(res.out).toContain("BOSS_MOVES='onnn'");
+      expect(res.out).toContain("0 dòng lỗi, 2 dòng [CẢNH BÁO]");
+      expect(res.out).toContain("[CẢNH BÁO]");
+    });
+
+    it("log có dòng lỗi (error / lỗi / exception / unhandled) -> đếm đúng, in dòng lỗi, trả mã 1 (THẤT BẠI)", () => {
+      const res = runAnalyzeLogs(
+        "Lưu trữ: PostgreSQL\n" +
+          "Error: connect ECONNREFUSED 127.0.0.1:5432\n" +
+          "UnhandledPromiseRejection: timeout\n" +
+          "Gặp lỗi nội bộ khi xử lý gói tin",
+      );
+      expect(res.code).toBe(1);
+      expect(res.out).toContain("3 dòng lỗi, 0 dòng [CẢNH BÁO]");
+      expect(res.out).toContain("[THẤT BẠI]");
+      expect(res.out).toContain("ECONNREFUSED");
+    });
+
+    it("hàm thuần sum_prometheus_metric cộng tổng đúng qua nhiều phòng (#1001, #782)", () => {
+      const sample = [
+        "# HELP tiengioi_room_input_dropped_total Input di chuyen bi bo",
+        "# TYPE tiengioi_room_input_dropped_total counter",
+        'tiengioi_room_input_dropped_total{room="r1",map="lac_ha"} 3',
+        'tiengioi_room_input_dropped_total{room="r2",map="hac_phong"} 5',
+        'tiengioi_room_input_backlog_ticks_total{room="r1",map="lac_ha"} 12',
+        'tiengioi_room_input_backlog_ticks_total{room="r2",map="hac_phong"} 7',
+      ].join("\n");
+      const r = spawnSync(
+        "bash",
+        [
+          "-c",
+          'source "$PROD_SH" && echo "dropped=$(sum_prometheus_metric "$SAMPLE" tiengioi_room_input_dropped_total) backlog=$(sum_prometheus_metric "$SAMPLE" tiengioi_room_input_backlog_ticks_total)"',
+        ],
+        {
+          encoding: "utf-8",
+          env: { ...process.env, PROD_SH: prodShPath, SAMPLE: sample },
+        },
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout.trim()).toBe("dropped=8 backlog=19");
+    });
   });
 });
 
@@ -384,7 +529,20 @@ describe("Hành vi thật của deploy/*.sh (docker giả, #299)", () => {
   const DOCKER_STUB = `#!/usr/bin/env bash
 echo "docker $* [TIEN_GIOI_TAG=\${TIEN_GIOI_TAG:-}]" >> "$STUB_LOG"
 case "$1" in
-  ps) exit 0 ;;
+  ps)
+    if [[ " $* " == *"--format"* ]]; then
+      if [[ -n "\${STUB_PS_OUT:-}" ]]; then
+        printf "%s\\n" "$STUB_PS_OUT"
+      else
+        printf "tien-gioi-db|Up 2 hours (healthy)\\ntien-gioi|Up 5 minutes (healthy)\\n"
+      fi
+    fi
+    exit 0 ;;
+  logs)
+    if [[ -n "\${STUB_LOGS:-}" ]]; then
+      printf "%s\\n" "$STUB_LOGS"
+    fi
+    exit 0 ;;
   compose)
     if [[ " $* " == *" pull "* && "\${STUB_PULL_FAIL:-}" == 1 ]]; then echo "pull loi" >&2; exit 1; fi
     if [[ " $* " == *" run "* ]]; then
@@ -406,9 +564,23 @@ exit 0
   const CURL_STUB = `#!/usr/bin/env bash
 args="$*"
 if [[ "$args" == *"%{http_code}"* ]]; then
-  if [[ "$args" == *"Authorization"* ]]; then printf 200; else printf 401; fi
+  if [[ "$args" == *"Authorization"* ]]; then
+    printf "\${STUB_METRICS_AUTH_CODE:-200}"
+  else
+    printf "\${STUB_METRICS_ANON_CODE:-401}"
+  fi
+elif [[ "$args" == *"/metrics"* ]]; then
+  if [[ -n "\${STUB_METRICS_BODY:-}" ]]; then
+    printf "%s\\n" "$STUB_METRICS_BODY"
+  else
+    printf 'tiengioi_room_input_dropped_total{room="r1",map="lac_ha"} 2\\ntiengioi_room_input_backlog_ticks_total{room="r1",map="lac_ha"} 5\\n'
+  fi
 else
-  echo '{"ok":true,"authMode":"account"}'
+  if [[ -n "\${STUB_HEALTH_OUT:-}" ]]; then
+    echo "$STUB_HEALTH_OUT"
+  else
+    echo '{"ok":true,"authMode":"account","protocol":4,"minProtocol":0}'
+  fi
 fi
 `;
 
@@ -598,6 +770,53 @@ fi
     const iUp = calls.findIndex((l) => / up -d game/.test(l));
     expect(iStop).toBeGreaterThanOrEqual(0);
     expect(iUp).toBeGreaterThan(iStop); // bản chạy thật không bị bỏ nằm tắt
+  });
+
+  it("check (#1001): kiểm 5 mục CHỈ ĐỌC (không stop/restart/up container, không in token), trả đúng mã thoát 0 / 2 / 1", () => {
+    prod(["init"]);
+    const env = readFileSync(envFile(), "utf-8");
+    const metricsToken = env.match(/^METRICS_TOKEN=(.+)$/m)?.[1] ?? "";
+    expect(metricsToken).toMatch(/^[0-9a-f]{48}$/);
+
+    // 1. Ca ĐẠT (mã thoát 0): không gọi bất kỳ lệnh stop/restart/up/exec/run nào, không lộ METRICS_TOKEN
+    writeFileSync(logFile, "");
+    const ok = prod(["check"], {
+      STUB_LOGS: "Trùm nhiều chiêu: BẬT (BOSS_MOVES): xich_mang",
+    });
+    expect(ok.code).toBe(0);
+    expect(ok.out).toContain("Kết luận: ĐẠT (mã thoát 0)");
+    expect(ok.out).toContain("BOSS_MOVES");
+    expect(ok.out).toContain(
+      "tiengioi_room_input_dropped_total=2, tiengioi_room_input_backlog_ticks_total=5",
+    );
+    expect(ok.out).not.toContain(metricsToken);
+    const calls = dockerLog();
+    expect(calls.some((l) => /\b(stop|restart|down|up|kill|rm|run|exec)\b/.test(l))).toBe(false);
+    expect(calls.some((l) => l.includes("logs --since 3m"))).toBe(true);
+
+    // 2. Ca CÓ CẢNH BÁO (mã thoát 2): log có dòng [CẢNH BÁO]
+    const warn = prod(["check"], {
+      STUB_LOGS: "[CẢNH BÁO] TEST_EXP_MULT đang BẬT: nhân tu vi của Han x3",
+    });
+    expect(warn.code).toBe(2);
+    expect(warn.out).toContain("Kết luận: CÓ CẢNH BÁO (mã thoát 2)");
+
+    // 3. Ca THẤT BẠI (mã thoát 1): container unhealthy, lệch protocol, hoặc có dòng lỗi trong log
+    const badContainer = prod(["check"], {
+      STUB_PS_OUT: "tien-gioi-db|Up 2 hours (healthy)\ntien-gioi|Up 1 minute (unhealthy)",
+    });
+    expect(badContainer.code).toBe(1);
+    expect(badContainer.out).toContain("Kết luận: THẤT BẠI (mã thoát 1)");
+
+    const badProto = prod(["check"], {
+      STUB_HEALTH_OUT: '{"ok":true,"authMode":"account","protocol":999,"minProtocol":0}',
+    });
+    expect(badProto.code).toBe(1);
+
+    const badLog = prod(["check"], {
+      STUB_LOGS: "Error: database connection lost",
+    });
+    expect(badLog.code).toBe(1);
   });
 
   it("xoa-tai-khoan: tên sai regex bị từ chối trước Docker; chạy thử không backup/stop/up; chạy thật có backup -> stop -> run -> up", () => {
