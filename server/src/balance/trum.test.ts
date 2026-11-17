@@ -107,16 +107,16 @@ describe("hàm đo", () => {
   });
 
   it("fightBossMoves: tất định theo hạt giống; đông người không hạ chậm hơn; có đếm chiêu trùm đã vận", () => {
-    const a = fightBossMoves(MANG, 1, 3);
-    const b = fightBossMoves(MANG, 1, 3);
+    const a = fightBossMoves(MANG, 4, 3);
+    const b = fightBossMoves(MANG, 4, 3);
     expect(b).toEqual(a);
     expect(a.killed).toBe(true);
     expect(a.casts).toBeGreaterThanOrEqual(0);
-    const solo = summarizeBossFights(MANG, 1, 4);
+    const two = summarizeBossFights(MANG, 2, 4);
     const four = summarizeBossFights(MANG, 4, 4);
-    expect(solo.simSeconds).not.toBeNull();
-    expect(four.simSeconds!).toBeLessThanOrEqual(solo.simSeconds!);
-    expect(solo.realMinutes!).toBeGreaterThan(solo.simSeconds! / 60); // quy ra thời gian thật chia cho uptime < 1
+    expect(two.simSeconds).not.toBeNull();
+    expect(four.simSeconds!).toBeLessThanOrEqual(two.simSeconds!);
+    expect(two.realMinutes!).toBeGreaterThan(two.simSeconds! / 60); // quy ra thời gian thật chia cho uptime < 1
   });
 });
 
