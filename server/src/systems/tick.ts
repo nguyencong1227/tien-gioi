@@ -12,6 +12,7 @@ import { tickSect } from "./sect";
 import { tickStatuses } from "./status";
 import { tickBolts } from "./bolt";
 import { tickPBolts } from "./pbolt";
+import { tickWindup } from "./windup";
 import { tickTreasure } from "./treasure";
 import { tickNetGuard } from "./net-guard";
 import { tickAmbush, trackAmbushWalk } from "./ambush";
@@ -22,6 +23,7 @@ export function tickWorld(w: World, dtMs: number) {
   w.state.players.forEach((p, sid) => {
     const c = w.ctrl.get(sid);
     if (!c) return;
+    if (c.windup !== undefined) tickWindup(w, sid, p, c); // chiêu vận (CT5): huỷ / đáp TRƯỚC các return sớm (chết, Hoàng Tuyền, hồn lìa xác vẫn phải huỷ vận)
     if (c.beatMs !== undefined || c.shieldUntil !== undefined) tickNetGuard(w, sid, c); // mục 33: im lặng -> hồn lìa xác, hết hạn hộ thể (client cũ không tốn gì)
     if (c.limbo) return; // ở Hoàng Tuyền: không hồi sinh theo đồng hồ, chỉ đầu thai khi người chơi chọn
     if (p.dead) return tickRespawn(w, p, c);
