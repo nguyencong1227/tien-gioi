@@ -904,6 +904,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thanh_van_kiem_khi"), chance: 0.01, min: 1, max: 1 },
     { itemId: bookIdOf("ban_thach_ho_the"), chance: 0.01, min: 1, max: 1 },
     { itemId: bookIdOf("doc_dang_phuc"), chance: 0.008, min: 1, max: 1 }, // bẫy Mộc (CT9 lát 1)
+    // Chiêu Thủy Trúc Cơ (CT7 #1052, E; A chuyển từ trùm Nguyên Anh Thiên Hàn Vương sang quái Trúc Cơ: chiêu rr 2 không thể chỉ rơi từ trùm cao hơn cấp chiêu)
+    { itemId: bookIdOf("thi_doc_am_chuong"), chance: 0.008, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
@@ -983,6 +985,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.018, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.012, min: 1, max: 1 },
+    // Kinh quyển 4 chiêu hệ Mộc cao cấp (CT7 #1052, Dev E): rơi hiếm từ Độc Tước (quái Mộc)
+    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("thiem_to_cong"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.02, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [

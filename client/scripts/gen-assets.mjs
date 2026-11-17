@@ -985,6 +985,14 @@ const BOOKS = {
   kinh_loi_lien_chau: [0xe0c850, 0xfff6b0],
   kinh_hon_phien_tuong: [0x5a3a7a, 0xc9a8e6, "tran"],
   kinh_pha_son_nhat_kich: [0x8f6a2e, 0xe6c98a],
+  // Mộc + Thủy (CT7 #1052): màu bìa theo hệ, dấu tròn (không mark để tránh chữ). Dev E thêm chiêu + quyển, atlas.test.ts đòi icon cho mọi vật phẩm.
+  kinh_hu_thuy_chuong: [0x3b7bd9, 0xbfe0ff],
+  kinh_trien_xa_thu: [0x5e9a4a, 0xd0f0b8],
+  kinh_hac_sa_doc_chuong: [0x4f8a4e, 0xc4e6b0],
+  kinh_thi_doc_am_chuong: [0x2f6ab8, 0xa8d4f0],
+  kinh_thiem_to_cong: [0x6fae5a, 0xd8ecc0],
+  kinh_doan_truong_chi_phap: [0x3f7a44, 0xb4dca0],
+  kinh_kho_moc_phung_xuan_quyet: [0x7ab866, 0xe0f0cc],
 };
 
 /**
