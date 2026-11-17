@@ -360,9 +360,9 @@ async function main() {
           };
         })()`);
       /** Bảng mẫu của shared; bảng Linh hồn đổi bậc về trong thang (mẫu của shared cho bậc 40, ngoài thang). */
-      const setBoard = (board, n, patch = "") =>
+      const setBoard = (board, n, patch = "", variant = "top") =>
         evalJs(`(() => {
-          const m = window.__sample.boards(${JSON.stringify(board)}, ${n});
+          const m = window.__sample.boards(${JSON.stringify(board)}, ${n}, ${JSON.stringify(variant)});
           if (m.board === "linhhon") m.rows = m.rows.map((r, i) => ({ ...r, step: 30 - i }));
           ${patch}
           window.__ui.setBoards(m);
@@ -445,12 +445,8 @@ async function main() {
         }
       }
 
-      // các trạng thái của "Hạng của bạn" + bảng rỗng + chống chèn HTML (trên bảng tu vi)
-      await setBoard(
-        "tuvi",
-        5,
-        `m.mine = { rank: 47, row: { rank: 47, name: "Tô Vân Hạc", realm: 1, tier: 4, exp: 1234 } };`,
-      );
+      // các trạng thái của "Hạng của bạn" (biến thể của `sampleBoards` ở shared) + bảng rỗng + chống chèn HTML (trên bảng tu vi)
+      await setBoard("tuvi", 5, "", "outside");
       k = await rank();
       check(
         k.mine === "Hạng của bạn: 47" &&
@@ -461,24 +457,16 @@ async function main() {
           k.rows[6].cells[0] === "47",
         `mình ngoài top: dòng "…" rồi dòng của mình (hạng 47) có số liệu (${k.rows.length} hàng)`,
       );
-      for (const [patch, want, name] of [
-        [
-          `m.mine = { rank: null, reason: "test" };`,
-          "Tài khoản thử nghiệm không vào bảng này.",
-          "thử nghiệm",
-        ],
-        [
-          `m.mine = { rank: null, reason: "min_games", need: 4 };`,
-          "Cần thêm 4 trận để lên bảng.",
-          "thiếu trận",
-        ],
-        [`m.mine = { rank: null, reason: "none" };`, "Chưa có hạng.", "chưa có"],
+      for (const [variant, want] of [
+        ["test", "Tài khoản thử nghiệm không vào bảng này."],
+        ["min_games", "Cần thêm 6 trận để lên bảng."],
+        ["none", "Chưa có hạng."],
       ]) {
-        await setBoard("tuvi", 5, patch);
+        await setBoard("tuvi", 5, "", variant);
         k = await rank();
         check(
           k.mine === want && !k.rows.some((x) => x.cls.includes("mine")),
-          `không hạng (${name}): "${k.mine}"`,
+          `không hạng (${variant}): "${k.mine}"`,
         );
       }
       await setBoard("tuvi", 5, `m.rows = [];`);

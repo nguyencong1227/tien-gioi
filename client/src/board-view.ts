@@ -11,10 +11,9 @@ import {
   BOARD_LABELS,
   BOARD_REFRESH_MS,
   BOARD_SIZE,
-  REALMS,
   TITLE_BY_ID,
   realmLabel,
-  stepOf,
+  realmOfStep,
   type BoardId,
   type BoardMine,
   type BoardRow,
@@ -39,22 +38,13 @@ export function fmtCount(n: unknown): string {
 }
 
 /**
- * Tên cảnh giới của một BẬC (`stepOf`): bảng Linh hồn gửi `step` chứ không gửi `realm` / `tier`, mà `shared/` chưa có hàm ngược nên đảo bằng cách
- * duyệt `REALMS` một lần (bảng nhỏ, ~70 bậc). Bậc ngoài thang -> "—".
+ * Tên cảnh giới của một BẬC (`realmOfStep`, ngược của `stepOf`): bảng Linh hồn gửi `step` chứ không gửi `realm` / `tier`.
+ * Bậc ngoài thang / không nguyên / không phải số -> "—".
  */
-const STEP_LABELS: string[] = (() => {
-  const out: string[] = [];
-  REALMS.forEach((r, ri) => r.tiers.forEach((_, ti) => (out[stepOf(ri, ti)] = realmLabel(ri, ti))));
-  return out;
-})();
-
 export function stepLabel(step: unknown): string {
-  return typeof step === "number" &&
-    Number.isInteger(step) &&
-    step >= 0 &&
-    step < STEP_LABELS.length
-    ? (STEP_LABELS[step] ?? DASH)
-    : DASH;
+  if (typeof step !== "number") return DASH;
+  const r = realmOfStep(step);
+  return r ? realmLabel(r.realm, r.tier) : DASH;
 }
 
 /** Chữ danh hiệu từ id ngắn (`Player.title` / `BoardRow.titleId`); id lạ (máy chủ mới hơn client) -> "" (không hiện gì). */
