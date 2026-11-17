@@ -8302,6 +8302,22 @@ body.ui-hidden
   font-weight: 700;
   color: #ffe08a;
 }
+/* nhãn NGUY HIỂM (mục 53): mức tinh anh / cầm đầu; bị hạ trong đấu trường là chết thật nên phải nổi, không chỉ bằng màu (chữ + viền) */
+.ambush-danger {
+  margin: 0;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border: 1px solid #ff6b5a;
+  border-radius: 4px;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #ff8a7a;
+  background: rgba(255, 107, 90, 0.14);
+}
+.ambush-danger[hidden] {
+  display: none;
+}
 .ambush-scene {
   margin: 0;
   font-size: var(--fs-13);
@@ -8489,6 +8505,26 @@ body.ui-hidden
 }
 .ahud-note:empty {
   display: none;
+}
+/* thanh vận bỏ chạy (mục 53): mép dưới của HUD đấu trường, đầy dần trong 1 giây; không đổi bố cục HUD */
+.ahud-flee-bar {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.ahud-flee-bar[hidden] {
+  display: none;
+}
+.ahud-flee-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ffd27a;
 }
 /* thanh trùm nằm DƯỚI HUD đấu trường (cùng cách nhường chỗ cho banner trùm thế giới) */
 body.in-arena .boss-bar {
