@@ -175,6 +175,123 @@ const SPECS: Record<SkillFxId, Spec> = {
       tint: 0x9fe3c2,
     },
   },
+  // bolt: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  bolt: {
+    priority: 1,
+    particles: {
+      frames: ["spark", "dot"],
+      count: 8,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // chain: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  chain: {
+    priority: 1,
+    particles: {
+      frames: ["spark"],
+      count: 7,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // zone: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  zone: {
+    priority: 1,
+    particles: {
+      frames: ["smoke", "ring"],
+      count: 10,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // trap: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  trap: {
+    priority: 1,
+    particles: {
+      frames: ["ring", "dot"],
+      count: 11,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // aura: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  aura: {
+    priority: 1,
+    particles: {
+      frames: ["ring", "dot"],
+      count: 12,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // totem: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  totem: {
+    priority: 1,
+    particles: {
+      frames: ["smoke", "ember"],
+      count: 13,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // pull: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  pull: {
+    priority: 1,
+    particles: {
+      frames: ["ring", "spark"],
+      count: 14,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // push: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  push: {
+    priority: 1,
+    particles: {
+      frames: ["ring", "spark"],
+      count: 15,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
+  // windup: hiệu ứng TẠM của đợt thêm chiêu (mục 51, CT1b); B thay bằng hình thật ở CT11b
+  windup: {
+    priority: 1,
+    particles: {
+      frames: ["ring", "dot"],
+      count: 16,
+      lifespan: { min: 400, max: 700 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd8d8e8,
+    },
+  },
 };
 
 export const CAST_RECIPES: readonly FxRecipe[] = (Object.keys(SPECS) as SkillFxId[]).map((fx) => ({
