@@ -303,12 +303,11 @@ async function main() {
         "ảnh chỉ trang trí: alt rỗng, aria-hidden, không bắt chuột",
       );
       check(state.manifestHits === 1, `manifest tải đúng MỘT lần (${state.manifestHits})`);
-      // Lần đầu (bộ nhớ đệm lạnh): đúng MỘT lần tải tệp; các khung sau tệp có thể đã nằm trong bộ nhớ đệm của Service Worker (0 lần): đúng hành vi thật
+      // Tệp gói được lấy qua `fetch` (nạp gói) rồi qua `<img>` (giải mã): tối đa HAI yêu cầu mạng (máy chủ giả của script đặt `no-store` để đếm được; máy chủ thật cho phép
+      // dùng lại bộ nhớ đệm HTTP / Service Worker), MỌI yêu cầu đều bằng URL CÓ BĂM. Số 0 / 1 / 2 phụ thuộc Service Worker đã kích hoạt chưa nên KHÔNG ghim đúng một.
       check(
-        state.fileUrls.length <= 1 &&
-          (vp !== VIEWPORTS[0] || state.fileUrls.length === 1) &&
-          state.fileUrls.every((u) => /\?v=[0-9a-f]{12}$/.test(u)),
-        `tệp gói tải tối đa một lần và bằng URL có băm (${state.fileUrls.join(" ") || "từ bộ nhớ đệm"})`,
+        state.fileUrls.length <= 2 && state.fileUrls.every((u) => /\?v=[0-9a-f]{12}$/.test(u)),
+        `tệp gói được tải bằng URL có băm, tối đa hai yêu cầu (${state.fileUrls.length})`,
       );
       if (shotsDir) {
         const s = await send("Page.captureScreenshot", { format: "webp", quality: 75 });
