@@ -1,5 +1,5 @@
 /**
- * Công thức hạt của đợt thêm chiêu (mục 51, CT11b): tia lửa điện của SÉT LAN, chớp ở mục tiêu, vụ nổ DẤU khi combo. CHỈ là dữ liệu (xem `recipes-combat.ts` về vòng import);
+ * Công thức hạt của đợt thêm chiêu (mục 51, CT11b): tia lửa điện của SÉT LAN, chớp ở mục tiêu, vụ nổ DẤU khi combo, bụi cuối đoạn ĐẠN của người chơi. CHỈ là dữ liệu (xem `recipes-combat.ts` về vòng import);
  * màu cuối do `opts.tint` (màu theo HỆ, `ct2-fx.ts`), `tint` ở đây chỉ là dự phòng. Kế hoạch điểm phát và ngân sách do `ct2-fx.ts` quyết.
  */
 import type { FxRecipe } from "./recipes";
@@ -31,6 +31,20 @@ export const CT2_RECIPES: readonly FxRecipe[] = [
       scale: { start: 0.9, end: 0 },
       alpha: { start: 1, end: 0 },
       tint: 0xd8d8ff,
+    },
+  },
+  // cuối mỗi đoạn đạn của người chơi (chạm tường / mục tiêu / điểm nảy): bụi tia nhỏ, tan nhanh
+  {
+    id: "pbolt-hit",
+    priority: 1,
+    particles: {
+      frames: ["spark", "dot"],
+      count: 5,
+      lifespan: { min: 140, max: 300 },
+      speed: { min: 30, max: 90 },
+      scale: { start: 0.8, end: 0 },
+      alpha: { start: 1, end: 0 },
+      tint: 0xffffff,
     },
   },
   // vụ nổ dấu khi ăn combo: chớp lớn, nhiều tia, có rung nhẹ khung
