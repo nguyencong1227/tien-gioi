@@ -917,7 +917,10 @@ Thời gian thật = giây mô phỏng / 0.6 (né làm đánh chậm đi; `ASSUM
 
 | Trùm | Bậc người chơi | 1 người | 2 người | 3 người | 4 người |
 |---|---|---|---|---|---|
-| Xích Mãng | bậc 12 (khí huyết 1.147) | 0,4 phút, 3 chiêu (100% thắng, 0 chết) | 0,2 phút, 2 chiêu (100% thắng, 0 chết) | 0,1 phút, 1,4 chiêu (100% thắng, 0 chết) | 0,1 phút, 0,9 chiêu (100% thắng, 0 chết) |
+| Xích Mãng | bậc 12 (khí huyết 1.147) | không hạ nổi | 0,2 phút, 2 chiêu (100% thắng, 0 chết) | 0,1 phút, 1,3 chiêu (100% thắng, 0 chết) | 0,1 phút, 0,9 chiêu (100% thắng, 0 chết) |
+| Hắc Giao | bậc 15 (khí huyết 2.236) | không hạ nổi | không hạ nổi | 1 phút, 9 chiêu (100% thắng, 1 chết) | 0,7 phút, 6 chiêu (100% thắng, 0,5 chết) |
+| Thiên Hàn Vương | bậc 18 (khí huyết 3.798) | không hạ nổi | 1,4 phút, 11,9 chiêu (88% thắng, 0,6 chết) | 0,9 phút, 8,8 chiêu (100% thắng, 0,3 chết) | 0,7 phút, 5,5 chiêu (100% thắng, 0 chết) |
+| Linh Hư Yêu Vương | bậc 9 (khí huyết 620) | không hạ nổi | không hạ nổi | không hạ nổi | 4,6 phút, 46,5 chiêu (100% thắng, 1 chết) |
 
 ### 2. Sát thương mỗi đòn và cuồng nộ
 
@@ -925,7 +928,10 @@ Mỗi đòn / khí huyết tối đa của người đúng bậc, hệ số côn
 
 | Trùm | Bộ chiêu | chiêu có sát thương | đòn nặng nhất (sát thương) | cuồng nộ | trận có tới cuồng nộ (1 / 2 / 3 / 4 người) |
 |---|---|--:|---|---|---|
-| Xích Mãng | 3 chiêu / 2 giai đoạn | 2 | cuon_minh 20% (224) | không có | 0% / 0% / 0% / 0% |
+| Xích Mãng | 4 chiêu / 2 giai đoạn | 3 | cuon_minh 29% (336) | không có | 0% / 0% / 0% / 0% |
+| Hắc Giao | 3 chiêu / 2 giai đoạn | 2 | vuc_xoay 32% (720) | không có | 0% / 0% / 0% / 0% |
+| Thiên Hàn Vương | 6 chiêu / 3 giai đoạn | 5 | doi_lao 27% (1.037) | không có | 0% / 0% / 0% / 0% |
+| Linh Hư Yêu Vương | 4 chiêu / 3 giai đoạn | 3 | truy_kich 20% (124) | 5 phút (công x1.5) | 0% / 0% / 0% / 0% |
 
 ### 3. Tỉ lệ trúng: bot né hoàn hảo vs bot đứng yên
 
@@ -933,7 +939,10 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 
 | Trùm | đòn đã đáp (bot né) | trúng bot NÉ (phải 0) | đòn đã đáp (bot đứng yên) | trúng bot ĐỨNG YÊN |
 |---|--:|--:|--:|--:|
-| Xích Mãng | 42 | 0 | 42 | 42 (100%) |
+| Xích Mãng | 59 | 0 | 59 | 59 (100%) |
+| Hắc Giao | 46 | 0 | 46 | 46 (100%) |
+| Thiên Hàn Vương | 175 | 0 | 176 | 176 (100%) |
+| Linh Hư Yêu Vương | 91 | 0 | 92 | 92 (100%) |
 
 **Không vi phạm bất biến nào** (mọi đòn <= ngưỡng, bot né hoàn hảo không bị trúng, bot đứng yên bị trúng).
 

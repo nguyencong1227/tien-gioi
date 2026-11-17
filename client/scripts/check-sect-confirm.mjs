@@ -643,13 +643,13 @@ async function main() {
         q.dis[1] && q.dis[2] && q.dis[3] && q.dis[4] && !q.dis[0],
         "chạm trần: khoá +, ×10, ×100, Tối đa; còn −",
       );
-      // gõ sai: chữ / số âm
-      for (const bad of ["abc", "-5"]) {
+      // gõ sai: chữ / số âm / SỐ LẺ (A review #983: "2.5" từng bị đọc thành 25 rồi kẹp về cả ví); ô GIỮ NGUYÊN chữ, không ghi đè
+      for (const bad of ["abc", "-5", "2.5", "1,5", "12.34"]) {
         await typeText(bad);
         q = await qtyInfo();
         check(
-          q.invalid === "true" && q.note !== "",
-          `gõ "${bad}": đánh dấu sai và báo "${q.note}"`,
+          q.invalid === "true" && q.note !== "" && q.value === bad,
+          `gõ "${bad}": đánh dấu sai, báo "${q.note}", ô giữ nguyên "${q.value}"`,
         );
       }
       await typeText("12");

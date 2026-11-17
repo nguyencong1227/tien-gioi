@@ -190,6 +190,22 @@ describe("qty-stepper: gõ số", () => {
     }
   });
 
+  it("SỐ LẺ ('2.5', '1,5', '12.34'...): hỏng, ô GIỮ NGUYÊN chữ (không bị ghi đè thành số đoán / số kẹp), Enter không xác nhận, không báo số nào (A review #983)", () => {
+    for (const bad of ["2.5", "0.5", "1,5", "12.34", "1.00", "1..000", ".5", "5."]) {
+      const { type, s, input, note, onChange, onConfirm } = make({ max: 20 });
+      onChange.mockClear();
+      type(bad);
+      expect(s.getQty(), bad).toBeNull();
+      expect(s.read(), bad).toBeNull();
+      expect(input.getAttribute("aria-invalid"), bad).toBe("true");
+      expect(input.value, bad).toBe(bad); // bản lỗi cũ: "2.5" -> 25 -> kẹp 20 -> ô bị ghi đè thành "20"
+      expect(note.textContent, bad).toMatch(/số nguyên dương/);
+      expect(onChange, bad).not.toHaveBeenCalledWith(expect.any(Number));
+      input.fire("keydown", { key: "Enter" });
+      expect(onConfirm, bad).not.toHaveBeenCalled();
+    }
+  });
+
   it("sửa lại thành số hợp lệ thì hết lỗi (bỏ aria-invalid, bỏ chữ báo)", () => {
     const { type, s, input, note } = make();
     type("abc");
