@@ -1935,3 +1935,18 @@ Sau khi bổ sung kiểm tra `isPointInAnyActiveWarn` (chặn không cho AI săn
 ## 33. E2E thật Xã hội + trùm thế giới (M9, nghiệm thu #1034; `npm run e2e:xa-hoi -w server`)
 
 Server Colyseus thật trong tiến trình (thư mục dữ liệu tạm, `ACHIEVEMENTS` bật, `LeaderboardService` như `index.ts`, lịch trùm thế giới MẪU gắn vào `WorldRoom.hub.worldBoss.slots`: Xích Mãng ở Lạc Hà, mốc phút kế tiếp cách >= 60 giây, báo trước 1 phút) phục vụ `client/dist`; HAI tab Chrome headless đi qua giao diện thật. Luồng (mất ~1,5-2 phút vì chờ mốc phút của lịch): đăng nhập bằng form -> dòng hệ thống "sẽ xuất hiện sau 1 phút" -> trùm xuất hiện (banner tên + máu + đồng hồ) -> hai người đóng góp (máy chủ trừ máu bằng `dealMonsterDamage`, đúng đường `worldBossCredit`; hai người thấy hai phần trăm khác nhau, danh sách đủ hai người) -> hạ trùm: banner kết quả + toast + thưởng chia theo tỉ lệ (A nhiều hơn B, tổng không vượt thưởng của khung) -> thành tựu 'Hạ Xích Mãng' mới (chấm Mới ở nút HUD) -> bảng Xã hội: tab Thành tựu (đeo 'Thợ Săn Trùm': máy chủ ghi `Player.title`, tab người KHÁC thấy danh hiệu trên đầu nhân vật), tab Xếp hạng (bảng Tu vi có hạng của mình), tab Sự kiện. Không lỗi console, không cảnh báo mất tin. `E2E_SHOTS=<thư mục>` chụp ảnh (mỗi tab một tiền tố `A-` / `B-`); bộ ảnh nghiệm thu đã chuyển sang WebP ở `docs/screenshots/m9-*.webp`. Lịch MẪU không phải dữ liệu thật (lịch thật là việc của E, M9.10).
+
+## 34. E2E thật sáu chiêu hình mới (CT9 lát 1, #1054; `npm run e2e:chieu-moi -w server`)
+
+Lần ĐẦU các hình của CT11 (đạn bay, sét lan, vật thể bền, chiêu vận) chạy với chiêu THẬT chứ không phải mock. Server Colyseus thật trong tiến trình (thư mục dữ liệu tạm) + một tab Chrome headless trên `client/dist`; nhân vật Nguyên Anh đã học đủ sáu chiêu, bốn chiêu đầu gắn ô L U I O, hai chiêu sau gắn bằng tin `skillSlot` thật. Điều khiển bằng PHÍM THẬT (`Input.dispatchKeyEvent`). Quái là một Linh Thố ở chỗ thoáng theo hướng bắn (ba tia quạt +-27 độ phải dài >= 200 px), nâng máu để không chết, bị CHOÁNG dài để không trả đòn; các quái khác cất vào góc xa bản đồ ở mỗi lần đặt lại. Mỗi ca chạy ~1 phút.
+
+| Chiêu | Hình | Kiểm (máy chủ quyết định, client chỉ vẽ) |
+|---|---|---|
+| Độc Đằng Phục | bẫy | `fx trap`: vật thể hiện ngay, CHƯA kích hoạt (`armMs` 600) -> kích hoạt; quái chạm bán kính -> máy chủ `fxEnd` `pop`, chính tin đó vẽ vòng nổ + bụi, vật thể gỡ, quái mất máu |
+| Phi Kiếm Tam Liên | đạn bay | ba `fx pbolt`, lớp đạn đếm đủ +3, quái trúng đạn |
+| Liệt Diễm Trận | vùng | `fx zone`: quái trong vòng mất máu NHIỀU lần theo nhịp 800 ms; hết 4 s TỰ TẮT, KHÔNG có `fxEnd` |
+| Liên Châu Lôi | sét lan | `fx chain` có >= 2 điểm, CHÍNH tin đó vẽ >= số đoạn điểm hạt, quái mất máu |
+| Hồn Phiên Tượng | tượng | `fx totem`: quái trong tầm mất máu theo nhịp 1 s; hết 6 s TỰ TẮT |
+| Phá Sơn Nhất Kích | chiêu vận 1200 ms | `fx cast` chưa có sát thương, vòng tụ khí hiện ngay và TIẾN DẦN (0,36 -> 0,65); hết vận đòn mới đáp, vòng tắt |
+
+Còn kiểm: thanh chiêu máy tính hiện đủ bốn ô >= 44 px trong khung nhìn; 0 lỗi console / exception. Chrome khởi động với `--blink-settings=primaryPointerType=4,...` vì headless không có chuột nên `(pointer: fine)` sai và thanh chiêu L U I O bị ẩn (ảnh `E2E_SHOTS` cũng cần). **Đột biến (6 / 6 đỏ đúng bước):** bỏ `persists.add` (bẫy không hiện), bỏ `windups.begin` (không vòng tụ khí), bỏ `pbolts.add` (đạn không đếm), bỏ `playFxPoints` của `chain` (0 điểm hạt), bỏ vòng nổ của `fxEnd pop`, máy chủ bỏ `k.land()` của chiêu vận (đòn không đáp). Ảnh: `E2E_SHOTS=<thư mục>` ghi mỗi hình một ảnh. Chạy: `npm run build -w client && npm run e2e:chieu-moi -w server`; nằm trong `e2e:all`.
