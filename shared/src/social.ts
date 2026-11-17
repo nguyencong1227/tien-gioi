@@ -800,7 +800,7 @@ function sampleBoardRow(board: BoardId, i: number, name: string): BoardRow {
       Object.assign(base, { realm: 3, tier: 2 - (i % 3), exp: Math.max(0, 90_000 - i * 7_000) });
       break;
     case "linhhon":
-      Object.assign(base, { step: Math.max(1, 40 - i * 2), kiep: Math.max(1, 12 - i) });
+      Object.assign(base, { step: Math.max(1, 30 - i * 2), kiep: Math.max(1, 12 - i) }); // bậc TRONG thang (bậc cao nhất là 33), để giao diện đổi ra tên cảnh giới được
       break;
     case "tongmon":
       Object.assign(base, {
