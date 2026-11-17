@@ -1119,6 +1119,33 @@ html[data-input="touch"] .mm-foot small {
     --sheet-w: min(92vw, 840px);
   }
 }
+/* Thẻ minh hoạ của bản đồ ĐANG XEM ở đầu bảng (ảnh AI 3:2, map-card.ts): ẩn cho tới khi ảnh tải xong, bản đồ chưa có thẻ thì không chỗ trống.
+   Điện thoại ngang thấp (bản đồ cần từng điểm ảnh chiều cao) thì bỏ hẳn. */
+#map-modal .inv-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.map-panel-card {
+  display: block;
+  flex: 0 0 auto;
+  width: 60px; /* cao 40 px = vừa ô nội dung của đầu bảng thấp nhất (48 px - 8 px đệm dưới), không nhô ra ngoài */
+  aspect-ratio: 3 / 2;
+  height: auto;
+  margin-right: 10px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  pointer-events: none;
+  user-select: none;
+}
+.map-panel-card[hidden] {
+  display: none;
+}
+@media (max-height: 480px) {
+  .map-panel-card {
+    display: none;
+  }
+}
 .map-body {
   display: flex;
   flex-direction: column;

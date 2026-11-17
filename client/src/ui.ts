@@ -5279,6 +5279,15 @@ export const ui = {
     renderPartyPanel();
   },
 
+  /**
+   * Thẻ minh hoạ ở đầu bảng Sơn Hà Đồ cho bản đồ ĐANG XEM (không nhất thiết bản đồ mình đứng). Chưa có ảnh / ảnh lỗi / bí cảnh thì thẻ ẩn,
+   * đầu bảng giữ nguyên như cũ (map-card.ts `applyMapCard`).
+   */
+  setMapPanelCard(mapId: string) {
+    const cardEl = document.getElementById("map-card");
+    if (cardEl instanceof HTMLImageElement) applyMapCard(cardEl, mapCardUrl(mapId));
+  },
+
   showTransition(mapName: string, mapId?: string) {
     const overlay = $("transition-overlay");
     const nameEl = $("transition-map-name");
