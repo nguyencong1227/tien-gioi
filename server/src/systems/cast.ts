@@ -26,6 +26,7 @@ import { dealMonsterDamage } from "./combat";
 import { rollDamage } from "./damage";
 import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
+import { fireBolts } from "./pbolt";
 import { syncPublicPos } from "./movement";
 import { cdrNow, sendSkills } from "./skills";
 import {
@@ -364,6 +365,8 @@ export function cast(w: World, sid: string, raw: unknown) {
       hits.push(...ch.hits);
       if (ch.hits.length > 0)
         w.events.fx({ kind: "chain", by: sid, skill: def.id, x: x0, y: y0, pts: ch.pts });
+    } else if (def.shape === "bolt") {
+      // ĐẠN BAY (CT3): không có mục tiêu tức thời, sát thương tới đúng lúc đạn chạm (`tickPBolts`)
     } else {
       w.state.monsters.forEach((mon, id) => {
         const mc = w.mctrl.get(id);
@@ -377,39 +380,19 @@ export function cast(w: World, sid: string, raw: unknown) {
         if (n > 0) hits.push({ id, n, scale: 1 });
       });
     }
-    for (const h of hits) {
-      const mon = w.state.monsters.get(h.id);
-      const mc = w.mctrl.get(h.id);
-      if (!mon || !mc) continue;
-      const em =
-        elementMult(def.element, mc.def.element ?? "none") *
-        treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
-        amp; // phù amp_<hệ> cùng hệ với chiêu (#514 lát 2); đòn lên người thách đấu (`castAtOpponent`) KHÔNG nhân
-      // COMBO (mục 51): mục tiêu ĐANG mang trạng thái `needs` thì sát thương nhân `mult` (kẹp [1, `comboMultMax`]); xét TRƯỚC khi đánh (đòn này gỡ dấu)
-      const cb = def.combo;
-      const comboOn = cb !== undefined && monsterHasStatus(w, h.id, cb.needs);
-      const cm = comboOn
-        ? Math.min(
-            SKILL_LIMITS.comboMultMax,
-            Math.max(1, Number.isFinite(cb.mult) ? (cb.mult as number) : COMBO_MULT_DEFAULT),
-          )
-        : 1;
-      let first = 0;
-      for (let k = 0; k < h.n && w.mctrl.has(h.id); k++) {
-        const { dmg, crit } = rollDamage(atk, mult * em * h.scale * cm, st.crit); // bạo kích cộng thêm từ trang bị (M7.4)
-        if (k === 0) first = dmg;
-        dealMonsterDamage(w, h.id, mon, sid, dmg, crit, true, comboOn);
-      }
-      if (!w.mctrl.has(h.id)) continue; // đã chết: không còn gắn trạng thái
-      if (comboOn && cb) {
-        if (cb.consume) takeMonsterStatus(w, h.id, cb.needs); // gỡ dấu / trạng thái đã dùng
-        if (cb.apply) applyMonsterStatus(w, h.id, cb.apply, first, sid); // gắn thêm (vd dấu hệ khác, choáng ngắn)
-      }
-      for (const eff of def.effects)
-        if (statusOf(eff.status)?.harmful) applyMonsterStatus(w, h.id, eff, first, sid);
-      if (def.displace) displaceMonster(w, h.id, def.displace.dir, def.displace.px, x0, y0); // kéo / đẩy kẻ còn sống
+    const sk: StrikeCtx = { atk, crit: st.crit, mult, amp };
+    for (const h of hits) strikeMonster(w, sid, def, sk, h.id, h.n, h.scale, x0, y0);
+    if (def.shape === "bolt") {
+      // CT3: quy hoạch đường bay + hẹn giờ trúng từng quái / đối thủ; trúng đòn nào thì đi CÙNG `strikeMonster` / `opponentAftermath` với chiêu tức thời
+      fireBolts(w, sid, def, x0, y0, m.angle, {
+        strike: (id, fx, fy) => strikeMonster(w, sid, def, sk, id, 1, 1, fx, fy),
+        hitOpponent: (target, fx, fy) => {
+          if (duelHit(w, sid, target, mult)) opponentAftermath(w, sid, def, target, fx, fy);
+        },
+      });
     }
-    if (def.shape !== "dash" && w.duels.active) castAtOpponent(w, sid, def, x0, y0, m.angle, mult);
+    if (def.shape !== "dash" && def.shape !== "bolt" && w.duels.active)
+      castAtOpponent(w, sid, def, x0, y0, m.angle, mult);
   }
 
   // trạng thái CÓ LỢI của chiêu (hộ thể, tăng tốc, hồi phục) luôn lên chính mình; trạng thái có hại chỉ lên kẻ trúng đòn
@@ -418,6 +401,66 @@ export function cast(w: World, sid: string, raw: unknown) {
   if (def.ally) shareWithParty(w, sid, def, x0, y0); // đồng đội cùng đội trong tầm cũng được trạng thái CÓ LỢI
 
   sendSkills(w, sid); // hồi chiêu mới (client đếm lùi từ đây)
+}
+
+/** Số liệu chốt LÚC DÙNG chiêu để mọi lần trúng (tức thời hay đạn bay tới sau) tính cùng một công thức. */
+interface StrikeCtx {
+  /** Công cơ bản của người dùng lúc dùng */
+  atk: number;
+  /** Bạo kích cộng thêm từ trang bị (M7.4) */
+  crit: number;
+  /** `def.mult` x hệ số tầng x Cường Lực (một lần mỗi lần dùng chiêu) */
+  mult: number;
+  /** Hệ số phù `amp_<hệ>` cùng hệ với chiêu (một lần mỗi lần dùng chiêu, không mỗi mục tiêu) */
+  amp: number;
+}
+
+/**
+ * MỘT mục tiêu quái bị chiêu `def` đánh `n` lần (fan: số tia trúng; còn lại 1) với hệ số `scale` (sét lan giảm dần): sát thương + combo + hiệu ứng có hại + kéo / đẩy
+ * (từ điểm (fromX, fromY): chỗ người dùng, hoặc chỗ bắt đầu đoạn bay của đạn). Dùng chung cho chiêu tức thời và đạn bay (CT3); người dùng đã rời phòng thì bỏ qua.
+ */
+function strikeMonster(
+  w: World,
+  sid: string,
+  def: SkillDef,
+  sk: StrikeCtx,
+  id: string,
+  n: number,
+  scale: number,
+  fromX: number,
+  fromY: number,
+) {
+  const mon = w.state.monsters.get(id);
+  const mc = w.mctrl.get(id);
+  const p = w.state.players.get(sid);
+  if (!mon || !mc || !p) return;
+  const em =
+    elementMult(def.element, mc.def.element ?? "none") *
+    treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
+    sk.amp; // phù amp_<hệ> cùng hệ với chiêu (#514 lát 2); đòn lên người thách đấu (`castAtOpponent`) KHÔNG nhân
+  // COMBO (mục 51): mục tiêu ĐANG mang trạng thái `needs` thì sát thương nhân `mult` (kẹp [1, `comboMultMax`]); xét TRƯỚC khi đánh (đòn này gỡ dấu)
+  const cb = def.combo;
+  const comboOn = cb !== undefined && monsterHasStatus(w, id, cb.needs);
+  const cm = comboOn
+    ? Math.min(
+        SKILL_LIMITS.comboMultMax,
+        Math.max(1, Number.isFinite(cb.mult) ? (cb.mult as number) : COMBO_MULT_DEFAULT),
+      )
+    : 1;
+  let first = 0;
+  for (let k = 0; k < n && w.mctrl.has(id); k++) {
+    const { dmg, crit } = rollDamage(sk.atk, sk.mult * em * scale * cm, sk.crit); // bạo kích cộng thêm từ trang bị (M7.4)
+    if (k === 0) first = dmg;
+    dealMonsterDamage(w, id, mon, sid, dmg, crit, true, comboOn);
+  }
+  if (!w.mctrl.has(id)) return; // đã chết: không còn gắn trạng thái
+  if (comboOn && cb) {
+    if (cb.consume) takeMonsterStatus(w, id, cb.needs); // gỡ dấu / trạng thái đã dùng
+    if (cb.apply) applyMonsterStatus(w, id, cb.apply, first, sid); // gắn thêm (vd dấu hệ khác, choáng ngắn)
+  }
+  for (const eff of def.effects)
+    if (statusOf(eff.status)?.harmful) applyMonsterStatus(w, id, eff, first, sid);
+  if (def.displace) displaceMonster(w, id, def.displace.dir, def.displace.px, fromX, fromY); // kéo / đẩy kẻ còn sống
 }
 
 /**
@@ -480,8 +523,19 @@ function castAtOpponent(
   const n = opponentHits(def, x0, y0, angle, pt.x, pt.y);
   let landed = false;
   for (let k = 0; k < n; k++) landed = duelHit(w, sid, target, mult) || landed;
-  if (!landed) return;
+  if (landed) opponentAftermath(w, sid, def, target, x0, y0);
+}
+
+/** Sau khi chiêu TRÚNG đối thủ thách đấu (đã qua `duelHit`): chỉ Tê cóng gắn được lên người, rồi kéo / đẩy từ (fromX, fromY) (đối thủ không có miễn). */
+function opponentAftermath(
+  w: World,
+  sid: string,
+  def: SkillDef,
+  target: string,
+  fromX: number,
+  fromY: number,
+) {
   for (const eff of def.effects)
     if (statusOf(eff.status)?.kind === "slow") applyPlayerStatus(w, target, eff, 0, sid);
-  if (def.displace) displacePlayer(w, target, def.displace.dir, def.displace.px, x0, y0); // kéo / đẩy đối thủ (không có miễn)
+  if (def.displace) displacePlayer(w, target, def.displace.dir, def.displace.px, fromX, fromY);
 }

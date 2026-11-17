@@ -11,6 +11,7 @@ import { tickDuels } from "./duel";
 import { tickSect } from "./sect";
 import { tickStatuses } from "./status";
 import { tickBolts } from "./bolt";
+import { tickPBolts } from "./pbolt";
 import { tickTreasure } from "./treasure";
 import { tickNetGuard } from "./net-guard";
 import { tickAmbush, trackAmbushWalk } from "./ambush";
@@ -38,6 +39,7 @@ export function tickWorld(w: World, dtMs: number) {
   tickStatuses(w, dt); // trước quái: quái chết vì sát thương theo giây thì không còn bị cập nhật
   tickMonsters(w, dt);
   tickBolts(w, dt); // đạn của quái tầm xa (M7.3): sau quái (quái vừa bắn thì đạn bay ngay tick sau)
+  tickPBolts(w); // đạn của người chơi (CT3): sau quái (quái đã đi / chết trong tick này thì đạn tới nơi tính theo đó)
   tickLoot(w);
   tickParty(w);
   tickDungeons(w);

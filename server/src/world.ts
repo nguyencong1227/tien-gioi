@@ -56,6 +56,7 @@ import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
+import type { PBolt } from "./systems/pbolt";
 import type { BossCtrl } from "./systems/boss-state";
 import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
@@ -323,6 +324,8 @@ export class World {
   readonly duels = new Duels();
   /** Đạn của quái tầm xa đang bay (M7.3, `systems/bolt.ts`): KHÔNG là state, tối đa `MAX_BOLTS`; client chỉ nhận `fx` `bolt` lúc bắn. */
   readonly bolts: Bolt[] = [];
+  /** Đạn của NGƯỜI CHƠI đang bay (mục 51, CT3, `systems/pbolt.ts`): KHÔNG là state; tối đa `MAX_PLAYER_BOLTS` mỗi phòng, `MAX_PLAYER_BOLTS_PER_PLAYER` mỗi người; client chỉ nhận `fx` `pbolt` từng đoạn. */
+  readonly pbolts: PBolt[] = [];
   monsterSeq = 0;
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */
