@@ -339,12 +339,9 @@ async function oracleShopBuy(
     expect(afterBag).toBe(beforeBag);
   } else if (notEnoughContrib) {
     // Đủ cấp & trong hạn mức nhưng THIẾU CỐNG HIẾN: BẮT BUỘC bị từ chối với lý do "no_contrib" (BẮT M5!)
-    const checkBuy = await rig.svc.shopBuy(
-      { soulKey: keyOf(who), name: who },
-      itemId,
-      qty,
-      { known: false },
-    );
+    const checkBuy = await rig.svc.shopBuy({ soulKey: keyOf(who), name: who }, itemId, qty, {
+      known: false,
+    });
     expect(checkBuy.ok).toBe(false);
     expect((checkBuy as any).reason).toBe("no_contrib");
 
