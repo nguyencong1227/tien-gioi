@@ -658,6 +658,10 @@ async function main() {
         q.invalid === null && q.note.includes("Ví còn lại 2.988"),
         `gõ 12: hết lỗi, xem trước: "${q.note}"`,
       );
+      await evalJs(
+        `document.getElementById("sect-input-deposit").scrollIntoView({ block: "center" }); 1`,
+      );
+      await shot("o-so-luong");
       // nút bằng chạm / chuột thật
       const press = async (i) => {
         const c = await center("#sect-deposit-qty button", i);
@@ -760,7 +764,6 @@ async function main() {
       await key("Escape", "Escape", 27);
       await sleep(300);
       check(!(await sectOpen()), "Esc lần 2: đóng bảng Tông môn");
-      await shot("o-so-luong");
     }
   } finally {
     try {
