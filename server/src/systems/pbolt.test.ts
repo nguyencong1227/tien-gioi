@@ -193,6 +193,22 @@ describe("planBolt: đường bay thuần", () => {
     );
   });
 
+  it("trúng đúng CUỐI tầm thì KHÔNG nảy (không dựng đoạn quãng 0): đạn dừng ở chỗ trúng", () => {
+    const targets = [tg("a", 200, 0), tg("b", 200, 100)];
+    const hitAt = enterAt(200);
+    const none = plan({ bounce: 1, range: hitAt, targets }); // tầm vừa tới chỗ trúng: còn 0
+    expect(none.legs).toHaveLength(1);
+    expect(none.hits.map((h) => h.id)).toEqual(["a"]);
+    const sub = plan({ bounce: 1, range: hitAt + 0.5, targets }); // còn dưới 1 px: cũng không nảy
+    expect(sub.legs).toHaveLength(1);
+    const little = plan({ bounce: 1, range: hitAt + 20, targets }); // còn 20 px (>= 1): vẫn nảy (đoạn hai ngắn, chưa tới b)
+    expect(little.legs).toHaveLength(2);
+    expect(little.hits.map((h) => h.id)).toEqual(["a"]);
+    const ok = plan({ bounce: 1, range: hitAt + 400, targets }); // còn dư: nảy bình thường
+    expect(ok.legs).toHaveLength(2);
+    expect(ok.hits.map((h) => h.id)).toEqual(["a", "b"]);
+  });
+
   it("ô chặn cũng cắt đoạn SAU khi nảy", () => {
     // a trên trục, b cách a 100 px phía +y; tường ở y >= 60: đoạn nảy dừng trước tường, b (y = 100) không trúng
     const p = plan({
