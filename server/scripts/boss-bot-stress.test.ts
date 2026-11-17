@@ -253,8 +253,13 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm (M42 T7, Issu
     expect(bot.warns).toHaveLength(1);
     expect(bot.warns[0].targeted).toBe(true);
 
-    const expiresAt = bot.warns[0].expiresAt;
-    const t0 = expiresAt - warnDurationMs;
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    // Mốc thời gian lấy từ warnAt (khi nhận cảnh báo) thay vì `expiresAt - warnDurationMs`: ms == warnDurationMs
+    // nên bằng nhau về toán, NHƯNG phép trừ hai số lớn (performance.now() ~ triệu ms) mất chữ số hạng thấp
+    // floating-point — cùng dạng flake #1115 (ca 5). Dùng warnAt trực tiếp loại bỏ sự trừ khử, nhất quán ca 2/5/6/7.
+    // (Ca này KHÔNG flake hiện nay, đổi để đồng bộ và ngừa rủi ro tương tự.)
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
     const speed = 150;
 
     // 18 tick (900 ms) di chuyển né
@@ -298,8 +303,13 @@ describe("Kịch bản thử tải Bot né vùng cảnh báo trùm (M42 T7, Issu
     expect(bot.warns).toHaveLength(1);
     expect(bot.warns[0].targeted).toBe(true);
 
-    const expiresAt = bot.warns[0].expiresAt;
-    const t0 = expiresAt - warnDurationMs;
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    // Mốc thời gian lấy từ warnAt (khi nhận cảnh báo) thay vì `expiresAt - warnDurationMs`: ms == warnDurationMs
+    // nên bằng nhau về toán, NHƯNG phép trừ hai số lớn (performance.now() ~ triệu ms) mất chữ số hạng thấp
+    // floating-point — cùng dạng flake #1115 (ca 5). Dùng warnAt trực tiếp loại bỏ sự trừ khử, nhất quán ca 2/5/6/7.
+    // (Ca này KHÔNG flake hiện nay, đổi để đồng bộ và ngừa rủi ro tương tự.)
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
     const speed = 150;
 
     // 14 tick (700 ms) di chuyển né vuông góc ra khỏi vệt lao
