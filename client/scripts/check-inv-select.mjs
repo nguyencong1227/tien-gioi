@@ -677,6 +677,7 @@ async function main() {
           await evalJs(
             `document.getElementById("inv-drop-qty-input").value = ""; document.getElementById("inv-drop-qty-input").dispatchEvent(new Event("input", { bubbles: true })); 1`,
           );
+        await evalJs(`document.getElementById("inv-drop-no").focus(); 1`); // focus rời ô: để thấy focus được ĐƯA VỀ ô (không phải còn nguyên từ lúc gõ)
         const yesBtn = await center("#inv-drop-yes");
         await tap(yesBtn.x, yesBtn.y);
         await sleep(200);
