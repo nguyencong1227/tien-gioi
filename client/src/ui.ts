@@ -3145,7 +3145,7 @@ function buildSkillElementOptions(rows: readonly SkillRow[]) {
     o.textContent = label;
     sel.append(o);
   };
-  add("all", `Mọi hệ (${rows.length})`);
+  add("all", "Mọi hệ");
   for (const [id, n] of counts) add(id, `${names.get(id) ?? id} (${n})`);
   syncSkillFilterControls();
 }
@@ -3158,10 +3158,13 @@ function renderSkillsList() {
   const bar = all.length >= SKILL_FILTER_MIN;
   const shown = bar ? sortSkills(filterSkills(all, skillFilter), skillSort) : all;
   const active = bar && skillFilterActive(skillFilter);
-  const sum = $("skills-filter-sum");
-  if (sum) sum.textContent = skillFilterSummary(shown.length, all.length, active);
-  const sumBar = $("skills-filter-sum")?.parentElement;
-  if (sumBar) sumBar.hidden = !active;
+  // số chiêu ở dòng phụ của tiêu đề (aria-live): "Hiện 5 / 60 chiêu" khi đang lọc, không thì "60 chiêu đã học"
+  const countEl = $("skills-count");
+  if (countEl) {
+    countEl.textContent = active
+      ? skillFilterSummary(shown.length, all.length, true)
+      : skillsModel.count;
+  }
   const clear = $("skills-filter-clear");
   if (clear) clear.hidden = !active;
   const nomatch = $("skills-nomatch");
@@ -3219,12 +3222,16 @@ function bindSkillFilter() {
     apply({ q: (e.target as HTMLInputElement).value }),
   );
   $("skills-q")?.addEventListener("keydown", (e) => {
-    // Esc trong ô tìm: có chữ thì xoá chữ (không đóng bảng); hết chữ rồi mới để Esc đóng bảng như thường
-    if (e.key === "Escape" && skillFilter.q !== "") {
+    // Esc trong ô tìm: có chữ thì xoá chữ (không đóng bảng); hết chữ rồi thì bỏ focus khỏi ô để Esc đóng bảng như thường
+    // (bộ xử lý Esc chung KHÔNG đóng bảng khi đang gõ trong ô nhập, nên ô rỗng mà không rời ô thì Esc vô tác dụng)
+    if (e.key !== "Escape") return;
+    if (skillFilter.q !== "") {
       e.preventDefault();
       e.stopPropagation();
       (e.target as HTMLInputElement).value = "";
       apply({ q: "" });
+    } else {
+      (e.target as HTMLInputElement).blur();
     }
   });
   $("skills-el")?.addEventListener("change", (e) =>

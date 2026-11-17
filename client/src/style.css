@@ -2080,20 +2080,14 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
 }
 .sk-filter-more {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 6px;
-}
-.sk-filter-more label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--fs-12);
-  opacity: 0.95;
 }
 .sk-filter-more select {
   width: 100%;
   min-height: 44px;
-  padding: 6px 10px;
+  padding: 6px 4px 6px 8px;
+  font-size: var(--fs-13);
   border-radius: 6px;
   border: 1px solid var(--gold);
   background: #1d1a16;
@@ -2102,11 +2096,12 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   color-scheme: dark;
 }
 .sk-filter-more .sk-filter-check {
-  flex-direction: row;
+  display: flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
   grid-column: 1 / -1;
+  font-size: var(--fs-13);
   cursor: pointer;
 }
 .sk-filter-check input {
@@ -2114,17 +2109,6 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   height: 22px;
   accent-color: var(--gold);
   flex: none;
-}
-.sk-filter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 20px;
-}
-.sk-filter-bar small {
-  font-size: var(--fs-12);
-  opacity: 0.85;
 }
 /* Màn thấp (điện thoại nằm ngang): danh sách chỉ còn ~150 px nên bỏ dòng gợi ý khi đã có thanh lọc, để nút gắn ô của chiêu vừa mở vẫn nằm trong vùng nhìn */
 @media (max-height: 520px) {
