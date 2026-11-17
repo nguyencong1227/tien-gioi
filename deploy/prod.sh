@@ -164,7 +164,8 @@ cmd_up() {
 
   echo "==> Triển khai phiên bản $tag hoàn tất!"
   echo "    Kiểm tra trạng thái: $0 status"
-  echo "    Kiểm tra kiểm thử khói: $0 smoke"
+  echo "    Kiểm tra sau triển khai (chỉ đọc, không ngắt người chơi): $0 check"
+  echo "    (Lưu ý: '$0 smoke' có bước dừng/bật lại container game làm gián đoạn vài giây, chỉ chạy khi vắng người chơi)"
 }
 
 # ------------------------------------------------------------------------------
@@ -472,6 +473,191 @@ cmd_xoa_tai_khoan() {
 }
 
 # ------------------------------------------------------------------------------
+# Hàm thuần phân tích nhật ký 3 phút gần nhất cho lệnh check (Issue #1001)
+# Nhận nội dung log qua tham số $1.
+# Mã trả về: 0 = sạch (ĐẠT), 2 = có [CẢNH BÁO] (CÓ CẢNH BÁO), 1 = có lỗi (THẤT BẠI)
+# ------------------------------------------------------------------------------
+analyze_check_logs() {
+  local raw_logs="${1:-}"
+  # Bỏ tiền tố tên container của docker compose (vd: "tien-gioi  | ") nếu có
+  local clean_logs
+  clean_logs="$(printf '%s\n' "$raw_logs" | sed -E 's/^[a-zA-Z0-9_.-]+[[:space:]]+\|[[:space:]]+//')"
+
+  # 1. In các dòng cờ cấu hình quan trọng nếu có (TEST_EXP_MULT, BOSS_MOVES, [CẢNH BÁO])
+  local flag_lines
+  flag_lines="$(printf '%s\n' "$clean_logs" | grep -E 'TEST_EXP_MULT|BOSS_MOVES|\[CẢNH BÁO\]' || true)"
+  if [[ -n "$flag_lines" ]]; then
+    echo "     Các dòng cờ cấu hình / cảnh báo ghi nhận trong log:"
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      echo "       + $line"
+    done <<< "$flag_lines"
+  else
+    echo "     Không có dòng cờ TEST_EXP_MULT / BOSS_MOVES hay [CẢNH BÁO] mới trong 3 phút qua"
+  fi
+
+  # 2. Đếm dòng cảnh báo [CẢNH BÁO]
+  local warn_count=0
+  local warn_lines
+  warn_lines="$(printf '%s\n' "$clean_logs" | grep -F '[CẢNH BÁO]' || true)"
+  if [[ -n "$warn_lines" ]]; then
+    warn_count="$(printf '%s\n' "$warn_lines" | wc -l | tr -d '[:space:]')"
+  fi
+
+  # 3. Đếm dòng lỗi (error / lỗi / exception / unhandled), không tính dòng [CẢNH BÁO]
+  local err_lines
+  err_lines="$(printf '%s\n' "$clean_logs" | grep -vF '[CẢNH BÁO]' | grep -iE '\berror\b|exception|unhandled|lỗi' || true)"
+  local err_count=0
+  if [[ -n "$err_lines" ]]; then
+    err_count="$(printf '%s\n' "$err_lines" | wc -l | tr -d '[:space:]')"
+  fi
+
+  echo "     Thống kê log (3 phút gần nhất): $err_count dòng lỗi, $warn_count dòng [CẢNH BÁO]"
+
+  if [[ "$err_count" -gt 0 ]]; then
+    echo "     [THẤT BẠI] Phát hiện $err_count dòng lỗi trong log:" >&2
+    printf '%s\n' "$err_lines" | head -n 5 | while IFS= read -r eline; do
+      echo "       ! $eline" >&2
+    done
+    return 1
+  fi
+
+  if [[ "$warn_count" -gt 0 ]]; then
+    echo "     [CẢNH BÁO] Có $warn_count dòng [CẢNH BÁO] trong log 3 phút gần nhất"
+    return 2
+  fi
+
+  echo "     [ĐẠT] Nhật ký 3 phút gần nhất sạch (0 lỗi, 0 cảnh báo)"
+  return 0
+}
+
+# ------------------------------------------------------------------------------
+# Lệnh check: kiểm tra sau triển khai CHỈ ĐỌC (Issue #1001)
+# Mã thoát: 0 = ĐẠT, 2 = CÓ CẢNH BÁO, 1 = THẤT BẠI
+# ------------------------------------------------------------------------------
+cmd_check() {
+  echo "==> Kiểm tra sau triển khai (CHỈ ĐỌC, không làm gián đoạn người chơi)..."
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[LỖI] Cần tiện ích 'curl' để thực hiện kiểm tra." >&2
+    exit 1
+  fi
+
+  local has_fail=0
+  local has_warn=0
+
+  # (a) docker ps: kiểm tra trạng thái & health của db và game
+  echo "  1. [a] Kiểm tra trạng thái container ($DB_CONTAINER, $GAME_CONTAINER)..."
+  local ps_out c c_status
+  ps_out="$(docker_cmd ps --format '{{.Names}}|{{.Status}}' 2>/dev/null || true)"
+  for c in "$DB_CONTAINER" "$GAME_CONTAINER"; do
+    c_status="$(printf '%s\n' "$ps_out" | awk -F'|' -v name="$c" '$1 == name {print $2; exit}')"
+    if [[ -z "$c_status" || ! "$c_status" =~ ^Up ]]; then
+      echo "     [THẤT BẠI] Container $c không ở trạng thái Up (${c_status:-không tìm thấy})" >&2
+      has_fail=1
+    elif [[ "$c_status" == *"(unhealthy)"* ]]; then
+      echo "     [THẤT BẠI] Container $c đang unhealthy: $c_status" >&2
+      has_fail=1
+    elif [[ "$c_status" == *"(health: starting)"* ]]; then
+      echo "     [CẢNH BÁO] Container $c đang khởi động healthcheck: $c_status"
+      has_warn=1
+    else
+      echo "     [ĐẠT] Container $c: $c_status"
+    fi
+  done
+
+  # (b) /health: ok, authMode, protocol, minProtocol (đối chiếu shared/src/protocol.ts nếu có)
+  echo "  2. [b] Kiểm tra endpoint http://127.0.0.1:2567/health..."
+  local health_out
+  health_out="$(curl -sS --max-time 5 http://127.0.0.1:2567/health 2>/dev/null || true)"
+  if [[ -z "$health_out" ]]; then
+    echo "     [THẤT BẠI] Không thể kết nối tới http://127.0.0.1:2567/health" >&2
+    has_fail=1
+  elif ! echo "$health_out" | grep -q '"ok":true' || ! echo "$health_out" | grep -q '"authMode":"account"'; then
+    echo "     [THẤT BẠI] Phản hồi /health không đạt yêu cầu: $health_out" >&2
+    has_fail=1
+  else
+    local proto min_proto proto_file expected_proto="" expected_min=""
+    proto="$(echo "$health_out" | grep -oE '"protocol":[0-9]+' | cut -d: -f2 || true)"
+    min_proto="$(echo "$health_out" | grep -oE '"minProtocol":[0-9]+' | cut -d: -f2 || true)"
+    proto_file="$SCRIPT_DIR/../shared/src/protocol.ts"
+    if [[ -f "$proto_file" ]]; then
+      expected_proto="$(grep -E '^export const PROTOCOL_VERSION\s*=' "$proto_file" | grep -oE '[0-9]+' || true)"
+      expected_min="$(grep -E '^export const MIN_PROTOCOL_VERSION\s*=' "$proto_file" | grep -oE '[0-9]+' || true)"
+    fi
+    if [[ -f "$ENV_FILE" ]]; then
+      local env_min
+      env_min="$(grep -E '^MIN_PROTOCOL_VERSION=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '[:space:]' | tr -d '"' || true)"
+      if [[ -n "$env_min" ]]; then
+        expected_min="$env_min"
+      fi
+    fi
+    if [[ -n "$expected_proto" && -n "$proto" && "$proto" != "$expected_proto" ]]; then
+      echo "     [THẤT BẠI] /health protocol=$proto lệch với shared/src/protocol.ts ($expected_proto)" >&2
+      has_fail=1
+    elif [[ -n "$expected_min" && -n "$min_proto" && "$min_proto" != "$expected_min" ]]; then
+      echo "     [CẢNH BÁO] /health minProtocol=$min_proto khác cấu hình kỳ vọng ($expected_min)"
+      has_warn=1
+    else
+      echo "     [ĐẠT] /health ok:true, authMode:account, protocol:${proto:-?}, minProtocol:${min_proto:-?}${expected_proto:+ (khớp cấu hình)}"
+    fi
+  fi
+
+  # (c) /metrics: ẩn danh phải 401, kèm METRICS_TOKEN phải 200 (KHÔNG in token)
+  echo "  3. [c] Kiểm tra xác thực endpoint /metrics..."
+  if [[ ! -f "$ENV_FILE" ]]; then
+    echo "     [CẢNH BÁO] Không tìm thấy $ENV_FILE để kiểm tra METRICS_TOKEN"
+    has_warn=1
+  else
+    local token
+    token="$(grep "^METRICS_TOKEN=" "$ENV_FILE" | cut -d'=' -f2- | tr -d '[:space:]' || true)"
+    if [[ -z "$token" ]]; then
+      echo "     [CẢNH BÁO] Chưa cấu hình METRICS_TOKEN trong $ENV_FILE"
+      has_warn=1
+    else
+      local anon_code auth_code
+      anon_code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:2567/metrics || true)"
+      if [[ "$anon_code" == "401" ]]; then
+        echo "     [ĐẠT] Truy cập ẩn danh /metrics bị từ chối với HTTP 401 Unauthorized"
+      else
+        echo "     [THẤT BẠI] Truy cập ẩn danh /metrics trả mã HTTP $anon_code (kỳ vọng 401)" >&2
+        has_fail=1
+      fi
+
+      auth_code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 -H "Authorization: Bearer $token" http://127.0.0.1:2567/metrics || true)"
+      if [[ "$auth_code" == "200" ]]; then
+        echo "     [ĐẠT] Truy cập kèm METRICS_TOKEN thành công với HTTP 200 OK"
+      else
+        echo "     [THẤT BẠI] Truy cập kèm METRICS_TOKEN trả mã HTTP $auth_code (kỳ vọng 200)" >&2
+        has_fail=1
+      fi
+    fi
+  fi
+
+  # (d) Đọc log --since 3m: in cờ cấu hình quan trọng (TEST_EXP_MULT, BOSS_MOVES, [CẢNH BÁO]) và đếm dòng lỗi
+  echo "  4. [d] Phân tích nhật ký container game (--since 3m)..."
+  local recent_logs log_rc=0
+  recent_logs="$(docker_cmd logs --since 3m "$GAME_CONTAINER" 2>&1 || true)"
+  analyze_check_logs "$recent_logs" || log_rc=$?
+  if [[ "$log_rc" -eq 1 ]]; then
+    has_fail=1
+  elif [[ "$log_rc" -eq 2 ]]; then
+    has_warn=1
+  fi
+
+  # (e) Kết luận ĐẠT / CÓ CẢNH BÁO / THẤT BẠI bằng mã thoát
+  if [[ "$has_fail" -ne 0 ]]; then
+    echo "==> [e] Kết luận: THẤT BẠI (mã thoát 1)" >&2
+    exit 1
+  elif [[ "$has_warn" -ne 0 ]]; then
+    echo "==> [e] Kết luận: CÓ CẢNH BÁO (mã thoát 2)"
+    exit 2
+  else
+    echo "==> [e] Kết luận: ĐẠT (mã thoát 0)"
+    exit 0
+  fi
+}
+
+# ------------------------------------------------------------------------------
 # Điều phối lệnh chính
 # ------------------------------------------------------------------------------
 usage() {
@@ -487,29 +673,33 @@ Các lệnh:
   backup            Sao lưu cơ sở dữ liệu PostgreSQL vào $PROD_DIR/backups/
   restore <tệp>     Khôi phục cơ sở dữ liệu từ tệp sao lưu (.sql.gz)
   rollback          Quay lại phiên bản trước đó (được ghi trong .last-tag)
-  smoke             Kiểm tra sức khoẻ server chạy thật (health, metrics, tắt êm < 25s)
+  check             Kiểm tra sau triển khai CHỈ ĐỌC (container, /health, /metrics, log 3 phút; không ngắt người chơi)
+  smoke             Kiểm tra sức khoẻ server chạy thật (health, metrics, tắt êm < 25s; làm gián đoạn vài giây)
   xoa-tai-khoan <tên> [--yes] Xoá tài khoản người chơi (tự sao lưu + tắt game khi có --yes)
 EOF
 }
 
-action="${1:-}"
-shift || true
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  action="${1:-}"
+  shift || true
 
-case "$action" in
-  init)     cmd_init "$@" ;;
-  up)       cmd_up "$@" ;;
-  stop)     cmd_stop "$@" ;;
-  status)   cmd_status "$@" ;;
-  logs)     cmd_logs "$@" ;;
-  backup)   cmd_backup "$@" ;;
-  restore)  cmd_restore "$@" ;;
-  rollback) cmd_rollback "$@" ;;
-  smoke)    cmd_smoke "$@" ;;
-  xoa-tai-khoan) cmd_xoa_tai_khoan "$@" ;;
-  -h|--help|help|"") usage ;;
-  *)
-    echo "[LỖI] Lệnh không hợp lệ: $action" >&2
-    usage
-    exit 1
-    ;;
-esac
+  case "$action" in
+    init)     cmd_init "$@" ;;
+    up)       cmd_up "$@" ;;
+    stop)     cmd_stop "$@" ;;
+    status)   cmd_status "$@" ;;
+    logs)     cmd_logs "$@" ;;
+    backup)   cmd_backup "$@" ;;
+    restore)  cmd_restore "$@" ;;
+    rollback) cmd_rollback "$@" ;;
+    check)    cmd_check "$@" ;;
+    smoke)    cmd_smoke "$@" ;;
+    xoa-tai-khoan) cmd_xoa_tai_khoan "$@" ;;
+    -h|--help|help|"") usage ;;
+    *)
+      echo "[LỖI] Lệnh không hợp lệ: $action" >&2
+      usage
+      exit 1
+      ;;
+  esac
+fi
