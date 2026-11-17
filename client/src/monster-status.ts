@@ -2,9 +2,16 @@
 // buff không lên quái, #559), client đọc bằng `statusesOfMask` rồi vẽ một hàng chấm nhỏ phía trên thanh máu. Mỗi trạng thái có MÀU và HÌNH riêng (tam giác, chấm tròn, thoi, ô vuông,
 // chữ thập, ngôi sao bốn cánh) để người khó phân biệt màu vẫn đọc được. Lớp THUẦN: hình học + màu; `drawPips` vẽ qua giao diện Graphics tối thiểu nên test được không cần Phaser.
 // Client không tin tin nhắn: `fx` lạ (không phải số nguyên, bit lạ) thì bỏ phần lạ (`statusesOfMask`), không vẽ gì.
-import { statusesOfMask, statusOf, type StatusId } from "@tien-gioi/shared";
+import {
+  markElementOf,
+  markStatusIdOf,
+  statusesOfMask,
+  statusOf,
+  type StatusId,
+} from "@tien-gioi/shared";
+import { elementColor } from "./skill-bar";
 
-export type PipShape = "triangle" | "circle" | "diamond" | "square" | "cross" | "star";
+export type PipShape = "triangle" | "circle" | "diamond" | "square" | "cross" | "star" | "ring";
 
 export interface PipSpec {
   id: StatusId;
@@ -26,14 +33,27 @@ export const PIP_STYLE: Readonly<Partial<Record<StatusId, { shape: PipShape; col
   weaken: { shape: "square", color: 0xb59cff },
 };
 
-/** Các chấm cho một mặt nạ `fx`, theo thứ tự bit tăng dần (ổn định: chấm không nhảy chỗ khi một cái hết hạn). */
-export function pipsOf(mask: unknown): PipSpec[] {
+/**
+ * Các chấm cho một mặt nạ `fx`, theo thứ tự bit tăng dần (ổn định: chấm không nhảy chỗ khi một cái hết hạn), rồi (nếu có) chấm DẤU HỆ cuối hàng: `Monster.mark` (mục 51, CT2) là
+ * chỉ số 1-9 của hệ (`markElementOf`), 0 / lạ = không dấu. Dấu vẽ HÌNH VÒNG RỖNG màu theo hệ (khác mọi hình của trạng thái có hại, để người khó phân biệt màu vẫn đọc được).
+ */
+export function pipsOf(mask: unknown, mark?: unknown): PipSpec[] {
   const out: PipSpec[] = [];
   for (const id of statusesOfMask(mask)) {
     const st = PIP_STYLE[id];
     const def = statusOf(id);
     if (st && def) out.push({ id, name: def.name, shape: st.shape, color: st.color });
   }
+  const el = markElementOf(mark);
+  const id = el === undefined ? undefined : markStatusIdOf(el);
+  const def = id === undefined ? undefined : statusOf(id);
+  if (el !== undefined && id !== undefined && def)
+    out.push({
+      id,
+      name: def.name,
+      shape: "ring",
+      color: Number.parseInt(elementColor(el).slice(1), 16),
+    });
   return out;
 }
 
@@ -125,6 +145,7 @@ export function pipPolygon(shape: PipShape, cx: number, cy: number, r: number): 
       return pts;
     }
     case "circle":
+    case "ring":
       return [];
   }
 }
@@ -151,7 +172,12 @@ export function drawPips(g: PipGraphics, pips: readonly PipSpec[], y: number): n
     g.fillCircle(x, y, PIP_R + 2);
     g.fillStyle(p.color, 1);
     if (p.shape === "circle") g.fillCircle(x, y, PIP_R * 0.85);
-    else g.fillPoints(pipPolygon(p.shape, x, y, PIP_R), true);
+    else if (p.shape === "ring") {
+      // vòng rỗng: đĩa màu hệ rồi đĩa tối nhỏ hơn ở giữa
+      g.fillCircle(x, y, PIP_R);
+      g.fillStyle(0x000000, 0.9);
+      g.fillCircle(x, y, PIP_R * 0.45);
+    } else g.fillPoints(pipPolygon(p.shape, x, y, PIP_R), true);
   }
   return xs.length;
 }
