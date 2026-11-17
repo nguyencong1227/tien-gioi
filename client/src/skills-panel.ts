@@ -21,6 +21,7 @@ import {
 } from "@tien-gioi/shared";
 import { BAR_SLOTS, needText, unlockText, type SkillTracker, type SlotMe } from "./skill-bar";
 import { pipsText } from "./skill-bar-dom";
+import { masteryView, type MasteryView } from "./skill-mastery";
 import { gradeName, skillGradeOf, skillStyleOf, styleName } from "./skill-meta";
 
 /** Số thập phân kiểu Việt ("1,84"), tối đa `digits` chữ số, bỏ số 0 thừa ("2" chứ không "2,00"). */
@@ -128,6 +129,8 @@ export interface SkillRow {
   maxLevel: number;
   /** Chấm tầng "●●○" (số chấm = `maxLevel`) */
   pips: string;
+  /** Thanh / dòng luyện chiêu (`skill-mastery.ts`); `null` khi máy chủ chưa gửi điểm luyện */
+  mastery: MasteryView | null;
   element: string;
   /** id hệ ("hoa"...), để lọc theo hệ; `element` là tên hiển thị */
   elementId: string;
@@ -318,6 +321,7 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       level,
       maxLevel,
       pips: pipsText(level, maxLevel),
+      mastery: masteryView(def, level, skills.masteryOf(def.id), maxLevel, skills.masteryKnown),
       element,
       elementId: def.element,
       grade,

@@ -277,6 +277,7 @@ import {
   type SkillRow,
   type SkillsPanelModel,
 } from "./skills-panel";
+import type { MasteryView } from "./skill-mastery";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
@@ -3247,6 +3248,35 @@ function setSkillsOpen(list: HTMLElement, id: string | null, scroll: boolean) {
  * Một chiêu = MỘT hàng gọn (biểu tượng + tên + hệ + ô đang giữ, cao >= 44 px); bấm / Enter mở chi tiết ngay dưới hàng: hàng nút gắn ô / gỡ TRƯỚC (điện thoại ngang
  * chỉ còn ~180 px cho danh sách: nút phải thấy ngay, không phải cuộn qua số liệu), rồi số thật, hiệu ứng, mô tả, kinh quyển. Mũi tên + Enter đi theo hình học (`panel-nav.ts`), Delete trên bất kỳ nút nào của chiêu gỡ chiêu khỏi ô đang giữ.
  */
+/**
+ * Đoạn luyện chiêu của một hàng: dòng chữ + (khi còn luyện được) thanh tiến độ `role=progressbar`. Chữ trên màn hình ẩn với trình đọc màn hình (nhãn của thanh đã đọc
+ * đủ điểm / điểm cần), tránh đọc hai lần; dòng chữ không có thanh (tầng cuối / tối đa) thì để nguyên cho trình đọc.
+ */
+function masteryEl(m: MasteryView): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "sk-mastery";
+  const text = document.createElement("small");
+  text.className = "sk-mastery-text";
+  text.textContent = m.text;
+  box.append(text);
+  if (m.kind === "bar") {
+    text.setAttribute("aria-hidden", "true");
+    const bar = document.createElement("div");
+    bar.className = "sk-mastery-bar";
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", String(m.need));
+    bar.setAttribute("aria-valuenow", String(m.points));
+    bar.setAttribute("aria-label", m.aria);
+    const fill = document.createElement("div");
+    fill.className = "sk-mastery-fill";
+    fill.style.width = `${m.percent}%`;
+    bar.append(fill);
+    box.append(bar);
+  }
+  return box;
+}
+
 function skillRowEl(row: SkillRow): HTMLElement {
   const el = document.createElement("div");
   el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}`;
@@ -3318,6 +3348,7 @@ function skillRowEl(row: SkillRow): HTMLElement {
   pips.setAttribute("aria-label", `Tầng ${row.level} trên ${row.maxLevel}`);
   kind.append(pips);
   detail.append(kind);
+  if (row.mastery !== null) detail.append(masteryEl(row.mastery));
 
   const actions = document.createElement("div");
   actions.className = "sk-row-actions";
