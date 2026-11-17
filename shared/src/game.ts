@@ -550,6 +550,12 @@ export interface ChatOut {
    * kể cả thành viên ở bản đồ khác; bỏ trống là chat chung **cả server** (mọi bản đồ / phòng, đi qua kênh chung giữa các phòng, M3 bước 1)
    */
   channel?: "party" | "sect";
+  /**
+   * Danh hiệu của người nói (M9, `docs/PHAN_CONG_M9.md`): ID NGẮN (`TITLE_ID_RE`, cùng `Player.title`), client tra `TITLES` ra chữ; thiếu / rỗng = không đeo danh hiệu.
+   * Máy chủ điền từ `Player.title` LÚC GỬI (không bao giờ tin client). Tin hệ thống (`sys`) và chat không có người nói thì bỏ trống. Client KHÔNG hiện id lạ ra màn hình
+   * (máy chủ mới hơn client). Chỉ hiện khi cờ `?social=1` bật (đến khi M9 phát hành).
+   */
+  titleId?: string;
 }
 export interface ToastMsg {
   text: string;
