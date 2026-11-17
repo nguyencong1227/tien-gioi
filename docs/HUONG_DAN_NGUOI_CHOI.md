@@ -148,6 +148,7 @@ Dùng **đan hộ đạo** trước khi đột phá sẽ cộng thêm phần tr�
 
 - Túi đồ có **24 ô**.
 - Đi gần đồ rơi trong bán kính nhỏ thì **F** để nhặt; đồ rơi tự biến sau **90 giây**, nên nhặt nhanh.
+- **Vứt đồ:** chọn ô rồi bấm **Vứt 1** hoặc **Vứt hết**; luôn có hộp xác nhận ghi rõ tên món và số lượng, và nút được chọn sẵn là **Giữ lại** (lỡ bấm Enter cũng không vứt). Khi ô có từ **2 cái** trở lên, hộp có **ô nhập số lượng** để vứt đúng số bạn muốn (gõ số, **− / +**, **×10 / ×100**, **Tối đa**); số trống hoặc sai thì **không vứt** và hộp vẫn mở. Từ **Bảo phẩm** trở lên hộp có thêm dòng nhắc "Đồ quý". Đồ vứt rơi xuống chân bạn, **ai cũng nhặt được ngay** và tự biến sau 90 giây như đồ rơi khác.
 
 ### Trang bị (6 ô)
 
@@ -310,7 +311,7 @@ Chi tiết thiết kế: [docs/THIET_KE_PK.md](THIET_KE_PK.md).
   - **Cửa hàng tông môn** (28 món, hai gian): **Bảo khố** (đan, nguyên liệu, đồ) và **Tàng Kinh Các** (kinh quyển chiêu thức). Mua bằng cống hiến; món mở dần theo cấp tông (nhóm "Mở ở cấp tông N" gập lại ở những cấp bạn chưa tới); mỗi món có **hạn mức mua mỗi ngày**; kinh quyển đã học thì khoá. Cống hiến mua hàng bị trừ nhưng **không làm tông hạ cấp**.
   - Ảnh chụp bảng luôn là số của máy chủ; thấy lệch thì mở lại bảng.
 - **Cấp tông** có 5 bậc theo điểm tông: **Sơ Lập** (0), **Tiểu Thành** (1.000), **Trung Hưng** (4.000), **Hưng Vượng** (12.000), **Đỉnh Thịnh** (30.000); lên cấp thì thêm chỗ thành viên, thêm ô kho và mở thêm hàng ở cửa hàng. **Buff cho mọi thành viên đang trực tuyến**: tu vi +2% / +3% / +4% / +5% (cấp 2-5), cơ hội rơi đồ +3% / +5% / +5% (cấp 3-5), hồi phục ngoài đả tọa +10% / +15% (cấp 4-5). Tông 3 người làm đủ trần mỗi ngày lên cấp 5 trong khoảng 10 tuần; làm chỉ nhiệm vụ thì khoảng 16 tuần.
-- **Gõ số lượng trực tiếp:** khi góp / rút đồ ở kho tông, góp / rút Linh thạch ở quỹ và đổi nhiều món ở cửa hàng tông (nút **Nhiều…** cạnh **Đổi**), bạn có một **ô nhập số** (điện thoại hiện bàn phím số) cùng nút **− / +**, **×10 / ×100** (nhân số đang có), **Tối đa** và giữ nút để tăng nhanh dần. Gõ quá giới hạn thì ô tự kẹp về mức tối đa và báo rõ; chỉ nhận số nguyên dương viết liền hoặc có dấu nghìn đúng kiểu (`1.000`), gõ `2.5` là sai chứ không bị đoán thành số khác. **Enter** xác nhận, **Esc** huỷ; đang gõ trong ô thì phím không điều khiển nhân vật.
+- **Gõ số lượng trực tiếp:** khi góp / rút đồ ở kho tông, góp / rút Linh thạch ở quỹ, đổi nhiều món ở cửa hàng tông (nút **Nhiều…** cạnh **Đổi**) và vứt đồ ở túi (ô có từ 2 cái), bạn có một **ô nhập số** (điện thoại hiện bàn phím số) cùng nút **− / +**, **×10 / ×100** (nhân số đang có), **Tối đa** và giữ nút để tăng nhanh dần. Gõ quá giới hạn thì ô tự kẹp về mức tối đa và báo rõ; chỉ nhận số nguyên dương viết liền hoặc có dấu nghìn đúng kiểu (`1.000`), gõ `2.5` là sai chứ không bị đoán thành số khác. **Enter** xác nhận, **Esc** huỷ; đang gõ trong ô thì phím không điều khiển nhân vật.
 - **Rời tông thì MẤT cống hiến** của bạn (hộp xác nhận hiện đúng số sẽ mất). Cống hiến gắn với **linh hồn**: qua đầu thai vẫn còn, nhưng nhảy sang tông khác để lấy lại trần ngày là không được.
 
 > **Mẹo:** Tham gia tông môn mang lại buff vĩnh viễn cho mọi hoạt động cày cuốc. Góp đồ vào kho chung để cả tông mạnh lên — đó cũng là cách tích cống hiến của riêng bạn.
