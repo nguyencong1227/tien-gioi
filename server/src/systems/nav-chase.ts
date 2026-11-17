@@ -194,7 +194,7 @@ export function navSteer(
   // Đường thẳng thông thì đi thẳng như cũ (kiểm theo chu kỳ)
   if (w.now - nav.losAt >= LOS_MS) {
     nav.losAt = w.now;
-    nav.los = lineClear(map, m.x, m.y, tx, ty, r);
+    nav.los = lineClear(map, m.x, m.y, tx, ty, r, mc.def.radius + 8);
   }
   if (nav.los) {
     nav.pts = null;
@@ -241,7 +241,7 @@ export function navSteer(
   )
     nav.i++;
   for (let j = Math.min(n - 1, nav.i + 3); j > nav.i; j--) {
-    if (lineClear(map, m.x, m.y, pts[2 * j], pts[2 * j + 1], r)) {
+    if (lineClear(map, m.x, m.y, pts[2 * j], pts[2 * j + 1], r, mc.def.radius + 8)) {
       nav.i = j;
       break;
     }

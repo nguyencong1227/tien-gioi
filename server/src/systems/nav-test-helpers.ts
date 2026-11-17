@@ -3,14 +3,18 @@ import { GameMap, T } from "@tien-gioi/shared";
 
 let seq = 0;
 /** Bản đồ phẳng w x h ô, viền đá, trấn nhỏ ở góc (không ảnh hưởng tìm đường). Mỗi lần gọi một bản đồ mới (không dính bộ nhớ đệm). */
-export function flatMap(w = 40, h = 30): GameMap {
+export function flatMap(
+  w = 40,
+  h = 30,
+  town: { cx: number; cy: number; r: number } = { cx: 3, cy: 3, r: 2 },
+): GameMap {
   const map = new GameMap({
     id: `test_nav_${++seq}`,
     name: "Phẳng",
     seed: 1,
     w,
     h,
-    town: { cx: 3, cy: 3, r: 2 },
+    town,
   });
   map.tiles.fill(T.Grass);
   for (let x = 0; x < w; x++) {

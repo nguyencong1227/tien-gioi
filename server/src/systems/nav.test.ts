@@ -157,6 +157,27 @@ describe("findPath: đường A* theo cỡ thân", () => {
   });
 });
 
+describe("khu an toàn là vật chặn của lưới (quái không bước vào đó)", () => {
+  it("trấn nằm chắn giữa đường: đường A* đi vòng ngoài khu an toàn (bán kính trấn + nới theo cỡ thân), không xuyên qua", () => {
+    const map = flatMap(40, 30, { cx: 20, cy: 15, r: 4 }); // trấn tâm (656, 496), bán kính 128 px
+    const r = 24;
+    const p = findPath(map, r, 200, 496, 1100, 496, 40)!;
+    expect(p.reached).toBe(true);
+    const pad = navClassOf(r) / 0.8 + 8;
+    const t = map.townPx;
+    for (let i = 0; i + 3 < p.pts.length; i += 2) {
+      const dx = p.pts[i + 2] - p.pts[i];
+      const dy = p.pts[i + 3] - p.pts[i + 1];
+      const n = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 4));
+      for (let k = 0; k <= n; k++) {
+        const x = p.pts[i] + (dx * k) / n;
+        const y = p.pts[i + 1] + (dy * k) / n;
+        expect(Math.hypot(x - t.x, y - t.y)).toBeGreaterThanOrEqual(t.r + pad - 1);
+      }
+    }
+  });
+});
+
 describe("inMainRegion (chỗ sinh trùm nằm trong vùng chính của bản đồ)", () => {
   it("ô kín: không nối; ngoài trống: nối; khe hẹp chỉ thân nhỏ lọt", () => {
     const map = flatMap();

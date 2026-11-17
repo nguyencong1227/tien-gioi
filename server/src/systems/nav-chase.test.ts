@@ -76,8 +76,11 @@ describe("quái thường vòng qua tường cây để tới người", () => {
     const { w } = setup({ gapFrom: 1, gapTo: 28 }); // tường mở hết
     const { m, mc } = addMonster(w, "hac_giao", 520, 400);
     const p = tough(w, "p1", 760, 400);
-    run(w, 3000);
-    expect(mc.nav?.pts ?? null).toBeNull();
+    let everPath = false;
+    run(w, 3000, () => {
+      if (mc.nav?.pts) everPath = true;
+    });
+    expect(everPath).toBe(false); // không một tick nào bám đường A*
     expect(Math.hypot(m.x - p.x, m.y - p.y)).toBeLessThan(240);
   });
 });
@@ -125,6 +128,7 @@ describe("trùm vòng qua tường, phát hiện kẹt và rút về", () => {
     expect(mc.target).toBeNull();
     // Trong lúc rút, đánh trùm không kéo nó lại
     dealMonsterDamage(w, id, m, "p1", 5, false);
+    expect(mc.target).toBeNull(); // ngay sau đòn (chưa tới tick sau): `dealMonsterDamage` không nhận mục tiêu khi đang rút
     run(w, 100);
     expect(mc.target).toBeNull();
     // Rút về chỗ sinh, hết rút; hồi đầy khí huyết (mất mục tiêu -> reset trùm)
@@ -191,6 +195,27 @@ describe("trùm vòng qua tường, phát hiện kẹt và rút về", () => {
     run(w, TICK_MS);
     expect(Math.hypot(m.x - mc.homeX, m.y - mc.homeY)).toBeLessThan(2);
     expect(isEvading(w, mc)).toBe(false);
+  });
+});
+
+describe("quái vòng qua khu an toàn (không bước vào trấn)", () => {
+  it("trấn chắn giữa quái và người: quái tới được người bằng đường vòng ngoài trấn, không kẹt, không rút", () => {
+    const map = flatMap(40, 30, { cx: 20, cy: 15, r: 3 }); // trấn tâm (656, 496), bán kính 96 px
+    const h = makeWorld(map);
+    const w = h.w;
+    w.now = 10_000;
+    const def = MONSTER_BY_ID["hac_giao"];
+    const { m, mc } = addMonster(w, "hac_giao", 400, 496);
+    const p = tough(w, "p1", 910, 496); // ngoài trấn (910 - 656 = 254 > 96 + 20), cách quái 510 px nên nới tầm phát hiện
+    mc.def = { ...def, aggro: 700 };
+    const reach = def.attackRange + PLAYER_RADIUS;
+    let evaded = false;
+    run(w, 40_000, () => {
+      if (isEvading(w, mc)) evaded = true;
+      return evaded || Math.hypot(m.x - p.x, m.y - p.y) <= reach;
+    });
+    expect(evaded).toBe(false);
+    expect(Math.hypot(m.x - p.x, m.y - p.y)).toBeLessThanOrEqual(reach);
   });
 });
 

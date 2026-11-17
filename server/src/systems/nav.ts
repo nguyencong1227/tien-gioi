@@ -22,6 +22,11 @@ export function navClassOf(r: number): number {
   return Math.min(32, Math.max(8, Math.ceil(r / 4) * 4));
 }
 
+/** Độ nới quanh khu an toàn (px) mà quái cỡ `cls` không bước vào: `def.radius + 8` với `def.radius` = bán kính di chuyển / 0,8 (`monsters.ts`). */
+export function safePadOf(cls: number): number {
+  return cls / 0.8 + 8;
+}
+
 /** Hình vuông nửa cạnh `r` quanh (x, y) không chạm ô chặn nào (kể cả ô chỉ chạm mép). Ngoài bản đồ tính là chặn. */
 export function squareFree(map: GameMap, x: number, y: number, r: number): boolean {
   const x0 = Math.floor((x - r) / TILE);
@@ -40,7 +45,7 @@ function isBlockedTile(map: GameMap, tx: number, ty: number): boolean {
 
 /**
  * Đường thẳng từ (x0, y0) tới (x1, y1) đi được cho thân bán kính `r` (cùng phép thử `circleBlocked` với `moveWithCollision`, nên khớp chuyển động thật)? Lấy mẫu mỗi
- * `LOS_STEP` px, kể cả hai đầu.
+ * `LOS_STEP` px, kể cả hai đầu. `safePad` (tuỳ chọn): đường chạm khu an toàn nới thêm chừng này (px) cũng coi là bị chặn (quái không bước vào khu an toàn).
  */
 export function lineClear(
   map: GameMap,
@@ -49,6 +54,7 @@ export function lineClear(
   x1: number,
   y1: number,
   r: number,
+  safePad?: number,
 ): boolean {
   const dx = x1 - x0;
   const dy = y1 - y0;
@@ -56,7 +62,11 @@ export function lineClear(
   const n = Math.max(1, Math.ceil(len / LOS_STEP));
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    if (map.circleBlocked(x0 + dx * t, y0 + dy * t, r)) return false;
+    const x = x0 + dx * t;
+    const y = y0 + dy * t;
+    if (map.circleBlocked(x, y, r)) return false;
+    // Quái không bước vào khu an toàn (nới `safePad`): đường xuyên qua đó coi như bị chặn
+    if (safePad !== undefined && map.inSafe(x, y, safePad)) return false;
   }
   return true;
 }
@@ -72,6 +82,7 @@ function lineSquareFree(
   x1: number,
   y1: number,
   r: number,
+  safePad: number,
 ): boolean {
   const dx = x1 - x0;
   const dy = y1 - y0;
@@ -79,7 +90,9 @@ function lineSquareFree(
   const rr = r + LOS_STEP / 2;
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    if (!squareFree(map, x0 + dx * t, y0 + dy * t, rr)) return false;
+    const x = x0 + dx * t;
+    const y = y0 + dy * t;
+    if (!squareFree(map, x, y, rr) || map.inSafe(x, y, safePad + LOS_STEP / 2)) return false;
   }
   return true;
 }
@@ -129,7 +142,7 @@ class NavGrid {
     m = new Uint8Array(this.cols * this.rows);
     // Quái không bước vào khu an toàn (`monsters.ts`: `inSafe(x, y, def.radius + 8)`, `def.radius` = bán kính di chuyển / 0,8): nút trong khu đó (nới theo cỡ) coi là chặn,
     // nếu không đường A* xuyên qua trấn / cổng và trùm đứng ngơ ở mép khu an toàn.
-    const safePad = cls / 0.8 + 8;
+    const safePad = safePadOf(cls);
     for (let j = 0; j < this.rows; j++)
       for (let i = 0; i < this.cols; i++) {
         const x = i * NAV_CELL;
@@ -342,6 +355,7 @@ class NavGrid {
           px(nodes[b + 1]),
           py(nodes[b + 1]),
           cls,
+          safePadOf(cls),
         )
       )
         b++;
