@@ -3,6 +3,7 @@
 // Client KHÔNG đoán trước kết quả gắn ô: gửi `skillSlot {slot, skillId}` rồi chờ `skills` của máy chủ (từ chối thì máy chủ gửi lại sổ đúng và toast).
 import {
   SKILL_MAX_LEVEL,
+  skillMaxLevelOf,
   TILE,
   WINDUP_SLOW,
   elementOf,
@@ -20,6 +21,7 @@ import {
 } from "@tien-gioi/shared";
 import { BAR_SLOTS, needText, unlockText, type SkillTracker, type SlotMe } from "./skill-bar";
 import { pipsText } from "./skill-bar-dom";
+import { masteryView, type MasteryView } from "./skill-mastery";
 import { gradeName, skillGradeOf, skillStyleOf, styleName } from "./skill-meta";
 
 /** Số thập phân kiểu Việt ("1,84"), tối đa `digits` chữ số, bỏ số 0 thừa ("2" chứ không "2,00"). */
@@ -123,8 +125,12 @@ export interface SkillRow {
   id: string;
   name: string;
   level: number;
-  /** Chấm tầng "●●○" */
+  /** Tầng tối đa của chiêu này (`skillMaxLevelOf`: Hoàng 3 / Huyền 4 / Địa 5 / Thiên 6) */
+  maxLevel: number;
+  /** Chấm tầng "●●○" (số chấm = `maxLevel`) */
   pips: string;
+  /** Thanh / dòng luyện chiêu (`skill-mastery.ts`); `null` khi máy chủ chưa gửi điểm luyện */
+  mastery: MasteryView | null;
   element: string;
   /** id hệ ("hoa"...), để lọc theo hệ; `element` là tên hiển thị */
   elementId: string;
@@ -306,13 +312,16 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
     const element = elementOf(def.element)?.name ?? "";
     const need = skillReqMet(def, me.realm, me.tier) ? null : needText(def);
     const grade = skillGradeOf(def);
+    const maxLevel = skillMaxLevelOf(def);
     const style = skillStyleOf(def);
     const slotLabel = slotNow === null ? "Chưa gắn" : `Ô ${slotNow}`;
     rows.push({
       id: def.id,
       name: def.name,
       level,
-      pips: pipsText(Math.min(level, SKILL_MAX_LEVEL)),
+      maxLevel,
+      pips: pipsText(level, maxLevel),
+      mastery: masteryView(def, level, skills.masteryOf(def.id), maxLevel, skills.masteryKnown),
       element,
       elementId: def.element,
       grade,
@@ -328,7 +337,7 @@ export function buildSkillsPanel(skills: SkillTracker, me: SlotMe): SkillsPanelM
       slotNow,
       slotLabel,
       sub: [element, `tầng ${level}`].filter((t) => t !== "").join(" · "),
-      aria: rowAria(def.name, element, level, slotNow, need, gradeName(grade)),
+      aria: rowAria(def.name, element, level, slotNow, need, gradeName(grade), maxLevel),
       slots,
       unequip: slotNow === null ? null : `Gỡ khỏi ô ${slotNow}`,
     });
@@ -349,11 +358,12 @@ export function rowAria(
   slotNow: SkillSlot | null,
   need: string | null,
   grade = "",
+  maxLevel: number = SKILL_MAX_LEVEL,
 ): string {
   const parts = [name];
   if (element) parts.push(`hệ ${element}`);
   if (grade) parts.push(`phẩm ${grade}`);
-  parts.push(`tầng ${level} trên ${SKILL_MAX_LEVEL}`);
+  parts.push(`tầng ${level} trên ${maxLevel}`);
   parts.push(slotNow === null ? "chưa gắn ô" : `đang ở ô ${slotNow}`);
   if (need) parts.push(need.charAt(0).toLowerCase() + need.slice(1));
   return parts.join(", ");
