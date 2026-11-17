@@ -423,6 +423,116 @@ export const ITEMS: ItemDef[] = [
     cooldown: 5_000,
     color: 0x9a4a8c,
   },
+  // ---------- Phù (nghề nhỏ lát 2, #514/#817): Bàn phù chế ----------
+  // Dùng gắn trạng thái `amp_<hệ>` tăng sát thương chiêu cùng hệ trong 60 giây (chiêu hệ khác / đòn thường / đòn thách
+  // đấu KHÔNG nhân), hoặc `cdr_phu` giảm hồi chiêu. Nguồn: bảng #764 (docs/NGHE_NHO_NGUON.md) — phù tấn công / buff sát
+  // thương của Vạn Kiếp Tu Tiên dịch thành `amp_<hệ>`; `cdr_phu` không có phù nguồn nên viết GỐC (tên Tiên Giới).
+  // `ratio` theo bậc trong khung (A chốt khi review): LK 0,08-0,10 / TC 0,12-0,15 / KD 0,18-0,22 / NA 0,25-0,30 / cdr <= 0,15.
+  // KHÔNG vào ITEM_VALUE (sellPrice = 0): chốt chặn chống sinh Linh thạch. EV: docs/NGHE_NHO_KINH_TE.md mục Phù.
+  // Luyện Khí (rarity 1):
+  {
+    id: "phu_hoa_dan",
+    name: "Hỏa Đạn Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 1,
+    desc: "Tăng 8% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.08, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xd9532a,
+  },
+  {
+    id: "phu_hoa_cuonghuyet",
+    name: "Cuồng Huyết Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 1,
+    desc: "Tăng 10% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.1, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xc94030,
+  },
+  // Trúc Cơ (rarity 2):
+  {
+    id: "phu_kim_phicham",
+    name: "Phi Châm Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Tăng 12% sát thương chiêu hệ Kim trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_kim", ratio: 0.12, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xb8b8c8,
+  },
+  {
+    id: "phu_kim_toagia",
+    name: "Toái Giáp Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Tăng 13% sát thương chiêu hệ Kim trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_kim", ratio: 0.13, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x9a9aa8,
+  },
+  {
+    id: "phu_hoa_lieutiem",
+    name: "Liệt Diễm Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Tăng 15% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.15, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xc0392b,
+  },
+  // Kim Đan (rarity 3):
+  {
+    id: "phu_loi_loino",
+    name: "Lôi Nộ Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Tăng 20% sát thương chiêu hệ Lôi trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_loi", ratio: 0.2, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x8a6a2a,
+  },
+  // Nguyên Anh (rarity 3):
+  {
+    id: "phu_hoa_tammoi",
+    name: "Tam Muội Hỏa Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Tăng 25% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.25, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xe05a1a,
+  },
+  {
+    id: "phu_moc_kimlan",
+    name: "Kim Lân Độc Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Tăng 28% sát thương chiêu hệ Mộc trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_moc", ratio: 0.28, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x3a8a4a,
+  },
+  // cdr_phu (giảm hồi chiêu): phù GỐC của Tiên Giới, giữa Trúc Cơ - Kim Đan
+  {
+    id: "phu_tho_tocphong",
+    name: "Tốc Phong Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Giảm tối đa 15% hồi chiêu của các chiêu thức trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "cdr_phu", ratio: 0.15, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x5a8ab0,
+  },
   // ---------- Trang bị (rèn ở Thợ rèn, xem recipes.ts) ----------
   {
     id: "lang_nha_kiem",

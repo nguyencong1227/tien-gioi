@@ -192,6 +192,60 @@ export const DAO_HO_RECIPES: RecipeDef[] = [
   ]),
 ];
 
+// Phù (nghề nhỏ lát 2, #514/#817): chế ở Bàn phù (`lao_phu`, trạm talisman) ở Lạc Hà. Phù tăng sát thương chiêu cùng hệ
+// (`amp_<hệ>`) hoặc giảm hồi chiêu (`cdr_phu`) trong 60 giây. Nguyên liệu là đồ quái rơi ĐÃ CÓ theo bậc phù (LK -> quái Lạc Hà,
+// TC -> quái Lạc Hà / Hắc Phong, KD -> Âm Sương, NA -> Hàn Vân); phí Linh thạch là chỗ xả tiền. Tên phù theo nguồn (Vạn Kiếp Tu
+// Tiên, `docs/NGHE_NHO_NGUON.md` mục 3); hiệu ứng `amp_<hệ>` / `cdr_phu` là cơ chế Tiên Giới (lát 2 chỉ có hai loại này).
+// `cdr_phu` (Tốc Phong Phù) KHÔNG có phù nguồn nên là nội dung GỐC. KHÔNG vào ITEM_VALUE (đồ tự chế không bán được, test giữ).
+const lp = (id: string, output: string, coin: number, inputs: [string, number][]): RecipeDef => ({
+  ...r(id, output, inputs),
+  npcId: "lao_phu",
+  coin,
+});
+export const PHU_RECIPES: RecipeDef[] = [
+  // Luyện Khí (rarity 1): quái Lạc Hà
+  lp("che_hoa_dan", "phu_hoa_dan", 300, [
+    ["long_tho", 8],
+    ["nanh_soi", 6],
+  ]),
+  lp("che_cuonghuyet", "phu_hoa_cuonghuyet", 400, [
+    ["nanh_soi", 8],
+    ["da_ho", 4],
+  ]),
+  // Trúc Cơ (rarity 2): quái Lạc Hà / Hắc Phong
+  lp("che_phicham", "phu_kim_phicham", 1500, [
+    ["vay_mang", 4],
+    ["da_ho", 6],
+  ]),
+  lp("che_toagia", "phu_kim_toagia", 1800, [
+    ["vay_mang", 5],
+    ["da_ho", 8],
+  ]),
+  lp("che_lietdiem", "phu_hoa_lieutiem", 2000, [
+    ["vay_mang", 6],
+    ["da_ho", 6],
+  ]),
+  lp("che_tocphong", "phu_tho_tocphong", 2500, [
+    ["vay_mang", 6],
+    ["suong_mao", 4],
+  ]),
+  // Kim Đan (rarity 3): quái Âm Sương Trạch
+  lp("che_loino", "phu_loi_loino", 6000, [
+    ["suong_mao", 6],
+    ["quy_giap", 4],
+    ["doc_nang", 3],
+  ]),
+  // Nguyên Anh (rarity 3): quái Hàn Vân Lĩnh
+  lp("che_tammoi", "phu_hoa_tammoi", 15000, [
+    ["han_lang_mao", 6],
+    ["tuong_cot", 4],
+  ]),
+  lp("che_kimlan", "phu_moc_kimlan", 18000, [
+    ["phong_nha_vu", 6],
+    ["doc_tuoc_nang", 4],
+  ]),
+];
+
 export const RECIPES: RecipeDef[] = [
   r("ren_lang_nha_kiem", "lang_nha_kiem", [
     ["nanh_soi", 8],
@@ -230,6 +284,7 @@ export const RECIPES: RecipeDef[] = [
   ...KIM_DAN_RECIPES,
   ...OWNER_GEAR_RECIPES,
   ...NGUYEN_ANH_RECIPES,
+  ...PHU_RECIPES,
 ];
 
 export const RECIPE_BY_ID: Record<string, RecipeDef> = Object.fromEntries(

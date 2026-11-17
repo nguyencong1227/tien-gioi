@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { STATUS_BIT, statusMask, type StatusId } from "@tien-gioi/shared";
+import {
+  AMP_ELEMENTS,
+  STATUS_BIT,
+  markIndexOf,
+  statusMask,
+  type StatusId,
+} from "@tien-gioi/shared";
+import { ELEMENT_COLOR } from "./skill-bar";
 import {
   PIP_R,
   PIP_STEP,
@@ -168,5 +175,43 @@ describe("monster-status: nhãn mục tiêu không che hàng chấm (mục 26: T
     expect(pipRowTop(13, false)).toBe(40);
     expect(targetLabelRise(13 + 12, 40)).toBe(42);
     expect(13 + 12 + 6).toBe(31);
+  });
+});
+
+describe("chấm DẤU hệ (Monster.mark, mục 51 CT2)", () => {
+  it("dấu thành MỘT chấm vòng rỗng ở CUỐI hàng, màu theo hệ, tên là tên trạng thái dấu", () => {
+    const pips = pipsOf(statusMask(["burn"]), markIndexOf("hoa"));
+    expect(pips.map((p) => p.id)).toEqual(["burn", "mark_hoa"]);
+    const mk = pips[1];
+    expect(mk.shape).toBe("ring");
+    expect(mk.name).toBe("Dấu Hỏa");
+    expect(mk.color).toBe(Number.parseInt(ELEMENT_COLOR.hoa.slice(1), 16));
+    // chỉ có dấu, không có trạng thái có hại
+    expect(pipsOf(0, markIndexOf("loi")).map((p) => p.id)).toEqual(["mark_loi"]);
+  });
+  it("mọi hệ có dấu đều ra màu khác nhau (không trùng)", () => {
+    const colors = AMP_ELEMENTS.map((el) => pipsOf(0, markIndexOf(el))[0].color);
+    expect(new Set(colors).size).toBe(AMP_ELEMENTS.length);
+  });
+  it("dấu 0 / lạ / sai kiểu: không chấm nào; không thiếu đối số (cũ) vẫn chạy", () => {
+    for (const bad of [0, 10, -1, 1.5, NaN, "2", null, undefined, {}])
+      expect(pipsOf(0, bad as never), String(bad)).toEqual([]);
+    expect(pipsOf(statusMask(["burn"])).map((p) => p.id)).toEqual(["burn"]);
+  });
+  it("vẽ chấm vòng: đĩa màu hệ rồi đĩa tối nhỏ ở giữa; đếm đúng số chấm", () => {
+    const calls: string[] = [];
+    const g = {
+      clear: () => calls.push("clear"),
+      fillStyle: (c: number) => calls.push(`style:${c}`),
+      fillCircle: (_x: number, _y: number, r: number) => calls.push(`circle:${r}`),
+      fillPoints: () => calls.push("poly"),
+    };
+    const pips = pipsOf(0, markIndexOf("kim"));
+    expect(drawPips(g, pips, -30)).toBe(1);
+    const joined = calls.join("|");
+    expect(joined).toContain(`style:${pips[0].color}`);
+    // quầng tối, đĩa màu (PIP_R), đĩa lõi tối (0,45 PIP_R): ba hình tròn và không đa giác
+    expect(calls.filter((c) => c.startsWith("circle:"))).toHaveLength(3);
+    expect(calls).not.toContain("poly");
   });
 });

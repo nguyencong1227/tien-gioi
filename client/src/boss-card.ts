@@ -4,7 +4,7 @@
  * máu giữ nguyên như cũ (chỉ tên), không chỗ trống, không ảnh vỡ (`art-image.ts` `showArtImage`).
  *
  * `BOSS_CARDS` là DANH SÁCH THẺ ĐÃ VÀO GAME: `kind` trùm (id trong `MONSTERS` của `shared/`) -> tên tệp trong `client/public/packs/art-trum/`.
- * RỖNG cho tới khi lô 2 có ảnh. Thêm một thẻ = một dòng ở đây CÙNG PR với ảnh, tệp nguồn `docs/art/nguon/<tên>.json`, mục ở `CREDITS.md`
+ * Lô 2 (4 thẻ) đã vào (17/11/2026). Thêm một thẻ = một dòng ở đây CÙNG PR với ảnh, tệp nguồn `docs/art/nguon/<tên>.json`, mục ở `CREDITS.md`
  * và `npm run build:packs` (`boss-card.test.ts` bắt dòng trỏ tới tệp không có / trùm không có / tên lệch khỏi `BOSS_CARD_BATCH`).
  */
 import { artPackId } from "./gfx/packs";
@@ -12,8 +12,13 @@ import { artPackId } from "./gfx/packs";
 /** Thư mục của gói `art:trum` trong `/packs/` (khớp `BOSS_CARD_BATCH.dir` ở `client/scripts/art/prompt-rules.mjs`, test kiểm). */
 export const BOSS_CARD_DIR = "art-trum";
 
-/** `kind` của trùm -> tên tệp thẻ (không kèm thư mục). Rỗng cho tới khi lô 2 vào game. */
-export const BOSS_CARDS: Readonly<Record<string, string>> = {};
+/** `kind` của trùm -> tên tệp thẻ (không kèm thư mục). Lô 2: bốn trùm có ảnh AI (mục 7 `CREDITS.md`). */
+export const BOSS_CARDS: Readonly<Record<string, string>> = {
+  mang: "the_xich_mang.webp",
+  hac_giao: "the_hac_giao.webp",
+  thien_han_vuong: "the_thien_han_vuong.webp",
+  yeu_vuong: "the_yeu_vuong.webp",
+};
 
 /** Ghi đè khi thử trong trình duyệt thật (`?debug` / DEV, `check-boss-card.mjs`); bản chạy thật không bao giờ có mục. */
 const overrides = new Map<string, string>();
