@@ -132,6 +132,7 @@ import {
   achievementsView,
   sanitizeAchievementNewMsg,
   sanitizeAchievementsMsg,
+  splitTitles,
   titleUnlockToast,
 } from "./achievement-view";
 import {
@@ -1171,6 +1172,8 @@ let achPending: string | null | undefined;
 let achPendingTimer: ReturnType<typeof setTimeout> | null = null;
 /** Nhóm mở / đóng do NGƯỜI CHƠI chọn (vẽ lại không làm mất lựa chọn). */
 const achOpen = new Map<string, boolean>();
+/** Mục gập "Còn N danh hiệu chưa mở" của tab Thành tựu đang mở? (mặc định gập; giữ qua các lần vẽ lại) */
+let achLockedOpen = false;
 const ACH_TITLE_WAIT_MS = 5_000;
 /** Đã hiện danh sách thành tựu cho người chơi thấy kể từ lúc vào tab (điều kiện để xoá dấu "Mới" khi rời). */
 let achViewed = false;
@@ -1276,7 +1279,31 @@ function renderAch() {
     titles.append(b);
   };
   mkTitle(null, "Không đeo", v.worn === null, false, "");
-  for (const t of v.titles) mkTitle(t.id, t.text, t.worn, !t.unlocked, t.hint);
+  const split = splitTitles(v.titles);
+  for (const t of split.open) mkTitle(t.id, t.text, t.worn, false, "");
+  // danh hiệu CHƯA mở: một mục gập "Còn N danh hiệu chưa mở" (giữ trạng thái mở / đóng người chơi đã chọn), mỗi cái chỉ là chữ: tên + cách mở
+  const lockedBox = achEl("ach-locked") as HTMLDetailsElement;
+  lockedBox.hidden = split.locked.length === 0;
+  achEl("ach-locked-sum").textContent = split.lockedLabel;
+  lockedBox.open = achLockedOpen;
+  if (!lockedBox.dataset.wired) {
+    lockedBox.dataset.wired = "1";
+    lockedBox.addEventListener("toggle", () => (achLockedOpen = lockedBox.open));
+  }
+  const lockedList = achEl("ach-locked-list");
+  lockedList.textContent = "";
+  for (const t of split.locked) {
+    const li = document.createElement("li");
+    li.className = "ach-item";
+    const name = document.createElement("b");
+    name.className = "ach-name";
+    name.textContent = t.text;
+    const how = document.createElement("p");
+    how.className = "ach-desc";
+    how.textContent = t.hint;
+    li.append(name, how);
+    lockedList.append(li);
+  }
   // thành tựu theo nhóm
   const groups = achEl("ach-groups");
   groups.textContent = "";
