@@ -277,6 +277,7 @@ import {
 } from "./a11y";
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
 import { applyMapCard, mapCardUrl } from "./map-card";
+import { NpcPortraitSlot } from "./npc-portrait";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
@@ -676,6 +677,8 @@ function loadSettings() {
 
 // Hộp thoại NPC
 let currentDialog: DialogMsg | null = null;
+/** Ô chân dung ở khung hội thoại (dựng lười ở lần mở đầu tiên). */
+let dlgPortrait: NpcPortraitSlot | null = null;
 let dlgTypeTimer: number | null = null;
 let dlgFullText = "";
 let dlgTypedLen = 0;
@@ -4722,6 +4725,7 @@ export const ui = {
   closeDialog() {
     stopTypewriter();
     currentDialog = null;
+    dlgPortrait?.clear();
     $("dialog-modal").hidden = true;
     $("dlg-options").replaceChildren();
     modalStack.remove("dialog-modal");
@@ -5156,6 +5160,12 @@ export const ui = {
     const npc = NPC_BY_ID[m.npcId];
     $("dlg-npc-name").textContent = npc?.name ?? "Kỳ nhân";
     $("dlg-npc-title").textContent = npc?.title ?? "";
+    // Chân dung NPC (ảnh AI, gói `art:npc` tải theo nhu cầu): chưa có chân dung / chưa tải xong thì chỉ có tên như cũ; cùng NPC thì giữ ảnh (không chớp)
+    const portraitImg = document.getElementById("dlg-npc-art");
+    if (portraitImg instanceof HTMLImageElement) {
+      dlgPortrait ??= new NpcPortraitSlot(portraitImg);
+      dlgPortrait.show(m.npcId);
+    }
 
     $("dialog-modal").hidden = false;
     $("dlg-options").replaceChildren();

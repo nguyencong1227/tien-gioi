@@ -104,9 +104,7 @@ describe("withDropQty: chỉnh số trong ô số lượng (mục 47)", () => {
     expect(withDropQty(plan1(), 9999).qty).toBe(5);
     expect(withDropQty(plan1(), 2.9).qty).toBe(2);
     for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])
-      expect(withDropQty(plan1(), bad).qty, String(bad)).toBe(
-        bad === Number.POSITIVE_INFINITY ? 1 : 1,
-      );
+      expect(withDropQty(plan1(), bad).qty, String(bad)).toBe(1);
   });
 
   it("'Vứt hết' (gửi không kèm qty) chỉ khi bấm Vứt hết VÀ số vẫn là toàn bộ; chỉnh xuống thì gửi qty cụ thể, kéo về toàn bộ thì trở lại", () => {

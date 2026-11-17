@@ -4,13 +4,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { MONSTER_BY_ID } from "@tien-gioi/shared";
+import { MONSTER_BY_ID, NPC_BY_ID } from "@tien-gioi/shared";
 import { MAP_STYLES } from "../../src/gfx/map-style";
 import { parsePackDir } from "../build-packs.mjs";
 import { CJK_REGEX, validateAiSource } from "../check-credits.mjs";
 import {
   BANNED_PROMPT_TERMS,
   BOSS_CARD_BATCH,
+  NPC_FACE_CLAUSE,
+  NPC_PORTRAIT_BATCH,
   MAP_CARD_BATCH,
   NEGATIVE_PROMPT,
   REQUIRED_NEGATIVE_TERMS,
@@ -307,5 +309,91 @@ describe("lô 2 (thẻ trùm) khớp trò chơi, luật prompt, ngân sách gói
     expect(DOC).toContain(`${final.w}x${final.h}`);
     expect(DOC).toContain("## 5b. LÔ 2");
     expect(DOC).toContain(BOSS_CARD_BATCH.dir);
+  });
+});
+
+describe("lô 3 (chân dung NPC) khớp trò chơi, luật prompt, ngân sách gói art và tài liệu", () => {
+  const { items, raw, final } = NPC_PORTRAIT_BATCH;
+  type Item = { id: string; npcId: string; seeds: number[]; prompt: string };
+  const list = items as Item[];
+  const budget = JSON.parse(
+    fs.readFileSync(path.join(REPO, "client/perf-budget.json"), "utf8"),
+  ) as {
+    packs: { art: { maxKb: number; maxFileKb: number } };
+  };
+
+  it("mười hai NPC THẬT của shared (không có cao_thi: bảng cáo thị), mỗi NPC một chân dung, ba hạt giống không trùng với bất kỳ ảnh nào của ba lô", () => {
+    expect(list.map((i) => i.npcId).sort()).toEqual(
+      [
+        "duoc_su",
+        "lai_buon",
+        "lai_buon_han",
+        "lai_buon_suong",
+        "lao_dan",
+        "thu_mon",
+        "tho_ren",
+        "tho_ren_han",
+        "tho_ren_suong",
+        "tram_truong",
+        "tram_truong_han",
+        "truong_tran",
+      ].sort(),
+    );
+    for (const it of list) {
+      expect(NPC_BY_ID[it.npcId], `${it.id}: NPC ${it.npcId} không có trong shared`).toBeDefined();
+      expect(it.id, "tên tệp = tên JSON nguồn").toMatch(/^npc_[a-z_]+$/);
+      expect(it.id).toBe(`npc_${it.npcId}`);
+      expect(it.seeds).toHaveLength(3);
+      expect(promptViolations(it.prompt, NEGATIVE_PROMPT), it.id).toEqual([]);
+    }
+    const all = [
+      ...MAP_CARD_BATCH.items.flatMap((i: { seeds: number[] }) => i.seeds),
+      ...BOSS_CARD_BATCH.items.flatMap((i: { seeds: number[] }) => i.seeds),
+      ...list.flatMap((i) => i.seeds),
+    ];
+    expect(new Set(all).size).toBe(all.length);
+    const ids = [...MAP_CARD_BATCH.items, ...BOSS_CARD_BATCH.items, ...list].map(
+      (i: { id: string }) => i.id,
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("thẻ vuông, cỡ thô bội 64, nằm trong gói `art:npc` đúng thư mục và trong ngân sách `packs.art`", () => {
+    expect(raw.w).toBe(raw.h);
+    expect(final.w).toBe(final.h);
+    expect(raw.w % 64).toBe(0);
+    expect(final.w).toBeLessThan(raw.w);
+    expect(NPC_PORTRAIT_BATCH.pack).toBe("art:npc");
+    expect(parsePackDir(path.basename(NPC_PORTRAIT_BATCH.dir))).toEqual({
+      id: "art:npc",
+      kind: "art",
+    });
+    expect(final.maxKb).toBeLessThanOrEqual(budget.packs.art.maxFileKb);
+    expect(list.length * final.maxKb).toBeLessThanOrEqual(budget.packs.art.maxKb);
+  });
+
+  it("NPC là NGƯỜI nên mặt PHẢI khuất bóng: mọi prompt có mệnh đề mặt-khuất-bóng, không 'no people', không từ tả nét mặt", () => {
+    expect(NPC_FACE_CLAUSE).toBe("face hidden in shadow");
+    for (const it of list) {
+      expect(it.prompt.split(", "), it.id).toContain(NPC_FACE_CLAUSE);
+      expect(it.prompt, it.id).not.toContain("no people");
+      expect(
+        /\b(smiling|smile|eyes|eyebrows|beautiful|handsome|pretty|young woman|young man|girl|boy|king|queen|celebrity)\b/i.test(
+          it.prompt,
+        ),
+        it.id,
+      ).toBe(false);
+    }
+  });
+
+  it("tài liệu (mục 5c) liệt kê ĐỦ prompt, hạt giống, cỡ và gói của lô 3", () => {
+    for (const it of list) {
+      expect(DOC, `prompt ${it.id}`).toContain(it.prompt);
+      expect(DOC, `mục ${it.id}`).toContain(`### \`${it.id}\` (NPC \`${it.npcId}\``);
+      for (const s of it.seeds) expect(DOC, `seed ${s}`).toContain(`\`${s}\``);
+    }
+    expect(DOC).toContain("## 5c. LÔ 3");
+    expect(DOC).toContain(NPC_PORTRAIT_BATCH.dir);
+    expect(DOC).toContain(`${final.w}x${final.h}`);
   });
 });
