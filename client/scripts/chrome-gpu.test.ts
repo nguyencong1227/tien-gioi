@@ -180,10 +180,14 @@ exit 3
     );
 
     try {
-      // Chờ Chrome CDP sẵn sàng
+      // Chờ Chrome mở CDP. Ngân sách CŨ là vòng cố định 40×100ms = 4s, quá ngắn khi máy
+      // dùng chung đang tải nặng (Chrome khởi động chậm hơn 4s → wsUrl vẫn null, test đỏ
+      // giả). Đổi thành chờ theo điều kiện: dừng ngay khi thấy CDP, hết khi gần hết một
+      // phần của it-timeout (đã bumped lên 25s cho test khởi động Chrome thật).
+      const CDP_WAIT_MS = 14_000;
       let wsUrl: string | null = null;
-      for (let i = 0; i < 40; i++) {
-        await new Promise((r) => setTimeout(r, 100));
+      const cdpDeadline = Date.now() + CDP_WAIT_MS;
+      while (wsUrl === null && Date.now() < cdpDeadline) {
         try {
           const res = await fetch(`http://127.0.0.1:${cdpPort}/json/list`);
           if (res.ok) {
@@ -194,8 +198,9 @@ exit 3
             }
           }
         } catch {
-          // tiếp tục thử
+          // Chrome chưa sẵn sàng: thử lại
         }
+        await new Promise((r) => setTimeout(r, 100));
       }
 
       expect(wsUrl).not.toBeNull();
@@ -229,11 +234,37 @@ exit 3
           );
         });
 
-      const webgl = await evaluate(WEBGL_RENDERER_EXPR);
+      // Đọc WebGL renderer. Khi GPU process đang khởi tạo, Chrome có thể trả SwiftShader
+      // TẠM (hoặc ok:false) rồi mới chuyển sang NVIDIA thật; đọc một lần ngay lập tức dễ
+      // đỏ giả. Nên quét nhiều lần cho tới khi thấy NVIDIA (xác nhận GPU thật) hoặc hết
+      // ngân sách (lúc đó tin vào giá trị cuối — fallback phần mềm thật). KHÔNG nới lỏng
+      // yêu cầu NVIDIA-không-SwiftShader: các expect bên dưới vẫn bắt buộc.
+      const RENDER_WAIT_MS = 6_000;
+      const RENDER_POLL_MS = 250;
+      let webgl: { ok: boolean; unmaskedRenderer?: string | null } = {
+        ok: false,
+        unmaskedRenderer: null,
+      };
+      if (gpuInfo.hasGpu) {
+        const deadline = Date.now() + RENDER_WAIT_MS;
+        do {
+          webgl = await evaluate(WEBGL_RENDERER_EXPR);
+          if (
+            typeof webgl.unmaskedRenderer === "string" &&
+            /NVIDIA|GeForce/i.test(webgl.unmaskedRenderer)
+          ) {
+            break; // đã thấy GPU thật → dừng sớm
+          }
+          await new Promise((r) => setTimeout(r, RENDER_POLL_MS));
+        } while (Date.now() < deadline);
+      } else {
+        webgl = await evaluate(WEBGL_RENDERER_EXPR);
+      }
+
       expect(webgl.ok).toBe(true);
 
       if (gpuInfo.hasGpu) {
-        // Trên máy chủ có NVIDIA RTX 5060: BẮT BUỘC phải nhận diện NVIDIA GPU
+        // Trên máy chủ có NVIDIA RTX: BẮT BUỘC phải nhận diện NVIDIA GPU, không phải phần mềm
         expect(webgl.unmaskedRenderer).toMatch(/NVIDIA|GeForce/i);
         expect(webgl.unmaskedRenderer).not.toMatch(/SwiftShader/i);
         expect(webgl.unmaskedRenderer).not.toMatch(/llvmpipe/i);
@@ -251,5 +282,5 @@ exit 3
         // bỏ qua
       }
     }
-  }, 15000);
+  }, 25000);
 });
