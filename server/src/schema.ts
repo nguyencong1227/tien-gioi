@@ -43,6 +43,8 @@ export class Player extends Schema {
   @type("boolean") duel = false;
   /** Biệt hiệu tông môn (2-4 ký tự, "" = không có): người ngoài vẽ `[xxxx]` cạnh tên; đổi chỉ lúc vào / rời / lập / giải tán / bị mời ra. */
   @type("string") sect = "";
+  /** Danh hiệu đang đeo (M9.5): ID NGẮN (`TITLE_ID_RE`, <= 4 ký tự), "" = không đeo; client tra `TITLES` ra chữ. Đổi chỉ khi vào phòng / đeo / gỡ (`WorldRoom.titleSet`). */
+  @type("string") title = "";
   // input cuối server đã xử lý (để client đối chiếu); chỉ chủ nhân vật nhận
   @view(TAG_OWNER) @type("uint32") lastSeq = 0;
   // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.
