@@ -35,6 +35,11 @@ describe("M7.15: build-packs (Trình tạo và kiểm tra manifest các gói t�
       id: "hd:map:hac_phong",
       kind: "hd",
     });
+    // gói ảnh minh hoạ AI tải theo nhu cầu (art:trum, art:npc)
+    expect(parsePackDir("art-trum")).toEqual({ id: "art:trum", kind: "art" });
+    expect(parsePackDir("art_npc")).toEqual({ id: "art:npc", kind: "art" });
+    expect(parsePackDir("art:npc")).toEqual({ id: "art:npc", kind: "art" });
+    expect(parsePackDir("artwork")).toBeNull(); // chỉ `art` + dấu phân cách
     expect(parsePackDir(".hidden")).toBeNull();
     expect(parsePackDir("random-dir")).toBeNull();
   });
@@ -161,6 +166,25 @@ describe("M7.15: build-packs (Trình tạo và kiểm tra manifest các gói t�
       const verifyMutated = verifyPacksManifest(tmpDir, manifestPath);
       expect(verifyMutated.ok).toBe(false);
       expect(verifyMutated.error).toMatch(/không đồng bộ/);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("buildPacksManifest: gói art (thư mục phẳng art-trum và lồng art/npc) thành art:trum / art:npc kind=art, đúng đường dẫn tương đối", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-packs-art-"));
+    try {
+      fs.mkdirSync(path.join(tmpDir, "art-trum"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, "art-trum", "the_xich_mang.webp"), Buffer.alloc(10));
+      fs.mkdirSync(path.join(tmpDir, "art", "npc"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, "art", "npc", "ha_lao.webp"), Buffer.alloc(7));
+      const m = buildPacksManifest(tmpDir);
+      expect(m.packs.map((p) => [p.id, p.kind, p.bytes])).toEqual([
+        ["art:npc", "art", 7],
+        ["art:trum", "art", 10],
+      ]);
+      expect(m.packs[0]!.files.map((f) => f.path)).toEqual(["art/npc/ha_lao.webp"]);
+      expect(m.packs[1]!.files.map((f) => f.path)).toEqual(["art-trum/the_xich_mang.webp"]);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

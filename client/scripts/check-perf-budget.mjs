@@ -370,6 +370,9 @@ export function calculateEffectiveFileSize(filePath) {
 export const PACK_ID_RE = /^[a-z0-9_:.-]{1,64}$/i;
 export const MAX_PACKS = 64;
 export const MAX_FILES_PER_PACK = 512;
+/** Trần mặc định của gói ảnh minh hoạ AI `art:*` (mỗi gói) và của MỖI ảnh trong đó, khi `perf-budget.json` thiếu `packs.art`. */
+export const DEFAULT_ART_PACK_KB = 512;
+export const DEFAULT_ART_FILE_KB = 60;
 export const MAX_PATH_LENGTH = 200;
 
 /**
@@ -615,6 +618,8 @@ export function checkPacksBudget(opts = {}) {
       limitKb = budgetPacks.icons?.maxKb ?? 3072;
     } else if (p.kind === "audio") {
       limitKb = budgetPacks.audio?.maxKb ?? 5120;
+    } else if (p.kind === "art") {
+      limitKb = budgetPacks.art?.maxKb ?? DEFAULT_ART_PACK_KB;
     } else if (p.kind === "hd") {
       const maxFactor = budgetPacks.hdMaxFactor ?? 3;
       // Tìm gói thường tương ứng (hd:core -> core, hd:map:hac_phong -> map:hac_phong)
@@ -638,6 +643,19 @@ export function checkPacksBudget(opts = {}) {
       errors.push(
         `Gói '${p.id}' (${p.compressedKb} KB đã nén) vượt ngân sách cho phép (${limitKb} KB)!`,
       );
+    }
+  }
+
+  // Gói ảnh minh hoạ AI: MỖI ảnh cũng có trần riêng (một ảnh phình to làm chậm lần mở bảng đầu tiên dù cả gói còn trong trần)
+  const artFileKb = budgetPacks.art?.maxFileKb ?? DEFAULT_ART_FILE_KB;
+  for (const p of manifest.packs) {
+    if (p.kind !== "art" || !Array.isArray(p.files)) continue;
+    for (const f of p.files) {
+      const kb = Number(((f.bytes || 0) / 1024).toFixed(2));
+      if (kb > artFileKb)
+        errors.push(
+          `Ảnh '${f.path}' trong gói '${p.id}' (${kb} KB) vượt trần mỗi ảnh ${artFileKb} KB!`,
+        );
     }
   }
 
