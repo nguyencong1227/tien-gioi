@@ -176,6 +176,17 @@ describe("chiêu vận: đáp", () => {
     expect(dmgTo(t, oldSpot.id)).toEqual([]);
   });
 
+  it("đáp theo HƯỚNG lúc bắt đầu vận (không đổi hướng giữa chừng): chiêu thẳng chỉ trúng quái đúng hướng đã chọn", () => {
+    const t = setup({ shape: "line", range: 400, width: 60 } as Partial<SkillDef>);
+    const ahead = mon(t, 200, 0);
+    const side = mon(t, 0, 200); // phía +y: hướng góc PI / 2
+    useIt(t); // hướng 0
+    t.p.angle = Math.PI / 2; // người chơi xoay mặt giữa lúc vận: không ảnh hưởng hướng đáp
+    run(t, WIND + TICK_MS);
+    expect(dmgTo(t, ahead.id)).toHaveLength(1);
+    expect(dmgTo(t, side.id)).toEqual([]);
+  });
+
   it("hiệu ứng hình của chiêu đạn (`pbolt`) chỉ gửi lúc ĐÁP, không lúc bắt đầu", () => {
     const t = setup({
       shape: "bolt",
@@ -253,6 +264,12 @@ describe("chiêu vận: HUỶ (không đáp, không hoàn tiêu hao)", () => {
       expect(dmgTo(t, m.id), name).toEqual([]);
       expect(t.c.windup, name).toBeUndefined();
       expect(statusIds(t.c), name).not.toContain("windup");
+      // chủ được báo bỏ trạng thái vận (không để thanh vận / huy hiệu treo): bản tin trạng thái cuối không còn `windup`
+      if (name !== "chết")
+        expect(
+          t.statusMsgs.at(-1)!.msg.list.some((x) => x[0] === "windup"),
+          name,
+        ).toBe(false);
       expect(t.p.mp, name).toBeLessThanOrEqual(mpAfter + 1e9); // linh lực không bị hoàn (không đổi do hồi chậm của tick ngắn)
       expect(t.c.skillCd[0], name).toBe(cd);
     });
