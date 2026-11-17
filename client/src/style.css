@@ -7493,17 +7493,13 @@ body.ui-hidden
 }
 .qty-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 6px;
 }
-.qty-quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 .qty-input {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 88px;
+  min-width: 72px;
   min-height: 44px;
   box-sizing: border-box;
   padding: 6px 10px;
@@ -7550,10 +7546,6 @@ body.ui-hidden
 .qty-btn:focus-visible {
   outline: 2px solid #ffe08a;
   outline-offset: 1px;
-}
-.qty-btn-quick,
-.qty-btn-max {
-  flex: 1 1 0;
 }
 .qty-note {
   margin: 0;

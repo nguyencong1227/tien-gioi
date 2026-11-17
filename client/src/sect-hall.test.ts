@@ -24,6 +24,7 @@ import {
   hallQuestRows,
   hallRefreshDelayMs,
   hallResetInMs,
+  depositPreviewText,
   hallShopGroups,
   hallShopRows,
   sanitizeHallView,
@@ -495,5 +496,43 @@ describe("hallShopGroups: gom cửa hàng theo cấp tông (bảng thật ~28 m�
         .filter((s) => s.level !== null && s.defaultOpen);
       expect(new Set(lockedOpen.map((s) => s.level)).size, `cấp ${lv}`).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe("depositPreviewText (xem trước góp Linh thạch vào quỹ, ô số lượng dùng chung)", () => {
+  const me = (o: Partial<SectHallView["me"]> = {}): SectHallView["me"] => ({
+    ...sample(3).me,
+    earnFromAt: 0,
+    depositLeft: 30,
+    ...o,
+  });
+
+  it("chưa có ảnh chụp Nội vụ: chỉ nói ví còn lại", () => {
+    expect(depositPreviewText(200, 3000, null)).toBe("Ví còn lại 2.800 Linh thạch.");
+  });
+
+  it("có ảnh chụp: thêm cống hiến theo sectDepositCh, kẹp theo lượt góp còn lại hôm nay", () => {
+    const t = depositPreviewText(100, 3000, me({ depositLeft: 1000 }), NOW);
+    expect(t).toMatch(/^Ví còn lại 2\.900 Linh thạch\. \+\d+ cống hiến\.$/);
+    const capped = depositPreviewText(100_000, 200_000, me({ depositLeft: 3 }), NOW);
+    expect(capped).toContain("+3 cống hiến (chạm trần hôm nay).");
+  });
+
+  it("hết lượt kiếm hôm nay (depositLeft 0): nói rõ; góp quá ít để ra 1 cống hiến: chỉ ví", () => {
+    expect(depositPreviewText(100_000, 200_000, me({ depositLeft: 0 }), NOW)).toContain(
+      "Hôm nay hết lượt kiếm cống hiến bằng cách góp.",
+    );
+    expect(depositPreviewText(1, 50, me(), NOW)).toBe("Ví còn lại 49 Linh thạch.");
+  });
+
+  it("chưa tới giờ được kiếm (earnFromAt tương lai): 'ngày mai mới kiếm được', không hứa cống hiến", () => {
+    const t = depositPreviewText(100_000, 200_000, me({ earnFromAt: NOW + 1000 }), NOW);
+    expect(t).toContain("Cống hiến: ngày mai mới kiếm được.");
+    expect(t).not.toContain("+");
+  });
+
+  it("ví hỏng (NaN) hoặc góp nhiều hơn ví: ví còn lại không âm, không NaN", () => {
+    expect(depositPreviewText(500, 100, null)).toBe("Ví còn lại 0 Linh thạch.");
+    expect(depositPreviewText(5, Number.NaN, null)).toBe("Ví còn lại 0 Linh thạch.");
   });
 });

@@ -30,7 +30,7 @@ export interface QtyStepperOptions {
   onChange?: (qty: number | null) => void;
   /** Enter trong ô khi số lượng hợp lệ */
   onConfirm?: (qty: number) => void;
-  /** Esc trong ô: có đặt thì chặn nổi bọt (hộp đóng theo nơi dùng), không đặt thì Esc đi tiếp lên nơi bắt Esc chung */
+  /** Esc trong ô (luôn rời ô và chặn nổi bọt; Esc lần kế mới đóng hộp chứa): nơi dùng có hộp riêng cần đóng thì đặt hàm này */
   onCancel?: () => void;
   /** Hẹn giờ (đưa vào được để test); mặc định của trình duyệt */
   timers?: {
@@ -100,12 +100,17 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
     if (b.action === "plus" && opts.ids?.plus) btn.id = opts.ids.plus;
     buttons.set(b.action, btn);
   }
-  // thứ tự DOM: − [ô] + ×10 ×100 Tối đa (Tab đi theo thứ tự này)
-  row.append(buttons.get("minus")!, input, buttons.get("plus")!);
-  const quick = doc.createElement("div");
-  quick.className = "qty-quick";
-  quick.append(buttons.get("x10")!, buttons.get("x100")!, buttons.get("max")!);
-  root.append(row, quick, note);
+  // MỘT hàng gói được (rộng thì cả sáu điều khiển nằm một dòng, hẹp thì tự xuống dòng): thanh hành động của kho đồ dính đáy màn hình nên càng thấp càng tốt (điện thoại ngang cao ~390 px).
+  // Thứ tự DOM (Tab đi theo): − [ô] + ×10 ×100 Tối đa
+  row.append(
+    buttons.get("minus")!,
+    input,
+    buttons.get("plus")!,
+    buttons.get("x10")!,
+    buttons.get("x100")!,
+    buttons.get("max")!,
+  );
+  root.append(row, note);
 
   let qty: number | null = null;
   let cleared = false;
@@ -169,11 +174,12 @@ export function createQtyStepper(opts: QtyStepperOptions): QtyStepper {
         render();
       }
     } else if (e.key === "Escape") {
-      if (opts.onCancel) {
-        e.preventDefault();
-        e.stopPropagation();
-        opts.onCancel();
-      }
+      // Esc = HUỶ: rời ô (bỏ tiêu điểm) và chặn nổi bọt, đúng quy ước của `processEscapeKey` (đang gõ trong ô thì Esc không đóng thẳng hộp chính; Esc lần kế mới đóng).
+      // Nơi dùng có `onCancel` (hộp riêng của nó) thì được gọi thêm.
+      e.preventDefault();
+      e.stopPropagation();
+      input.blur();
+      opts.onCancel?.();
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
       commit(applyQtyAction(qty, e.key === "ArrowUp" ? "plus" : "minus", max) || null, true);

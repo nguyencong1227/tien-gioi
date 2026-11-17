@@ -50,6 +50,9 @@ class FakeEl {
   focus() {
     this.focused = true;
   }
+  blur() {
+    this.focused = false;
+  }
 }
 
 /** Hẹn giờ giả: chạy tay theo thứ tự thời gian */
@@ -95,15 +98,14 @@ function make(o: Partial<QtyStepperOptions> = {}) {
   });
   const root = s.el as unknown as FakeEl;
   const row = root.children[0]!;
-  const quick = root.children[1]!;
-  const note = root.children[2]!;
+  const note = root.children[1]!;
   const input = row.children[1]!;
   const btn = {
     minus: row.children[0]!,
     plus: row.children[2]!,
-    x10: quick.children[0]!,
-    x100: quick.children[1]!,
-    max: quick.children[2]!,
+    x10: row.children[3]!,
+    x100: row.children[4]!,
+    max: row.children[5]!,
   };
   const type = (text: string) => {
     input.value = text;
@@ -124,6 +126,20 @@ describe("qty-stepper: dựng và thuộc tính", () => {
     expect(input.type).toBe("text");
     expect(input.value).toBe("1");
     expect(s.getQty()).toBe(1);
+  });
+
+  it("MỘT hàng duy nhất (− ô + ×10 ×100 Tối đa) rồi vùng báo: càng thấp càng tốt cho thanh dính đáy của kho đồ", () => {
+    const { root } = make();
+    const r = root as unknown as FakeEl;
+    expect(r.children).toHaveLength(2);
+    expect(r.children[0]!.children.map((c) => c.tag)).toEqual([
+      "button",
+      "input",
+      "button",
+      "button",
+      "button",
+      "button",
+    ]);
   });
 
   it("năm nút đều là button type=button có nhãn tiếng Việt; vùng báo là role=status aria-live=polite", () => {
@@ -318,16 +334,20 @@ describe("qty-stepper: bàn phím trong ô", () => {
     expect(note.textContent).toBe("Nhập số lượng từ 1 trở lên.");
   });
 
-  it("Esc: có onCancel thì gọi và CHẶN nổi bọt; không có onCancel thì để Esc đi tiếp (nơi bắt Esc chung đóng hộp)", () => {
+  it("Esc = huỷ: rời ô (bỏ tiêu điểm), CHẶN nổi bọt (Esc lần kế mới đóng hộp chứa), gọi onCancel nếu có", () => {
     const onCancel = vi.fn();
     const a = make({ onCancel });
+    a.input.focus();
     const e1 = a.input.fire("keydown", { key: "Escape" });
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(e1.stopPropagation).toHaveBeenCalled();
-    const b = make();
+    expect(e1.preventDefault).toHaveBeenCalled();
+    expect(a.input.focused).toBe(false);
+    const b = make(); // không onCancel: vẫn rời ô và chặn nổi bọt
+    b.input.focus();
     const e2 = b.input.fire("keydown", { key: "Escape" });
-    expect(e2.stopPropagation).not.toHaveBeenCalled();
-    expect(e2.preventDefault).not.toHaveBeenCalled();
+    expect(e2.stopPropagation).toHaveBeenCalled();
+    expect(b.input.focused).toBe(false);
   });
 
   it("mũi tên lên / xuống ±1", () => {
