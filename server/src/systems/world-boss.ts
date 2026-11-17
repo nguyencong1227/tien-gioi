@@ -70,7 +70,8 @@ function findSpot(w: World, def: MonsterKind): { x: number; y: number } | null {
       const x = rand(64, map.worldW - 64);
       const y = rand(64, map.worldH - 64);
       if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
-      if (strict && !bossSpawnOk(w, def, x, y)) continue;
+      // lượt chặt: đúng vùng nguy hiểm tối thiểu của loài như `spawnMonster` (không hiện trùm sát khu an toàn nếu loài đó vốn ở vùng sâu); lượt nới bỏ luật này để KHÔNG thiếu trùm
+      if (strict && (map.dangerAt(x, y) < def.minDanger || !bossSpawnOk(w, def, x, y))) continue;
       return { x, y };
     }
   }

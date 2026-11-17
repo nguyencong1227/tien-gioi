@@ -16,7 +16,7 @@ import { Hub } from "../hub";
 import type { World } from "../world";
 import { addPlayer, makeWorld } from "./test-helpers";
 import { dealMonsterDamage } from "./combat";
-import { topUpMonsters } from "./monsters";
+import { navKindsOf, topUpMonsters } from "./monsters";
 import { placeMonster } from "./monster-place";
 import { tickWorldBoss, worldBossStatus } from "./world-boss";
 
@@ -133,6 +133,20 @@ describe("world-boss: báo trước + sinh trùm", () => {
       expect(lac.sys.filter((t) => t.includes(`sau ${m} phút`))).toHaveLength(1);
     expect(bossOf(han.w)?.m.kind).toBe("thien_han_vuong"); // đúng giờ 00:05 (sang ngày mới) vẫn sinh
     expect(lac.worldBosses.filter((x) => x.msg.phase === "live")).toHaveLength(1);
+  });
+
+  it("trùm thế giới sinh ĐÚNG vùng nguy hiểm tối thiểu của loài (như quái thường), không sát khu an toàn: Hắc Giao (>= 0,85) ở Âm Sương Trạch, 20 lần sinh", () => {
+    const def = MONSTER_BY_ID.hac_giao!;
+    for (let i = 0; i < 20; i++) {
+      const hub = new Hub();
+      hub.worldBoss.slots = sampleWorldBossSchedule();
+      const am = makeWorld(getMap("am_suong")!, hub);
+      addPlayer(am.w, "A");
+      run([am.w], at(20, 59, 59), at(21, 0, 2), 500);
+      const b = bossOf(am.w)!;
+      expect(b, `lần ${i}`).not.toBeNull();
+      expect(am.w.map.dangerAt(b.m.x, b.m.y), `lần ${i}`).toBeGreaterThanOrEqual(def.minDanger);
+    }
   });
 
   it("khởi động (sập máy) GIỮA sự kiện thì sự kiện đó coi như huỷ: không sinh, không báo, sự kiện kế vẫn đúng giờ", () => {
@@ -492,6 +506,22 @@ describe("world-boss: kết cục", () => {
 });
 
 describe("world-boss: hiệu năng", () => {
+  it("dựng sẵn lưới tìm đường cho loài trùm thế giới của lịch ở ĐÚNG bản đồ của nó (lần sinh theo giờ không phải dựng trong tick)", () => {
+    // Hắc Giao vốn ở Âm Sương Trạch: ở Hàn Vân Lĩnh `monsterCapOf` = 0 nên trước khi sửa lưới của nó chỉ dựng lười, ngay trong tick sinh trùm
+    const slot: WorldBossSlot = {
+      ...sampleWorldBossSchedule()[0]!,
+      boss: "hac_giao",
+      mapId: "han_van",
+    };
+    const { han, lac } = setup([slot]);
+    expect(getMap("han_van")!.monsterCapOf("hac_giao")).toBe(0);
+    expect(navKindsOf(han.w).map((d) => d.id)).toContain("hac_giao");
+    expect(navKindsOf(lac.w).map((d) => d.id)).not.toContain("hac_giao"); // phòng khác không dựng thừa
+    expect(navKindsOf(makeWorld(getMap("han_van")!, new Hub()).w).map((d) => d.id)).not.toContain(
+      "hac_giao",
+    ); // không có lịch thì không thêm gì
+  });
+
   it("không có lịch thì mỗi tick không tốn gì; có lịch thì chỉ một lần làm việc mỗi nhịp 250 ms dù nhiều phòng gọi", () => {
     const { hub, han, lac } = setup();
     addPlayer(han.w, "A");
