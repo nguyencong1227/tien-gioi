@@ -304,7 +304,7 @@ export function planStillValid(
   return !!s && s.itemId === plan.itemId && s.qty >= plan.qty;
 }
 
-/** Dòng sổ kho đồ: "10:30 · Tiêu Viêm đã góp Hồi Huyết Đan ×5" (giờ theo máy người xem). */
+/** Dòng sổ kho đồ: "10:30 · Phó Hồng Ngạn đã góp Hồi Huyết Đan ×5" (giờ theo máy người xem). */
 export function vaultLogLine(e: SectVaultLogEntry): string {
   const d = new Date(e.at);
   const hh = String(d.getHours()).padStart(2, "0");

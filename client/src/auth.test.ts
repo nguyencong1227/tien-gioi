@@ -393,7 +393,7 @@ describe("client/src/auth-ui - Quyết định điều hướng sau khi có toke
       me: async () => ({
         username: "user1",
         hasCharacter: true,
-        name: "Lý Tiêu Dao",
+        name: "Trịnh Hoài Sơn",
       }),
     } as any;
 
@@ -410,7 +410,7 @@ describe("client/src/auth-ui - Quyết định điều hướng sau khi có toke
     );
 
     expect(joinedToken).toBe("test_token_abc");
-    expect(joinedName).toBe("Lý Tiêu Dao");
+    expect(joinedName).toBe("Trịnh Hoài Sơn");
   });
 
   it("enterWithToken không gọi onTokenAuth khi tài khoản chưa có nhân vật", async () => {
@@ -445,7 +445,7 @@ describe("client/src/auth-ui - Quyết định điều hướng sau khi có toke
       me: async () => ({
         username: "user_bad",
         hasCharacter: true,
-        name: "Lý Tiêu Dao",
+        name: "Trịnh Hoài Sơn",
       }),
     } as any;
 
@@ -495,7 +495,7 @@ describe("client/src/auth-ui - Quyết định điều hướng sau khi có toke
       me: async () => ({
         username: "user_need_char",
         hasCharacter: true,
-        name: "Lý Tiêu Dao",
+        name: "Trịnh Hoài Sơn",
       }),
     } as any;
 

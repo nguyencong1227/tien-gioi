@@ -160,7 +160,7 @@ function createMockDungeonRoom(
           [
             "mock-session-01",
             {
-              name: "Trương Tiểu Phàm",
+              name: "Tô Vân Hạc",
               realm,
               tier: 8,
               hp: dead ? 0 : 2500,
@@ -773,7 +773,7 @@ async function start(room: Room, mapId: string) {
           buildMockThuMonDialog({
             canOpen: false,
             failReason: "member_low",
-            failWho: "Lâm Kinh Vũ",
+            failWho: "Mạc Khinh Trần",
           }),
         ),
       showInvite: () => ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite()),
@@ -817,14 +817,14 @@ async function start(room: Room, mapId: string) {
       },
     };
     (window as any).__mockDuel = {
-      showInvite: (from = "Diệp Phàm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
-      showCountdown: (opponent = "Diệp Phàm") =>
+      showInvite: (from = "Ngô Tử Khiêm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
+      showCountdown: (opponent = "Ngô Tử Khiêm") =>
         ui.onDuelState(MOCK_DUEL_SAMPLES.stateCountdown(opponent)),
-      showFighting: (opponent = "Diệp Phàm") =>
+      showFighting: (opponent = "Ngô Tử Khiêm") =>
         ui.onDuelState(MOCK_DUEL_SAMPLES.stateFighting(opponent)),
       updateOpponentHp: (hp: number, maxHp: number) => ui.updateDuelOpponentHp(hp, maxHp),
-      showWon: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
-      showLost: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
+      showWon: (opponent = "Ngô Tử Khiêm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
+      showLost: (opponent = "Ngô Tử Khiêm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
       showDraw: () => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endDraw()),
       hide: () => {
         ui.hideDuelHud();

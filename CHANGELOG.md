@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.4.0
 
+### Giao diện
+- **Dọn tên nhân vật mẫu lấy từ truyện khác (quy tắc Asset của `AGENTS.md`: nhân vật phải là của Tiên Giới; chỉ client, không đổi máy chủ / giao thức / chữ người chơi thấy khi chơi thật):** nhân vật giả của chế độ `?dungeon=mock` / `?duel=mock` / `?sect=mock` và các test / script chụp ảnh còn mang tên của nhân vật truyện khác (Trương Tiểu Phàm, Lục Tuyết Kỳ, Lâm Kinh Vũ, Diệp Phàm, Tiêu Phong, Hư Trúc, Đoàn Dự, Vương Ngữ Yên, Tiêu Viêm, Hàn Lập, Đường Tam, Lý Tiêu Dao, Lệ Phi Vũ, Nam Cung Uyển) => đổi hết sang tên tự đặt (Tô Vân Hạc, Hạ Thanh Linh, Mạc Khinh Trần, Ngô Tử Khiêm, Bùi Chấn Nhạc, Vũ Thanh Tùng, Cát Mặc Lâm, Doãn Nhược Vy, Phó Hồng Ngạn, Giang Tĩnh Uyên, Kha Bích Hạ, Trịnh Hoài Sơn, Đỗ Phi Vân, Tống Uyển Thu) ở `client/src/{main,dungeon,duel,sect,sect-vault}.ts`, 6 tệp test và 2 script `snap-*`; chụp lại 16 ảnh `docs/screenshots/o-so-luong/` có hiện tên giả trên HUD (chạy `check-inv-select`, `check-sect-hall`, `check-sect-confirm`, `check-shop-qty` với `--shots`, cả bốn ĐẠT). Test mới `client/src/no-foreign-names.test.ts` quét `client/` và đỏ nếu tên cũ quay lại (2 đột biến đỏ: tên trong `dungeon.ts` và trong script `snap-sect.mjs`). Các tên chung chung (Tiêu Dao Phái, Thanh Vân Môn, Mộc Thanh...) giữ nguyên. `npm test` đạt.
+
 ## [0.4.0] — 17/11/2026: M8 tông môn có chiều sâu + trùm nhiều chiêu + ô nhập số lượng + ảnh AI đầu tiên
 
 Bản lớn đầu tiên sau M7: **tông môn có chiều sâu (M8)**, **trùm nhiều chiêu**, **ô nhập số lượng** và **ảnh AI đầu tiên**. Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục bên dưới.
