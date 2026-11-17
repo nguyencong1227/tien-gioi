@@ -345,6 +345,13 @@ describe("bannerShown", () => {
     ...(ms === undefined ? {} : { startsInMs: ms }),
   });
 
+  it("ngưỡng ghim 15 phút: lớn hơn mốc báo trước lớn nhất của lịch mẫu (10 phút) nhưng không phải cả giờ (banner không chiếm chỗ cả buổi)", () => {
+    expect(WB_BANNER_SOON_MS).toBe(15 * 60_000);
+    expect(WB_OVERDUE_MS).toBe(60_000);
+    const maxAnnounce = Math.max(...sampleWorldBossSchedule().flatMap((s) => s.announceMin));
+    expect(maxAnnounce * 60_000).toBeLessThanOrEqual(WB_BANNER_SOON_MS);
+  });
+
   it("soon: chỉ hiện khi còn <= 15 phút (biên), xa hơn thì chỉ tab Sự kiện", () => {
     expect(bannerShown(worldBossView(soon(WB_BANNER_SOON_MS)))).toBe(true);
     expect(bannerShown(worldBossView(soon(WB_BANNER_SOON_MS + 1)))).toBe(false);
