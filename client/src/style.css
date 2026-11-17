@@ -7399,13 +7399,34 @@ body.ui-hidden
 }
 .boss-bar-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   font-size: var(--fs-14);
 }
 .boss-bar-head b {
   color: #ffb0a0;
+}
+/* Ảnh đại diện trùm (thẻ minh hoạ AI, boss-card.ts): chỉ hiện khi ảnh đã tải xong; điện thoại ngang thấp thì nhỏ hơn để thanh không cao thêm nhiều */
+.boss-bar-art {
+  display: block;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 120, 90, 0.55);
+  pointer-events: none;
+  user-select: none;
+}
+.boss-bar-art[hidden] {
+  display: none;
+}
+@media (max-height: 420px) {
+  .boss-bar-art {
+    width: 28px;
+    height: 28px;
+  }
 }
 .boss-bar-phase {
   font-size: var(--fs-12);
