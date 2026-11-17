@@ -8,6 +8,7 @@ import {
   skillCooldownMs,
   SKILL_MAX_LEVEL,
   SKILL_TIER_MAX,
+  masteryNeedOf,
   skillMaxLevelOf,
   SLOT_UNLOCK_REALM,
   REALMS,
@@ -24,6 +25,7 @@ import {
   type SkillSlot,
   type SkillsMsg,
 } from "@tien-gioi/shared";
+import { parseMastery } from "./skill-mastery";
 
 /** Hồi chiêu còn lại tối đa mà client chịu nhận (ms): chiêu dài nhất ~ vài chục giây; số rác không làm vòng quét kẹt hàng giờ. */
 const CD_CLAMP_MS = 10 * 60 * 1000;
@@ -46,6 +48,10 @@ export class SkillTracker {
   private at = 0;
   /** Đã nhận `skills` ít nhất một lần chưa (chưa thì chưa biết gì: ô hiện trống, không phải "lỗi") */
   private got = false;
+  /** Điểm luyện dở dang đã nhớ (id chiêu -> điểm, `skill-mastery.ts`); chiêu không có mục = 0 điểm */
+  private mastery: Record<string, number> = {};
+  /** Đã từng nhận trường `mastery` (kể cả rỗng) chưa: máy chủ cũ không gửi thì không vẽ thanh luyện */
+  private masteryGot = false;
   /** Tăng mỗi lần nhận `skills`: người vẽ so để biết có phải dựng lại danh sách không */
   version = 0;
 
@@ -53,7 +59,21 @@ export class SkillTracker {
   set(raw: unknown, now: number): void {
     const r = raw !== null && typeof raw === "object" ? (raw as Partial<SkillsMsg>) : {};
     // `realm` lớn: không lọc ô theo cảnh giới ở đây (server đã lọc; ô khoá do `slotView` quyết theo cảnh giới hiện tại, kể cả lúc vừa đột phá)
+    const prev = this.book.learned;
     this.book = sanitizeSkillBook({ learned: r.learned, slots: r.slots }, 99);
+    // LUYỆN CHIÊU: có trường `mastery` thì thay toàn bộ; vắng thì giữ, TRỪ chiêu đổi tầng / mất khỏi sổ (điểm tầng cũ hết nghĩa)
+    const got = parseMastery(r.mastery, this.book.learned);
+    if (got !== null) {
+      this.mastery = got;
+      this.masteryGot = true;
+    } else {
+      const keep: Record<string, number> = {};
+      for (const id of Object.keys(this.mastery)) {
+        const lv = this.book.learned[id];
+        if (lv !== undefined && prev[id] === lv) keep[id] = this.mastery[id]!;
+      }
+      this.mastery = keep;
+    }
     for (let i = 0; i < 4; i++) {
       const id = this.book.slots[i];
       const cd = Array.isArray(r.cd) ? msClamp(r.cd[i]) : 0;
@@ -72,8 +92,20 @@ export class SkillTracker {
     this.book = { learned: {}, slots: ["", "", "", ""] };
     this.cd = [0, 0, 0, 0];
     this.cdMax = [0, 0, 0, 0];
+    this.mastery = {};
+    this.masteryGot = false;
     this.got = false;
     this.version++;
+  }
+
+  /** Điểm luyện dở dang của chiêu (0 khi chưa có / chiêu lạ). */
+  masteryOf(skillId: string): number {
+    return Object.prototype.hasOwnProperty.call(this.mastery, skillId) ? this.mastery[skillId]! : 0;
+  }
+
+  /** Máy chủ đã gửi điểm luyện ít nhất một lần (kể cả rỗng): chỉ khi đó mới vẽ thanh luyện. */
+  get masteryKnown(): boolean {
+    return this.masteryGot;
   }
 
   get received(): boolean {
@@ -386,7 +418,14 @@ export function mockSkillsMsg(ids: readonly string[], n: 0 | 1 | 2 | 4, cdMs = 0
     cdMax[i] = def?.cooldown ?? 0;
   }
   if (n > 0) cd[0] = Math.min(cdMs, cdMax[0]);
-  return { learned, slots, cd, cdMax };
+  // điểm luyện giả: 40% điểm cần của mỗi chiêu còn luyện được (để thấy thanh luyện ở `?skills=mock`)
+  const mastery: Record<string, number> = {};
+  for (const id of ids) {
+    const d = skillOf(id);
+    const need = d ? masteryNeedOf(d, learned[id]!) : null;
+    if (need !== null) mastery[id] = Math.floor(need * 0.4);
+  }
+  return { learned, slots, cd, cdMax, mastery };
 }
 
 /** Cảnh giới của người chơi giả: `?realm=N` (0..8) nếu có, không thì đủ để mở số ô cần thấy (4 chiêu -> Nguyên Anh mở cả bốn ô; 0 / 1 / 2 chiêu -> mở vừa đủ ô). */

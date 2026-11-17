@@ -2238,6 +2238,25 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   color: #ffe08a;
   letter-spacing: 1px;
 }
+.sk-mastery {
+  margin: 6px 0 2px;
+}
+.sk-mastery-text {
+  display: block;
+  opacity: 0.85;
+  font-size: var(--fs-12);
+}
+.sk-mastery-bar {
+  margin-top: 3px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.sk-mastery-fill {
+  height: 100%;
+  background: #ffe08a;
+}
 .sk-row-stats {
   margin: 6px 0 2px;
   padding-left: 18px;
