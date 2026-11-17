@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ITEMS } from "@tien-gioi/shared";
 import { quickLabel } from "./quick-label";
+import { isQuickCandidate } from "./item-use";
 
 describe("quickLabel: nhãn ngắn của ô nhanh đan dược", () => {
   it("giữ loại (Huyết / Linh) và cấp (2 / 3) của đan Hồi", () => {
@@ -21,8 +22,10 @@ describe("quickLabel: nhãn ngắn của ô nhanh đan dược", () => {
     expect(quickLabel(null as unknown as string)).toBe("");
   });
 
-  it("MỌI vật phẩm tiêu hao có nhãn KHÁC NHAU và đủ ngắn cho ô ~48 px (<= 9 ký tự): đan mới thêm vào mà nhãn trùng / quá dài thì đỏ ở đây", () => {
-    const consumables = ITEMS.filter((i) => i.type === "consumable");
+  it("MỌI vật phẩm có thể chiếm ô dùng nhanh có nhãn KHÁC NHAU và đủ ngắn cho ô ~48 px (<= 9 ký tự): đan mới thêm vào mà nhãn trùng / quá dài thì đỏ ở đây", () => {
+    // Ô dùng nhanh chỉ hiển thị ứng viên (isQuickCandidate = consumable KHÔNG gắn trạng thái). Đan hộ đạo (#763) và phù
+    // (#817) gắn trạng thái (`effect.kind === "status"`) nên KHÔNG xuất hiện ở ô nhanh (xem item-use.ts): không cần nhãn ngắn.
+    const consumables = ITEMS.filter(isQuickCandidate);
     expect(consumables.length).toBeGreaterThanOrEqual(7);
     const labels = consumables.map((i) => quickLabel(i.name));
     expect(new Set(labels).size).toBe(labels.length); // không hai đan chung nhãn
