@@ -5,6 +5,7 @@ import {
   DEFAULT_MAP,
   DEFAULT_MAP_ID,
   DUNGEON_MAPS,
+  GameMap,
   LINH_HU_MAP_ID,
   MAPS,
   MAP_BY_ID,
@@ -127,6 +128,34 @@ describe("ARENA_MAPS", () => {
       // phần đi được đủ rộng để đánh nhau (>= 300 ô)
       expect(seen.size, a.id).toBeGreaterThanOrEqual(300);
     }
+  });
+
+  it("kể cả khi (giả sử) có cổng: khu an toàn quanh cổng cũng KHÔNG hiệu lực trong đấu trường (kind arena luôn không an toàn)", () => {
+    const base = ARENA_MAPS[0];
+    const g0 = getMap(base.id)!;
+    const px = g0.townPx.x;
+    const py = g0.townPx.y;
+    const g = new GameMap({
+      ...base,
+      portals: [
+        {
+          id: "arena_thu_cong",
+          name: "Cổng thử",
+          x: px,
+          y: py,
+          r: 20,
+          safeR: 120,
+          toMap: DEFAULT_MAP_ID,
+          toPortal: "khong_co",
+          spawn: { x: px + 60, y: py },
+        },
+      ],
+    });
+    expect(g.inSafe(px, py)).toBe(false);
+    expect(g.inSafe(px + 60, py)).toBe(false);
+    // đối chứng: cùng cổng đó ở bản đồ KHÔNG phải đấu trường thì có khu an toàn
+    const w = new GameMap({ ...base, kind: "world", portals: g.def.portals });
+    expect(w.inSafe(px + 60, py)).toBe(true);
   });
 
   it("tất định: dựng hai lần cho cùng ô (client và server cùng sinh từ seed)", () => {

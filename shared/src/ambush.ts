@@ -90,7 +90,7 @@ export const AMBUSH_EXP_PRICE_PCT: Readonly<Record<AmbushPriceStage, number>> = 
 export const AMBUSH_COIN_BASE = 30;
 export const AMBUSH_COIN_GROWTH = 1.18;
 export const AMBUSH_COIN_MULT: Readonly<Record<AmbushPriceStage, number>> = { offer: 1, mid: 2 };
-/** Giá Linh thạch tối thiểu: chặn cách "để tu vi sát đáy rồi bỏ chạy bằng tu vi mãi" (khi giá tu vi bị kẹp về 0 mà không có sàn này). */
+/** Sàn của giá Linh thạch: dù chỉnh `AMBUSH_COIN_BASE` / `AMBUSH_COIN_GROWTH` thế nào, bỏ chạy bằng Linh thạch không bao giờ rẻ hơn mức này (không thành "phí không đáng kể"). Hiện nhỏ hơn mọi giá thật nên chưa chạm tới. */
 export const AMBUSH_FLEE_MIN_COIN = 5;
 
 const wholeNonNeg = (v: unknown): number =>
