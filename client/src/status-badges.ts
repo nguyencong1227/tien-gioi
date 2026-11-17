@@ -81,6 +81,13 @@ export function effectText(def: StatusDef, ratio: number | undefined): string {
     }
     case "cdr":
       return pct > 0 ? `giảm ${pct}% hồi chiêu` : "giảm hồi chiêu";
+    // trạng thái mới của mục 51 (CT1b)
+    case "empower":
+      return pct > 0 ? `tăng ${pct}% sát thương mọi chiêu` : "tăng sát thương mọi chiêu";
+    case "weaken":
+      return "gây ít sát thương hơn";
+    case "mark":
+      return "mang dấu: chiêu cùng hệ kích được";
   }
 }
 
@@ -92,6 +99,7 @@ function ratioTag(def: StatusDef, ratio: number | undefined): string {
   if (def.kind === "breakAid") return ` +${Math.round(ratio * 100)}%`;
   if (def.kind === "amp") return ` +${Math.round(ratio * 100)}%`;
   if (def.kind === "cdr") return ` −${Math.round(ratio * 100)}%`;
+  if (def.kind === "empower") return ` +${Math.round(ratio * 100)}%`;
   return "";
 }
 

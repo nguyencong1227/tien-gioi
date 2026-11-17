@@ -12,15 +12,15 @@
 // Giá hiện trên nút LÀ GIÁ BỊ TRỪ: máy chủ CHỐT giá lúc gửi `ambushOffer` / `ambushState` (gắn với `id` đề nghị), `ambushChoose` / `ambushFlee` trừ ĐÚNG số đã chốt, chỉ kiểm lại ví còn đủ
 // (client không gửi số nào; không tính lại theo trạng thái lúc nhận vì tu vi có thể đổi trong lúc chờ).
 // Nối lại mạng giữa chừng: máy chủ ĐÓNG BĂNG đồng hồ (hộp thoại / trận) tối đa `AMBUSH_DROP_GRACE_S`; sau khi nối lại máy chủ gửi LẠI `ambushOffer` (CÙNG `id`, `ms` còn lại THẬT) hoặc
-// `ambushState` (trong đấu trường). Client coi cùng `id` là CẬP NHẬT hộp thoại đang mở (không dựng lại, không gửi lại `ambushSeen`); hết đồng hồ cục bộ mà chưa có tin mới thì KHÔNG tự chọn
+// `ambushState` (trong đấu trường). Client coi cùng `id` là CẬP NHẬT hộp thoại đang mở (không dựng lại; có thể gửi lại `ambushSeen` cho cùng `id`: máy chủ chỉ đặt cờ "đã thấy", gửi nhiều lần vô hại); hết đồng hồ cục bộ mà chưa có tin mới thì KHÔNG tự chọn
 // (máy chủ mới là bên quyết): hiện "đang chờ máy chủ".
 
 import { NET_RECONNECT_GRACE_S } from "./net-guard";
 
 // ---------- Hằng số (thời gian ms, khoảng cách px) ----------
 
-/** Phiên bản giao thức tối thiểu của client để được kích hoạt chặn đường (client cũ không có hộp thoại: đứng chờ rồi vào trận không nút bỏ chạy). */
-export const AMBUSH_MIN_PROTOCOL = 5;
+/** Phiên bản giao thức tối thiểu của client để được kích hoạt chặn đường (client cũ không có hộp thoại: đứng chờ rồi vào trận không nút bỏ chạy). 6 = bản đầu tiên có giao diện hộp thoại (CD7; client v5 đang chạy thật không có); CD10 chốt lại khi bật `AMBUSH`. */
+export const AMBUSH_MIN_PROTOCOL = 6;
 /** Hộp thoại mở bấy lâu không chọn = `fight`. */
 export const AMBUSH_OFFER_MS = 10_000;
 /** Một trận tối đa chừng này; hết giờ là THUA (mất giá giữa trận, không thưởng). */

@@ -532,7 +532,44 @@ export type FxMsg =
       speed: number;
       range: number;
       element?: Element;
-    };
+    }
+  /**
+   * ĐẠN của người chơi, theo TỪNG ĐOẠN (mục 51, CT1b): bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) trong `ms` (thời gian tới chỗ dừng do MÁY CHỦ tính: ô chặn, trúng,
+   * hết tầm). Mỗi lần nảy / xuyên đổi hướng máy chủ gửi `pbolt` MỚI từ điểm đó (client KHÔNG tự mô phỏng nảy). `skill` = id `SkillDef` (tra `fx` + hệ để vẽ). Phần trúng đã có `dmg`.
+   */
+  | {
+      kind: "pbolt";
+      by: string;
+      skill: string;
+      x: number;
+      y: number;
+      angle: number;
+      speed: number;
+      ms: number;
+    }
+  /** SÉT LAN: đường nảy theo thứ tự, `pts` = toạ độ phẳng [x0, y0, x1, y1, ...] (2 tới `CHAIN_FX_POINTS_MAX` điểm nguyên, điểm đầu là người dùng); (x, y) = chỗ người dùng đứng (để `sendNear` chỉ gửi cho người ở gần). Client vẽ tia nối tiếp; phần trúng có `dmg`. */
+  | { kind: "chain"; by: string; skill: string; x: number; y: number; pts: number[] }
+  /**
+   * VẬT THỂ BỀN (`zone` / `trap` / `totem` / `aura`) vừa dựng: `id` (số nguyên tăng dần THEO PHÒNG) để `fxEnd` gỡ đúng cái; (x, y) tâm, `r` bán kính, `ms` thời gian tồn tại tối đa. `zone` / `trap` /
+   * `totem` ĐỨNG YÊN ở (x, y); `aura` BÁM THEO người dùng `by` (client vẽ theo vị trí của thực thể `by`, (x, y) chỉ là chỗ lúc dựng). Gửi MỘT lần (`sendNear`); người đi VÀO vùng nhìn sau lúc dựng KHÔNG thấy nó (sát thương vẫn tính), nối lại mạng thì hình mất: chấp nhận vì vật thể ngắn.
+   */
+  | {
+      kind: "zone" | "trap" | "totem" | "aura";
+      by: string;
+      skill: string;
+      id: number;
+      x: number;
+      y: number;
+      r: number;
+      ms: number;
+    }
+  /** Vật thể bền `id` kết thúc SỚM hơn `ms`: `pop` (bẫy nổ) hoặc `gone` (chủ chết / rời / qua cổng, bị thay, vùng cũ nhất bị đẩy). (x, y) = chỗ vật thể đứng (để `sendNear` chỉ gửi cho người ở gần). */
+  | { kind: "fxEnd"; id: number; x: number; y: number; why: "pop" | "gone" };
+// CHIÊU VẬN (`SkillDef.windupMs`, mục 51): trạng thái `windup` chỉ nằm trong danh sách RIÊNG của người vận (`StatusMsg` gửi chủ), người đứng cạnh KHÔNG nhận nó. Người khác biết ai đang vận nhờ tin
+// `fx` `cast` máy chủ gửi lúc BẮT ĐẦU vận (client tra `windupMs` từ `skill` để vẽ vòng tụ khí trong chừng đó); hiệu ứng của hình (`pbolt` / `chain` / `zone`...) gửi lúc ĐÁP, sau `windupMs`.
+// Vận bị ngắt (choáng, chết, hồn lìa xác, qua cổng) thì máy chủ KHÔNG gửi thêm tin nào: client tự tắt vòng tụ khí khi thấy người vận choáng / chết hoặc quá `windupMs` (hở tối đa `WINDUP_MAX_MS`).
+/** Số điểm tối đa của `FxMsg` `chain` (người dùng + `SKILL_LIMITS.chainBouncesMax` lần nảy + 1 mục tiêu đầu). */
+export const CHAIN_FX_POINTS_MAX = 6;
 export interface DmgMsg {
   target: string;
   amount: number;
@@ -540,6 +577,11 @@ export interface DmgMsg {
   y: number;
   crit?: boolean;
   toPlayer?: boolean;
+  /**
+   * Đòn này ĂN COMBO (mục 51, CT1b: chiêu có `combo` gỡ DẤU `mark_<hệ>` trên mục tiêu và nhân sát thương): client vẽ vụ nổ dấu theo hệ ngay chỗ trúng (x, y). TUỲ CHỌN: client cũ bỏ qua
+   * trường lạ nên chỉ thấy con số to hơn (review B ở #1084). Máy chủ chỉ đặt `true` khi thật sự gỡ dấu.
+   */
+  combo?: boolean;
 }
 export interface ChatOut {
   from: string;
@@ -550,6 +592,12 @@ export interface ChatOut {
    * kể cả thành viên ở bản đồ khác; bỏ trống là chat chung **cả server** (mọi bản đồ / phòng, đi qua kênh chung giữa các phòng, M3 bước 1)
    */
   channel?: "party" | "sect";
+  /**
+   * Danh hiệu của người nói (M9, `docs/PHAN_CONG_M9.md`): ID NGẮN (`TITLE_ID_RE`, cùng `Player.title`), client tra `TITLES` ra chữ; thiếu / rỗng = không đeo danh hiệu.
+   * Máy chủ điền từ `Player.title` LÚC GỬI (không bao giờ tin client). Tin hệ thống (`sys`) và chat không có người nói thì bỏ trống. Client KHÔNG hiện id lạ ra màn hình
+   * (máy chủ mới hơn client). Chỉ hiện khi cờ `?social=1` bật (đến khi M9 phát hành).
+   */
+  titleId?: string;
 }
 export interface ToastMsg {
   text: string;
