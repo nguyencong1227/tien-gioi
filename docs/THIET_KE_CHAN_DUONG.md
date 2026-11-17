@@ -77,6 +77,8 @@ Bị hạ trong đấu trường: **không `beginLimbo`**, không mất kiếp /
 `shared/src/ambush.ts`: hằng số (`AMBUSH_*` ở trên), `AMBUSH_MSG` (`offer`, `choose`, `state`, `flee`, `end`; chỉ người liên quan nhận), kiểu `AmbushOfferMsg { id, scene, foe: { name, tier, count }, price: { exp, coin | null }, ms }`, `AmbushChooseMsg { id, choice: "fight" | "flee_coin" | "flee_exp" }`, `AmbushStateMsg { foeHpPct, msLeft, priceMid }`, `AmbushEndMsg { result: "won" | "fled" | "lost" | "timeout" | "dropped", paid?, rewards? }`, hàm thuần `ambushExpPrice` / `ambushCoinPrice` / `ambushRollP` / `parseAmbushChoose` (kiểu, hữu hạn, id), `MapDef.kind: "arena"`, `ARENA_MAPS`, `isArenaMap`, `sampleAmbushOffer()` cho giao diện. `shared/src/ambush-data.ts` khung rỗng + `ambushViolations` (E / G / D nhập dữ liệu vào sau). Thêm tin vào `server/scripts/red-team.ts` EXPECTED_MESSAGE_TYPES; env `AMBUSH`, `AMBUSH_BOTS` vào `docs/TRIEN_KHAI.md` (check-env).
 
 ## 11. Chia việc (mỗi dòng một issue; nhãn `dev-x` + `chan-duong`; cột mốc "Chặn đường (mục 52)")
+Số issue: CD1 #1061, CD2 #1062, CD3 #1063, CD4 #1064, CD5 #1065, CD6 #1066, CD7 #1067, CD8 #1068, CD9 #1069, CD10 #1070.
+
 | # | Việc | Ai | Phụ thuộc |
 |---|---|---|---|
 | CD1 | Hợp đồng `shared/` (mục 10) + `PROTOCOL_VERSION` 5 + test + đột biến | A | - |
