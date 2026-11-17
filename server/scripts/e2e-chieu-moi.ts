@@ -277,12 +277,17 @@ async function main() {
     );
     // Ghi lại MỌI tin `fx` thật client nhận (bọc `onFx`: tin đi đúng đường mạng -> `reg("fx")` -> `onFx`) kèm ảnh chụp lớp vẽ NGAY lúc nhận
     await ev(`(() => {
-      const sc = window.__scene; window.__fxLog = [];
+      const sc = window.__scene; window.__fxLog = []; window.__pts = [];
+      // mọi điểm phát hạt playFxPoints (chỗ chung của tia sét, vòng nổ bẫy, bụi cuối đạn): ghi số điểm để biết MỖI tin fx thật sự vẽ gì (không lẫn hạt của tin khác)
+      const origPts = sc.playFxPoints.bind(sc);
+      sc.playFxPoints = (pts) => { window.__pts.push(Array.isArray(pts) ? pts.length : -1); return origPts(pts); };
       const orig = sc.onFx.bind(sc);
       sc.onFx = (m) => {
+        const before = window.__pts.length;
         const r = orig(m);
         window.__fxLog.push({ kind: m?.kind, skill: m?.skill, id: m?.id, why: m?.why, x: m?.x, y: m?.y, r: m?.r, ms: m?.ms,
           n: Array.isArray(m?.pts) ? m.pts.length : undefined, t: performance.now(),
+          drawn: window.__pts.slice(before).reduce((a, b) => a + b, 0),
           persist: sc.persists.snapshot(sc.time.now), windup: sc.windups.snapshot(sc.time.now) });
         return r;
       };
@@ -301,6 +306,8 @@ async function main() {
         r?: number;
         ms?: number;
         n?: number;
+        /** số điểm hạt `playFxPoints` do CHÍNH tin này vẽ */
+        drawn: number;
         persist: Array<{ id: number; kind: string; mine: boolean; armed: boolean; alpha: number }>;
         windup: Array<{ phase: string; progress: number; mine: boolean }>;
       }>;
@@ -390,7 +397,8 @@ async function main() {
       `bẫy NỔ (why=${pop.why}, id ${pop.id} khớp ${trap.id})`,
     );
     await T.waitFor(`window.__scene.persists.stats().alive === 0`, "vật thể bẫy được gỡ");
-    must((await admitted()) > adm0, "bẫy nổ: có hạt vòng nổ + bụi (hạt được phát)");
+    must(pop.drawn >= 1, `bẫy nổ: CHÍNH tin fxEnd vẽ vòng nổ + bụi (${pop.drawn} điểm hạt)`);
+    must((await admitted()) > adm0, "bẫy nổ: hạt được phát thật");
     must(hpDrop() > 0, `quái mất máu vì bẫy (-${hpDrop()})`);
     ok(
       `bẫy: hiện ngay chưa kích hoạt -> kích hoạt sau armMs -> quái chạm thì NỔ (fxEnd pop), gỡ vật thể, hạt nổ, quái -${hpDrop()} máu`,
@@ -441,7 +449,11 @@ async function main() {
     await waitLog("chain", CHAIN, 1, "client nhận `fx chain` của Liên Châu Lôi");
     const chain = (await fxLog("chain", CHAIN))[0]!;
     must((chain.n ?? 0) >= 2, `tia sét có >= 2 điểm (${chain.n})`);
-    must((await admitted()) > adm4, "hạt tia sét được phát");
+    must(
+      chain.drawn >= (chain.n ?? 2) - 1,
+      `CHÍNH tin chain vẽ tia sét: >= ${(chain.n ?? 2) - 1} điểm hạt, thực tế ${chain.drawn}`,
+    );
+    must((await admitted()) > adm4, "hạt tia sét được phát thật");
     const t4 = Date.now();
     while (hpDrop() === 0 && Date.now() - t4 < 3000) await sleep(100);
     must(hpDrop() > 0, "quái trúng sét (mất máu)");
