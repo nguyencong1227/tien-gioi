@@ -130,8 +130,8 @@ describe("Âm Sương Trạch: bản đồ thứ ba", () => {
 });
 
 describe("giao thức", () => {
-  it("PROTOCOL_VERSION = 4 (3: M7.1 chiêu thức / hành vi quái / kinh quyển; 4: nghề nhỏ #514 vật phẩm `status` + trạm Lò đan / Bàn phù); MIN_PROTOCOL_VERSION KHÔNG đổi (người vận hành quyết lúc phát hành)", () => {
-    expect(PROTOCOL_VERSION).toBe(4);
+  it("PROTOCOL_VERSION = 5 (3: M7.1 chiêu thức / hành vi quái / kinh quyển; 4: nghề nhỏ #514 vật phẩm `status` + trạm Lò đan / Bàn phù; 5: chặn đường #1061 tin ambush* + bản đồ arena); MIN_PROTOCOL_VERSION KHÔNG đổi (người vận hành quyết lúc phát hành)", () => {
+    expect(PROTOCOL_VERSION).toBe(5);
     expect(MIN_PROTOCOL_VERSION).toBe(0);
   });
 });

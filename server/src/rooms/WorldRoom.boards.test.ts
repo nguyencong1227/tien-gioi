@@ -16,6 +16,7 @@ import {
 } from "@tien-gioi/shared";
 import { listenWithRetry } from "../test-port";
 import { LeaderboardService } from "../leaderboard";
+import { soulIdOf } from "../soul";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-boards-"));
 let PORT = 0;
@@ -166,5 +167,44 @@ describe("boardsGet / boards qua phòng thật", () => {
     await sleep(700);
     expect(a.boards.length).toBeGreaterThan(0);
     expect(a.boards.length).toBeLessThan(15); // burst 6 + vài tin hồi lại
+  });
+  it("tongmon: `mine` là hạng tông CỦA NGƯỜI HỎI (phòng truyền khoá chân linh); người không ở tông nào nhận none", async () => {
+    const a = await spawn();
+    const b = await spawn();
+    const mk = (soulKeys: string[], points: number, name: string) => ({
+      v: 1,
+      id: `id-${name}`,
+      name,
+      tag: "T",
+      leader: "x",
+      motd: "",
+      members: soulKeys.map((k) => ({ soulKey: k })),
+      coin: 0,
+      log: [],
+      vault: {},
+      points,
+      createdAt: "t",
+      updatedAt: "t",
+    });
+    const svc = new LeaderboardService({
+      souls: { all: async () => [] } as never,
+      players: { listProfiles: async () => [] } as never,
+      sects: {
+        all: async () => [
+          mk(["khac"], 9000, "Thanh Van"),
+          mk([soulIdOf(a.name)], 100, "Bach Lien"),
+        ],
+      } as never,
+      testExp: () => new Map(),
+    });
+    await svc.refresh();
+    WorldRoomCls.leaderboards = svc;
+    a.room.send(SOCIAL_MSG.boardsGet, { board: "tongmon" });
+    b.room.send(SOCIAL_MSG.boardsGet, { board: "tongmon" });
+    const ma = await waitFor(() => a.boards[0], 3000, "boards của A");
+    const mb = await waitFor(() => b.boards[0], 3000, "boards của B");
+    expect(ma.rows.map((r) => r.name)).toEqual(["Thanh Van", "Bach Lien"]);
+    expect(ma.mine).toMatchObject({ rank: 2, row: { name: "Bach Lien" } });
+    expect(mb.mine).toEqual({ rank: null, reason: "none" });
   });
 });

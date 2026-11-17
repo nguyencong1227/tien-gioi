@@ -18,6 +18,8 @@ export * from "./reincarnation";
 export * from "./social";
 export * from "./account";
 export * from "./dungeon";
+export * from "./ambush";
+export * from "./ambush-data";
 export * from "./duel";
 export * from "./sect";
 export * from "./sect-depth";

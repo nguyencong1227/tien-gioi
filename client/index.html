@@ -1627,7 +1627,21 @@
           tabindex="0"
           hidden
         >
-          <p class="social-empty">Sổ thành tựu đang được dựng.</p>
+          <p id="ach-summary" class="social-mine" role="status" aria-live="polite"></p>
+          <p id="ach-status" class="social-empty" role="status"></p>
+          <button type="button" id="ach-retry" class="social-retry" hidden>Tải lại</button>
+          <div id="ach-body" hidden>
+            <h3 class="wbt-h">Danh hiệu</h3>
+            <p id="ach-worn" class="social-age" role="status" aria-live="polite"></p>
+            <div
+              id="ach-titles"
+              class="ach-titles"
+              role="radiogroup"
+              aria-label="Chọn danh hiệu đeo cạnh đạo hiệu"
+            ></div>
+            <h3 class="wbt-h">Thành tựu</h3>
+            <div id="ach-groups"></div>
+          </div>
         </div>
         <div
           id="social-tab-event"

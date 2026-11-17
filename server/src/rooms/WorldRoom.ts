@@ -476,6 +476,7 @@ export class WorldRoom extends Room<WorldState> {
       const view = WorldRoom.leaderboards?.view(
         board,
         this.state.players.get(sid)?.name ?? null,
+        this.world.ctrl.get(sid)?.identity.soulKey ?? null,
       ) ?? {
         board,
         rows: [],
