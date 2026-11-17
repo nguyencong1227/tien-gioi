@@ -10,7 +10,7 @@ import { chargerStep } from "./charge";
 import { cancelSlam, slamStep } from "./slam";
 import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
 import { applyPlayerStatus } from "./status";
-import { isStunned, speedMult } from "./status-rules";
+import { isStunned, speedMult, weakened } from "./status-rules";
 import { inMainRegion, squareFree, warmNav } from "./nav";
 import {
   EVADE_HOME_PX,
@@ -197,7 +197,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
         if (!stunned && w.now >= mc.nextAttack) {
           mc.nextAttack = w.now + def.attackCd;
           w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
-          const dmg = Math.round(def.atk * mc.boss.atk * rand(0.85, 1.15));
+          const dmg = weakened(mc, w.now, Math.round(def.atk * mc.boss.atk * rand(0.85, 1.15))); // `weaken` (mục 51): quái yếu đi
           const eff = onHitEffectOf(def);
           if (hurtPlayer(w, mc.target!, target, dmg, m) && eff)
             applyPlayerStatus(w, mc.target!, eff, dmg, "");
@@ -223,7 +223,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       if (!stunned && w.now >= mc.nextAttack) {
         mc.nextAttack = w.now + def.attackCd;
         w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
-        const dmg = Math.round(def.atk * rand(0.85, 1.15));
+        const dmg = weakened(mc, w.now, Math.round(def.atk * rand(0.85, 1.15))); // `weaken` (mục 51)
         const eff = onHitEffectOf(def);
         // Đòn gần của `poisoner` (M7.3): trúng thì gắn thêm độc; quái thường không đụng tới `status`
         if (hurtPlayer(w, mc.target!, target, dmg, m) && eff)
