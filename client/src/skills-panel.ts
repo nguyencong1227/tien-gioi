@@ -4,6 +4,7 @@
 import {
   SKILL_MAX_LEVEL,
   TILE,
+  WINDUP_SLOW,
   elementOf,
   skillCooldownMs,
   skillDamageMult,
@@ -88,9 +89,14 @@ export function effectText(e: SkillEffect): string {
     case "stun":
       body = "";
       break;
-    default:
-      // trạng thái mới của mục 51 (cường lực, suy yếu, dấu hệ, vận khí): không số liệu riêng ở bảng này; B bổ sung ở CT11a
-      body = "";
+    case "empower":
+      body = ` (tăng ${pct(e.ratio)}% sát thương mọi chiêu)`;
+      break;
+    case "weaken":
+      body = ` (gây ít hơn ${pct(e.ratio)}% sát thương, trùm chỉ chịu một nửa)`;
+      break;
+    case "mark":
+      body = " (chiêu cùng hệ đánh vào sẽ ăn combo)";
       break;
   }
   const who = st.harmful ? "" : ", cho bản thân";
@@ -160,11 +166,7 @@ export function statLines(def: SkillDef, level: number, maxMp: number): string[]
   const out: string[] = [];
   if (def.mult > 0) {
     const m = fmtNum(def.mult * skillDamageMult(level));
-    out.push(
-      def.shape === "fan" && def.count
-        ? `Sát thương: ${m} lần công mỗi tia`
-        : `Sát thương: ${m} lần công`,
-    );
+    out.push(`Sát thương: ${m} lần công${damageUnit(def)}`);
   } else {
     out.push("Không gây sát thương");
   }
@@ -190,17 +192,94 @@ export function statLines(def: SkillDef, level: number, maxMp: number): string[]
       break;
     case "self":
       break;
-    // hình mới (mục 51, CT1b): hiện tầm cơ bản; B bổ sung số liệu riêng (số lần nảy, thời gian...) ở CT11a
+    // hình mới (mục 51, CT1b): số liệu riêng của từng hình (nảy, đạn, vùng / bẫy / hào quang / tượng)
     case "chain":
-    case "bolt":
-    case "zone":
-    case "trap":
-    case "aura":
-    case "totem":
       out.push(`Tầm: ${tiles(def.range)} ô`);
+      out.push(
+        def.bounces && def.bounces > 0
+          ? `Sét lan: nảy ${def.bounces} lần, tầm nhảy ${tiles(def.chainReach ?? 0)} ô, mỗi lần còn ${pct(def.falloff ?? CHAIN_FALLOFF_DEFAULT)}% sát thương`
+          : "Sét lan: không nảy",
+      );
+      break;
+    case "bolt": {
+      const parts = [`Tầm: ${tiles(def.range)} ô`];
+      if (def.speed) parts.push(`bay ${fmtNum(def.speed / TILE, 1)} ô/giây`);
+      if (def.count && def.count > 1) parts.push(`${def.count} viên`);
+      if (def.pierce) parts.push(`xuyên ${def.pierce} quái`);
+      if (def.bounce) parts.push(`nảy ${def.bounce} lần`);
+      out.push(parts.join(", "));
+      break;
+    }
+    case "zone":
+      out.push(
+        `Vùng: bán kính ${tiles(def.range)} ô, đặt cách ${tiles(def.reach ?? 0)} ô${lasting(def)}`,
+      );
+      break;
+    case "trap":
+      out.push(
+        `Bẫy: bán kính ${tiles(def.range)} ô, đặt cách ${tiles(def.reach ?? 0)} ô, kích hoạt sau ${seconds(def.armMs ?? 0)} giây, tồn tại ${seconds(def.durationMs ?? 0)} giây, nổ một lần`,
+      );
+      break;
+    case "aura":
+      out.push(`Hào quang: bán kính ${tiles(def.range)} ô, bám theo người${lasting(def)}`);
+      break;
+    case "totem":
+      out.push(
+        `Tượng: tầm ${tiles(def.range)} ô, đặt cách ${tiles(def.reach ?? 0)} ô${lasting(def)}${def.taunt ? ", thu hút quái" : ""}`,
+      );
       break;
   }
+  // trường chung của mục 51 (mọi hình có thể mang): chiêu vận, kéo / đẩy, combo, đồng đội
+  if (def.windupMs) {
+    out.push(
+      `Vận khí: ${seconds(def.windupMs)} giây rồi mới đáp (lúc vận đi chậm ${pct(WINDUP_SLOW)}%, bị choáng thì huỷ)`,
+    );
+  }
+  if (def.displace) {
+    out.push(
+      `${def.displace.dir === "pull" ? "Kéo" : "Đẩy"} mục tiêu ${tiles(def.displace.px)} ô (trùm miễn, tinh anh nửa quãng)`,
+    );
+  }
+  if (def.combo) {
+    const needs = statusOf(def.combo.needs)?.name ?? "";
+    if (needs !== "") {
+      const fx = def.combo.apply ? `, gắn ${effectText(def.combo.apply)}` : "";
+      out.push(
+        `Combo: đánh vào mục tiêu đang mang ${needs} thì sát thương x${fmtNum(def.combo.mult ?? COMBO_MULT_DEFAULT)}${def.combo.consume ? `, gỡ ${needs}` : ""}${fx}`,
+      );
+    }
+  }
+  if (def.ally) out.push(`Hiệu ứng có lợi cũng lên đồng đội trong ${tiles(def.ally.range)} ô`);
   return out;
+}
+
+/** Hệ số mặc định khi dữ liệu không ghi (đúng chú thích của `SkillDef`): sét lan còn 85% mỗi lần nảy, combo nhân 1,4. */
+const CHAIN_FALLOFF_DEFAULT = 0.85;
+const COMBO_MULT_DEFAULT = 1.4;
+
+/** Hậu tố của dòng "Sát thương": con số `mult` áp cho MỖI đơn vị nào (tia, viên, nhịp, đòn đầu). */
+function damageUnit(def: SkillDef): string {
+  switch (def.shape) {
+    case "fan":
+      return def.count ? " mỗi tia" : "";
+    case "bolt":
+      return def.count && def.count > 1 ? " mỗi viên" : "";
+    case "zone":
+    case "aura":
+    case "totem":
+      return " mỗi nhịp";
+    case "chain":
+      return def.bounces && def.bounces > 0 ? " ở đòn đầu" : "";
+    default:
+      return "";
+  }
+}
+
+/** ", tồn tại X giây, mỗi Y giây" của vật thể bền (thiếu số thì bỏ phần đó, không in "0 giây"). */
+function lasting(def: SkillDef): string {
+  const dur = def.durationMs ? `, tồn tại ${seconds(def.durationMs)} giây` : "";
+  const tick = def.tickMs ? `, mỗi ${seconds(def.tickMs)} giây` : "";
+  return dur + tick;
 }
 
 /** Dựng mô hình bảng từ sổ chiêu của mình. `me` = cảnh giới, bậc, linh lực tối đa hiện tại (đổi thì dựng lại). */
