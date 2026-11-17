@@ -26,15 +26,18 @@ import {
   AMBUSH_TIERS,
   AMBUSH_TIER_WEIGHTS,
   AMBUSH_FLEE_MIN_COIN,
+  AMBUSH_FOE_LEVEL_CAP,
   AMBUSH_FOES,
   AMBUSH_SCENES,
   TRAVEL_COOLDOWN_MS,
   ambushFillScene,
   ambushPrice,
   ambushRollP,
+  MONSTER_BY_ID,
   dayKey,
   parseAmbushChoose,
   parseAmbushSeen,
+  realmOfStep,
   stepOf,
   type AmbushChoice,
   type AmbushEndMsg,
@@ -293,6 +296,17 @@ export function ambushBlocked(w: World, sid: string): AmbushBlock | null {
 // ---------- Chọn cảnh + bầy ----------
 
 /** Chọn bầy + cảnh hợp (bản đồ, bậc người chơi, mức có cả cảnh lẫn bầy) theo trọng số mức; `null` nếu bảng không có gì hợp (khi đó lần tung bị bỏ). */
+/**
+ * Mục 53 (bị hạ = chết thật): KHÔNG BAO GIỜ chọn bầy có loài mạnh vượt cảnh giới người chơi: cấp loài (`MonsterKind.level`) <= `AMBUSH_FOE_LEVEL_CAP` của cảnh giới ở bậc `step`. Dữ liệu hợp lệ
+ * (`ambushViolations`) luôn qua; đây là dây an toàn thứ hai khi dữ liệu chưa qua luật kiểm (bản chạy thật không nên có, test tiêm bầy tay). Cảnh giới chưa khai trần: không chọn gì.
+ */
+export function foesWithinRealm(g: AmbushFoeGroup, step: number): boolean {
+  const realm = realmOfStep(step)?.realm;
+  const cap = realm === undefined ? undefined : AMBUSH_FOE_LEVEL_CAP[realm];
+  if (cap === undefined) return false;
+  return g.foes.every((f) => (MONSTER_BY_ID[f.kind]?.level ?? Infinity) <= cap);
+}
+
 export function pickAmbush(
   rt: Pick<AmbushRuntime, "random" | "scenes" | "foes">,
   mapId: string,
@@ -301,7 +315,12 @@ export function pickAmbush(
   const byTier = new Map<AmbushTier, { groups: AmbushFoeGroup[]; scenes: AmbushScene[] }>();
   for (const t of AMBUSH_TIERS) {
     const groups = rt.foes.filter(
-      (g) => g.mapId === mapId && g.tier === t && step >= g.minStep && step <= g.maxStep,
+      (g) =>
+        g.mapId === mapId &&
+        g.tier === t &&
+        step >= g.minStep &&
+        step <= g.maxStep &&
+        foesWithinRealm(g, step),
     );
     const scenes = rt.scenes.filter((s) => s.mapIds.includes(mapId) && s.tiers.includes(t));
     if (groups.length > 0 && scenes.length > 0) byTier.set(t, { groups, scenes });
