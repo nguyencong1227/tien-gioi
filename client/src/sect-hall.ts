@@ -332,6 +332,8 @@ export interface HallShopRow {
   /** "5 cống hiến" */
   price: string;
   hall: "baoKho" | "tangKinh";
+  /** Cấp tông tối thiểu để mua (để gom nhóm: `hallShopGroups`) */
+  minLevel: number;
   /** "Bảo khố" / "Tàng Kinh Các" */
   hallLabel: string;
   /** "Còn 3 / 10 lượt hôm nay" */
@@ -376,6 +378,7 @@ export function hallShopRows(v: SectHallView, opts: { down: boolean }): HallShop
       name: itemName(e.itemId),
       price: `${e.cost.toLocaleString("vi-VN")} ${SECT_TERMS.contrib.toLowerCase()}`,
       hall: e.hall,
+      minLevel: e.minLevel,
       hallLabel: e.hall === "tangKinh" ? SECT_TERMS.tangKinh : SECT_TERMS.baoKho,
       leftLabel: `Còn ${e.left} / ${e.limitDay} lượt hôm nay`,
       locked,
@@ -383,4 +386,62 @@ export function hallShopRows(v: SectHallView, opts: { down: boolean }): HallShop
       canBuy: locked === null,
     };
   });
+}
+
+// ---------- Gom nhóm cửa hàng theo cấp tông (bảng thật có ~28 món: cuộn dài, nhiều hàng khoá) ----------
+
+/** Một phần của một gian hàng: các món ĐÃ mở theo cấp tông (không tiêu đề) hoặc một nhóm "Mở ở cấp tông N" (thu gọn được). */
+export interface HallShopSection {
+  /** Khoá ổn định để nhớ trạng thái mở / thu của người chơi qua các lần vẽ lại: `<hall>:open` hoặc `<hall>:<cấp>` */
+  key: string;
+  /** Cấp tông cần để mở nhóm; `null` = phần đã mở theo cấp (luôn hiện, không tiêu đề) */
+  level: number | null;
+  /** Tiêu đề nhóm ("Mở ở cấp tông 3 (Trung Hưng) · 3 món"); rỗng cho phần đã mở */
+  title: string;
+  rows: HallShopRow[];
+  /** Mặc định mở không: phần đã mở theo cấp luôn mở; nhóm chưa mở chỉ mở nếu là cấp KẾ TIẾP (gần nhất trên cả hai gian) */
+  defaultOpen: boolean;
+}
+
+export interface HallShopHall {
+  hall: "baoKho" | "tangKinh";
+  hallLabel: string;
+  sections: HallShopSection[];
+}
+
+/**
+ * Gom các hàng cửa hàng thành hai gian, mỗi gian: (1) các món đã mở theo cấp tông (`minLevel <= myLevel`; vẫn có thể khoá vì đã học / hết lượt / thiếu cống hiến, lý do hiện ở hàng),
+ * rồi (2) các nhóm chưa mở theo từng cấp tăng dần. Trong mỗi phần món xếp theo cấp rồi theo thứ tự gốc (ổn định), nên món rẻ / mở sớm lên trước và không còn xen kẽ cấp.
+ * Chỉ nhóm của cấp kế tiếp (nhỏ nhất trên cả hai gian) mở sẵn, các cấp xa hơn thu gọn: người mới không phải cuộn qua hàng chục hàng khoá. KHÔNG bỏ món nào: tổng số hàng giữ nguyên.
+ */
+export function hallShopGroups(rows: readonly HallShopRow[], myLevel: number): HallShopHall[] {
+  const lvl = Number.isFinite(myLevel) ? myLevel : 1;
+  const locked = rows.filter((r) => r.minLevel > lvl);
+  const nextLevel = locked.length ? Math.min(...locked.map((r) => r.minLevel)) : null;
+  const halls: HallShopHall[] = [];
+  for (const hall of ["baoKho", "tangKinh"] as const) {
+    const mine = rows
+      .filter((r) => r.hall === hall)
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => a.r.minLevel - b.r.minLevel || a.i - b.i)
+      .map((x) => x.r);
+    if (!mine.length) continue;
+    const sections: HallShopSection[] = [];
+    const open = mine.filter((r) => r.minLevel <= lvl);
+    if (open.length)
+      sections.push({ key: `${hall}:open`, level: null, title: "", rows: open, defaultOpen: true });
+    const levels = [...new Set(mine.filter((r) => r.minLevel > lvl).map((r) => r.minLevel))];
+    for (const lv of levels) {
+      const inLv = mine.filter((r) => r.minLevel === lv);
+      sections.push({
+        key: `${hall}:${lv}`,
+        level: lv,
+        title: `Mở ở ${SECT_TERMS.level.toLowerCase()} ${lv} (${sectLevelInfo(lv).name}) · ${inLv.length} món`,
+        rows: inLv,
+        defaultOpen: lv === nextLevel,
+      });
+    }
+    halls.push({ hall, hallLabel: mine[0]!.hallLabel, sections });
+  }
+  return halls;
 }

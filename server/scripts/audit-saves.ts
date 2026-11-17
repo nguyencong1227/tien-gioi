@@ -1697,6 +1697,19 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
                     message: `Thành viên thứ ${i} có today.buys[${itemId}] (${show(qty)}) không hợp lệ (cần số nguyên 0..${maxDayLimit})`,
                   });
                 }
+                // Bất biến M8.10: điểm tông chỉ tăng nên cấp tông không bao giờ tụt; đã mua được món hôm nay
+                // thì cấp tông HIỆN TẠI >= `minLevel` của món (sectService.shopBuy từ chối `shop_locked` dưới cấp đó)
+                if (
+                  shopEntry &&
+                  typeof qty === "number" &&
+                  qty > 0 &&
+                  shopEntry.minLevel > sectLimits.level
+                ) {
+                  errors.push({
+                    code: "sect_member_today_buy_level_too_high",
+                    message: `Thành viên thứ ${i} có today.buys[${itemId}] = ${qty} nhưng món mở ở cấp tông ${shopEntry.minLevel}, tông đang cấp ${sectLimits.level}`,
+                  });
+                }
               }
             }
           }

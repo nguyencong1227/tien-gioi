@@ -96,21 +96,89 @@ async function walk20Hz(
   room: Room,
   n: number,
   stall?: { stallAt: number; stallMs: number },
+  onStall?: (fromMs: number, toMs: number) => void,
 ): Promise<number> {
   let s = 0;
   let due = Date.now();
   for (let i = 0; i < n; i++) {
     await sleep(Math.max(0, due - Date.now()));
     if (stall && i === stall.stallAt) {
+      const from = performance.now();
       const end = Date.now() + stall.stallMs;
       while (Date.now() < end); // đứng hình: không timer / I/O nào chạy (máy chủ cùng tiến trình cũng đứng)
+      onStall?.(from, performance.now());
     }
     room.send("input", { seq: ++s, dx: 1, dy: 0 });
     due = Math.max(due, Date.now()) + TICK_MS;
   }
-  await sleep(Math.max(0, due - Date.now())); // một nhịp nữa rồi mới nhả phím (tin dừng tới lúc hàng đợi đã rỗng, như người chơi thật)
+  await sleep(Math.max(0, due - Date.now())); // một nhịp nữa rồi mới nhả phím
+  // ...và chờ máy chủ xử lý hết hàng đợi: nhả phím sau khi mọi bước đã tới và đã đi (người chơi thật nhả khi thấy mình dừng tới đích); không thì máy chủ đói tick
+  // (CI tải nặng) còn vài bước trong hàng đợi lúc tin dừng tới và cắt chúng, tính vào `dropped` (đúng thiết kế mục 41, nhưng không phải thứ ca này đo)
+  await waitFor(
+    () => ctrlOf(room).inputs.length === 0,
+    8000,
+    "hàng đợi input rỗng trước khi nhả phím",
+  );
   for (let i = 0; i < 3; i++) room.send("input", { seq: ++s, dx: 0, dy: 0 });
   return s;
+}
+
+/** Ghi mốc (performance.now) mỗi lần vòng `update` của phòng chạy: để biết máy chủ có bị ĐÓI tick (CI tải nặng) trong lúc đo hay không. `stop()` trả các khoảng giữa hai tick liên tiếp. */
+function watchTicks(room: Room) {
+  const r = serverRoom(room) as any;
+  const orig = Object.getPrototypeOf(r).update as (...a: unknown[]) => unknown;
+  const at: number[] = [];
+  r.update = function (this: unknown, ...a: unknown[]) {
+    at.push(performance.now());
+    return orig.apply(this, a);
+  };
+  return {
+    stop() {
+      delete r.update;
+      const gaps: { from: number; to: number }[] = [];
+      for (let i = 1; i < at.length; i++) gaps.push({ from: at[i - 1]!, to: at[i]! });
+      return gaps;
+    },
+  };
+}
+
+/** Khoảng giữa hai tick dài hơn mức này (ms) tính là máy chủ bị đói tick: input dồn lại và bị bỏ là hậu quả ĐÚNG của thiết kế, không phải lỗi. */
+const STARVED_GAP_MS = 3 * TICK_MS;
+
+/** Một lần đi 20 Hz trong phòng mới: trả số input bị bỏ, quãng đã đi, và máy chủ có bị đói tick không (không tính chính cú đứng hình do test dựng). */
+async function attempt20Hz(stall?: { stallAt: number; stallMs: number }) {
+  const room = await join();
+  const p = serverPlayer(room);
+  const x0 = p.x;
+  const w = (serverRoom(room) as any).world;
+  const dropped0 = w.inputStats.dropped;
+  const watch = watchTicks(room);
+  let stallWin: [number, number] | null = null;
+  const s = await walk20Hz(room, 40, stall, (a, b) => (stallWin = [a, b]));
+  await waitFor(() => p.lastSeq === s, 8000, "tới tin dừng cuối");
+  const gaps = watch.stop();
+  const { moved } = await settle(room, x0);
+  const win = stallWin as [number, number] | null;
+  const starved = gaps.some(
+    (g) => g.to - g.from > STARVED_GAP_MS && !(win && g.from <= win[1] && g.to >= win[0]),
+  );
+  return { dropped: w.inputStats.dropped - dropped0, moved, starved };
+}
+
+/**
+ * Chạy `attempt20Hz` tới khi KHÔNG input nào bị bỏ. Có input bị bỏ mà máy chủ KHÔNG đói tick (mọi khoảng giữa hai tick <= 150 ms, trừ cú đứng hình do test dựng) là LỖI THẬT
+ * (máy chủ bỏ input của một khách đi đều 20 Hz): đỏ ngay. Có bỏ mà máy chủ đói tick (CI tải nặng, #923) thì đo lại, tối đa 4 lần: tải tạm thời không kéo dài mãi.
+ */
+async function walkWithoutDrops(stall?: { stallAt: number; stallMs: number }) {
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const r = await attempt20Hz(stall);
+    if (r.dropped === 0) return r;
+    expect(
+      r.starved,
+      `lần ${attempt}: máy chủ bỏ ${r.dropped} input dù KHÔNG đói tick (mọi khoảng giữa hai tick <= ${STARVED_GAP_MS} ms): lỗi thật`,
+    ).toBe(true);
+  }
+  throw new Error("máy chủ đói tick 4 lần liên tiếp (máy quá tải): không đo được");
 }
 
 /** Chờ máy chủ xử lý xong hàng đợi, trả { x đã đi, thời gian (ms) tới lúc đứng yên hẳn }. */
@@ -165,29 +233,13 @@ describe("mạng đứng rồi xả dồn, nhả phím (phòng thật)", () => {
   });
 
   it("đi bình thường 20 Hz trong 2 giây rồi tin dừng: không input nào bị bỏ, đi đúng ~40 bước và dừng ngay", async () => {
-    const room = await join();
-    const p = serverPlayer(room);
-    const x0 = p.x;
-    const w = (serverRoom(room) as any).world;
-    const dropped0 = w.inputStats.dropped;
-    const s = await walk20Hz(room, 40);
-    await waitFor(() => p.lastSeq === s, 2000, "tới tin dừng cuối");
-    const { moved } = await settle(room, x0);
-    expect(w.inputStats.dropped - dropped0).toBe(0);
+    const { moved } = await walkWithoutDrops();
     expect(moved).toBeGreaterThan(30 * 7.5); // đi gần đủ 40 bước (mạng tốt: không bị cắt vô cớ)
     expect(moved).toBeLessThanOrEqual(41 * 7.5 + 1e-6);
   });
 
   it("tiến trình đứng hình 1,2 giây giữa chừng (máy tải, #923): khách thật KHÔNG bắn bù nên không input nào bị bỏ, vẫn đi đủ và dừng ngay", async () => {
-    const room = await join();
-    const p = serverPlayer(room);
-    const x0 = p.x;
-    const w = (serverRoom(room) as any).world;
-    const dropped0 = w.inputStats.dropped;
-    const s = await walk20Hz(room, 40, { stallAt: 15, stallMs: 1200 });
-    await waitFor(() => p.lastSeq === s, 2000, "tới tin dừng cuối");
-    const { moved } = await settle(room, x0);
-    expect(w.inputStats.dropped - dropped0).toBe(0);
+    const { moved } = await walkWithoutDrops({ stallAt: 15, stallMs: 1200 });
     expect(moved).toBeGreaterThan(30 * 7.5);
     expect(moved).toBeLessThanOrEqual(41 * 7.5 + 1e-6);
   });
