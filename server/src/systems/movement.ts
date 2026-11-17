@@ -4,11 +4,24 @@ import type { Player } from "../schema";
 import { rand, quantAngle, type World, type PlayerCtrl } from "../world";
 
 /**
- * Hàng đợi input tối đa mỗi người. Client gửi 20 input / giây; hàng đợi phải chứa được đợt dồn sau một lần mạng chập chờn (gói tin bị giữ rồi
- * ập tới cùng lúc): đầy thì input MỚI bị bỏ, client đã đoán trước chúng nên nhân vật bị kéo giật lùi. 60 = 3 giây (mạng đứt lâu hơn thì
- * nhịp tim ứng dụng của client coi là chết sau 8 giây và nối lại, `shared/src/heartbeat.ts`).
+ * BACKLOG tối đa còn lại SAU khi đã dùng hết ngân sách bước của tick (mục 41 QUYET_DINH_M3, "trôi như liệt phím"): 5 input = 0,25 giây. Mạng nhà đứng rồi xả dồn
+ * làm hàng đợi đầy input CŨ; trước đây (tới 60 input = 3 giây) máy chủ cứ áp hết nên nhân vật còn đi tiếp tới ~3 giây SAU KHI người chơi đã nhả phím. Nay input CŨ NHẤT
+ * vượt mức này bị BỎ (giữ thứ tự `seq`; client đối chiếu theo `lastSeq` nên tự hấp thụ phần bị kéo lại). Cái giá: một lần mạng đứng LÂU (hơn ngân sách bước 0,5 giây + 0,25 giây
+ * này) làm nhân vật bị kéo lại một đoạn thay vì trôi tiếp: người chơi đã chọn đúng đổi này.
  */
-const MAX_QUEUED_INPUTS = 60;
+export const MAX_INPUT_BACKLOG = 5;
+/**
+ * Chặn CỨNG bộ nhớ lúc nhận (client gian lận gửi hàng nghìn tin trong một nhịp): đầy thì bỏ input CŨ NHẤT. Phần lớn việc cắt backlog làm ở `applyInputs` (theo ngân sách
+ * bước thật); hằng số này chỉ để hàng đợi không phình giữa hai tick.
+ */
+const INPUT_QUEUE_HARD_CAP = 64;
+/**
+ * Input "dừng" (độ dài hướng <= ngưỡng này: khớp ngưỡng `len > 0.05` của `applyInputs`, client gửi `dx = dy = 0`): máy chủ CẮT hàng đợi còn tối đa `STOP_KEEP_INPUTS` input
+ * cũ nhất rồi mới xếp input dừng vào, nên nhả phím thì nhân vật dừng trong <= (STOP_KEEP_INPUTS + 1) tick = 0,15 giây dù hàng đợi đang đầy. Giữ lại 1-2 input cũ nhất vì
+ * ở mạng tốt luôn có 1-2 input "đang bay" mà client đã đoán trước: xoá sạch thì mỗi lần dừng nhân vật bị kéo giật lùi 1-2 bước (7-15 px) dù không có chuyện gì.
+ */
+const STOP_LEN = 0.05;
+export const STOP_KEEP_INPUTS = 2;
 /**
  * Ngân sách bước tối đa dồn lại (mỗi bước = một TICK_MS thời gian thật). Ngân sách tích khi không có input (mạng chậm gói, rồi gói ập tới
  * cùng lúc): 10 bước = 0,5 giây bù trễ mà không phải dồn hàng đợi. Cũng là mức "nhảy cóc" tối đa của client gian lận (đứng im 0,5 giây rồi gửi
@@ -18,16 +31,29 @@ const MAX_MOVE_BUDGET = 10;
 /** Sai số cộng dồn số thực: 0,9999999999 bước coi như đủ một bước (dt chia cho TICK_MS không luôn tròn). */
 const BUDGET_EPS = 1 - 1e-9;
 
-/** Nhận input từ client; bỏ qua dữ liệu sai kiểu. */
+/**
+ * Nhận input từ client; bỏ qua dữ liệu sai kiểu. Input DỪNG (`dx = dy = 0`) cắt hàng đợi còn `STOP_KEEP_INPUTS` input cũ nhất (xem trên); đầy `INPUT_QUEUE_HARD_CAP` thì bỏ
+ * input cũ nhất. Mọi input DI CHUYỂN bị bỏ tính vào `World.inputStats.dropped` (input dừng thừa bị cắt thì không).
+ */
 export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
   const c = w.ctrl.get(sid);
   if (!c || typeof m?.seq !== "number" || !Number.isFinite(m.dx) || !Number.isFinite(m.dy)) return;
-  if (c.inputs.length < MAX_QUEUED_INPUTS) c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
-  else w.inputStats.dropped++;
+  if (Math.hypot(m.dx, m.dy) <= STOP_LEN && c.inputs.length > STOP_KEEP_INPUTS) {
+    // Chỉ input DI CHUYỂN bị cắt mới tính vào `dropped`: input DỪNG thừa bị cắt (client lặp tin dừng cho chắc: tin thứ ba cắt tin thứ hai) là vô hại
+    // và làm `input_dropped` ở `/metrics` nhiễu (chỉ cần một bước chờ + ba tin dừng là dropped = 1; B đo ở #963).
+    for (let i = STOP_KEEP_INPUTS; i < c.inputs.length; i++)
+      if (Math.hypot(c.inputs[i]!.dx, c.inputs[i]!.dy) > STOP_LEN) w.inputStats.dropped++;
+    c.inputs.length = STOP_KEEP_INPUTS;
+  }
+  c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
+  if (c.inputs.length > INPUT_QUEUE_HARD_CAP) {
+    c.inputs.shift();
+    w.inputStats.dropped++;
+  }
 }
 
-/** Hàng đợi còn từng này input (0,3 giây) sau khi xử lý một tick thì tính là "tụt hậu" (`World.inputStats.backlogTicks`). Input chờ 1-2 là bình thường (đang bay). */
-export const INPUT_BACKLOG_WARN = 6;
+/** Hàng đợi còn từng này input (0,2 giây) sau khi xử lý một tick thì tính là "tụt hậu" (`World.inputStats.backlogTicks`). Input chờ 1-2 là bình thường (đang bay); tối đa còn `MAX_INPUT_BACKLOG`. */
+export const INPUT_BACKLOG_WARN = 4;
 
 /**
  * Người khác nhận vị trí công khai px, py (số nguyên, 10 Hz) thay vì x, y thật 20 Hz (#80): ở 100 người tụ trong trấn
@@ -54,12 +80,23 @@ export function syncPublicPos(p: Player) {
  * Cộng theo thời gian thật chứ không "+1 mỗi tick": `setInterval(50)` của Node chạy thật ~19,9 Hz (và tick bị trễ khi máy bận), trong khi client
  * gửi đúng 20 Hz, nên cộng cố định mỗi tick làm hàng đợi tụt hậu thêm ~1 input / 12 giây, đầy sau ~4 phút đi liên tục rồi bỏ input, nhân vật
  * giật lùi (đo bằng `scripts/do-input-lag.ts`, mục 25 QUYET_DINH_M3). `dtMs` mặc định TICK_MS (test đơn vị, bench).
+ * Trước khi áp: input CŨ NHẤT vượt (số bước áp được tick này + `MAX_INPUT_BACKLOG`) bị BỎ (mục 41): bước nào không áp kịp trong 0,25 giây thì không áp nữa.
+ * Trả số input đã bỏ (người gọi cộng vào `World.inputStats.dropped`).
  */
-export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl, dtMs: number = TICK_MS) {
+export function applyInputs(
+  map: GameMap,
+  p: Player,
+  c: PlayerCtrl,
+  dtMs: number = TICK_MS,
+): number {
   const step = TICK_MS / 1000;
   // dt sai (NaN, âm) thì coi như một tick đúng nhịp; dt lớn (máy chủ bị treo) bị MAX_MOVE_BUDGET chặn
   const credit = Number.isFinite(dtMs) && dtMs >= 0 ? dtMs / TICK_MS : 1;
   c.moveBudget = Math.min(MAX_MOVE_BUDGET, c.moveBudget + credit);
+  // Giới hạn độ trễ: chỉ giữ số input áp được ngay tick này (theo ngân sách) cộng `MAX_INPUT_BACKLOG` chờ tick sau; cũ nhất bỏ trước (giữ thứ tự seq)
+  const keep = Math.floor(c.moveBudget + (1 - BUDGET_EPS)) + MAX_INPUT_BACKLOG;
+  const dropped = c.inputs.length > keep ? c.inputs.length - keep : 0;
+  if (dropped > 0) c.inputs.splice(0, dropped);
   // hộ phù có tốc độ; tăng tốc / tê cóng nhân thêm `moveSpeedMul` (bản nhớ trong `c.moveMul`, client dùng CÙNG hàm để đoán trước)
   const speed = statsFor(p.realm, p.tier, p).speed * (c.moveMul ?? 1);
   while (c.inputs.length && c.moveBudget >= BUDGET_EPS) {
@@ -71,8 +108,8 @@ export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl, dtMs: number
       dx /= len;
       dy /= len;
     }
-    // Choáng: vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
-    if (len > 0.05 && !c.stunned) {
+    // Choáng / đang mở hộp thoại chặn đường (mục 52): vẫn TIÊU THỤ input và tăng `lastSeq` (chỉ không di chuyển) để hàng đợi dự đoán của client rỗng được, `reconcile` không chạy lại input cũ
+    if (len > 0.05 && !c.stunned && c.ambush?.offer === undefined) {
       p.meditating = false;
       const next = map.moveWithCollision(
         p.x,
@@ -87,6 +124,7 @@ export function applyInputs(map: GameMap, p: Player, c: PlayerCtrl, dtMs: number
     }
     p.lastSeq = inp.seq;
   }
+  return dropped;
 }
 
 /**

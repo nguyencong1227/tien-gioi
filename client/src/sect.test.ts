@@ -9,12 +9,23 @@ import {
   mergeMemberPresence,
   mapLabelOf,
   sectMemberStatusText,
+  sectMemberMeritText,
+  sectEldersCap,
+  sectMembersCap,
+  sectFullText,
   UNKNOWN_MAP_LABEL,
   sectConfirmText,
   isMockSectEnabled,
   MOCK_SECT_SAMPLES,
 } from "./sect";
-import { MAPS, DUNGEON_MAPS, realmLabel } from "@tien-gioi/shared";
+import {
+  MAPS,
+  DUNGEON_MAPS,
+  SECT_ELDERS_MAX,
+  SECT_LEVELS,
+  SECT_MAX_MEMBERS,
+  realmLabel,
+} from "@tien-gioi/shared";
 import type { SectMember, SectPresenceMsg, SectLogEntry } from "@tien-gioi/shared";
 
 describe("sectConfirmText (hộp xác nhận trong game, #246)", () => {
@@ -68,21 +79,21 @@ describe("client sect pure logic", () => {
     const time = new Date("2026-11-10T10:30:00Z").getTime();
     const depositLog: SectLogEntry = {
       at: time,
-      name: "Tiêu Phong",
+      name: "Bùi Chấn Nhạc",
       kind: "deposit",
       amount: 50000,
     };
     const logStr = formatSectLog(depositLog);
-    expect(logStr).toContain("Tiêu Phong đã góp +50.000 Linh thạch");
+    expect(logStr).toContain("Bùi Chấn Nhạc đã góp +50.000 Linh thạch");
 
     const withdrawLog: SectLogEntry = {
       at: time,
-      name: "Tiêu Phong",
+      name: "Bùi Chấn Nhạc",
       kind: "withdraw",
       amount: 10000,
     };
     const withdrawStr = formatSectLog(withdrawLog);
-    expect(withdrawStr).toContain("Tiêu Phong đã rút -10.000 Linh thạch");
+    expect(withdrawStr).toContain("Bùi Chấn Nhạc đã rút -10.000 Linh thạch");
   });
 
   it("sortSectMembers sắp xếp đúng thứ bậc Tông chủ -> Trưởng lão -> Đệ tử", () => {
@@ -101,38 +112,38 @@ describe("client sect pure logic", () => {
 
   it("mergeMemberPresence gắn cờ online và thông tin cảnh giới bản đồ", () => {
     const members: SectMember[] = [
-      { name: "Hàn Lập", rank: "chu", joinedAt: 100 },
-      { name: "Nam Cung Uyển", rank: "truong_lao", joinedAt: 200 },
-      { name: "Lệ Phi Vũ", rank: "de_tu", joinedAt: 300 },
+      { name: "Giang Tĩnh Uyên", rank: "chu", joinedAt: 100 },
+      { name: "Tống Uyển Thu", rank: "truong_lao", joinedAt: 200 },
+      { name: "Đỗ Phi Vân", rank: "de_tu", joinedAt: 300 },
     ];
     const presence: SectPresenceMsg = {
       online: [
-        { name: "Hàn Lập", realm: 2, tier: 1, mapId: "hac_phong" },
-        { name: "Lệ Phi Vũ", realm: 0, tier: 9, mapId: "lac_ha" },
+        { name: "Giang Tĩnh Uyên", realm: 2, tier: 1, mapId: "hac_phong" },
+        { name: "Đỗ Phi Vân", realm: 0, tier: 9, mapId: "lac_ha" },
       ],
     };
 
     const merged = mergeMemberPresence(members, presence);
     expect(merged).toHaveLength(3);
 
-    const hanLap = merged.find((m) => m.name === "Hàn Lập");
-    expect(hanLap?.online).toBe(true);
-    expect(hanLap?.mapId).toBe("hac_phong");
-    expect(hanLap?.realm).toBe(2);
+    const giangTinhUyen = merged.find((m) => m.name === "Giang Tĩnh Uyên");
+    expect(giangTinhUyen?.online).toBe(true);
+    expect(giangTinhUyen?.mapId).toBe("hac_phong");
+    expect(giangTinhUyen?.realm).toBe(2);
 
-    const uyen = merged.find((m) => m.name === "Nam Cung Uyển");
-    expect(uyen?.online).toBe(false);
+    const tongUyenThu = merged.find((m) => m.name === "Tống Uyển Thu");
+    expect(tongUyenThu?.online).toBe(false);
 
-    const lePhiVu = merged.find((m) => m.name === "Lệ Phi Vũ");
-    expect(lePhiVu?.online).toBe(true);
-    expect(lePhiVu?.mapId).toBe("lac_ha");
+    const doPhiVan = merged.find((m) => m.name === "Đỗ Phi Vân");
+    expect(doPhiVan?.online).toBe(true);
+    expect(doPhiVan?.mapId).toBe("lac_ha");
 
     // Khớp online với tên tiếng Việt có dấu khác dạng phân rã Unicode (NFC vs NFD)
     const nfcMembers: SectMember[] = [
-      { name: "Tiêu Viêm", rank: "chu", joinedAt: 100 }, // NFC
+      { name: "Phó Hồng Ngạn", rank: "chu", joinedAt: 100 }, // NFC
     ];
     const nfdPresence: SectPresenceMsg = {
-      online: [{ name: "Tiêu Viêm".normalize("NFD"), realm: 1, tier: 1, mapId: "lac_ha" }],
+      online: [{ name: "Phó Hồng Ngạn".normalize("NFD"), realm: 1, tier: 1, mapId: "lac_ha" }],
     };
     const nfdMerged = mergeMemberPresence(nfcMembers, nfdPresence);
     expect(nfdMerged[0].online).toBe(true);
@@ -170,7 +181,7 @@ describe("client sect pure logic", () => {
     expect(presence.online.length).toBeGreaterThan(0);
 
     const inv = MOCK_SECT_SAMPLES.invited();
-    expect(inv.from).toBe("Tiêu Phong");
+    expect(inv.from).toBe("Bùi Chấn Nhạc");
     expect(inv.sect).toBe("Tiêu Dao Phái");
     expect(inv.ttlMs).toBe(30_000);
   });
@@ -222,5 +233,48 @@ describe("nhãn bản đồ trong bảng tổ đội / tông môn (M6 #409): tê
     expect(sectMemberStatusText({ ...base, online: true, realm: 0, tier: 3 }).endsWith("·")).toBe(
       false,
     );
+  });
+});
+
+describe("sectMemberMeritText: công tích trong danh sách thành viên (M8.6, #843)", () => {
+  it("có công tích thì hiện 'Công tích N' (số theo vi-VN); thiếu / 0 / âm / hỏng thì không hiện gì", () => {
+    expect(sectMemberMeritText({ merit: 1234 })).toBe("Công tích 1.234");
+    expect(sectMemberMeritText({ merit: 5 })).toBe("Công tích 5");
+    expect(sectMemberMeritText({ merit: 7.9 })).toBe("Công tích 7");
+    for (const bad of [undefined, 0, -3, Number.NaN, Number.POSITIVE_INFINITY, "12", null, {}])
+      expect(sectMemberMeritText({ merit: bad }), String(bad)).toBe("");
+    expect(sectMemberMeritText({})).toBe("");
+  });
+});
+
+describe("sectEldersCap: giới hạn Trưởng lão theo CẤP TÔNG, không cứng 3 (M8.6)", () => {
+  it("lấy đúng `caps.elders` của ảnh chụp Nội vụ ở mọi cấp (cấp cao thăng được nhiều hơn 3)", () => {
+    for (const l of SECT_LEVELS)
+      expect(sectEldersCap(l.maxElders), `cấp ${l.level}`).toBe(l.maxElders);
+    expect(Math.max(...SECT_LEVELS.map((l) => l.maxElders))).toBeGreaterThan(SECT_ELDERS_MAX);
+  });
+  it("chưa có ảnh chụp / số hỏng: mức cấp 1 (SECT_ELDERS_MAX), không ném", () => {
+    for (const bad of [undefined, null, 0, -1, 2.5, Number.NaN, "5", Number.MAX_VALUE, {}])
+      expect(sectEldersCap(bad), String(bad)).toBe(SECT_ELDERS_MAX);
+  });
+});
+
+describe("sectMembersCap / sectFullText: giới hạn thành viên theo CẤP TÔNG, không cứng 30 (M8.6)", () => {
+  it("lấy đúng `caps.members` ở mọi cấp (cấp cao nhận nhiều hơn 30)", () => {
+    for (const l of SECT_LEVELS)
+      expect(sectMembersCap(l.maxMembers), `cấp ${l.level}`).toBe(l.maxMembers);
+    expect(Math.max(...SECT_LEVELS.map((l) => l.maxMembers))).toBeGreaterThan(SECT_MAX_MEMBERS);
+  });
+  it("chưa có ảnh chụp / số hỏng: mức cấp 1 (SECT_MAX_MEMBERS), không ném", () => {
+    for (const bad of [undefined, null, 0, -1, 2.5, Number.NaN, "40", Number.MAX_VALUE, {}])
+      expect(sectMembersCap(bad), String(bad)).toBe(SECT_MAX_MEMBERS);
+  });
+  it("sectFullText: đủ người thì nêu 'đủ (cap/cap)', còn chỗ hoặc số hỏng thì null; tông cấp 3 đang 30 người KHÔNG đủ", () => {
+    expect(sectFullText(30, 30)).toBe("Tông môn đã đủ (30/30)");
+    expect(sectFullText(40, 40)).toBe("Tông môn đã đủ (40/40)");
+    expect(sectFullText(29, 30)).toBeNull();
+    expect(sectFullText(30, sectMembersCap(SECT_LEVELS[2]!.maxMembers))).toBeNull();
+    expect(sectFullText(Number.NaN, 30)).toBeNull();
+    expect(sectFullText(5, Number.NaN)).toBeNull();
   });
 });

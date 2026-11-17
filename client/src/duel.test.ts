@@ -35,23 +35,27 @@ describe("client duel pure logic", () => {
   });
 
   it("duelEndReasonText giải thích đầy đủ các lý do kết thúc", () => {
-    expect(duelEndReasonText("ko", "won", "Diệp Phàm")).toContain("Đã đánh gục Diệp Phàm!");
-    expect(duelEndReasonText("ko", "lost", "Diệp Phàm")).toContain("Đã bị Diệp Phàm đánh gục!");
-    expect(duelEndReasonText("yield", "won", "Diệp Phàm")).toContain("Diệp Phàm đã xin đầu hàng.");
-    expect(duelEndReasonText("yield", "lost", "Diệp Phàm")).toContain(
+    expect(duelEndReasonText("ko", "won", "Ngô Tử Khiêm")).toContain("Đã đánh gục Ngô Tử Khiêm!");
+    expect(duelEndReasonText("ko", "lost", "Ngô Tử Khiêm")).toContain(
+      "Đã bị Ngô Tử Khiêm đánh gục!",
+    );
+    expect(duelEndReasonText("yield", "won", "Ngô Tử Khiêm")).toContain(
+      "Ngô Tử Khiêm đã xin đầu hàng.",
+    );
+    expect(duelEndReasonText("yield", "lost", "Ngô Tử Khiêm")).toContain(
       "Đạo hữu đã nhận thua đầu hàng.",
     );
-    expect(duelEndReasonText("fled", "won", "Diệp Phàm")).toContain(
-      "Diệp Phàm đã rời khỏi lôi đài quyết đấu.",
+    expect(duelEndReasonText("fled", "won", "Ngô Tử Khiêm")).toContain(
+      "Ngô Tử Khiêm đã rời khỏi lôi đài quyết đấu.",
     );
-    expect(duelEndReasonText("fled", "lost", "Diệp Phàm")).toContain(
+    expect(duelEndReasonText("fled", "lost", "Ngô Tử Khiêm")).toContain(
       "Đạo hữu đã rời quá xa lôi đài quyết đấu.",
     );
     expect(duelEndReasonText("timeout", "draw")).toContain(
       "Hết thời gian quyết đấu, hai bên bất phân thắng bại.",
     );
-    expect(duelEndReasonText("disconnect", "won", "Diệp Phàm")).toContain(
-      "Diệp Phàm đã mất kết nối.",
+    expect(duelEndReasonText("disconnect", "won", "Ngô Tử Khiêm")).toContain(
+      "Ngô Tử Khiêm đã mất kết nối.",
     );
   });
 
@@ -60,14 +64,14 @@ describe("client duel pure logic", () => {
     const safePos = { x: map.townPx.x, y: map.townPx.y };
     const wildPos = { x: 100, y: 100 };
 
-    const p1 = toDuelParty({ name: "Tiêu Viêm", dead: false, duel: true }, safePos, map);
-    expect(p1.name).toBe("Tiêu Viêm");
+    const p1 = toDuelParty({ name: "Phó Hồng Ngạn", dead: false, duel: true }, safePos, map);
+    expect(p1.name).toBe("Phó Hồng Ngạn");
     expect(p1.alive).toBe(true);
     expect(p1.inSafe).toBe(true);
     expect(p1.inDuel).toBe(true);
 
-    const p2 = toDuelParty({ name: "Hàn Lập", dead: true, duel: false }, wildPos, map);
-    expect(p2.name).toBe("Hàn Lập");
+    const p2 = toDuelParty({ name: "Giang Tĩnh Uyên", dead: true, duel: false }, wildPos, map);
+    expect(p2.name).toBe("Giang Tĩnh Uyên");
     expect(p2.alive).toBe(false);
     expect(p2.inSafe).toBe(false);
     expect(p2.inDuel).toBe(false);
@@ -80,8 +84,8 @@ describe("client duel pure logic", () => {
     const wildFar = { x: 900, y: 100 }; // cách 800px > 400px
     const safePos = { x: map.townPx.x, y: map.townPx.y };
 
-    const self = { name: "Tiểu Phàm", dead: false };
-    const target = { name: "Kinh Vũ", dead: false };
+    const self = { name: "Vân Hạc", dead: false };
+    const target = { name: "Khinh Trần", dead: false };
 
     // Tự thách chính mình
     expect(clientCanChallenge(self, wild1, self, wild1, map).ok).toBe(false);
@@ -107,15 +111,15 @@ describe("client duel pure logic", () => {
   });
 
   it("MOCK_DUEL_SAMPLES tạo đúng dữ liệu mẫu cho dev", () => {
-    const inv = MOCK_DUEL_SAMPLES.invited("Đường Tam");
-    expect(inv.from).toBe("Đường Tam");
+    const inv = MOCK_DUEL_SAMPLES.invited("Kha Bích Hạ");
+    expect(inv.from).toBe("Kha Bích Hạ");
     expect(inv.ttlMs).toBeGreaterThan(0);
 
-    const stFight = MOCK_DUEL_SAMPLES.stateFighting("Đường Tam");
+    const stFight = MOCK_DUEL_SAMPLES.stateFighting("Kha Bích Hạ");
     expect(stFight.phase).toBe("fight");
-    expect(stFight.opponent).toBe("Đường Tam");
+    expect(stFight.opponent).toBe("Kha Bích Hạ");
 
-    const end = MOCK_DUEL_SAMPLES.endWon("Đường Tam");
+    const end = MOCK_DUEL_SAMPLES.endWon("Kha Bích Hạ");
     expect(end.result).toBe("won");
   });
 
@@ -128,12 +132,12 @@ describe("client duel pure logic", () => {
   });
 
   it("thông điệp gục khi thua thách đấu (KO) không hứa về Lạc Hà Trấn", () => {
-    const endLost = MOCK_DUEL_SAMPLES.endLost("Diệp Phàm");
+    const endLost = MOCK_DUEL_SAMPLES.endLost("Ngô Tử Khiêm");
     expect(endLost.result).toBe("lost");
     expect(endLost.reason).toBe("ko");
 
-    const reason = duelEndReasonText(endLost.reason, endLost.result, "Diệp Phàm");
-    expect(reason).toContain("Đã bị Diệp Phàm đánh gục!");
+    const reason = duelEndReasonText(endLost.reason, endLost.result, "Ngô Tử Khiêm");
+    expect(reason).toContain("Đã bị Ngô Tử Khiêm đánh gục!");
     expect(reason).not.toContain("Lạc Hà Trấn");
   });
 });

@@ -66,6 +66,8 @@ import {
   type RebornMsg,
   type SectInvitedMsg,
   type SectMsg,
+  type SectHallMsg,
+  type SectHallView,
   type SellMsg,
   type SkillBook,
   type SkillMsg,
@@ -137,6 +139,8 @@ interface CliArgs {
   sect: boolean;
   skills: boolean;
   evade: boolean;
+  boss: boolean;
+  reflexMs: number;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -174,6 +178,8 @@ function parseArgs(argv: string[]): CliArgs {
   let sect = false;
   let skills = false;
   let evade = false;
+  let boss = false;
+  let reflexMs = 400;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -184,7 +190,17 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--die") die = true;
     else if (arg === "--skills") skills = true;
     else if (arg === "--evade") evade = true;
-    else if (arg === "--dungeon") dungeon = true;
+    else if (arg === "--no-evade" || arg === "--evade=false") evade = false;
+    else if (arg === "--boss" || arg === "--boss-hunt") {
+      boss = true;
+      if (!argv.includes("--no-evade") && !argv.includes("--evade=false")) {
+        evade = true;
+      }
+      if (!argv.some((a) => a.startsWith("--map="))) map = "hac_phong";
+    } else if (arg.startsWith("--reflex-ms=") || arg.startsWith("--reflex=")) {
+      const v = Number(arg.split("=")[1]);
+      if (!isNaN(v) && v >= 0) reflexMs = v;
+    } else if (arg === "--dungeon") dungeon = true;
     else if (arg === "--dungeon-fall") {
       dungeon = true;
       dungeonFall = true;
@@ -303,6 +319,8 @@ function parseArgs(argv: string[]): CliArgs {
     sect,
     skills,
     evade,
+    boss,
+    reflexMs,
   };
 }
 
@@ -316,6 +334,49 @@ function seededPrng(seed: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+export interface BotSectM8DecisionState {
+  sectTag?: string;
+  sectHall: SectHallView | null;
+  sectContrib: number;
+}
+
+export type BotSectM8Decision =
+  | { type: "hallGet" }
+  | { type: "questAccept"; questId: string }
+  | { type: "questTurnIn"; questId: string }
+  | { type: "shopBuy"; itemId: string; qty: number }
+  | null;
+
+/**
+ * Quyết định hành vi M8 (nhiệm vụ tông môn, cửa hàng bảo khố) cho bot thử tải (Issue #846, M8.9).
+ */
+export function decideSectM8Action(state: BotSectM8DecisionState): BotSectM8Decision {
+  if (!state.sectTag) return null;
+  if (!state.sectHall) return { type: "hallGet" };
+
+  // 1. Nhận nhiệm vụ nếu có nhiệm vụ chưa nhận và chưa hết trần ngày
+  const offerQuest = state.sectHall.quests.find((q) => q.state === "offer");
+  if (offerQuest && state.sectHall.me.earnedToday < state.sectHall.me.earnCap) {
+    return { type: "questAccept", questId: offerQuest.questId };
+  }
+
+  // 2. Đổi đồ cửa hàng nếu đủ cống hiến (ưu tiên tiêu cống hiến đã tích lũy trước khi thử trả nhiệm vụ)
+  if (state.sectContrib >= 5) {
+    const buyableItem = state.sectHall.shop.find((item) => item.locked === null && item.left > 0);
+    if (buyableItem) {
+      return { type: "shopBuy", itemId: buyableItem.itemId, qty: 1 };
+    }
+  }
+
+  // 3. Thử trả nhiệm vụ đang làm (đường tải gửi liên tục)
+  const activeQuest = state.sectHall.quests.find((q) => q.state === "active");
+  if (activeQuest) {
+    return { type: "questTurnIn", questId: activeQuest.questId };
+  }
+
+  return null;
 }
 
 /**
@@ -884,6 +945,15 @@ export interface BotState {
   sectDepositsCount: number;
   sectWithdrawsCount: number;
   sectChatsCount: number;
+  // Các trường cho thử tải Tông môn M8 (Issue #846)
+  sectContrib?: number;
+  sectMerit?: number;
+  sectLevel?: number;
+  sectHall?: SectHallView | null;
+  sectQuestsAcceptedCount: number;
+  sectQuestsTurnedInCount: number;
+  sectShopBuysCount: number;
+  sectLeavesCount: number;
   // Các trường cho thử tải chiêu thức (--skills, #511)
   skills?: boolean;
   skillsLearned: Record<string, number>;
@@ -895,8 +965,10 @@ export interface BotState {
   skillsCastCount: number;
   skillsMsgsCount: number;
   skillsSent: number;
-  // Các trường cho thử tải né đòn báo trước (--evade, #511)
+  // Các trường cho thử tải né đòn báo trước (--evade, #511, M42 #876)
   evade?: boolean;
+  bossHunt?: boolean;
+  reflexMs?: number;
   warns: ActiveWarnZone[];
   evadeCount: number;
   warnsTargetedCount: number;
@@ -1024,6 +1096,10 @@ export interface LoadTestMetrics {
   sectDepositsTotal?: number;
   sectWithdrawsTotal?: number;
   sectChatsTotal?: number;
+  sectQuestsAcceptedTotal?: number;
+  sectQuestsTurnedInTotal?: number;
+  sectShopBuysTotal?: number;
+  sectLeavesTotal?: number;
   /** Các chỉ số thử tải chiêu thức M7 (--skills, #511) */
   skills?: boolean;
   castsSent?: number;
@@ -1328,7 +1404,13 @@ export interface ActiveWarnZone {
   w: number;
   angle: number;
   arc: number;
+  /** Bán kính trong (px), CHỈ dùng với circle (vành khuyên của trùm, mục 42 #876) */
+  r0?: number;
   expiresAt: number;
+  /** Thời điểm nhận cảnh báo (ms, performance.now()) */
+  warnAt?: number;
+  /** Thời gian trễ phản xạ trước khi bot bắt đầu chạy né (ms, mặc định 400 ms, mục 42 #876) */
+  reflexMs?: number;
   /** Bot có nằm trong vùng nguy hiểm của đòn này lúc nhận cảnh báo hay không */
   targeted?: boolean;
   /** Đã kiểm tra kết quả né/trúng tại thời điểm đòn đáp xuống hay chưa */
@@ -1336,13 +1418,14 @@ export interface ActiveWarnZone {
 }
 
 /**
- * Trích xuất vùng báo trước nguy hiểm từ tin nhắn fx (M7.10 #511).
- * Lưu ý: expiresAt phải tính theo cùng đồng hồ với vòng lặp bot (performance.now()),
+ * Trích xuất vùng báo trước nguy hiểm từ tin nhắn fx (M7.10 #511, M42 #876).
+ * Lưu ý: expiresAt và warnAt phải tính theo cùng đồng hồ với vòng lặp bot (performance.now()),
  * không dùng Date.now() để tránh lệch thang đo thời gian.
  */
 export function parseWarnZoneFromFx(
   msg?: FxMsg,
   now: number = performance.now(),
+  reflexMs = 0,
 ): ActiveWarnZone | null {
   if (!msg) return null;
   if (msg.kind === "warn" && msg.shape) {
@@ -1350,6 +1433,7 @@ export function parseWarnZoneFromFx(
     const w = typeof msg.w === "number" && msg.w > 0 ? msg.w : 56;
     const angle = typeof msg.angle === "number" ? msg.angle : 0;
     const arc = typeof msg.arc === "number" ? msg.arc : Math.PI / 2;
+    const r0 = typeof msg.r0 === "number" && msg.r0 > 0 ? msg.r0 : undefined;
     const ms = typeof msg.ms === "number" && msg.ms > 0 ? msg.ms : 800;
     return {
       shape: msg.shape,
@@ -1359,6 +1443,9 @@ export function parseWarnZoneFromFx(
       w,
       angle,
       arc,
+      r0,
+      warnAt: now,
+      reflexMs,
       expiresAt: now + ms,
     };
   }
@@ -1377,6 +1464,8 @@ export function parseWarnZoneFromFx(
       w: 2 * BOLT_RADIUS,
       angle,
       arc: 0,
+      warnAt: now,
+      reflexMs,
       expiresAt: now + ms,
     };
   }
@@ -1468,8 +1557,18 @@ export function isPointInWarnZone(
     return segDist(px, py, ax, ay, bx, by).dist <= reach;
   }
   if (warn.shape === "circle") {
+    const d = Math.hypot(px - warn.x, py - warn.y);
+    if (warn.r0 !== undefined && warn.r0 > 0) {
+      // Vành khuyên (donut/ring zone, trùm mục 42): nguy hiểm trong [r0 - reach, r + reach]
+      // Nếu d < r0 - reach: an toàn trong vùng lõi tâm
+      // Nếu d > r + reach: an toàn ngoài rìa
+      const reach = PLAYER_RADIUS + buffer;
+      const innerSafe = Math.max(0, warn.r0 - reach);
+      const outerReach = warn.r + reach;
+      return d >= innerSafe && d <= outerReach;
+    }
     const reach = warn.r + PLAYER_RADIUS + buffer;
-    return Math.hypot(px - warn.x, py - warn.y) <= reach;
+    return d <= reach;
   }
   if (warn.shape === "cone") {
     const d = Math.hypot(px - warn.x, py - warn.y);
@@ -1483,8 +1582,27 @@ export function isPointInWarnZone(
 }
 
 /**
+ * Kiểm tra xem điểm (px, py) có nằm trong bất kỳ vùng cảnh báo nào còn hiệu lực (chưa nổ) không.
+ */
+export function isPointInAnyActiveWarn(
+  px: number,
+  py: number,
+  warns: ActiveWarnZone[],
+  now: number,
+  buffer = 8,
+): boolean {
+  for (const w of warns) {
+    if (w.expiresAt > now && isPointInWarnZone(px, py, w, buffer)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Tính vector di chuyển né tránh { dx, dy } (đã chuẩn hoá) nếu bot đang nằm trong vùng nguy hiểm của một hoặc nhiều cảnh báo.
- * Trả về null nếu bot an toàn.
+ * Chờ đúng `warn.reflexMs` (mặc định 400 ms) kể từ lúc nhận cảnh báo trước khi bắt đầu chạy né (M42 #876).
+ * Trả về null nếu bot an toàn hoặc chưa hết thời gian phản xạ.
  */
 export function computeEvadeVector(
   px: number,
@@ -1504,20 +1622,52 @@ export function computeEvadeVector(
   }
   if (warns.length === 0) return null;
 
-  // Tìm warn nguy hiểm nhất đe doạ bot (sắp đáp đòn nhất)
+  // Tìm warn nguy hiểm nhất đe doạ bot (sắp đáp đòn nhất và đã qua thời gian phản xạ)
   let urgentWarn: ActiveWarnZone | null = null;
   let minExpires = Number.POSITIVE_INFINITY;
 
   for (const w of warns) {
     if (isPointInWarnZone(px, py, w, buffer)) {
-      if (w.expiresAt < minExpires) {
-        minExpires = w.expiresAt;
-        urgentWarn = w;
+      // Chỉ né khi đã qua thời gian phản xạ (nếu có cấu hình warnAt + reflexMs)
+      const reflexMs = typeof w.reflexMs === "number" ? w.reflexMs : 0;
+      const warnAt = typeof w.warnAt === "number" ? w.warnAt : 0;
+      if (now >= warnAt + reflexMs) {
+        if (w.expiresAt < minExpires) {
+          minExpires = w.expiresAt;
+          urgentWarn = w;
+        }
       }
     }
   }
 
   if (!urgentWarn) return null;
+
+  // Tính vector hướng thoát hiểm ngắn nhất đưa bot ra ngoài vùng nguy hiểm theo từng dạng hình học
+  if (urgentWarn.shape === "circle") {
+    const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
+    if (urgentWarn.r0 !== undefined && urgentWarn.r0 > 0) {
+      // Vành khuyên: so sánh khoảng cách tới lõi an toàn (d - r0) và rìa ngoài an toàn (r - d)
+      const distToCore = Math.max(0, d - urgentWarn.r0);
+      const distToOuter = Math.max(0, urgentWarn.r - d);
+      if (distToCore < distToOuter) {
+        // Gần lõi an toàn hơn: chạy thẳng vào tâm
+        if (d > 0.001) {
+          return { dx: -(px - urgentWarn.x) / d, dy: -(py - urgentWarn.y) / d };
+        }
+        return { dx: 0, dy: 0 };
+      }
+      // Gần rìa ngoài hơn: chạy thẳng ra ngoài
+      if (d > 0.001) {
+        return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+      }
+      return { dx: 1, dy: 0 };
+    }
+    // Hình tròn đặc: chạy thẳng ra xa tâm
+    if (d > 0.001) {
+      return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
+    }
+    return { dx: 1, dy: 0 };
+  }
 
   if (urgentWarn.shape === "line") {
     const ax = urgentWarn.x;
@@ -1528,25 +1678,21 @@ export function computeEvadeVector(
     return { dx: nx, dy: ny };
   }
 
-  if (urgentWarn.shape === "circle") {
-    const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
-    if (d > 0.001) {
-      return { dx: (px - urgentWarn.x) / d, dy: (py - urgentWarn.y) / d };
-    }
-    return { dx: 1, dy: 0 };
-  }
-
   if (urgentWarn.shape === "cone") {
     const d = Math.hypot(px - urgentWarn.x, py - urgentWarn.y);
     const a = Math.atan2(py - urgentWarn.y, px - urgentWarn.x);
-    if (d > urgentWarn.r * 0.7) {
+    const diff = normalizeAngle(a - urgentWarn.angle);
+    const distToOuter = Math.max(0, urgentWarn.r - d);
+    const distToSide = d * Math.sin(Math.max(0, urgentWarn.arc / 2 - Math.abs(diff)));
+    if (distToOuter <= distToSide || d > urgentWarn.r * 0.8) {
+      // Gần rìa ngoài hơn: chạy thẳng theo hướng tia từ tâm ra rìa
       return { dx: Math.cos(a), dy: Math.sin(a) };
     }
-    const diff = normalizeAngle(a - urgentWarn.angle);
+    // Thoát ra cạnh bên nón gần nhất: vuông góc với tia cạnh nón hướng ra phía ngoài
     const escapeAngle =
       diff >= 0
-        ? urgentWarn.angle + urgentWarn.arc / 2 + 0.3
-        : urgentWarn.angle - urgentWarn.arc / 2 - 0.3;
+        ? urgentWarn.angle + urgentWarn.arc / 2 + Math.PI / 2
+        : urgentWarn.angle - urgentWarn.arc / 2 - Math.PI / 2;
     return { dx: Math.cos(escapeAngle), dy: Math.sin(escapeAngle) };
   }
 
@@ -1570,7 +1716,7 @@ function bindRoomEvents(
 
   room.onMessage("fx", (msg?: FxMsg) => {
     if (isMeasuring()) b.fxCount++;
-    const zone = parseWarnZoneFromFx(msg, performance.now());
+    const zone = parseWarnZoneFromFx(msg, performance.now(), b.reflexMs ?? 400);
     if (zone) {
       if (isPointInWarnZone(b.predX, b.predY, zone, 0)) {
         zone.targeted = true;
@@ -1685,6 +1831,24 @@ function bindRoomEvents(
     } else if (b.sect && !msg.sect) {
       b.sectTag = undefined;
       b.sectBalance = 0;
+      b.sectHall = null;
+      b.sectContrib = 0;
+      b.sectMerit = 0;
+      b.sectLevel = 1;
+    }
+  });
+  room.onMessage(SECT_MSG.hall, (msg: SectHallMsg) => {
+    if (b.sect) {
+      b.sectHall = msg.hall;
+      if (msg.hall) {
+        b.sectContrib = msg.hall.me.contrib;
+        b.sectMerit = msg.hall.me.merit;
+        b.sectLevel = msg.hall.level;
+      } else {
+        b.sectContrib = 0;
+        b.sectMerit = 0;
+        b.sectLevel = 1;
+      }
     }
   });
   room.onMessage("limbo", (msg: LimboMsg) => {
@@ -1835,6 +1999,8 @@ async function runLoadTest(
   sect = false,
   skills = false,
   evade = false,
+  boss = false,
+  reflexMs = 400,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -1854,14 +2020,15 @@ async function runLoadTest(
   const sectSuffix = sect ? ", tông môn (--sect)" : "";
   const skillsSuffix = skills ? ", chiêu thức (--skills)" : "";
   const evadeSuffix = evade ? ", né đòn (--evade)" : "";
+  const bossSuffix = boss ? `, săn trùm (--boss, reflex=${reflexMs}ms)` : "";
   const mapSuffix =
     currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -2174,6 +2341,14 @@ async function runLoadTest(
       sectDepositsCount: 0,
       sectWithdrawsCount: 0,
       sectChatsCount: 0,
+      sectContrib: 0,
+      sectMerit: 0,
+      sectLevel: 1,
+      sectHall: null,
+      sectQuestsAcceptedCount: 0,
+      sectQuestsTurnedInCount: 0,
+      sectShopBuysCount: 0,
+      sectLeavesCount: 0,
       skills,
       skillsLearned: {},
       skillsSlots: ["", "", "", ""],
@@ -2185,6 +2360,8 @@ async function runLoadTest(
       skillsMsgsCount: 0,
       skillsSent: 0,
       evade,
+      bossHunt: boss,
+      reflexMs,
       warns: [],
       evadeCount: 0,
       warnsTargetedCount: 0,
@@ -2488,6 +2665,28 @@ async function runLoadTest(
         const roleIndex = (b.index - 1) % groupSize;
         const isLeader = roleIndex === 0;
 
+        // Helper hành vi M8 (Nội vụ: nhiệm vụ, cửa hàng)
+        const trySectM8Actions = () => {
+          const decision = decideSectM8Action({
+            sectTag: b.sectTag,
+            sectHall: b.sectHall ?? null,
+            sectContrib: b.sectContrib ?? 0,
+          });
+          if (!decision) return;
+          if (decision.type === "hallGet") {
+            b.room.send(SECT_MSG.hallGet, {});
+          } else if (decision.type === "questAccept") {
+            b.room.send(SECT_MSG.questAccept, { questId: decision.questId });
+            if (measuring) b.sectQuestsAcceptedCount++;
+          } else if (decision.type === "questTurnIn") {
+            b.room.send(SECT_MSG.questTurnIn, { questId: decision.questId });
+            if (measuring) b.sectQuestsTurnedInCount++;
+          } else if (decision.type === "shopBuy") {
+            b.room.send(SECT_MSG.shopBuy, { itemId: decision.itemId, qty: decision.qty });
+            if (measuring) b.sectShopBuysCount++;
+          }
+        };
+
         if (isLeader) {
           if (!b.sectTag) {
             const sectName = `Phai Dao ${groupIndex + 1}`;
@@ -2503,29 +2702,44 @@ async function runLoadTest(
             if (measuring) b.sectInvitesSentCount++;
 
             const r = Math.random();
-            if (r < 0.4) {
-              b.room.send(SECT_MSG.deposit, { amount: 100 });
+            if (r < 0.25) {
+              // Nộp 500 Linh thạch -> nhận 5 cống hiến (đủ điều kiện đổi bảo khố ngay)
+              b.room.send(SECT_MSG.deposit, { amount: 500 });
               if (measuring) b.sectDepositsCount++;
-            } else if (r < 0.7) {
+            } else if (r < 0.45) {
               b.room.send(SECT_MSG.withdraw, { amount: 50 });
               if (measuring) b.sectWithdrawsCount++;
+            } else if (r < 0.8) {
+              trySectM8Actions();
             } else {
               b.room.send("chat", { text: `/s Tông môn ${b.sectTag} đồng đạo cố lên` });
               if (measuring) b.sectChatsCount++;
             }
-            b.nextSectActionAt = now + 4000 + Math.random() * 2000;
+            b.nextSectActionAt = now + 3000 + Math.random() * 2000;
           }
         } else {
           if (b.sectTag) {
-            if (Math.random() < 0.5) {
-              b.room.send(SECT_MSG.deposit, { amount: 50 });
+            const r = Math.random();
+            if (r < 0.08) {
+              // Nhảy tông môn (leave): reset trạng thái, tiếp tục tick để gửi input di chuyển bình thường
+              b.room.send(SECT_MSG.leave, {});
+              b.sectTag = undefined;
+              b.sectHall = null;
+              b.sectContrib = 0;
+              if (measuring) b.sectLeavesCount++;
+              b.nextSectActionAt = now + 4000;
+            } else if (r < 0.4) {
+              // Nộp 500 Linh thạch -> nhận 5 cống hiến
+              b.room.send(SECT_MSG.deposit, { amount: 500 });
               if (measuring) b.sectDepositsCount++;
+            } else if (r < 0.8) {
+              trySectM8Actions();
             } else {
               b.room.send("chat", { text: `/s Bái kiến Tông chủ ${b.sectTag}` });
               if (measuring) b.sectChatsCount++;
             }
           }
-          b.nextSectActionAt = now + 4000 + Math.random() * 3000;
+          b.nextSectActionAt = now + 3000 + Math.random() * 2000;
         }
       }
     } else {
@@ -2707,13 +2921,21 @@ async function runLoadTest(
       } else {
         let targetMon: any = null;
         let bestScore = Number.POSITIVE_INFINITY;
-        const maxSearchDist = mode === "realistic" ? 280 : 420;
+        const maxSearchDist = b.bossHunt ? 2500 : mode === "realistic" ? 280 : 420;
         if (state?.monsters && typeof state.monsters.forEach === "function") {
           state.monsters.forEach((m: any) => {
             if (!m || m.hp <= 0) return;
             const dist = Math.hypot(m.x - b.predX, m.y - b.predY);
             if (dist > maxSearchDist) return;
-            const penalty = m.kind === "mang" ? 250 : m.kind === "ho" ? 80 : 0;
+            const penalty = b.bossHunt
+              ? m.kind === "mang"
+                ? -2000
+                : 500
+              : m.kind === "mang"
+                ? 250
+                : m.kind === "ho"
+                  ? 80
+                  : 0;
             const score = dist + penalty;
             if (score < bestScore) {
               bestScore = score;
@@ -2740,12 +2962,17 @@ async function runLoadTest(
             dy = 0;
           }
 
+          const inEvadeDanger =
+            b.evade &&
+            b.warns.length > 0 &&
+            isPointInAnyActiveWarn(b.predX, b.predY, b.warns, now, 16);
           if (
+            !inEvadeDanger &&
             b.skills &&
             tryCastLearnedSkill(b, me, dist, angle, now, measuring, targetMon.def?.element)
           ) {
             // Đã thi triển chiêu thức thành công
-          } else {
+          } else if (!inEvadeDanger) {
             if (dist <= SKILLS.slash.range && now >= b.nextSlashAt) {
               const msg: AttackMsg = { angle };
               b.room.send("attack", msg);
@@ -2812,13 +3039,24 @@ async function runLoadTest(
     // Cập nhật cảnh báo: giải quyết kết quả trúng/né và dọn dẹp warn hết hạn (M7.10 #511)
     updateBotWarns(b, now, measuring);
 
-    // Nếu bot bật --evade và đang nằm trong vùng nguy hiểm của báo trước: ghi đè dx, dy để thoát hiểm
+    // Nếu bot bật --evade và đang có cảnh báo: né thoát hoặc giữ khoảng cách an toàn ngoài vùng
     if (b.evade && b.warns.length > 0) {
-      const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now);
+      const evadeVec = computeEvadeVector(b.predX, b.predY, b.warns, now, 12);
       if (evadeVec) {
         dx = evadeVec.dx;
         dy = evadeVec.dy;
         b.evadeCount++;
+      } else {
+        // Bot đã ở ngoài vùng nguy hiểm. Kiểm tra xem vector di chuyển thông thường (dx, dy)
+        // có đưa bot bước vào lại vùng cảnh báo đang đếm ngược chưa nổ không?
+        const stepPx = statsFor(me.realm ?? 0, me.tier ?? 0).speed * (TICK_MS / 1000);
+        const nextX = b.predX + dx * stepPx;
+        const nextY = b.predY + dy * stepPx;
+        if (isPointInAnyActiveWarn(nextX, nextY, b.warns, now, 16)) {
+          // Ngăn không cho bot bước vào vùng nguy hiểm đang chờ nổ! Đứng yên ở vị trí an toàn.
+          dx = 0;
+          dy = 0;
+        }
       }
     }
 
@@ -3299,6 +3537,10 @@ async function runLoadTest(
   const totalSectDeposits = bots.reduce((s, b) => s + b.sectDepositsCount, 0);
   const totalSectWithdraws = bots.reduce((s, b) => s + b.sectWithdrawsCount, 0);
   const totalSectChats = bots.reduce((s, b) => s + b.sectChatsCount, 0);
+  const totalSectQuestsAccepted = bots.reduce((s, b) => s + b.sectQuestsAcceptedCount, 0);
+  const totalSectQuestsTurnedIn = bots.reduce((s, b) => s + b.sectQuestsTurnedInCount, 0);
+  const totalSectShopBuys = bots.reduce((s, b) => s + b.sectShopBuysCount, 0);
+  const totalSectLeaves = bots.reduce((s, b) => s + b.sectLeavesCount, 0);
 
   const totalCasts = bots.reduce((s, b) => s + b.skillsCastCount, 0);
   const totalSkillsMsgs = bots.reduce((s, b) => s + b.skillsMsgsCount, 0);
@@ -3429,6 +3671,12 @@ async function runLoadTest(
     sectDepositsTotal: sect || totalSectDeposits > 0 ? totalSectDeposits : undefined,
     sectWithdrawsTotal: sect || totalSectWithdraws > 0 ? totalSectWithdraws : undefined,
     sectChatsTotal: sect || totalSectChats > 0 ? totalSectChats : undefined,
+    sectQuestsAcceptedTotal:
+      sect || totalSectQuestsAccepted > 0 ? totalSectQuestsAccepted : undefined,
+    sectQuestsTurnedInTotal:
+      sect || totalSectQuestsTurnedIn > 0 ? totalSectQuestsTurnedIn : undefined,
+    sectShopBuysTotal: sect || totalSectShopBuys > 0 ? totalSectShopBuys : undefined,
+    sectLeavesTotal: sect || totalSectLeaves > 0 ? totalSectLeaves : undefined,
     skills: skills ? true : undefined,
     castsSent: skills || totalCasts > 0 ? totalCasts : undefined,
     skillsMsgsReceivedPerBot:
@@ -3570,6 +3818,16 @@ function printMetrics(m: LoadTestMetrics) {
     console.log(
       `- Thử tải Tông môn (--sect): Lập: ${m.sectsCreatedTotal ?? 0} | Mời: ${m.sectInvitesSentTotal ?? 0} | Nhận: ${m.sectInvitesAcceptedTotal ?? 0} | Nạp: ${m.sectDepositsTotal ?? 0} | Rút: ${m.sectWithdrawsTotal ?? 0} | Chat /s: ${m.sectChatsTotal ?? 0}`,
     );
+    if (
+      m.sectQuestsAcceptedTotal !== undefined ||
+      m.sectQuestsTurnedInTotal !== undefined ||
+      m.sectShopBuysTotal !== undefined ||
+      m.sectLeavesTotal !== undefined
+    ) {
+      console.log(
+        `  + Chiều sâu M8: Nhận NV: ${m.sectQuestsAcceptedTotal ?? 0} | Gửi trả NV: ${m.sectQuestsTurnedInTotal ?? 0} | Đổi bảo khố: ${m.sectShopBuysTotal ?? 0} | Nhảy tông: ${m.sectLeavesTotal ?? 0}`,
+      );
+    }
   }
 }
 
@@ -3861,6 +4119,8 @@ async function main() {
           args.sect,
           args.skills,
           args.evade,
+          args.boss,
+          args.reflexMs,
         ),
       );
     }

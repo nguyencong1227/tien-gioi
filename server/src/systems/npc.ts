@@ -1,5 +1,6 @@
 // Tương tác NPC: nói chuyện, nhận / trả / bỏ nhiệm vụ, đổi đồ.
 // Mọi thao tác đều kiểm tra lại ở server: còn sống, đứng gần NPC, đủ điều kiện.
+import { trackSocial } from "./social";
 import {
   COIN_CAP,
   CURRENCY_NAME,
@@ -241,4 +242,5 @@ export function craft(w: World, sid: string, recipeId: unknown) {
     tone: "good",
   });
   sendInv(w, sid, [{ ...rc.output }]);
+  trackSocial(w, sid, [`craft:${station}`, 1]); // thành tựu nghề (M9.5 / M9.9): số lần chế theo trạm (rèn / luyện đan / bàn phù), MỘT lần mỗi lần chế thành công
 }

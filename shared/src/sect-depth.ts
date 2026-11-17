@@ -357,59 +357,241 @@ export interface SectQuestTemplate {
 }
 
 /**
- * KHUNG: vài mẫu để test và để B làm giao diện; Dev D thay bằng bảng thật (>= 12 mẫu x 4 bậc, issue M8.7) trong PR riêng của D.
- * Quái / vật phẩm phải CÓ THẬT (test kiểm).
+ * Mẫu nhiệm vụ tông hằng ngày (M8.7a, #856): 12 mẫu x 4 bậc (Luyện Khí / Trúc Cơ / Kim Đan / Nguyên Anh), chỉ dùng quái / vật phẩm CÓ THẬT.
+ * Ý tưởng gốc: các sự kiện tông môn của Vạn Kiếp Tu Tiên (docs/NGUON_NOI_DUNG.md), viết lại cho thời gian thực. Mỗi bậc dùng quái / nguyên liệu
+ * KHÔNG quá khó hơn bậc đó (tho / lang vừa bậc 0, hổ bậc 1, loài Kim Đan bậc 2, loài Nguyên Anh bậc 3); test kiểm (`sect-depth.test.ts`).
+ * Số lượng bước và thưởng (tu vi / đan) là ĐỀ XUẤT; Dev D/A hiệu chỉnh bằng mô phỏng (`docs/CAN_BANG.md`).
  */
 export const SECT_QUESTS: readonly SectQuestTemplate[] = [
+  // ---------- Độ khó 1 (20 cống hiến) ----------
   {
-    id: "st_tru_lang",
-    title: "Trừ sói quanh trấn",
-    desc: "Hạ Hôi Lang quanh trấn để đường núi yên ổn.",
+    id: "st_tru_ho_son",
+    title: "Trừ hổ dữ sơn cốc",
+    desc: "Thú dữ chặn đường sơn cốc, Trưởng lão giao đệ tử trừ hại.",
+    difficulty: 1,
+    byTier: {
+      0: { steps: [{ kind: "kill", monster: "lang", count: 12 }], rewards: { exp: 40 } },
+      1: { steps: [{ kind: "kill", monster: "ho", count: 6 }], rewards: { exp: 80 } },
+      2: { steps: [{ kind: "kill", monster: "suong_ho", count: 5 }], rewards: { exp: 120 } },
+      3: { steps: [{ kind: "kill", monster: "han_lang", count: 4 }], rewards: { exp: 160 } },
+    },
+    talk: {
+      offer: ["Sơn cốc có hổ dữ chặn đường, ngươi hãy vào trừ cho gọn."],
+      progress: ["Thú dữ vẫn còn đó, chưa đủ số đã hứa."],
+      complete: ["Sơn cốc đã yên, tông môn ghi công cho ngươi."],
+    },
+  },
+  {
+    id: "st_tuan_son_dao",
+    title: "Tuần sơn đạo",
+    desc: "Dọn thú dữ trên các lối núi để đoàn người qua lại yên ổn.",
+    difficulty: 1,
+    byTier: {
+      0: { steps: [{ kind: "kill", monster: "tho", count: 15 }], rewards: { exp: 40 } },
+      1: { steps: [{ kind: "kill", monster: "lang", count: 10 }], rewards: { exp: 80 } },
+      2: { steps: [{ kind: "kill", monster: "thach_quy", count: 4 }], rewards: { exp: 120 } },
+      3: { steps: [{ kind: "kill", monster: "phong_nha", count: 4 }], rewards: { exp: 160 } },
+    },
+    talk: {
+      offer: ["Sơn đạo nhiều thú dữ, ngươi hãy tuần tra và trừ sạch."],
+      progress: ["Lối núi vẫn chưa yên, chưa đủ số."],
+      complete: ["Sơn đạo đã thông, tông môn cảm tạ."],
+    },
+  },
+  {
+    id: "st_diet_doc_trung",
+    title: "Diệt độc trùng",
+    desc: "Đầm lầy đầy độc trùng gây hại, cần người diệt gọn.",
     difficulty: 1,
     byTier: {
       0: { steps: [{ kind: "kill", monster: "lang", count: 10 }], rewards: { exp: 40 } },
-      1: { steps: [{ kind: "kill", monster: "lang", count: 20 }], rewards: { exp: 80 } },
+      1: { steps: [{ kind: "kill", monster: "ho", count: 6 }], rewards: { exp: 80 } },
+      2: { steps: [{ kind: "kill", monster: "doc_thiem", count: 5 }], rewards: { exp: 120 } },
+      3: { steps: [{ kind: "kill", monster: "doc_tuoc", count: 4 }], rewards: { exp: 160 } },
     },
     talk: {
-      offer: ["Đệ tử ngoại môn được giao dọn bầy Hôi Lang quanh trấn."],
-      progress: ["Hôi Lang còn quấy nhiễu, chưa đủ số."],
-      complete: ["Đường núi đã yên, tông môn ghi công cho ngươi."],
+      offer: ["Độc trùng tràn đầm, hại người và thú, ngươi hãy diệt gọn."],
+      progress: ["Độc trùng vẫn còn, chưa đủ số."],
+      complete: ["Đầm lầy đã sạch độc trùng, tông môn ghi công."],
     },
   },
   {
-    id: "st_nop_nanh",
-    title: "Nộp nanh sói cho đan phòng",
-    desc: "Nộp nanh sói cho đan phòng của tông môn.",
+    id: "st_nop_thu_pham",
+    title: "Nộp thú phàm",
+    desc: "Nộp da thú cho đan phòng của tông môn.",
+    difficulty: 1,
+    byTier: {
+      0: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 8 }], rewards: { exp: 40 } },
+      1: { steps: [{ kind: "collect", itemId: "da_ho", count: 6 }], rewards: { exp: 80 } },
+      2: { steps: [{ kind: "collect", itemId: "suong_mao", count: 6 }], rewards: { exp: 120 } },
+      3: { steps: [{ kind: "collect", itemId: "han_lang_mao", count: 5 }], rewards: { exp: 160 } },
+    },
+    talk: {
+      offer: ["Đan phòng cần nguyên liệu thú phàm, ngươi hãy thu thập nộp vào."],
+      progress: ["Chưa đủ thú phàm cho đan phòng."],
+      complete: ["Nguyên liệu đủ tươi, đan phòng nhận."],
+    },
+  },
+  // ---------- Độ khó 2 (30 cống hiến) ----------
+  {
+    id: "st_bao_ve_duoc_vien",
+    title: "Bảo vệ dược viên",
+    desc: "Thu thập nguyên liệu cho dược viên của tông môn.",
     difficulty: 2,
     byTier: {
-      0: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 8 }], rewards: { exp: 60 } },
-      1: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 16 }], rewards: { exp: 120 } },
+      0: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 12 }], rewards: { exp: 60 } },
+      1: { steps: [{ kind: "collect", itemId: "da_ho", count: 10 }], rewards: { exp: 120 } },
+      2: { steps: [{ kind: "collect", itemId: "quy_giap", count: 6 }], rewards: { exp: 180 } },
+      3: { steps: [{ kind: "collect", itemId: "tuong_cot", count: 5 }], rewards: { exp: 240 } },
     },
     talk: {
-      offer: ["Đan phòng cần nanh sói còn tươi."],
-      progress: ["Chưa đủ nanh sói cho đan phòng."],
-      complete: ["Nanh còn tươi, đan phòng nhận."],
+      offer: ["Dược viên thiếu nguyên liệu, ngươi hãy thu cho đủ."],
+      progress: ["Nguyên liệu dược viên vẫn chưa đủ."],
+      complete: ["Dược viên đã đầy nguyên liệu, tông môn hậu tạ."],
     },
   },
   {
-    id: "st_tru_ho",
-    title: "Trừ hổ dữ",
-    desc: "Hạ Hắc Hổ ở bìa rừng.",
+    id: "st_khai_khoang_mach",
+    title: "Khai khoáng mạch",
+    desc: "Khai thác khoáng mạch của tông môn nơi rừng sâu.",
+    difficulty: 2,
+    byTier: {
+      0: { steps: [{ kind: "collect", itemId: "long_tho", count: 14 }], rewards: { exp: 60 } },
+      1: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 16 }], rewards: { exp: 120 } },
+      2: { steps: [{ kind: "collect", itemId: "doc_nang", count: 6 }], rewards: { exp: 180 } },
+      3: { steps: [{ kind: "collect", itemId: "phong_nha_vu", count: 6 }], rewards: { exp: 240 } },
+    },
+    talk: {
+      offer: ["Khoáng mạch cần người khai thác, ngươi hãy vào thu khoáng."],
+      progress: ["Khoáng thu được chưa đủ."],
+      complete: ["Khoáng mạch đã khai xong, tông môn ghi công."],
+    },
+  },
+  {
+    id: "st_giac_linh_thu",
+    title: "Giác linh thú",
+    desc: "Canh gác và trừ thú dữ quanh khu nuôi linh thú.",
+    difficulty: 2,
+    byTier: {
+      0: { steps: [{ kind: "kill", monster: "lang", count: 12 }], rewards: { exp: 60 } },
+      1: { steps: [{ kind: "kill", monster: "ho", count: 8 }], rewards: { exp: 120 } },
+      2: { steps: [{ kind: "kill", monster: "suong_ho", count: 6 }], rewards: { exp: 180 } },
+      3: { steps: [{ kind: "kill", monster: "cot_tuong", count: 4 }], rewards: { exp: 240 } },
+    },
+    talk: {
+      offer: ["Khu linh thú có thú dữ xâm phạm, ngươi hãy vào trừ."],
+      progress: ["Thú dữ vẫn còn quấy phá, chưa đủ số."],
+      complete: ["Linh thú đã yên, tông môn cảm tạ."],
+    },
+  },
+  {
+    id: "st_tru_quy_dau_dan",
+    title: "Trừ quỷ đầu đàn",
+    desc: "Trừ thủ lĩnh đàn quái đang làm loạn biên giới.",
+    difficulty: 2,
+    byTier: {
+      0: { steps: [{ kind: "kill", monster: "lang", count: 10 }], rewards: { exp: 60 } },
+      1: { steps: [{ kind: "kill", monster: "ho", count: 8 }], rewards: { exp: 120 } },
+      2: { steps: [{ kind: "kill", monster: "thach_quy", count: 5 }], rewards: { exp: 180 } },
+      3: { steps: [{ kind: "kill", monster: "doc_tuoc", count: 5 }], rewards: { exp: 240 } },
+    },
+    talk: {
+      offer: ["Đàn quái có đầu lĩnh hung hãn, ngươi hãy vào trừ gọn."],
+      progress: ["Đầu đàn vẫn chưa bị diệt, chưa đủ số."],
+      complete: ["Đầu đàn đã trừ, biên giới yên ổn, tông môn ghi công."],
+    },
+  },
+  // ---------- Độ khó 3 (40 cống hiến) ----------
+  {
+    id: "st_dinh_sat_doc",
+    title: "Đính sát độc trùng",
+    desc: "Ám sát đàn độc trùng hung dữ nơi đầm sâu.",
     difficulty: 3,
     byTier: {
-      0: {
-        steps: [{ kind: "kill", monster: "ho", count: 3 }],
-        rewards: { exp: 120, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
+      0: { steps: [{ kind: "kill", monster: "lang", count: 16 }], rewards: { exp: 100 } },
+      1: { steps: [{ kind: "kill", monster: "ho", count: 12 }], rewards: { exp: 200 } },
+      2: {
+        steps: [{ kind: "kill", monster: "doc_thiem", count: 8 }],
+        rewards: { exp: 300, items: [{ itemId: "hoi_huyet_dan", qty: 1 }] },
       },
-      1: {
-        steps: [{ kind: "kill", monster: "ho", count: 6 }],
-        rewards: { exp: 240, items: [{ itemId: "hoi_huyet_dan", qty: 3 }] },
+      3: {
+        steps: [{ kind: "kill", monster: "doc_tuoc", count: 6 }],
+        rewards: { exp: 400, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
       },
     },
     talk: {
-      offer: ["Hắc Hổ lảng vảng ở bìa rừng, cần người trừ."],
-      progress: ["Hắc Hổ còn đó, chưa đủ số."],
-      complete: ["Hổ dữ đã trừ, tông môn hậu tạ."],
+      offer: ["Đầm sâu có độc trùng hung dữ, ngươi hãy vào ám sát cho gọn."],
+      progress: ["Độc trùng vẫn còn nhiều, chưa đủ số."],
+      complete: ["Độc trùng đã diệt sạch, tông môn trọng thưởng."],
+    },
+  },
+  {
+    id: "st_nop_linh_duoc",
+    title: "Nộp linh dược",
+    desc: "Nộp dược liệu quý cho tàng kinh các của tông môn.",
+    difficulty: 3,
+    byTier: {
+      0: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 18 }], rewards: { exp: 100 } },
+      1: { steps: [{ kind: "collect", itemId: "da_ho", count: 14 }], rewards: { exp: 200 } },
+      2: {
+        steps: [{ kind: "collect", itemId: "quy_giap", count: 10 }],
+        rewards: { exp: 300, items: [{ itemId: "hoi_huyet_dan", qty: 1 }] },
+      },
+      3: {
+        steps: [{ kind: "collect", itemId: "tuong_cot", count: 6 }],
+        rewards: { exp: 400, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
+      },
+    },
+    talk: {
+      offer: ["Tàng kinh các cần dược liệu quý, ngươi hãy thu nộp."],
+      progress: ["Dược liệu quý vẫn chưa đủ."],
+      complete: ["Dược liệu đã đủ, tàng kinh các ghi công."],
+    },
+  },
+  {
+    id: "st_tuan_thu_rung",
+    title: "Tuần thú rừng sâu",
+    desc: "Tuần tra rừng sâu trừ thú dữ đe dọa thợ khai thác.",
+    difficulty: 3,
+    byTier: {
+      0: { steps: [{ kind: "kill", monster: "tho", count: 25 }], rewards: { exp: 100 } },
+      1: { steps: [{ kind: "kill", monster: "lang", count: 18 }], rewards: { exp: 200 } },
+      2: {
+        steps: [{ kind: "kill", monster: "thach_quy", count: 8 }],
+        rewards: { exp: 300, items: [{ itemId: "hoi_huyet_dan", qty: 1 }] },
+      },
+      3: {
+        steps: [{ kind: "kill", monster: "cot_tuong", count: 6 }],
+        rewards: { exp: 400, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
+      },
+    },
+    talk: {
+      offer: ["Rừng sâu thú dữ rình rập, ngươi hãy tuần tra trừ sạch."],
+      progress: ["Thú dữ vẫn còn, chưa đủ số."],
+      complete: ["Rừng sâu đã yên, thợ khai thác an toàn, tông môn hậu tạ."],
+    },
+  },
+  {
+    id: "st_bao_ve_khoang_mach",
+    title: "Bảo vệ khoáng mạch",
+    desc: "Bảo vệ mỏ khoáng của tông môn và thu khoáng quý.",
+    difficulty: 3,
+    byTier: {
+      0: { steps: [{ kind: "collect", itemId: "long_tho", count: 20 }], rewards: { exp: 100 } },
+      1: { steps: [{ kind: "collect", itemId: "nanh_soi", count: 20 }], rewards: { exp: 200 } },
+      2: {
+        steps: [{ kind: "collect", itemId: "doc_nang", count: 8 }],
+        rewards: { exp: 300, items: [{ itemId: "hoi_huyet_dan", qty: 1 }] },
+      },
+      3: {
+        steps: [{ kind: "collect", itemId: "phong_nha_vu", count: 6 }],
+        rewards: { exp: 400, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
+      },
+    },
+    talk: {
+      offer: ["Khoáng mạch bị quấy phá, ngươi hãy bảo vệ và thu khoáng."],
+      progress: ["Chưa thu đủ khoáng, thú dữ vẫn còn."],
+      complete: ["Khoáng mạch đã an toàn, tông môn ghi trọng công."],
     },
   },
 ];
@@ -606,12 +788,50 @@ export interface SectShopEntry {
 }
 
 /**
- * KHUNG: vài món mẫu cho test và giao diện; Dev D thay bằng bảng thật (5 nhóm hàng, issue M8.7). Bất biến giá ở `sectShopViolations`.
+ * Cửa hàng tông môn THẬT (M8.7, #844; A viết vì D chưa kịp, D mô phỏng ngân sách ở `docs/M8_TONG_MON_MO_PHONG.md`). NĂM NHÓM HÀNG, nhóm k mở ở cấp tông k (mục 12.4 / 12.6
+ * `THIET_KE_TONG_MON.md`); ba món đầu giữ nguyên thứ tự của khung cũ (test và giao diện tham chiếu `SECT_SHOP[0]`).
+ *
+ * GIÁ: `cost` = ceil(2 x `ITEM_VALUE` / `SECT_CH_VALUE_LT`) (2 = hệ số giá mua NPC; món NPC có bán thì `sectShopViolations` đòi `cost x 5 >= buyPrice`, nên giá luôn >= giá mua NPC quy
+ * ra cống hiến). Ba món khung đầu giữ giá cũ (5 / 5 / 30; tu_khi_dan rẻ hơn công thức 6 cống hiến, chủ ý: đan tu luyện trung cấp là phần thưởng chính của cấp 3). Bốn đan hồi phục cao (Đại Hồi / Thượng Hồi Huyết, Linh) làm tròn LÊN bội 5 so với công thức (25 thay 24, 75 thay 72): đắt hơn chút, vẫn đúng `cost x 5 >= buyPrice`.
+ * `limitDay`: đan / nguyên liệu nhiều lượt; kinh quyển 1 / ngày (đã học thì `known` khoá luôn); đồ hiếm 2 / ngày.
+ * KHÔNG bán trang bị (kiếm / bào / phù / giày / bội / ấn): trang bị rơi từ trùm và nghề nhỏ là mốc tiến độ của từng bậc, bán bằng cống hiến sẽ đi tắt qua chúng (A chốt, người dùng đổi được).
  */
 export const SECT_SHOP: readonly SectShopEntry[] = [
+  // --- Nhóm 1 (cấp 1): đan hồi phục + nguyên liệu cơ bản (Bảo khố) ---
   { itemId: "hoi_huyet_dan", cost: 5, minLevel: 1, limitDay: 10, hall: "baoKho" },
   { itemId: "hoi_linh_dan", cost: 5, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  // --- Nhóm 3 (cấp 3): đan tu luyện trung cấp (khung cũ, thứ tự giữ nguyên) ---
   { itemId: "tu_khi_dan", cost: 30, minLevel: 3, limitDay: 2, hall: "baoKho" },
+  // --- Nhóm 1 tiếp: nguyên liệu cơ bản ---
+  { itemId: "long_tho", cost: 1, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  { itemId: "nanh_soi", cost: 2, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  { itemId: "da_ho", cost: 8, minLevel: 1, limitDay: 10, hall: "baoKho" },
+  // --- Nhóm 2 (cấp 2): kinh quyển phổ thông, rarity 0-1 (Tàng Kinh Các) ---
+  { itemId: "kinh_phieu_phong_bo", cost: 3, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_bon_thach_quyen", cost: 12, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_ung_trao", cost: 12, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_kim_chung_trao", cost: 14, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_hoa_van_kiem", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_trong_nhac_tram", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_huyen_bang_chi", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_bich_thuy_hoi_xuan", cost: 16, minLevel: 2, limitDay: 1, hall: "tangKinh" },
+  // --- Nhóm 3 tiếp (cấp 3): đan hồi phục cao ---
+  { itemId: "dai_hoi_huyet_dan", cost: 25, minLevel: 3, limitDay: 5, hall: "baoKho" },
+  { itemId: "dai_hoi_linh_dan", cost: 25, minLevel: 3, limitDay: 5, hall: "baoKho" },
+  // --- Nhóm 4 (cấp 4): kinh quyển rarity 2 (Tàng Kinh Các) ---
+  { itemId: "kinh_me_tung_bo", cost: 30, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_han_quang_tien", cost: 48, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_bach_kim_trao", cost: 56, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_lac_tuyet_phan_phi", cost: 58, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_thanh_tung_phi_cham", cost: 60, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_cuu_cung_khon_sat", cost: 60, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_van_hanh_bo", cost: 60, minLevel: 4, limitDay: 1, hall: "tangKinh" },
+  // --- Nhóm 5 (cấp 5): đồ hiếm + kinh quyển rarity 3 ---
+  { itemId: "thuong_hoi_huyet_dan", cost: 75, minLevel: 5, limitDay: 2, hall: "baoKho" },
+  { itemId: "thuong_hoi_linh_dan", cost: 75, minLevel: 5, limitDay: 2, hall: "baoKho" },
+  { itemId: "kinh_bang_hoa_loan", cost: 80, minLevel: 5, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_van_thach_tran", cost: 84, minLevel: 5, limitDay: 1, hall: "tangKinh" },
+  { itemId: "kinh_liet_hoa_kiem", cost: 92, minLevel: 5, limitDay: 1, hall: "tangKinh" },
 ];
 
 export const SECT_SHOP_BY_ITEM: Record<string, SectShopEntry> = Object.fromEntries(

@@ -12,6 +12,19 @@ describe("giới hạn tần suất tin nhắn", () => {
     expect(lim.check("attack", 1000 / perSec)).toBe("drop");
   });
 
+  it("danh hiệu / thành tựu (M9.5) + trùm thế giới (M9.4): titleSet, achievementsGet và worldBossGet chặt hơn mặc định (mỗi tin có thể là một lần ghi tệp), người thật bấm vài lần vẫn qua", () => {
+    for (const type of ["titleSet", "achievementsGet", "worldBossGet"]) {
+      const l = MESSAGE_LIMITS[type];
+      expect(l, type).toBeDefined();
+      expect(l.perSec).toBeLessThan(DEFAULT_LIMIT.perSec);
+      expect(l.burst).toBeLessThan(DEFAULT_LIMIT.burst);
+      const lim = new RateLimiter(0);
+      for (let i = 0; i < l.burst; i++) expect(lim.check(type, 0)).toBe("ok");
+      expect(lim.check(type, 0)).toBe("drop");
+      expect(lim.check(type, 1000 / l.perSec)).toBe("ok"); // hồi lại
+    }
+  });
+
   it("nhịp tim: client thật (1 ping / 5 giây + 1 lúc quay lại tiền cảnh) không bao giờ bị bỏ; dồn dập thì bị chặn chặt", () => {
     const lim = new RateLimiter(0);
     for (let t = 0; t < 600_000; t += HEARTBEAT_INTERVAL_MS)
@@ -28,6 +41,29 @@ describe("giới hạn tần suất tin nhắn", () => {
   it("client bình thường (input 20 lần/giây) không bao giờ bị bỏ", () => {
     const lim = new RateLimiter(0);
     for (let t = 0; t < 60_000; t += 50) expect(lim.check("input", t)).toBe("ok");
+  });
+
+  it("MỤC 41: đợt xả dồn sau khi mạng đứng 3 giây (60 input + 3 tin DỪNG) KHÔNG bị bỏ tin nào, kể cả các tin dừng nằm cuối; đứng 5 giây (100 tin) vẫn đủ", () => {
+    for (const n of [63, MESSAGE_LIMITS.input.burst]) {
+      const lim = new RateLimiter(0);
+      // đứng im lâu trước đó (quỹ đã đầy), rồi n tin tới CÙNG MỘT LÚC
+      for (let i = 0; i < n; i++) expect(lim.check("input", 60_000)).toBe("ok");
+    }
+    expect(MESSAGE_LIMITS.input.burst).toBeGreaterThanOrEqual(63); // 3 giây x 20 Hz + 3 tin dừng
+    expect(MESSAGE_LIMITS.input.burst).toBeGreaterThanOrEqual(5 * 20); // nhịp tim coi là chết sau 8 giây; 5 giây đầu phải dồn được
+  });
+
+  it("spam input bền vững (hàng nghìn tin trong một nhịp) vẫn bị bỏ rồi ngắt kết nối: nới burst không mở cửa cho spam", () => {
+    const lim = new RateLimiter(0);
+    let ok = 0;
+    let kicked = false;
+    for (let i = 0; i < 2000 && !kicked; i++) {
+      const v = lim.check("input", 1000);
+      if (v === "ok") ok++;
+      if (v === "kick") kicked = true;
+    }
+    expect(ok).toBe(MESSAGE_LIMITS.input.burst);
+    expect(kicked).toBe(true);
   });
 
   it("mỗi loại tin nhắn có quỹ riêng; loại không khai báo dùng DEFAULT_LIMIT", () => {

@@ -1,16 +1,34 @@
 // Quái: sinh, bổ sung, AI (lang thang, phát hiện, đuổi, tấn công, về nhà).
 import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
-import { Monster } from "../schema";
+import type { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
-import { eliteDefOf, rollElite } from "./elite";
+import { rollElite } from "./elite";
+import { placeMonster, WANDER_STRIDE } from "./monster-place";
+import { bossReset, bossStep } from "./boss";
 import { chargerStep } from "./charge";
 import { cancelSlam, slamStep } from "./slam";
 import { isRanged, onHitEffectOf, rangedStep } from "./bolt";
 import { applyPlayerStatus } from "./status";
-import { isStunned, speedMult } from "./status-rules";
+import { isStunned, speedMult, weakened } from "./status-rules";
+import { inMainRegion, squareFree, warmNav } from "./nav";
+import {
+  EVADE_HOME_PX,
+  NAV_OUT,
+  NAV_SEARCHES_PER_TICK,
+  STUCK_EVADE_MS,
+  isEvading,
+  isShunned,
+  navIdle,
+  navPause,
+  navSteer,
+  resetNav,
+  snapHome,
+  startEvade,
+} from "./nav-chase";
 
 const LEASH_DIST = 520; // kéo quá xa nhà thì bỏ mục tiêu
+export { placeMonster, WANDER_STRIDE };
 const WANDER_RADIUS = 90;
 const RETURN_HOME_DIST = 200;
 const MAX_SPAWN_PER_TOPUP = 3;
@@ -21,59 +39,82 @@ const MAX_SPAWN_PER_TOPUP = 3;
  */
 export const MONSTER_WAKE_DIST = 900;
 
-/**
- * Quái KHÔNG có mục tiêu (lang thang, về nhà) chỉ áp bước di chuyển mỗi WANDER_STRIDE tick, với bước dài gấp bấy nhiêu lần:
- * tốc độ trung bình y hệt, nhưng vị trí trong state chỉ đổi 1/WANDER_STRIDE số lần (#80). Quái chạy chậm (~1 px/tick) và client
- * nội suy vị trí quái nên không nhìn ra; quái có mục tiêu (đang đuổi / đánh) vẫn di chuyển mỗi tick.
- * Vị trí thật vẫn nằm trong state (không tách vị trí mô phỏng) nên các system khác đọc `m.x`, `m.y` như cũ.
- */
-export const WANDER_STRIDE = 4;
+/** Trùm sinh cách ô chặn ít nhất chừng này (px) ngoài bán kính thân: không sát cây để khỏi kẹt ngay lúc sinh (mục 48). */
+export const BOSS_SPAWN_MARGIN = 32;
 
-/** Dựng một con quái `def` ở (x, y): vào state và dữ liệu riêng. Không kiểm vị trí (người gọi lo). */
-export function placeMonster(w: World, def: MonsterKind, x: number, y: number, elite = false) {
-  if (elite) def = eliteDefOf(def); // tinh anh (M7.3, `elite.ts`): số liệu nhân, `id` giữ nguyên
-  const id = `m${++w.monsterSeq}`;
-  const m = new Monster();
-  m.kind = def.id;
-  if (elite) m.elite = 1; // đặt MỘT lần lúc sinh
-  m.x = x;
-  m.y = y;
-  m.hp = def.hp;
-  m.maxHp = def.hp;
-  w.state.monsters.set(id, m);
-  w.mctrl.set(id, {
-    def,
-    homeX: x,
-    homeY: y,
-    target: null,
-    nextAttack: 0,
-    wanderX: x,
-    wanderY: y,
-    nextWander: 0,
-    damageBy: new Map(),
-    hpFrac: 0,
-    // Lệch pha theo số thứ tự để quái không cùng nhúc nhích một tick (không dùng random: giữ nguyên chuỗi của bench có seed)
-    strideLeft: w.monsterSeq % WANDER_STRIDE,
-    ...(elite ? { elite: true as const } : {}),
-  });
-  return id;
+/** Chỗ sinh của trùm đủ rộng: không sát cây / đá và nằm trong vùng chính của bản đồ cho cỡ thân của trùm (không nằm trong túi kín). */
+export function bossSpawnOk(w: World, def: MonsterKind, x: number, y: number): boolean {
+  return (
+    squareFree(w.map, x, y, def.radius + BOSS_SPAWN_MARGIN) &&
+    inMainRegion(w.map, def.radius * 0.8, x, y)
+  );
+}
+
+/**
+ * Các loài cần dựng sẵn lưới tìm đường ở bản đồ của phòng: loài có ở đây theo `monsterCapOf` VÀ trùm thế giới của lịch (M9.4) sinh ở bản đồ này (loài đó thường KHÔNG có
+ * `monsterCapOf` > 0, nên nếu không thêm thì lần sinh trùm theo giờ phải dựng mặt nạ + vùng chính ngay trong tick: vài chục ms, vượt ngân sách 10 ms).
+ */
+export function navKindsOf(w: World): MonsterKind[] {
+  const kinds = MONSTERS.filter((d) => w.map.monsterCapOf(d.id) > 0);
+  for (const slot of w.hub.worldBoss.slots) {
+    if (slot.mapId !== w.map.def.id) continue;
+    const def = MONSTERS.find((d) => d.id === slot.boss);
+    if (def && !kinds.includes(def)) kinds.push(def);
+  }
+  return kinds;
+}
+
+/** Dựng sẵn lưới tìm đường cho các loài quái có ở bản đồ của phòng (một lần lúc tạo phòng, `nav.ts` `warmNav`). */
+function warmMonsterNav(w: World) {
+  const present = navKindsOf(w);
+  warmNav(
+    w.map,
+    present.map((d) => d.radius * 0.8),
+    present.filter((d) => d.boss).map((d) => d.radius * 0.8),
+  );
+}
+
+/**
+ * Khoảng cách tối thiểu (px) giữa hai con CÙNG loài lúc sinh, cho loài cần RẢI ĐỀU bản đồ (QUYET_DINH_M3 mục 32 / 54 / 56: Hắc Giao 6 con ở Âm Sương Trạch không được dồn một chỗ hay
+ * quanh cổng). Đo trên bản đồ thật: vùng sinh hợp lệ của Hắc Giao ~4.800 điểm trải khắp bản đồ (chỉ ~2 % trong 500 px quanh cổng), ~17 con cách nhau >= 700 px chứa được, nên 6 con xếp được.
+ * Hết lượt thử mà chưa có chỗ thì KHÔNG sinh lần này (`topUpMonsters` thử lại nhịp sau), không nới khoảng cách.
+ */
+export const SPAWN_SPREAD_PX: Readonly<Record<string, number>> = { hac_giao: 700 };
+const SPREAD_TRIES = 400;
+
+/** Đã có con CÙNG loài trong vòng `r` px quanh (x, y) chưa. */
+function sameKindNear(w: World, kind: string, x: number, y: number, r: number): boolean {
+  for (const m of w.state.monsters.values()) {
+    if (m.kind === kind && Math.hypot(m.x - x, m.y - y) < r) return true;
+  }
+  return false;
 }
 
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
-  for (let i = 0; i < 40; i++) {
-    const x = rand(64, map.worldW - 64),
-      y = rand(64, map.worldH - 64);
-    const d = map.dangerAt(x, y);
-    if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
-    if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
-    placeMonster(w, def, x, y, rollElite(w, def));
-    return;
+  const spread = Object.prototype.hasOwnProperty.call(SPAWN_SPREAD_PX, def.id)
+    ? SPAWN_SPREAD_PX[def.id]
+    : undefined;
+  // Trùm khó tìm chỗ hơn (vòng ngoài xa trấn + rộng + thuộc vùng chính): thử nhiều lần; không thấy chỗ rộng nào thì quay về luật cũ (còn hơn thiếu trùm: bản đồ thật còn > 1000 chỗ rộng, test giữ)
+  for (const strict of def.boss ? [true, false] : [false]) {
+    const tries = spread !== undefined ? SPREAD_TRIES : strict ? 200 : 40;
+    for (let i = 0; i < tries; i++) {
+      const x = rand(64, map.worldW - 64),
+        y = rand(64, map.worldH - 64);
+      const d = map.dangerAt(x, y);
+      if (d < def.minDanger || (def.id === "tho" && d > 0.45)) continue;
+      if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
+      if (strict && !bossSpawnOk(w, def, x, y)) continue;
+      if (spread !== undefined && sameKindNear(w, def.id, x, y, spread)) continue; // rải đều (mục 32 / 54)
+      placeMonster(w, def, x, y, rollElite(w, def));
+      return;
+    }
   }
 }
 
 /** Sinh đủ số quái mỗi loại khi tạo thế giới (số lượng theo bản đồ của phòng: `GameMap.monsterCapOf`). */
 export function spawnInitial(w: World) {
+  warmMonsterNav(w);
   for (const def of MONSTERS)
     for (let i = 0; i < w.map.monsterCapOf(def.id); i++) spawnMonster(w, def);
 }
@@ -84,6 +125,7 @@ export function spawnInitial(w: World) {
  * (phòng bí cảnh không gọi `topUpMonsters`).
  */
 export function spawnDungeonMonsters(w: World) {
+  warmMonsterNav(w);
   const lair = w.map.lairPx;
   for (const def of MONSTERS) {
     const cap = w.map.monsterCapOf(def.id);
@@ -98,7 +140,9 @@ export function spawnDungeonMonsters(w: World) {
 /** Bổ sung quái bị giết, mỗi lần tối đa vài con mỗi loại. */
 export function topUpMonsters(w: World) {
   const count: Record<string, number> = {};
-  for (const m of w.state.monsters.values()) count[m.kind] = (count[m.kind] ?? 0) + 1;
+  w.state.monsters.forEach((m, id) => {
+    if (id !== w.wbossId) count[m.kind] = (count[m.kind] ?? 0) + 1; // trùm thế giới (M9.4) là thêm, không thay một con thường
+  });
   for (const def of MONSTERS) {
     const missing = w.map.monsterCapOf(def.id) - (count[def.id] ?? 0);
     for (let i = 0; i < Math.min(missing, MAX_SPAWN_PER_TOPUP); i++) spawnMonster(w, def);
@@ -111,6 +155,7 @@ export function forgetTarget(w: World, sid: string) {
 }
 
 export function tickMonsters(w: World, dt: number) {
+  w.navBudget = NAV_SEARCHES_PER_TICK; // tìm đường của quái thường chia chung từng này lần mỗi tick (trùm không giới hạn), `nav-chase.ts`
   w.state.monsters.forEach((m, id) => {
     const mc = w.mctrl.get(id);
     if (mc) updateMonster(w, id, m, mc, dt);
@@ -122,6 +167,14 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   // Trạng thái (M7.2b): choáng = đứng im và không ra đòn, tê cóng làm chậm. Quái không dính gì thì `mc.st` là undefined (không tốn gì).
   const st = mc.st !== undefined && mc.st.list.length > 0 ? mc.st : undefined;
   const stunned = st !== undefined && isStunned(st, w.now);
+  // Rút về (mục 48, `nav-chase.ts`): đang rút thì không nhắm ai, về chỗ sinh; rút quá lâu thì đặt thẳng về chỗ sinh
+  if (mc.nav !== undefined && mc.nav.evadeUntil > 0 && w.now >= mc.nav.evadeUntil)
+    snapHome(w, m, mc);
+  const evading = isEvading(w, mc);
+  if (evading && mc.target) {
+    mc.target = null;
+    mc.damageBy.clear();
+  }
   let tx = mc.wanderX,
     ty = mc.wanderY,
     speed = def.speed * 0.35;
@@ -143,10 +196,11 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   }
   // Không có mục tiêu: tìm người chơi gần nhất (để gây hấn, và để biết có nên "ngủ" không)
   let nearest = Infinity;
-  if (!target) {
+  if (!target && !evading) {
     let best = def.aggro; // aggro 0 (quái hiền) thì không bao giờ chọn mục tiêu
     w.state.players.forEach((p, sid) => {
       if (p.dead) return;
+      if (mc.nav !== undefined && isShunned(w, mc, sid)) return; // vừa kẹt vì người này (đứng chỗ không tới được): không nhắm lại ngay (mục 48)
       if (w.ghosts.size > 0 && w.ghosts.has(sid)) return; // hồn lìa xác: quái không thấy
       if (w.shielded.size > 0 && w.shielded.has(sid)) return; // đang hộ thể: quái không nhắm (mục 33)
       if (w.duels.active && w.duels.has(sid)) return; // đang thách đấu: quái không thấy
@@ -160,12 +214,32 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     });
   }
 
+  let inReach = false; // đã trong tầm đánh gần của mục tiêu (đứng đánh, không phải kẹt)
+  let seeking = false; // đang đi tới người (đuổi) hoặc về chỗ sinh: nơi áp tìm đường / đo kẹt (đặt ở chỗ chọn đích, không dò lại bằng so sánh số thực)
   if (target) {
     const d = Math.hypot(target.x - m.x, target.y - m.y);
+    inReach = d <= def.attackRange + PLAYER_RADIUS;
     tx = target.x;
     ty = target.y;
+    seeking = true;
     speed = def.speed;
-    if (def.slam && slamStep(w, id, m, mc, d, stunned)) {
+    if (mc.boss) {
+      // Trùm nhiều chiêu (mục 42, `boss.ts`): bộ chiêu bằng dữ liệu thay hẳn đập đất / lao của loài đó (một chiêu một lúc). Đang gầm / vận chiêu thì đứng yên, không đánh thường.
+      if (bossStep(w, id, m, mc, target, d, dt)) speed = 0;
+      else if (d <= def.attackRange + PLAYER_RADIUS) {
+        speed = 0;
+        const aim = Math.atan2(target.y - m.y, target.x - m.x);
+        m.angle = quantAngle(aim);
+        if (!stunned && w.now >= mc.nextAttack) {
+          mc.nextAttack = w.now + def.attackCd;
+          w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
+          const dmg = weakened(mc, w.now, Math.round(def.atk * mc.boss.atk * rand(0.85, 1.15))); // `weaken` (mục 51): quái yếu đi
+          const eff = onHitEffectOf(def);
+          if (hurtPlayer(w, mc.target!, target, dmg, m) && eff)
+            applyPlayerStatus(w, mc.target!, eff, dmg, "");
+        }
+      }
+    } else if (def.slam && slamStep(w, id, m, mc, d, stunned)) {
       // Đang gồng đập đất / vừa đáp đòn (M7.3, `slam.ts`): đứng yên, không đánh thường, không lao
       speed = 0;
     } else if (def.behavior === "charger" && chargerStep(w, id, m, mc, target, d, stunned)) {
@@ -175,6 +249,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       // Tầm xa (M7.3, `bolt.ts`): đứng bắn / lùi / đuổi tới tầm bắn; không đánh gần
       const mv = rangedStep(w, m, mc, target, d, stunned);
       tx = mv.tx;
+      seeking = mv.tx === target.x && mv.ty === target.y; // tầm xa: chỉ khi đang TIẾN tới người (lui / đứng bắn thì không)
       ty = mv.ty;
       speed = mv.speed;
     } else if (d <= def.attackRange + PLAYER_RADIUS) {
@@ -184,7 +259,7 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
       if (!stunned && w.now >= mc.nextAttack) {
         mc.nextAttack = w.now + def.attackCd;
         w.events.fx({ kind: "mslash", by: id, x: m.x, y: m.y, angle: aim });
-        const dmg = Math.round(def.atk * rand(0.85, 1.15));
+        const dmg = weakened(mc, w.now, Math.round(def.atk * rand(0.85, 1.15))); // `weaken` (mục 51)
         const eff = onHitEffectOf(def);
         // Đòn gần của `poisoner` (M7.3): trúng thì gắn thêm độc; quái thường không đụng tới `status`
         if (hurtPlayer(w, mc.target!, target, dmg, m) && eff)
@@ -194,11 +269,15 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   } else {
     mc.ai = undefined; // mất mục tiêu giữa lúc gồng / thở: bỏ đòn đang dở
     cancelSlam(mc);
-    // Đang đi về nhà hoặc lang thang
-    if (Math.hypot(m.x - mc.homeX, m.y - mc.homeY) > RETURN_HOME_DIST) {
+    if (mc.boss) bossReset(w, m, mc); // trùm đang trong trận mà hết mục tiêu: reset (hồi đầy, giai đoạn 0, bỏ quái con)
+    // Đang đi về nhà hoặc lang thang. Đang RÚT (mục 48) thì về tới sát chỗ sinh, chạy hết tốc độ.
+    const homeD = Math.hypot(m.x - mc.homeX, m.y - mc.homeY);
+    if (evading && homeD <= EVADE_HOME_PX) resetNav(mc, m, w.now); // về tới nơi: hết rút
+    if (evading ? homeD > EVADE_HOME_PX : homeD > RETURN_HOME_DIST) {
       tx = mc.homeX;
       ty = mc.homeY;
-      speed = def.speed * 0.8;
+      seeking = true;
+      speed = def.speed * (evading ? 1 : 0.8);
     } else if (nearest > MONSTER_WAKE_DIST) {
       // Ngủ: đứng yên tại chỗ, không ghi gì vào state ngoài hồi máu
       tx = m.x;
@@ -215,11 +294,12 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
     } else mc.hpFrac = 0;
   }
 
+  if (mc.boss) speed *= mc.boss.mv; // giai đoạn / cuồng nộ: nhanh hơn
   if (st !== undefined) speed = stunned ? 0 : speed * speedMult(st, w.now);
 
   // Không có mục tiêu: chỉ áp bước di chuyển mỗi WANDER_STRIDE tick (bước dài gấp WANDER_STRIDE lần)
   let stride = 1;
-  if (target) {
+  if (target || evading) {
     mc.strideLeft = 0;
   } else if (mc.strideLeft > 0) {
     mc.strideLeft--;
@@ -227,6 +307,32 @@ function updateMonster(w: World, id: string, m: Monster, mc: MonsterCtrl, dt: nu
   } else {
     mc.strideLeft = WANDER_STRIDE - 1;
     stride = WANDER_STRIDE;
+  }
+
+  // Tìm đường / phát hiện kẹt (mục 48, `nav-chase.ts`): chỉ khi quái đang đi tới người (đuổi) hoặc về chỗ sinh; đường thẳng thông thì không đổi gì
+  if (speed > 0) {
+    const chasing = seeking && target !== undefined;
+    if (seeking) {
+      const goalR = chasing ? Math.max(8, def.attackRange + PLAYER_RADIUS - 6) : 24;
+      const stuck = navSteer(w, id, m, mc, tx, ty, goalR);
+      if (stuck >= STUCK_EVADE_MS) {
+        if (chasing) {
+          // Kẹt quá lâu (người đứng chỗ không tới được, hoặc không có lối): RÚT về chỗ sinh, trùm hồi đầy (mất mục tiêu -> `bossReset`)
+          startEvade(w, mc, mc.target);
+          mc.target = null;
+          mc.damageBy.clear();
+          mc.ai = undefined;
+          cancelSlam(mc);
+        } else snapHome(w, m, mc); // về nhà mà vẫn kẹt: đặt thẳng về
+        return;
+      }
+      tx = NAV_OUT.x;
+      ty = NAV_OUT.y;
+    } else if (mc.nav !== undefined) navIdle(mc, m, w.now); // đi nhưng không phải tới người / về nhà (lui, lang thang): đang di chuyển, đo kẹt lại từ đầu
+  } else if (mc.nav !== undefined) {
+    // Đứng yên: đã tới tầm đánh thì đo kẹt lại từ đầu; còn lại (gồng, vận chiêu, gầm, choáng) thì chỉ TẠM DỪNG đo, không đặt lại
+    if (inReach) navIdle(mc, m, w.now);
+    else navPause(mc, m, w.now);
   }
 
   const dx = tx - m.x,

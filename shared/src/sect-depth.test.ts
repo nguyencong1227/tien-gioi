@@ -42,6 +42,7 @@ import {
   sectQuestTemplateOf,
   SECT_QUEST_TEMPLATE_BY_ID,
   ITEM_BY_ID,
+  ITEM_VALUE,
   parseSectHallGet,
   parseSectQuest,
   parseSectShopBuy,
@@ -368,7 +369,7 @@ describe("sectAwardDay: MỘT nơi tính cống hiến (mục 12.3)", () => {
 });
 
 describe("F1: nhiệm vụ khoá theo MẪU, đổi bậc giữa ngày không làm lại được (mục 12.7)", () => {
-  const tpl = SECT_QUESTS[0]!; // khung: có bậc 0 và 1
+  const tpl = SECT_QUESTS[0]!; // mẫu thật: có đủ 4 bậc 0-3
   const t0 = sectQuestId(tpl.id, 0);
   const t1 = sectQuestId(tpl.id, 1);
   const day0 = emptySectDay("2026-11-17");
@@ -376,6 +377,7 @@ describe("F1: nhiệm vụ khoá theo MẪU, đổi bậc giữa ngày không l�
   it("sectQuestTemplateOf: id cụ thể -> id mẫu; id lạ / không đúng dạng -> undefined", () => {
     expect(sectQuestTemplateOf(t0)).toBe(tpl.id);
     expect(sectQuestTemplateOf(t1)).toBe(tpl.id);
+    // mọi bậc 0-3 của mẫu thật đều là nhiệm vụ cụ thể hợp lệ -> KHÔNG nằm trong danh sách xấu
     for (const bad of [
       undefined,
       null,
@@ -383,7 +385,6 @@ describe("F1: nhiệm vụ khoá theo MẪU, đổi bậc giữa ngày không l�
       "",
       tpl.id,
       `${tpl.id}.t9`,
-      `${tpl.id}.t2`,
       "st_khong_co.t0",
       "constructor",
       "__proto__",
@@ -548,6 +549,70 @@ describe("nhiệm vụ tông môn (mục 12.7)", () => {
     }
   });
 
+  it("dữ liệu thật (M8.7a, #856): >= 12 mẫu, mỗi độ khó >= 4 mẫu, mọi mẫu có đủ cả 4 bậc", () => {
+    expect(SECT_QUESTS.length).toBeGreaterThanOrEqual(12);
+    for (const d of [1, 2, 3] as const)
+      expect(SECT_QUESTS.filter((t) => t.difficulty === d).length).toBeGreaterThanOrEqual(4);
+    for (const t of SECT_QUESTS) {
+      for (const tier of SECT_QUEST_TIERS)
+        expect(t.byTier[tier], `${t.id} thiếu bậc ${tier}`).toBeDefined();
+    }
+  });
+
+  it("không khó hơn bậc (min-safe-tier): kill / collect ở bậc T chỉ dùng quái / nguyên liệu vừa sức bậc T", () => {
+    // Bậc an toàn tối thiểu của mỗi quái (hunt-check: tho/lang=0, ho=1, loài Kim Đan=2, loài Nguyên Anh=3).
+    const minTierMonster: Record<string, number> = {
+      tho: 0,
+      lang: 0,
+      ho: 1,
+      suong_ho: 2,
+      thach_quy: 2,
+      doc_thiem: 2,
+      han_lang: 3,
+      phong_nha: 3,
+      cot_tuong: 3,
+      doc_tuoc: 3,
+    };
+    // Nguyên liệu -> bậc an toàn = bậc của quái rơi nó (DROP_TABLES): nanh_soi/long_tho=0, da_ho=1, phần còn lại theo quái Kim Đan / Nguyên Anh.
+    const minTierItem: Record<string, number> = {};
+    for (const [mid, entries] of Object.entries(DROP_TABLES)) {
+      const mt = minTierMonster[mid];
+      if (mt === undefined) continue; // trùm / quái không dùng cho nhiệm vụ hằng ngày
+      for (const e of entries) if (typeof e.itemId === "string") minTierItem[e.itemId] = mt;
+    }
+    for (const t of SECT_QUESTS) {
+      for (const tier of SECT_QUEST_TIERS) {
+        const d = t.byTier[tier]!;
+        for (const st of d.steps) {
+          const where = `${t.id}.t${tier}`;
+          if (st.kind === "kill") {
+            expect(minTierMonster[st.monster], `${where}: quái ${st.monster}`).toBeLessThanOrEqual(
+              tier,
+            );
+          } else if (st.kind === "collect") {
+            expect(
+              minTierItem[st.itemId],
+              `${where}: nguyên liệu ${st.itemId}`,
+            ).toBeLessThanOrEqual(tier);
+          }
+        }
+      }
+    }
+  });
+
+  it("sectQuestSlots trải đều qua 60 ngày (mỗi độ khó >= 4 mẫu nên phải thấy nhiều mẫu, không kẹt một bộ)", () => {
+    const seen = new Set<string>();
+    for (let d = 1; d <= 60; d++)
+      seen.add(
+        sectQuestSlots(
+          "tong-a",
+          `2026-${String(Math.floor(d / 2) + 1).padStart(2, "0")}-${String((d % 28) + 1).padStart(2, "0")}`,
+        ).join(","),
+      );
+    // 60 ngày với >= 4 mẫu / độ khó: phải thấy hơn một tổ hợp chọn (không kẹt một bộ)
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
   it("sectTierOfRealm: Luyện Khí trở xuống 0, Trúc Cơ 1, Kim Đan 2, Nguyên Anh trở lên 3; số xấu 0", () => {
     expect([0, 1, 2, 3, 4, 5, 9].map(sectTierOfRealm)).toEqual([0, 0, 1, 2, 3, 3, 3]);
     for (const bad of [NaN, -1, "2", null, undefined]) expect(sectTierOfRealm(bad)).toBe(0);
@@ -604,12 +669,13 @@ describe("nhiệm vụ tông môn (mục 12.7)", () => {
   });
 
   it("sectQuestFor: bản của bậc mình, thiếu thì bậc thấp hơn gần nhất; mẫu lạ / không bản vừa sức -> undefined", () => {
-    const t = SECT_QUESTS[0]!; // khung: có bậc 0 và 1
+    const t = SECT_QUESTS[0]!; // mẫu thật: có đủ 4 bậc 0-3
     expect(sectQuestFor(t.id, 1)).toBe(sectQuestId(t.id, 0));
     expect(sectQuestFor(t.id, 0)).toBe(sectQuestId(t.id, 0));
     expect(sectQuestFor(t.id, 2)).toBe(sectQuestId(t.id, 1));
-    // Nguyên Anh (bậc 3) khi mẫu chỉ có tới bậc 1 -> lùi về bậc 1
-    expect(sectQuestFor(t.id, 4)).toBe(sectQuestId(t.id, 1));
+    expect(sectQuestFor(t.id, 3)).toBe(sectQuestId(t.id, 2));
+    // Nguyên Anh (realm 4 -> bậc 3) nhận bản bậc 3 của mẫu có đủ cả 4 bậc
+    expect(sectQuestFor(t.id, 4)).toBe(sectQuestId(t.id, 3));
     expect(sectQuestFor("st_khong_co", 1)).toBeUndefined();
     expect(sectQuestFor("constructor", 1)).toBeUndefined();
     expect(sectQuestFor(t.id, NaN)).toBe(sectQuestId(t.id, 0));
@@ -619,6 +685,65 @@ describe("nhiệm vụ tông môn (mục 12.7)", () => {
 describe("cửa hàng tông môn (mục 12.6)", () => {
   it("bảng khung hợp lệ và đúng neo giá (mua bằng cống hiến không rẻ hơn mua ở NPC)", () => {
     expect(sectShopViolations()).toEqual([]);
+  });
+
+  describe("bảng THẬT (M8.7, #844): năm nhóm hàng, giá neo theo giá trị, không bán trang bị", () => {
+    const entries = [...SECT_SHOP];
+    const itemOf = (id: string) => ITEM_BY_ID[id]!;
+
+    it("đủ năm nhóm: nhóm k mở ở cấp tông k (mục 12.4), mỗi cấp có ít nhất một món", () => {
+      for (let lv = 1; lv <= 5; lv++)
+        expect(
+          entries.some((e) => e.minLevel === lv),
+          `cấp ${lv} không có món nào`,
+        ).toBe(true);
+      expect(entries.every((e) => e.minLevel >= 1 && e.minLevel <= 5)).toBe(true);
+    });
+
+    it("Bảo khố bán đồ dùng, Tàng Kinh Các bán kinh quyển (hall khớp loại vật phẩm)", () => {
+      for (const e of entries)
+        expect(e.hall, e.itemId).toBe(itemOf(e.itemId).type === "book" ? "tangKinh" : "baoKho");
+      expect(entries.some((e) => e.hall === "tangKinh")).toBe(true);
+      expect(entries.some((e) => e.hall === "baoKho")).toBe(true);
+    });
+
+    it("KHÔNG bán trang bị (rơi từ trùm / nghề nhỏ là mốc tiến độ; bán bằng cống hiến sẽ đi tắt)", () => {
+      for (const e of entries) expect(itemOf(e.itemId).type, e.itemId).not.toBe("equip");
+    });
+
+    it("kinh quyển theo cấp: cấp 2 rarity <= 1, cấp 4 rarity 2, cấp 5 rarity 3; mỗi quyển 1 lượt / ngày", () => {
+      for (const e of entries.filter((x) => itemOf(x.itemId).type === "book")) {
+        const r = itemOf(e.itemId).rarity;
+        if (e.minLevel === 2) expect(r, e.itemId).toBeLessThanOrEqual(1);
+        else if (e.minLevel === 4) expect(r, e.itemId).toBe(2);
+        else if (e.minLevel === 5) expect(r, e.itemId).toBe(3);
+        else
+          throw new Error(`${e.itemId}: kinh quyển chỉ ở cấp 2 / 4 / 5, không phải ${e.minLevel}`);
+        expect(e.limitDay, e.itemId).toBe(1);
+      }
+    });
+
+    it("GIÁ: mọi món có giá trị đều phải mua bằng cống hiến KHÔNG rẻ hơn 1,5 lần giá trị (chống sinh Linh thạch qua bán lại) và không quá 3 lần", () => {
+      for (const e of entries) {
+        const v = ITEM_VALUE[e.itemId];
+        expect(v, `${e.itemId} không có giá trị`).toBeGreaterThan(0);
+        expect(e.cost * SECT_CH_VALUE_LT, `${e.itemId} quá rẻ`).toBeGreaterThanOrEqual(1.5 * v!);
+        expect(e.cost * SECT_CH_VALUE_LT, `${e.itemId} quá đắt`).toBeLessThanOrEqual(
+          3 * v! + SECT_CH_VALUE_LT,
+        );
+      }
+    });
+
+    it("TRẦN GIÁ THEO CẤP: món cấp k không đắt hơn món đắt nhất đã duyệt của cấp k (không đưa đồ cấp cao xuống cấp thấp)", () => {
+      // món đắt nhất mỗi cấp trong bảng đã duyệt: da hổ 8 / kinh quyển 16 / Tụ Khí Đan 30 / kinh quyển 60 / kinh quyển 92
+      const cap: Record<number, number> = { 1: 8, 2: 16, 3: 30, 4: 60, 5: 92 };
+      for (const e of entries)
+        expect(e.cost, `${e.itemId} ở cấp ${e.minLevel}`).toBeLessThanOrEqual(cap[e.minLevel]!);
+    });
+
+    it("hạn mức ngày trong khoảng mua một lượt (không bắt người chơi bấm hơn một lượt cho hạn mức)", () => {
+      for (const e of entries) expect(e.limitDay, e.itemId).toBeLessThanOrEqual(SECT_SHOP_QTY_MAX);
+    });
   });
 
   it("sectShopViolations bắt đúng: món lạ, trùng, giá / hạn mức / cấp xấu, RẺ HƠN NPC", () => {
@@ -721,7 +846,7 @@ describe("tin nhắn M8 và bộ đọc không tin client", () => {
       { itemId: "__proto__", qty: 1 },
       { itemId: "khong_co", qty: 1 },
       { itemId: 5, qty: 1 },
-      { itemId: ITEM_BY_ID["long_tho"] ? "long_tho" : "x", qty: 1 }, // có thật nhưng KHÔNG bán ở cửa hàng tông
+      { itemId: ITEM_BY_ID["giao_lan"] ? "giao_lan" : "x", qty: 1 }, // có thật nhưng KHÔNG bán ở cửa hàng tông
     ]) {
       expect(parseSectShopBuy(bad)).toBeNull();
     }

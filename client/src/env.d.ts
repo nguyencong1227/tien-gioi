@@ -67,8 +67,12 @@ declare module "*check-credits.mjs" {
     file: string;
     detail: string;
   }
+  export const PACKS_DIR: string;
+  export function aiAssetDirs(packsDir?: string, aiDir?: string): string[];
   export function auditAiImages(opts?: {
     aiDir?: string;
+    aiDirs?: string[];
+    packsDir?: string;
     sourceDir?: string;
     creditsPath?: string;
     rootDir?: string;
@@ -112,4 +116,65 @@ declare module "*gen-notices.mjs" {
     spec: { file: string; name: string; license: string; start: string },
   ): string;
   export function buildNotices(root?: string): string;
+}
+
+/** Luật prompt ảnh AI (`client/scripts/art/prompt-rules.mjs`, docs/art/PHONG_CACH_MINH_HOA.md). */
+declare module "*prompt-rules.mjs" {
+  export interface StylePaletteEntry {
+    id: string;
+    hex: string;
+    role: string;
+    from: { css: string } | { map: string };
+  }
+  export interface MapCardItem {
+    id: string;
+    mapId: string;
+    seeds: number[];
+    prompt: string;
+  }
+  export const STYLE_PALETTE: readonly StylePaletteEntry[];
+  export const BANNED_PROMPT_TERMS: Readonly<Record<string, readonly string[]>>;
+  export const STYLE_ANCHORS: readonly string[];
+  export const REQUIRED_POSITIVE_CLAUSE: string;
+  export const REQUIRED_NEGATIVE_TERMS: readonly string[];
+  export const NEGATIVE_PROMPT: string;
+  export const MAP_CARD_BATCH: {
+    class: string;
+    aspect: string;
+    raw: { w: number; h: number };
+    final: { w: number; h: number; maxKb: number };
+    items: MapCardItem[];
+  };
+  export interface BossCardItem {
+    id: string;
+    bossId: string;
+    seeds: number[];
+    prompt: string;
+  }
+  export const BOSS_CARD_BATCH: {
+    class: string;
+    aspect: string;
+    pack: string;
+    dir: string;
+    raw: { w: number; h: number };
+    final: { w: number; h: number; maxKb: number };
+    items: BossCardItem[];
+  };
+  export const NPC_FACE_CLAUSE: string;
+  export interface NpcPortraitItem {
+    id: string;
+    npcId: string;
+    seeds: number[];
+    prompt: string;
+  }
+  export const NPC_PORTRAIT_BATCH: {
+    class: string;
+    aspect: string;
+    pack: string;
+    dir: string;
+    raw: { w: number; h: number };
+    final: { w: number; h: number; maxKb: number };
+    items: NpcPortraitItem[];
+  };
+  export function promptViolations(prompt: unknown, negativePrompt: unknown): string[];
 }

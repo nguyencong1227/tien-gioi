@@ -44,6 +44,21 @@ describe("startupWarnings", () => {
     );
     expect(startupWarnings({ ...prod, STORE: "pg", DATABASE_URL: "postgres://x" })).toEqual([]);
   });
+  it("BOSS_MOVES gõ sai bị báo lúc khởi động (trùm lặng lẽ chạy như cũ); on / off đúng thì im", () => {
+    const base = {
+      NODE_ENV: "production",
+      AUTH_MODE: "account",
+      TRUST_PROXY: "1",
+      STORE: "pg",
+      DATABASE_URL: "postgres://x",
+    };
+    expect(startupWarnings({ ...base, BOSS_MOVES: "on" })).toEqual([]);
+    expect(startupWarnings({ ...base, BOSS_MOVES: "off" })).toEqual([]);
+    const w = startupWarnings({ ...base, BOSS_MOVES: "enable" });
+    expect(w).toHaveLength(1);
+    expect(w[0]).toContain("BOSS_MOVES='enable'");
+  });
+
   it("dev (không production): STORE=file không thêm tiếng ồn ngoài cảnh báo /give", () => {
     expect(startupWarnings({ STORE: "file" })).toHaveLength(1);
   });

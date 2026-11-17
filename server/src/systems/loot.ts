@@ -39,10 +39,12 @@ export function spawnLoot(
  */
 export function dropLoot(w: World, mc: MonsterCtrl, x: number, y: number) {
   const owner = lootOwner(w, mc.damageBy);
+  // Buff tông môn (M8.3b, mục 12.5): cơ hội rơi nhân hệ số của CHỦ ĐỒ (đang trực tuyến, cấp tông >= 2); không có buff thì 1 = y hệt trước M8 (kết quả và số lần gọi rng không đổi)
+  const mult = w.ctrl.get(owner)?.sectBuff?.drop ?? 1;
   // Tinh anh (`elite.ts`): tung bảng rơi đồ thêm MỘT lần
   const drops = mc.elite
-    ? [...rollDrops(mc.def.id), ...rollDrops(mc.def.id)]
-    : rollDrops(mc.def.id);
+    ? [...rollDrops(mc.def.id, Math.random, mult), ...rollDrops(mc.def.id, Math.random, mult)]
+    : rollDrops(mc.def.id, Math.random, mult);
   for (const d of drops) {
     const a = rand(0, Math.PI * 2),
       r = rand(0, 16);

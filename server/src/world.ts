@@ -2,6 +2,7 @@
 // nên các system có thể test riêng bằng một World giả.
 import type {
   GameMap,
+  SoulSocial,
   InputMsg,
   FxMsg,
   DmgMsg,
@@ -23,10 +24,16 @@ import type {
   DuelStateMsg,
   DuelEndMsg,
   SectInvitedMsg,
+  SectHallMsg,
+  SectBuff,
   SectVaultMsg,
   NetShieldMsg,
   SectMsg,
   SectPresenceMsg,
+  AmbushOfferMsg,
+  AmbushEndMsg,
+  AmbushStateMsg,
+  WorldBossMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -50,7 +57,14 @@ import type { StatusBox } from "./systems/status-rules";
 import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
+import type { PBolt } from "./systems/pbolt";
+import type { PObj } from "./systems/objects";
+import type { Windup } from "./systems/windup";
+import type { BossCtrl } from "./systems/boss-state";
+import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
+import type { AmbushCtrl, AmbushRuntime } from "./systems/ambush";
+import type { ArenaCtrl } from "./systems/arena";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -94,6 +108,12 @@ export interface PlayerCtrl {
   skills: SkillBook;
   /** Thời điểm (ms, `w.now`) mỗi ô chiêu 2-5 dùng lại được */
   skillCd: [number, number, number, number];
+  /** Cửa sổ 60 giây tính điểm luyện chiêu đã cộng (`creditMastery`, CT5): `start` = `w.now` lúc mở cửa sổ, `n` = số điểm đã cộng trong cửa sổ (trần `MASTERY_PER_MIN_CAP`). Chỉ dữ liệu riêng, không lưu. */
+  masteryWin?: { start: number; n: number };
+  /** Đang vận khí chiêu `windupMs` (CT5, `systems/windup.ts`): dữ liệu riêng, không lưu; huỷ khi choáng / chết / hồn lìa xác / Hoàng Tuyền / thách đấu bắt đầu. */
+  windup?: Windup;
+  /** Lần cuối (`w.now`) gửi `SkillsMsg.mastery` cho chủ: tối đa 1 lần / `MASTERY_SEND_MS` (trừ lúc lên tầng / vào phòng). */
+  masterySentAt?: number;
   /** Trạng thái đang có (M7.2b, `systems/status.ts`): tạo khi gắn lần đầu; chỉ gửi cho chủ qua tin `status`, không vào state chung */
   st?: StatusBox;
   /**
@@ -137,8 +157,20 @@ export interface PlayerCtrl {
    * CHỈ ở phía máy chủ (không vào state, không gửi client: người dùng bỏ nhãn ở mục 36); `gainExp` nhân sau cùng.
    */
   testExpMult?: number;
+  /**
+   * Buff tông môn (M8.3b, docs/THIET_KE_TONG_MON.md mục 12.5): hệ số tu vi / cơ hội rơi đồ (chủ đồ) / tốc độ hồi phục ngoài đả tọa, CHỈ khi cấp tông >= 2 (cấp 1 không buff nên để
+   * trống: đường nóng không tốn gì). `systems/sect.ts` (`applySectBuff`) đặt lúc vào phòng / lên cấp / thành viên đổi, xoá khi rời / bị mời ra / giải tán. CHỈ phía máy chủ (không vào
+   * state); `gainExp`, `dropLoot`, `tickRecovery` đọc. Người ngoại tuyến không có `PlayerCtrl` nên không có buff (chỉ người ĐANG TRỰC TUYẾN).
+   */
+  sectBuff?: SectBuff;
   /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
   treasure?: TreasureRt;
+  /** Phiên bản giao thức client khai lúc vào phòng (`JoinOptions.v`); `undefined` = client chưa khai (coi là 0). Chặn đường chỉ kích hoạt khi `>= AMBUSH_MIN_PROTOCOL`. */
+  proto?: number;
+  /** Lần gần nhất người này GÂY sát thương cho quái (`w.now`, `dealMonsterDamage`): chặn đường coi "đang đánh" trong `AMBUSH_CALM_MS`. */
+  lastDealtAt?: number;
+  /** Chặn đường (mục 52, `systems/ambush.ts`): quãng đi, hồi, hộp thoại đang mở. Dựng lười khi `World.ambush` bật; tính năng tắt thì không có. */
+  ambush?: AmbushCtrl;
 }
 
 /** Dữ liệu riêng của server cho mỗi món đồ rơi. */
@@ -179,6 +211,16 @@ export interface MonsterCtrl {
   nextSlam?: number;
   /** Tinh anh (M7.3, `systems/elite.ts`): `def` là bản nhân số liệu; rơi thêm đồ và tiền. Trống = quái thường. */
   elite?: true;
+  /** Trùm nhiều chiêu (mục 42, `systems/boss.ts`): giai đoạn, chiêu đang vận, hồi chiêu, quái con. Chỉ có khi phòng bật `World.bossMoves` và loài có bộ chiêu. */
+  boss?: BossCtrl;
+  /** Quái con do trùm gọi: id trùm. KHÔNG rơi đồ, KHÔNG tu vi, KHÔNG tính nhiệm vụ (chống cày); biến mất khi trùm chết hoặc reset. */
+  addOf?: string;
+  /** TRÙM THẾ GIỚI theo giờ (M9.4, `systems/world-boss.ts`): KHÔNG tu vi / rơi đồ / Linh thạch theo đường quái thường; thưởng chia theo đóng góp khi chết (`worldBossKilled`). */
+  wboss?: true;
+  /** Quái của ĐẤU TRƯỜNG chặn đường (`systems/arena.ts`): KHÔNG tu vi, KHÔNG rơi đồ / Linh thạch, KHÔNG tính nhiệm vụ (thưởng đi qua một đường riêng khi thắng); chỉ biến mất khi chết. */
+  arena?: true;
+  /** Tìm đường / phát hiện kẹt / rút về của quái đang đuổi (mục 48, `systems/nav-chase.ts`); dựng lười ở lần đuổi đầu tiên, quái không đuổi thì không có. */
+  nav?: NavCtrl;
 }
 
 /** Pha của đòn mạnh (`systems/charge.ts`): `windup` đứng gồng tới `until` rồi lao theo `angle`; `recover` đứng thở tới `until`. */
@@ -199,7 +241,8 @@ export interface WorldEvents {
   dmgTo(sessionId: string, msg: DmgMsg): void;
   /** Thông báo hệ thống cho toàn server (kênh chat). */
   sys(text: string): void;
-  chat(from: string, text: string): void;
+  /** Chat toàn server. `titleId` = danh hiệu đang đeo của người nói (M9, `titleOf`), bỏ trống nếu không đeo; hệ thống không có người nói thì không truyền. */
+  chat(from: string, text: string, titleId?: string): void;
   toast(sessionId: string, msg: ToastMsg): void;
   /** Gửi túi đồ cho đúng chủ túi. */
   inv(sessionId: string, msg: InvMsg): void;
@@ -247,8 +290,18 @@ export interface WorldEvents {
   sectInvited(sessionId: string, msg: SectInvitedMsg): void;
   /** Ảnh chụp KHO ĐỒ của tông môn gửi chính người nhận (mục 11; `vault: null` = không còn ở tông môn nào). */
   sectVault(sessionId: string, msg: SectVaultMsg): void;
+  /** Ảnh chụp "Nội vụ" (M8: cấp, cống hiến, nhiệm vụ, cửa hàng) gửi chính người nhận (`hall: null` = không còn ở tông môn nào). */
+  sectHall(sessionId: string, msg: SectHallMsg): void;
   /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
   netShield(sessionId: string, msg: NetShieldMsg): void;
+  /** Hộp thoại gặp chặn đường (mục 52; chỉ người bị chặn nhận). Gửi lại cùng `id` sau khi nối lại mạng là bản cập nhật. */
+  ambushOffer(sessionId: string, msg: AmbushOfferMsg): void;
+  /** Kết cục chặn đường (mục 52; chỉ người bị chặn nhận). */
+  ambushEnd(sessionId: string, msg: AmbushEndMsg): void;
+  /** Trạng thái đấu trường chặn đường mỗi giây (thời gian còn, giá bỏ chạy giữa trận đã chốt; chỉ người trong trận nhận). */
+  ambushState(sessionId: string, msg: AmbushStateMsg): void;
+  /** Trùm thế giới (M9.4, `systems/world-boss.ts`): báo trước / xuất hiện / kết thúc cho mọi người chơi, bảng đóng góp định kỳ cho người ở phòng đích (chỉ người nhận). */
+  worldBoss(sessionId: string, msg: WorldBossMsg): void;
 }
 
 export class World {
@@ -284,6 +337,12 @@ export class World {
   readonly duels = new Duels();
   /** Đạn của quái tầm xa đang bay (M7.3, `systems/bolt.ts`): KHÔNG là state, tối đa `MAX_BOLTS`; client chỉ nhận `fx` `bolt` lúc bắn. */
   readonly bolts: Bolt[] = [];
+  /** Đạn của NGƯỜI CHƠI đang bay (mục 51, CT3, `systems/pbolt.ts`): KHÔNG là state; tối đa `MAX_PLAYER_BOLTS` mỗi phòng, `MAX_PLAYER_BOLTS_PER_PLAYER` mỗi người; client chỉ nhận `fx` `pbolt` từng đoạn. */
+  readonly pbolts: PBolt[] = [];
+  /** Vật thể BỀN của người chơi (mục 51, CT4, `systems/objects.ts`): vùng / bẫy / hào quang / tượng; KHÔNG là state; theo thứ tự dựng (cũ nhất trước); trần `persistPerPlayerMax` mỗi người, `persistPerRoomMax` mỗi phòng. */
+  readonly objs: PObj[] = [];
+  /** Bộ đếm `id` vật thể bền, tăng dần THEO PHÒNG (client ghép `fxEnd` với `fx` dựng bằng id này). */
+  objSeq = 0;
   monsterSeq = 0;
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */
@@ -293,8 +352,22 @@ export class World {
    * system / bench chạy riêng không cần phòng. Nhánh hồi sinh còn dùng cho chết không mất kiếp (PK thách đấu, bước 5).
    */
   reincarnate = false;
+  /**
+   * Trùm nhiều chiêu (mục 42, `systems/boss.ts`): bật thì trùm có bộ chiêu trong `BOSSES` dùng bộ thực thi mới (báo trước, giai đoạn, triệu hồi, cuồng nộ) thay cho đòn thường / đập đất / lao.
+   * Mặc định TẮT (bản chạy thật không đổi cho tới khi dữ liệu thật của E và cân bằng của D xong); `WorldRoom` đặt từ `BOSS_MOVES` (`server/src/systems/boss-config.ts`).
+   */
+  bossMoves = false;
+  /** Số lần tìm đường còn lại của quái THƯỜNG trong tick này (đặt lại ở đầu `tickMonsters`; trùm không bị giới hạn). Mục 48, `systems/nav-chase.ts`. */
+  navBudget = 0;
   /** Phòng đăng ký: được gọi (một lần) khi một người vừa vào Hoàng Tuyền, để lưu file, cộng Duyên và gửi `limbo`. */
   onLimbo: ((sid: string) => void) | null = null;
+  /**
+   * Phòng đăng ký (M9, `systems/social.ts`): ghi PHẦN XÃ HỘI của một chân linh (`Soul.social`) bất đồng bộ NGOÀI tick: `fn` thuần, nhận bản hiện có (hoặc `undefined`) và trả bản mới;
+   * phòng chạy `SoulStore.update` rồi cập nhật `PlayerCtrl.soul` của người đang trực tuyến. Khoá là `identity.soulKey` (không phải sessionId: người đó có thể đã rời phòng). Không có hook
+   * (test đơn vị / bench) thì các sự kiện xã hội bị bỏ qua.
+   */
+  onSocial: ((soulKey: string, fn: (s: SoulSocial | undefined) => SoulSocial) => void) | null =
+    null;
   /**
    * Phòng đăng ký (bí cảnh, 4b): được gọi khi một run vừa được lập, để TẠO phòng bí cảnh (`matchMaker.createRoom`, bất
    * đồng bộ) rồi gọi `runReady(w, run, roomId)` (hoặc `runFailed`). Không có hook (test đơn vị): coi như phòng sẵn sàng ngay.
@@ -309,13 +382,15 @@ export class World {
   onDungeonExit: ((sid: string) => void) | null = null;
   /** Phòng bí cảnh: id của run mà phòng này phục vụ (`Hub.runs`); `null` ở mọi phòng thường. */
   runId: string | null = null;
+  /** Id quái của TRÙM THẾ GIỚI đang sống trong phòng này (M9.4), hoặc `null`: để `topUpMonsters` không tính nó vào số trùm thường của loài. */
+  wbossId: string | null = null;
   /** Id phòng Colyseus của thế giới này (nhãn cho `/metrics`); rỗng ở test / bench. */
   roomId = "";
   /** Thời gian xử lý mỗi tick của phòng này (M4 3.3); `WorldRoom.update` ghi, `/metrics` đọc. Bench / test không ghi. */
   readonly tickStats = new TickStats();
   /**
-   * Số đo hàng đợi input di chuyển của phòng (mục 25 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ vì hàng đợi đầy
-   * (client đã đoán trước nên nhân vật bị kéo giật lùi); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
+   * Số đo hàng đợi input di chuyển của phòng (mục 25 + 41 QUYET_DINH_M3, `docs/THIET_KE_DI_CHUYEN.md`), `/metrics` đọc: `dropped` = input bị bỏ (cũ vượt backlog
+   * `MAX_INPUT_BACKLOG`, bị input dừng cắt, hoặc hàng đợi đầy; client đã đoán trước nên nhân vật bị kéo lại); `backlogTicks` = số lượt (người chơi x tick) mà hàng đợi còn `INPUT_BACKLOG_WARN` input trở lên sau khi
    * xử lý (máy chủ tụt hậu so với client). Hai số này tăng đều trên bản chạy thật thì có chuyện về mạng hoặc nhịp tick.
    */
   readonly inputStats = { dropped: 0, backlogTicks: 0 };
@@ -330,12 +405,29 @@ export class World {
    */
   sectNewLifeLockMs = 0;
   /**
+   * "Chờ sang ngày mới kiếm được cống hiến" (M8, `sectCanEarn`): MẶC ĐỊNH BẬT. `WorldRoom` đặt từ `SECT_EARN_WARMUP` (`off` chỉ để dev / E2E; test đơn vị đặt `false` khi cần
+   * kiểm kiếm ngay).
+   */
+  sectEarnWarmup = true;
+  /**
    * Phòng đăng ký: lưu hồ sơ của một người NGAY và chờ ghi xong (trước khi chuyển Linh thạch sang kho tông môn).
    * Trả `true` CHỈ khi hồ sơ đã nằm trên đĩa / DB; `false` khi lưu lỗi hoặc không lưu được lúc này (đang qua cổng: bản ghi
    * của cổng đã giữ ví cũ). Người gọi gặp `false` phải HUỶ chuyển tiền vào kho (không thì sập là nhân đôi Linh thạch).
    * Không có hook: coi như đã lưu (bench, test đơn vị không có đĩa).
    */
   onSaveNow: ((sid: string) => Promise<boolean>) | null = null;
+  /**
+   * Gặp chặn đường (mục 52, `systems/ambush.ts`): cấu hình chạy của phòng. `null` = TẮT (MẶC ĐỊNH: bản chạy thật không đổi cho tới nghiệm thu CD10; mọi hàm của system thoát ngay,
+   * đường nóng không tốn gì). `WorldRoom` đặt từ `AMBUSH` (`server/src/systems/ambush-config.ts`); test đơn vị dựng bằng `createAmbushRuntime`.
+   */
+  ambush: AmbushRuntime | null = null;
+  /**
+   * Đấu trường chặn đường (mục 52, `systems/arena.ts`): có ở phòng ĐẤU TRƯỜNG (vé, đồng hồ trận, bầy kẻ địch), `null` ở mọi phòng thường. `WorldRoom.onCreate` đặt khi nhận vé; tắt
+   * thì mọi hàm của `arena.ts` thoát ngay.
+   */
+  arena: ArenaCtrl | null = null;
+  /** Phòng đấu trường đăng ký: đưa một người từ đấu trường về CHỖ CŨ của vé (lưu rồi `travelTo`); thử lại mỗi 2 giây nếu lỗi. Không có hook (test đơn vị): không làm gì. */
+  onArenaExit: ((sid: string) => void) | null = null;
   /** Nhật ký kiểm toán (`server/src/audit.ts`): `WorldRoom` đặt; null (test, bench) = không ghi. Chỉ gọi khi có sự kiện nhạy cảm, không trong tick nóng. */
   audit: AuditFn | null = null;
   /** Đổi ví từ ngần này trở lên (cộng hoặc trừ) thì ghi `wallet.big`. Infinity = không ghi. */
@@ -358,11 +450,14 @@ export class World {
     this.hub.worlds.delete(this);
   }
 
-  /** Người chơi còn sống và đang trong phòng; null nếu không. */
+  /**
+   * Người chơi còn sống và đang trong phòng; null nếu không. Đang mở hộp thoại chặn đường (mục 52) cũng là `null`: nhân vật bị KHOÁ (không đánh, dùng chiêu / đan, nhặt, qua cổng,
+   * mở bí cảnh... trong tối đa `AMBUSH_OFFER_MS`); `systems/ambush.ts` tự tra `state` / `ctrl` nên vẫn nhận được lựa chọn.
+   */
   ready(sessionId: string): { p: Player; c: PlayerCtrl } | null {
     const p = this.state.players.get(sessionId);
     const c = this.ctrl.get(sessionId);
-    if (!p || !c || p.dead) return null;
+    if (!p || !c || p.dead || c.ambush?.offer !== undefined) return null;
     return { p, c };
   }
 }

@@ -305,7 +305,7 @@ async function main() {
             selBag: [...document.querySelectorAll("#sect-vault-bag .inv-slot.selected")].map(idx),
             act: act.textContent, actDisabled: act.disabled,
             why: g("sect-vault-why").textContent, selText: g("sect-vault-sel").textContent,
-            draw: g("sect-vault-draw").textContent, qty: g("sect-vault-qty").textContent,
+            draw: g("sect-vault-draw").textContent, qty: g("sect-vault-qty").value,
             qtyHidden: g("sect-vault-qty-box").hidden, policyHidden: g("sect-vault-policy").hidden,
             count: g("sect-vault-count").textContent,
             vaultCells: g("sect-vault-grid").children.length, bagCells: g("sect-vault-bag").children.length,
@@ -349,6 +349,29 @@ async function main() {
       check(s.vaultCells === 40, `lưới kho có 40 ô (${s.vaultCells})`);
       check(s.bagCells > 0, `lưới túi có ô (${s.bagCells})`);
       check(s.count === "(3 / 40 ô)", `đếm ô dùng: "${s.count}"`);
+      // M8: số ô kho theo cấp tông (`SectVaultView.unlocked`): chỉ vẽ ô ĐÃ MỞ + ghi chú ô còn khoá; cấp 1 giữ nguyên 40 ô
+      for (const [n, note] of [
+        [50, /Còn 30 ô chưa mở.*cấp tông 3/],
+        [80, null],
+        [40, /Còn 40 ô chưa mở.*cấp tông 2/],
+      ]) {
+        await setVault({
+          slots: Array.from({ length: n }, (_, i) => VAULT_SLOTS[i] ?? null),
+          unlocked: n,
+        });
+        await sleep(150);
+        const u = await evalJs(
+          `({ cells: document.getElementById("sect-vault-grid").children.length, note: document.getElementById("sect-vault-locked").textContent, shown: getComputedStyle(document.getElementById("sect-vault-locked")).display, count: document.getElementById("sect-vault-count").textContent })`,
+        );
+        check(u.cells === n, `unlocked ${n}: lưới kho có ${n} ô (${u.cells})`);
+        check(
+          note ? note.test(u.note) && u.shown !== "none" : u.note === "" && u.shown === "none",
+          `unlocked ${n}: ghi chú ô khoá ${note ? "nêu số ô + cấp mở thêm" : "ẩn"}: "${u.note}"`,
+        );
+        check(u.count.endsWith(`/ ${n} ô)`), `unlocked ${n}: đếm "${u.count}"`);
+      }
+      await setVault();
+      await sleep(150);
       check(s.draw === "Lượt rút: không hạn.", `Tông chủ không hạn mức: "${s.draw}"`);
       check(!s.policyHidden, "Tông chủ thấy form chỉnh hạn mức");
       check(

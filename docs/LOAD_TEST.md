@@ -618,6 +618,35 @@ Bộ kiểm thử stress test tự động hoá 7 kịch bản then chốt trên
 | **6. Kiểm tra dọn dẹp rò rỉ sau N chu kỳ** | 3 chu kỳ liên tiếp (từ chối, nhận rồi rời, disconnect khi có lời mời treo): `Hub.sects.invitesSize` về 0, `online.size` về 0, `cache.size` về 0, `_cooldownSize` về 0 sau sweep | 0 lời mời treo, 0 tông môn rò rỉ trong cache, sạch sẽ bộ nhớ | **PASS** (~0.9s) |
 | **7. Kiểm tra tính toàn vẹn lưu trữ (`audit-saves`)** | Chạy `auditSavesDirectory` trên toàn bộ file lưu nhân vật và tông môn phát sinh: 0 file lỗi, 0 lỗi tông môn, 0 file mồ côi | Lưu trữ nhất quán, không bẩn dữ liệu trên đĩa | **PASS** (~0.15s) |
 
+### 15.3. Thử tải Hành vi Tông môn có Chiều sâu M8 (`--sect`, Issue #846, PR #927)
+
+Ở M8 (M8.3–M8.5), kịch bản bot `--sect` được mở rộng để mô phỏng và thử tải toàn diện các tương tác có chiều sâu của hệ thống Tông môn (Nội vụ, nhiệm vụ tông môn, bảo khố, biến động thành viên):
+
+1. **Hành vi bot M8 (`decideSectM8Action`):**
+   - **Đồng bộ sảnh Nội vụ (`sectHallGet`):** Bot xin ảnh chụp `SECT_MSG.hallGet` khi mới vào tông môn hoặc mất đồng bộ.
+   - **Nhận nhiệm vụ tông môn (`questAccept`):** Bot nhận nhiệm vụ có sẵn (`state: "offer"`) nếu chưa kẹp trần cống hiến ngày (`earnedToday < earnCap`).
+   - **Nộp Linh thạch nhận cống hiến (`deposit`):** Để kích hoạt đường đổi bảo khố, bot nộp **500 Linh thạch** mỗi lần (thay vì 50/100 như bản thử tải M3.6 cũ), nhận `floor(500 / 100) = 5` cống hiến (vừa đủ đổi món `hoi_huyet_dan` giá 5 cống hiến). *Lưu ý:* Khi chạy thử tải ngắn trong ngày tạo nhân vật, server cần chạy với `SECT_EARN_WARMUP=off` để bỏ qua thời gian chờ sang ngày mới.
+   - **Đổi đồ bảo khố (`shopBuy`):** Ưu tiên tiêu cống hiến tích luỹ khi `sectContrib >= 5` và bảo khố có món mở bán (`locked === null && left > 0`).
+   - **Thử tải gửi trả nhiệm vụ (`questTurnIn`):** Khi cống hiến đã tiêu (< 5), bot liên tục gửi yêu cầu trả nhiệm vụ đang làm (`active`) để thử tải đường truyền và kiểm tra tính an toàn của máy chủ (máy chủ từ chối an toàn khi nhiệm vụ chưa hoàn thành tiến độ).
+   - **Nhảy tông môn (`leave`):** Đệ tử có xác suất 8% tự rời tông môn giữa chừng để thử tải biến động thành viên và kiểm chứng việc bảo toàn nguyên tắc mất toàn bộ cống hiến/công tích. Bot tiếp tục di chuyển và gửi input bình thường ngay sau khi rời phái.
+
+2. **Kết quả đo lường thực tế (6 bot, 60 giây, server Colyseus thật cổng 2587):**
+   - **Lệnh chạy:** `npm run bots -w server -- --bots=6 --sect --duration=60`
+   - **Kết nối:** Giữ vững 6/6 bot suốt 60s (0 ngắt bất thường, 0 lỗi 4429).
+   - **Hoạt động chiều sâu M8 (số lượt tin bot gửi lên máy chủ):**
+     + Nhận nhiệm vụ: **5** lượt gửi (`questAccept`).
+     + Gửi trả nhiệm vụ: **0** lượt gửi (`questTurnIn`; ở đợt chạy đối chứng khi bot chưa đổi bảo khố: **6** lượt gửi).
+     + Đổi bảo khố: **3** lượt gửi (`shopBuy`).
+     + Nhảy tông môn: **0** lượt gửi (`leave`; ở đợt chạy đối chứng: **1** lượt gửi).
+     + Tương tác kho & chat: Lập: 2 phái, Mời: 20, Nạp kho: 4 lượt (500 LS/lượt), Rút kho: 2, Chat `/s`: 6.
+   - **Tải hệ thống & Băng thông:**
+     + CPU server mỗi tick (50 ms): Trung bình **0.81 ms** | p95 **1.29 ms** | Max **3.2 ms** (ngân sách < 10 ms).
+     + Bộ nhớ server RSS: **119.4 MB**.
+     + Băng thông mỗi bot: Nhận TB **2.36 KB/s** (20.9 gói/s), Gửi TB **0.6 KB/s** (14.7 gói/s).
+     + Nhịp nhận patch (Δt): TB **50.18 ms** | p95 **50.97 ms**. Độ trễ vòng lặp: TB **51.07 ms**.
+     + Dữ liệu đĩa: Kịch bản bot tự động dọn dẹp sạch sẽ 6/6 file lưu người chơi và tông môn sau khi kết thúc đợt chạy.
+
+
 ## 16. E2E thật phiên bản giao thức (M4 2.5, `npm run e2e:phien-ban -w server`)
 Chrome headless + server Colyseus thật trong tiến trình (thư mục dữ liệu tạm), cùng khung với mục 13 (`server/scripts/e2e-kit.ts`). Server nâng `WorldRoom.minProtocol` lên `PROTOCOL_VERSION + 1` nên client thật (gửi `v: PROTOCOL_VERSION`) thành "quá cũ". Luồng 4 bước: (1) client thấy màn hình "Phiên Bản Đã Cũ" nêu đúng mức tối thiểu và KHÔNG vào được game; (2) sau 2,5 giây `onAuth` được gọi đúng 1 lần (lỗi dứt khoát, không vòng thử lại / `wrong_map`) và không có hồ sơ nhân vật nào được tạo; (3) server hạ mức, bấm "Tải Lại Trang": trang tải lại sạch, màn hình tắt; (4) đăng nhập lại vào game bình thường. Cần `npm run build` (client/dist mới) và google-chrome. Đột biến: bỏ `throw new ClientOutdatedError` ở `client/src/connection.ts` thì bước 1 đỏ. Bước 1 kiểm HIỂN THỊ THẬT (không chỉ `!m.hidden`): `checkVisibility()`, kích thước, `elementFromPoint` ở giữa modal nằm trong modal (không bị che), màn hình đăng nhập đã ẩn; lý do: `hidden` của phần tử cha (`#ui` lúc chưa vào game) làm modal biến mất mà `m.hidden` vẫn `false`, nên bản chỉ kiểm `!m.hidden` đã để lọt lỗi ở #264 (modal nằm trong `#ui` nên người chơi không bao giờ thấy; sửa ở #270). Chạy trên main sau #261 (server) + #264 (client): bản kiểm hiển thị thật ĐỎ ở bước 1 (hết 15 giây chờ), sau #270: PASS 4/4.
 
@@ -926,7 +955,11 @@ Cách chạy:
 ```bash
 npm run build -w client
 npm run e2e:nhip-tim -w server
+# mô phỏng runner CI chậm (nightly đo RTT nền ~45 ms): độ trễ MỖI CHIỀU làm nền của ca 7 (mặc định 0)
+E2E_NEN_MS=22 npm run e2e:nhip-tim -w server
 ```
+
+Ca 7 không giả định RTT cục bộ nhỏ: trần RTT nền 120 ms và vùng báo kiểm theo `1000 - clamp(RTT + 10, 0, 250)` với RTT đọc cùng lúc phát. Lý do: trên runner CI hai lõi (Chrome WebGL mềm) pong chờ luồng chính nên RTT loopback ~40-50 ms; kỳ vọng cũ "RTT < 40 ms" làm nightly 17/11 đỏ (hết giờ 20 s ở cả hai lần thử). Chỉ tải CPU thuần (một lõi + vòng đốt) KHÔNG tái hiện được, nên dùng `E2E_NEN_MS`.
 
 ## 22. Đo thực nghiệm bot săn Kim Đan, qua hai cổng và đội hạ trùm (M6.9, Issue #410)
 
@@ -1549,6 +1582,375 @@ Bộ kiểm thử đơn vị độc lập (`server/scripts/quest-walk.test.ts`) 
    - *Đột biến (f) (Phạt né quái = 0 / không cộng ma trận phạt vào chi phí A* - Issue #818)*: Khi `penaltyFactor = 0`, thuật toán A* đi thẳng qua ô quái nguy hiểm `centerCell`, làm ĐỎ kiểm tra `safePath!.cells.includes(centerCell) === false` trong `quest-walk.test.ts`.
    - *Đột biến (g) (Bỏ né quái khi di chuyển liên bản đồ trên máy chủ thật - Issue #818)*: Khi bỏ né quái (`avoidMonsters = false` hoặc không dùng ma trận phạt) ở nhiệm vụ `lang_han_quan`, bot đi thẳng qua đầm lầy Âm Sương Trạch nơi bầy Sương Hồ và Thạch Quy canh giữ, bot bị đánh gục (`bot_died`), làm ĐỎ bài test tích hợp máy chủ thật trong < 20s.
 
+## 28. Bot mạng giật xả dồn input 100 / 150 tin trên Colyseus THẬT: đo trôi trước / sau #852 (issue #857 [F1], mục 41)
+
+### 28.1. Bối cảnh & phạm vi
+Mục 41 (`QUYET_DINH_M3.md`): mạng nhà đứng rồi xả dồn làm nhân vật "trôi như liệt phím". PR #852 (đã merge vào `main`, đầu `ac7d6a7`) sửa phía máy chủ: backlog 0,25 giây (`MAX_INPUT_BACKLOG = 5`), tin dừng cắt hàng đợi (`STOP_KEEP_INPUTS = 2`), và **nâng giới hạn tần suất `input` burst 40 -> 100**. Phạm vi thu hẹp của #857 [F1] (theo thư Dev A): chạy lại + **mở rộng kịch bản lên 100 và 150 tin** — burst 100 nay vừa khít 100 tin nên **tin dừng cuối phải tới nơi**; 150 tin thì **phần đuôi (bao gồm tin dừng) bị bỏ** ở lớp giới hạn tần suất, đo hậu quả.
+
+### 28.2. Cách chạy & tham số
+Script `server/scripts/do-network-burst.ts` (đo trên máy chủ Colyseus thật trong tiến trình, cổng do hệ điều hành cấp qua `listenWithRetry`, dữ liệu ghi thư mục tạm, tắt hết khi xong). Bot colyseus.js giữ phím di chuyển (`dx=1`), **xả dồn N tin `input` cùng lúc** rồi (tuỳ kịch bản) gửi 3 tin dừng (`dx=dy=0`, mô phỏng client mới #851). TCP giữ thứ tự nên tin dừng ở ĐUÔI: bị bỏ thì bỏ đúng tin dừng — đúng hiện thực mạng giật.
+
+- Chờ theo **ĐIỀU KIỆN**, không `sleep` cố định: coi nhân vật "đứng yên hẳn" khi vị trí không đổi >= 200 ms **và** hàng đợi input đã rỗng.
+- Chạy **lặp 12 lượt** (`--iterations 12`); tổng hợp min / median / mean / max + tỉ lệ tin dừng tới nơi k/N.
+- Hai mã so sánh, chạy CÙNG script: **"trước #852"** = `main` tại `bfd6eb1` (burst 40, không backlog cap / cắt dừng); **"sau #852"** = `main` tại `004a7f8` (burst 100). Nhân vật đặt ở sân trấn thông thoáng (`x=1300, y=1500`), đi về +x.
+- Chỉ số: **Dừng (ms)** = thời gian từ lúc xả dồn tới lần di chuyển cuối; **Trôi (px)** = quãng đi thêm; **Đuôi bị bỏ** = `sent - lastSeq cuối` (seq đơn điệu: số tin không bao giờ tới tay máy chủ, chủ yếu bị giới hạn tần suất bỏ); **Tin dừng tới nơi** = `lastSeq cuối >= seq tin dừng cuối`.
+
+### 28.3. Kết quả (lặp 12 lượt, N=12 mỗi ô)
+
+**Sau #852 (`main` @ `004a7f8`, burst 100):**
+
+| Kịch bản | Dừng min/med/mean/max (ms) | Trôi (px) | Đuôi bị bỏ | Tin dừng tới nơi |
+|---|---|---|---|---|
+| 100 tin (97 đi + 3 dừng) — vừa khít burst 100 | 10 / 22 / **25** / 53 | 15 | 0 | **12/12** |
+| 100 tin (100 đi), không dừng (client cũ) | 265 / 270 / 275 / 318 | 112,5 | 0 | — |
+| 150 tin (147 đi + 3 dừng) — vượt burst 100 | 268 / 276 / **283** / 328 | 112,5 | 50 | **0/12** |
+| 150 tin (150 đi), không dừng (client cũ) | 266 / 274 / 272 / 281 | 112,5 | 50 | — |
+
+**Trước #852 (`main` @ `bfd6eb1`, burst 40):**
+
+| Kịch bản | Dừng min/med/mean/max (ms) | Trôi (px) | Đuôi bị bỏ | Tin dừng tới nơi |
+|---|---|---|---|---|
+| 100 tin (97 đi + 3 dừng) | 1518 / 1529 / **1528** / 1536 | 300 | 60 | 0/12 |
+| 100 tin (100 đi), không dừng | 1516 / 1525 / 1526 / 1537 | 300 | 60 | — |
+| 150 tin (147 đi + 3 dừng) | 1522 / 1528 / **1529** / 1538 | 300 | 110 | 0/12 |
+| 150 tin (150 đi), không dừng | 1514 / 1528 / 1527 / 1537 | 300 | 110 | — |
+
+### 28.4. Phân tích & kết luận
+- **Trước #852:** dù gửi 100 hay 150 tin, giới hạn tần suất burst 40 chỉ cho ~40 tin qua -> đi ~40 bước = **300 px trong ~1,5 giây**; tin dừng ở đuôi LUÔN bị bỏ (0/12). Con số gần như y hệt cho 100 và 150 vì burst 40 đã chặn từ đầu — KHÔNG đạt mục 41 (dừng <= 0,3 s).
+- **Sau #852, client MỚI (gửi tin dừng):**
+  - **100 tin vừa khít burst 100 -> tất cả qua, tin dừng LUÔN tới nơi (12/12), dừng trong 25 ms / 15 px** (max 53 ms). ĐẠT mạnh mục 41.
+  - **150 tin vượt burst 100 -> 50 tin đuôi LUÔN bị bỏ (12/12), tin dừng KHÔNG tới (0/12)**; nhưng `MAX_INPUT_BACKLOG = 5` + token bucket vẫn chặn drift ở **112,5 px** và dừng trong **283 ms trung bình** (đỉnh 328 ms). Hậu quả của việc mất tin dừng bị giới hạn cứng, không trôi hàng giây như trước.
+- **Sau #852, client CŨ (không tin dừng):** backlog cap tự chặn ở ~275–283 ms trung bình / 112,5 px (đỉnh ~318–328 ms). Phần lớn đạt <= 0,3 s trên trung bình; đỉnh có thể nhích quá 300 ms khi dồn >= 100 tin — nhưng đây là biên spam/DoS, không phải chơi bình thường (client thật gửi <= 20 input/giây và có tin dừng).
+- **Kết luận:** #852 cải thiện thời gian dừng sau đợt dồn **~1,5 s -> 25 ms (client mới) / ~275 ms (client cũ)**, drift **300 px -> 15–112,5 px**. Tiêu chí mục 41 ĐẠT với client mới (tin dừng tới nơi, burst <= 100); ngay cả khi burst > 100 làm mất tin dừng, backlog cap vẫn giữ drift <= 112,5 px và dừng <= ~0,3 s.
+
+### 28.5. Kiểm
+- Script chạy lặp được (cổng `listenWithRetry` không bao giờ 2567, dữ liệu tạm, `gracefullyShutdown` + `rmSync` khi xong), chờ theo điều kiện (không `sleep` cố định), đã chạy **12 lượt** mỗi bên, số liệu ở trên là số THẬT đo được (không ghi số chưa đo).
+- Chạy lại: `cd server && npx tsx scripts/do-network-burst.ts --iterations 12 --suite new` (100/150 tin) hoặc `--suite old` (kịch bản 30/40/200 gốc của Dev C trên PR #852) hoặc `--suite all`.
+- Không sửa mã trò chơi; đây là công cụ đo của Dev F (issue #857).
+
+## 29. Báo cáo thử nghiệm & đối chứng động học Bot né vùng cảnh báo trên hình mẫu (Refs #876)
+
+### 29.1. Bối cảnh & Nguyên tắc công bằng
+Mục 42 (`QUYET_DINH_M3.md`) và thiết kế trùm `docs/THIET_KE_TRUM.md` (Issue #876, T7):
+- **Nguyên tắc công bằng (mục 42.1):** mọi đòn đánh nguy hiểm gây sát thương của trùm đều có báo trước qua `fx` `warn` (hình tròn, vành khuyên `r0`, nón quạt `cone`, đường thẳng `line`), thời gian báo trước `telegraphMs >= BOSS_MIN_TELEGRAPH_MS` (800 ms) hiện đúng vùng trên đất để người chơi né bằng di chuyển; không có đòn chưa báo mà trúng.
+- **Tính nghiêm ngặt:** vì trong Tiên Giới chết do quái/trùm = Hoàng Tuyền (mất kiếp), cơ chế né đòn bằng động học di chuyển phải bảo đảm người chơi phản xạ chuẩn xác sẽ né thoát khỏi vùng nguy hiểm trước khi đòn đánh đáp xuống.
+
+### 29.2. Kịch bản thực nghiệm & Phương pháp kiểm chứng
+Kịch bản được tích hợp và kiểm thử tự động tại `server/scripts/boss-bot-stress.test.ts`:
+- **Môi trường:** máy chủ Colyseus thật khởi động trong tiến trình (`WorldRoom`), cổng mạng ngẫu nhiên cấp bởi `listenWithRetry`, kết nối bằng `colyseus.js` Client. Kênh chuyển phát cảnh báo `fx` là sự kiện WebSocket giữa máy chủ và client.
+- **Hình mẫu hình học cảnh báo của test:** sử dụng 3 dạng hình học chuẩn tắc với các thông số đặt thẳng trong `server/scripts/boss-bot-stress.test.ts` (chưa gắn với số liệu chiêu thức trùm thật của Xích Mãng / Hắc Giao / Thiên Hàn Vương — dữ liệu trùm thật thuộc issue #872):
+  + Vành khuyên: tâm `(1000, 1000)`, `r = 150`, `r0 = 50`, báo trước 800 ms.
+  + Nón quạt: tâm `(1000, 1000)`, `r = 250`, góc quét 0° (hướng sang phải), `arc = 90°`, báo trước 1000 ms.
+  + Đường thẳng: xuất phát `(1000, 1000)`, đích `(1300, 1000)`, chiều rộng `w = 60`, báo trước 800 ms.
+- **Thuật toán Bot né (`bots.ts`):**
+  + Lắng nghe sự kiện `fx` `warn` nhận từ phòng Colyseus.
+  + Phân tích hình học vùng nguy hiểm (`parseWarnZoneFromFx`): tâm `(x, y)`, bán kính ngoài `r`, bán kính trong `r0` (vành khuyên), góc quét và góc mở `arc` (nón quạt), độ dài và chiều rộng (đường thẳng), thời hạn nổ `expiresAt = t0 + ms`.
+  + Đánh giá rủi ro (`isPointInWarnZone`): xác định vị trí dự đoán `(predX, predY)` có nằm trong vùng nguy hiểm hay không.
+  + Tính vector thoát hiểm (`computeEvadeVector`): tính vector đơn vị `(dx, dy)` chỉ ra hướng ngắn nhất rời khỏi ranh giới hình học vùng nguy hiểm.
+  + Di chuyển thoát hiểm: cập nhật vị trí dự đoán `predX += vec.dx * speed * 0.05` ở mỗi nhịp tick 50 ms với vận tốc chuẩn 150 px/s (7.5 px/tick).
+- **Phân loại kịch bản trong test:**
+  + Kịch bản vành khuyên (Test 2): 2 bot tại (1000, 1080), 1 bot bật né (`evade=true`), 1 bot đối chứng đứng yên (`evade=false`).
+  + Kịch bản nón quạt (Test 3): 1 bot bật né tại (1200, 1050) trong góc quét nón.
+  + Kịch bản đường thẳng (Test 4): 1 bot bật né tại (1150, 1015) trên trục đường lao.
+  + Kịch bản đa bot đồng thời (Test 5): 10 bot quanh (1000–1020, 1080) trong cùng một vùng vành khuyên (5 bot bật né, 5 bot đứng yên).
+
+### 29.3. Kết quả đối chứng động học trên hình mẫu
+
+**Bảng 1: Kết quả né / dính đòn của Bot theo từng kịch bản test (báo trước 800 - 1000 ms, vận tốc 150 px/s):**
+
+| Kịch bản hình học của test | Thiết lập Bot | Bot bật né (`evade=true`) | Bot đối chứng đứng yên (`evade=false`) | Quãng đường & số tick thoát hiểm (tính theo hình học) | Biên an toàn còn lại trước khi đòn đáp (tính theo hình học) |
+|---|---|:---:|:---:|---:|---:|
+| **Vành khuyên (`r=150, r0=50, 800ms`)**<br>Bot ở `(1000, 1080)` | 2 bot (1 né, 1 đứng) | **Né thoát 100% (0/1 đòn trúng)** | Dính đòn 100% (1/1 đòn trúng) | ~45 px (6 tick = 300 ms) | **500 ms** (10 tick an toàn) |
+| **Nón quạt (`r=250, arc=90°, 1000ms`)**<br>Bot ở `(1200, 1050)` | 1 bot (bật né) | **Né thoát 100% (0/1 đòn trúng)** | *(không có bot đứng)* | ~60 px (8 tick = 400 ms) | **600 ms** (12 tick an toàn) |
+| **Đường thẳng (`w=60, len=300, 800ms`)**<br>Bot ở `(1150, 1015)` | 1 bot (bật né) | **Né thoát 100% (0/1 đòn trúng)** | *(không có bot đứng)* | ~30 px (4 tick = 200 ms) | **600 ms** (12 tick an toàn) |
+| **Đa Bot đồng thời (vành khuyên `r=150, r0=50`)**<br>10 bot quanh `(1000–1020, 1080)` | 10 bot (5 né, 5 đứng) | **Né thoát 100% (5/5 né thoát)** | Dính đòn 100% (5/5 dính đòn) | ~45 px (6 tick = 300 ms) | **500 ms** (10 tick an toàn) |
+
+*Ghi chú:*
+- Tỉ lệ né thoát (0 đòn trúng) và dính đòn (1 đòn trúng) là kết quả kiểm thử thực tế từ bộ đếm `warnsEvadedCount` và `warnsHitCount` trong `boss-bot-stress.test.ts`.
+- Quãng đường thoát hiểm, số tick di chuyển và biên an toàn được tính toán lý thuyết từ hình học vùng nguy hiểm và vận tốc di chuyển chuẩn 150 px/s (7.5 px/tick, 20 tick/giây).
+
+**Bảng 2: Phân tích động học di chuyển & Phản xạ né đòn (tính từ tham số test):**
+
+| Thông số động học | Giá trị lý thuyết / cấu hình | Giải thích |
+|---|---|---|
+| **Thời gian phản xạ nhận diện (`t_react`)** | **0 - 50 ms** (1 tick) | Bot phát hiện vùng nguy hiểm và đổi hướng di chuyển ngay ở chu kỳ tick kế tiếp |
+| **Vận tốc di chuyển tiêu chuẩn** | **150 px/s** (7.5 px/tick) | Vận tốc di chuyển cơ bản của người chơi |
+| **Quãng đường thoát hiểm trung bình** | **30 - 60 px** | Khoảng cách từ vị trí xuất phát đến mép an toàn gần nhất của hình học test |
+| **Số tick di chuyển cần thiết (`ticks_to_evade`)** | **4 - 8 tick** (200 - 400 ms) | Thời gian để bot di chuyển ra khỏi ranh giới nguy hiểm |
+| **Thời gian báo trước tối thiểu (`telegraphMs`)** | **800 - 1000 ms** (16 - 20 tick) | Thời gian báo trước theo cấu hình test |
+| **Biên an toàn còn lại (`t_margin`)** | **500 - 600 ms** (10 - 12 tick) | Biên thời gian dự phòng sau khi đã thoát hiểm, đủ để bù đắp độ trễ mạng thực tế (RTT 50 - 150 ms) |
+
+### 29.4. Độ ổn định của kịch bản kiểm thử
+- **Loại bỏ quái tự nhiên:** Trong môi trường phòng Colyseus thật của test, quái tự nhiên của bản đồ sinh ra gần vị trí bot có thể gây nhiễu bộ đếm sự kiện. Test chủ động dọn sạch quái bản đồ (`world.state.monsters` và `world.mctrl`) sau khi bot kết nối để bảo đảm tính tất định.
+- **Tắt cờ điều khiển trùm:** Test chạy với cờ `BOSS_MOVES` không bật, vùng cảnh báo do chính kịch bản test phát qua máy chủ Colyseus để kiểm tra thuần tuý thuật toán nhận diện và né đòn của client.
+
+### 29.5. Kết luận & Hướng đi tiếp theo
+1. **Khẳng định tính đúng đắn của thuật toán né (`computeEvadeVector`):** Với thời gian báo trước >= 800 ms, thuật toán tính vector thoát hiểm giúp bot rời khỏi vùng nguy hiểm của cả 3 dạng hình học chuẩn (vành khuyên, nón quạt, đường thẳng) trong 4–8 tick (200–400 ms), bảo đảm biên an toàn còn lại 500–600 ms.
+2. **Kế hoạch thử tải trên trùm thật:** Phần đo lường tỉ lệ sống sót, thời gian hạ trùm, số đòn trúng trên các trùm thật (Xích Mãng, Hắc Giao, Thiên Hàn Vương) theo yêu cầu đầy đủ của Issue #876 sẽ được tiến hành sau khi Dev E hoàn thành việc đưa dữ liệu bộ chiêu trùm thật vào `main` (Issue #872).
+3. **Mã kiểm thử thường trực:** Bài test được lưu tại `server/scripts/boss-bot-stress.test.ts` (5 tests, chạy bằng lệnh `npx vitest run server/scripts/boss-bot-stress.test.ts`).
+
+---
+
+## 30. Thống kê thời lượng & Phân tích ổn định CI GitHub Actions (Issue #945)
+
+> Kịch bản đo: Thu thập thời lượng thực tế của >= 40 lượt chạy CI gần nhất bằng script `node server/scripts/measure-ci.mjs` (gọi GitHub REST API `actions/runs/{id}/jobs`).
+
+### 30.1. Hiện tượng & Bối cảnh
+- **Lượt chạy bị huỷ sau 10 phút (Run `43952326729` - PR #924):** Job `check` của CI bị GitHub Actions tự động huỷ sau đúng 10 phút do chạm trần `timeout-minutes: 10`. Khi chạy lại (`gh run rerun --failed`), cả job xanh hoàn toàn chỉ mất 311 giây (5 phút 11 giây), trong đó bước `Test` mất 228 giây.
+- **Dao động thời lượng trên runner GitHub Actions:** Trong khi chạy kiểm thử cục bộ trên máy dev mất ~75–90 giây cho cả bộ 307 tệp (~5370 ca kiểm thử), thời lượng trên CI dao động mạnh từ 159 giây đến 239 giây cho riêng bước `Test`, và từ 208 giây đến 365 giây cho toàn bộ job `check`.
+- **Hệ quả của việc huỷ ngang do timeout:** Khi job bị huỷ bởi `timeout-minutes: 10`, GitHub Actions lập tức ngắt runner mà không xuất log chi tiết hay đẩy artifact, dẫn đến không xác định được test nào bị nghẽn hoặc runner bị chậm ở khâu nào.
+
+### 30.2. Bảng tổng hợp thời lượng 50 lượt CI gần nhất
+
+**Phân loại kết quả (50 lượt gần nhất):**
+- **Thành công (success):** 34 lượt (~68%).
+- **Thất bại (failure):** 1 lượt (~2%) do lỗi định dạng Prettier trên PR #912 của Dev G.
+- **Bị huỷ (cancelled):** 15 lượt (~30%) do cơ chế huỷ lượt cũ khi có commit dồn dập trên `main` (`concurrency: cancel-in-progress: true`).
+
+**Bảng 1: Phân bố thời lượng Job `check` và Bước `Test` (34 lượt thành công):**
+
+| Chỉ số thời lượng | Job `check` (toàn bộ) | Bước `Test` (vitest run) | Ghi chú |
+|---|---:|---:|---|
+| **Mẫu đo (N)** | **34** | **34** | Chỉ tính các lượt hoàn thành thành công |
+| **Nhanh nhất (Min)** | **208 giây** (3m 28s) | **159 giây** (2m 39s) | Lượt chạy khi runner GitHub Actions ít tải |
+| **Trung bình (TB)** | **271 giây** (4m 31s) | **194 giây** (3m 14s) | Thời lượng trung bình ổn định |
+| **Trung vị (Median)** | **265 giây** (4m 25s) | **194 giây** (3m 14s) | 50% số lượt hoàn thành dưới mốc này |
+| **Bách phân vị 95 (p95)** | **330 giây** (5m 30s) | **237 giây** (3m 57s) | Mức tải cao trên hạ tầng runner |
+| **Chậm nhất (Max)** | **365 giây** (6m 05s) | **239 giây** (3m 59s) | Chậm nhất trong các lượt bình thường |
+
+**Bảng 2: Phân bổ thời lượng từng bước trong Job `check` (Đo thực tế qua `measure-ci.mjs`):**
+
+| Bước trong Job `check` | Min | TB | Median | p95 | MAX | Tỉ lệ TB/Job | Ghi chú |
+|---|---:|---:|---:|---:|---:|---:|---|
+| **1. `actions/checkout@v4`** | 2s | 4s | 3s | 7s | **8s** | 1.5% | Kéo mã nguồn Git (đột biến riêng ở lượt 43952326729 xem mục 30.4) |
+| **2. `actions/setup-node@v4`** | 1s | 5s | 4s | 10s | **10s** | 1.8% | Nạp Node.js 22 theo `.nvmrc` |
+| **3. `npm ci`** | 9s | 26s | 18s | 54s | **54s** | 9.5% | Cài đặt dependencies từ `package-lock.json` (tận dụng cache) |
+| **4. Kiểm tra kiểu (`typecheck`)** | 10s | 12s | 12s | 17s | **17s** | 4.4% | `tsc --build` toàn bộ workspace |
+| **5. Lint (`npm run lint`)** | 9s | 12s | 12s | 16s | **16s** | 4.4% | ESLint toàn bộ repo |
+| **6. Kiểm tra định dạng (`prettier`)** | 12s | 16s | 15s | 20s | **21s** | 5.8% | Prettier kiểm tra định dạng |
+| **7. Test (`npm run test`)** | 159s | 191s | 181s | 236s | **237s** | 69.5% | Chạy 307 tệp test qua vitest worker threads |
+| **8. Build client (`npm run build`)** | 4s | 5s | 4s | 6s | **6s** | 1.8% | Vite đóng gói client vào `client/dist` |
+| **TỔNG CẢ JOB CHECK** | **216s** | **275s** | **266s** | **358s** | **365s** | **100.0%** | Trung bình ~4 phút 35 giây |
+
+### 30.3. Danh sách chi tiết các lượt chạy CI gần nhất (Thu thập thực tế)
+
+| Run ID | Nhánh | Sự kiện | Kết quả | Job check | Checkout | npm ci | Typecheck | Test |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| 43968049904 | `a/test-movement-20hz-khong-bu` | pull_request | success | 250s | 3s | 35s | 11s | 167s |
+| 43967991109 | `c/945-ci-duration-log-timeout` | pull_request | success | 293s | 3s | 44s | 12s | 198s |
+| 43967181936 | `b/don-chu-thich-boss-bar` | pull_request | success | 245s | 2s | 33s | 11s | 164s |
+| 43966802891 | `main` | push | success | 358s | 3s | 54s | 17s | 235s |
+| 43966593294 | `a/changelog-trum-fx-tran-giap` | pull_request | success | 277s | 4s | 39s | 12s | 181s |
+| 43965599283 | `a/test-quest-nav-khong-cung-id-tong` | pull_request | success | 365s | 4s | 54s | 17s | 237s |
+| 43965534049 | `b/do-hieu-nang-trum` | pull_request | success | 298s | 4s | 44s | 13s | 196s |
+| 43965375579 | `b/giap-tran-dung-chung` | pull_request | success | 298s | 3s | 45s | 13s | 199s |
+| 43964957067 | `main` | push | failure | 295s | 3s | 45s | 13s | 197s |
+| 43964506367 | `b/do-hieu-nang-trum` | pull_request | success | 276s | 8s | 38s | 11s | 175s |
+| 43963624239 | `main` | push | success | 253s | 6s | 14s | 10s | 177s |
+| 43963512951 | `a/test-trieu-hoi-dat-mot-phan` | pull_request | success | 266s | 3s | 15s | 12s | 196s |
+| 43963407874 | `a/trum-giap-ms-toi-da` | pull_request | success | 245s | 3s | 13s | 11s | 177s |
+| 43963379461 | `c/846-audit-saves-sect-sources` | pull_request | success | 268s | 3s | 15s | 13s | 197s |
+| 43963285413 | `a/fix-sect-shop-gục-chap-chon` | pull_request | success | 216s | 3s | 9s | 10s | 159s |
+| 43962576747 | `b/trum-giap-trieu-hoi` | pull_request | success | 325s | 4s | 18s | 16s | 236s |
+| 43961777476 | `c/846-audit-saves-sect-sources` | pull_request | success | 253s | 7s | 14s | 11s | 175s |
+| 43960840290 | `main` | push | success | 263s | 3s | 16s | 12s | 194s |
+| 43960053920 | `c/846-docs-load-test-sect-m8` | pull_request | success | 242s | 3s | 11s | 11s | 180s |
+| 43959715255 | `main` | push | success | 248s | 5s | 14s | 11s | 179s |
+| 43959446574 | `d/m8-7-budget-sim` | pull_request | success | 250s | 6s | 14s | 11s | 179s |
+| 43958011007 | `a/changelog-trum-ne-kip` | pull_request | success | 311s | 3s | 18s | 15s | 225s |
+| 43957833257 | `main` | push | success | 259s | 7s | 13s | 12s | 180s |
+| 43952326729 | `a/agents-tong-mon-chieu-sau` | pull_request | success (rerun) | 311s | 4s | 16s | 15s | 228s |
+
+### 30.4. Phân tích nguyên nhân thực tế lượt bị huỷ ở 10 phút (Run `43952326729`)
+Tra cứu API chi tiết của **Lượt 1 (Attempt 1)** bị huỷ (`gh api repos/nguyencong1227/tien-gioi/actions/runs/43952326729/attempts/1/jobs`):
+
+| Bước | Bắt đầu | Kết thúc | Thời lượng | Tình trạng |
+|---|---|---|---|---|
+| **Set up job** | 20:41:15 | 20:41:15 | 0s | Hoàn thành |
+| **`actions/checkout@v4`** | **20:41:15** | **20:48:09** | **6 phút 54 giây (414s)** | **Đột biến bất thường** (bình thường 2–8s) |
+| **setup-node + npm ci** | 20:48:09 | 20:48:25 | 16s | Bình thường |
+| **typecheck + lint + prettier** | 20:48:25 | 20:49:01 | 36s | Bình thường |
+| **Test (`npm run test`)** | **20:49:01** | **20:51:27** | **2 phút 26 giây (146s)** | **Bị huỷ (cancelled)** khi vừa chạm 10 phút cả job |
+
+1. **Nguyên nhân chính xác:**
+   - Lượt huỷ duy nhất quan sát được là do bước `actions/checkout@v4` ngốn **6 phút 54 giây** (chiếm tới 70% ngân sách 10 phút của cả job) do sự cố nghẽn mạng / hạ tầng Git clone của runner GitHub Actions lúc đó.
+   - Hoàn toàn **không có bằng chứng về nghẽn CPU hoặc treo deadlock trong bước Test**: vitest mới chạy được 2 phút 26 giây thì toàn bộ job bị hết giờ (trong khi thời gian trung bình của bước Test là 3 phút 14 giây, tức là vitest thậm chí còn chưa kịp hoàn thành thời lượng bình thường). Lần chạy lại (attempt 2) xanh bình thường trong 311s cho thấy sự cố mang tính ngẫu nhiên về mạng/hạ tầng runner.
+
+2. **Bài học về shell bẫy lỗi trong GitHub Actions (`pipefail`):**
+   - Khi ghi nhật ký ra tệp bằng pipe: `npm run test --if-present 2>&1 | tee vitest.log`, shell mặc định của GitHub Actions trên Linux là `bash -e {0}` (KHÔNG có `pipefail`).
+   - Nếu không khai báo `shell: bash`, mã thoát của cả câu lệnh pipe sẽ là mã thoát của lệnh cuối cùng (`tee`), vốn luôn là 0! Điều này dẫn tới nguy cơ: vitest đỏ nhưng bước Test vẫn xanh và PR hỏng vẫn vượt qua CI.
+   - Bắt buộc phải khai báo tường minh `shell: bash` (GitHub Actions tự động chuyển thành `bash --noprofile --norc -eo pipefail {0}`).
+
+### 30.5. Các giải pháp đã triển khai (Issue #945)
+1. **Khống chế timeout riêng cho bước checkout (`timeout-minutes: 3`):**
+   - Đặt `timeout-minutes: 3` cho `actions/checkout@v4`. Nếu hạ tầng GitHub Actions gặp trục trặc mạng khi clone, bước này sẽ timeout và báo lỗi ngay sau 3 phút thay vì ngốn 7–10 phút của cả job.
+2. **Nâng trần timeout của job `check` lên 15 phút (`timeout-minutes: 15`):**
+   - Bảo đảm khoảng đệm an toàn cho cả job ngay cả khi các bước phụ trợ dao động tải.
+3. **Khai báo `shell: bash` có `pipefail` kèm lưu artifact `vitest.log`:**
+   - Bảo đảm bất kỳ ca kiểm thử vitest nào đỏ đều khiến bước Test thất bại (`exit 1`).
+   - Bước `actions/upload-artifact@v4` được kích hoạt khi `failure() || cancelled()` để tải tệp nhật ký `vitest.log` lên cho dev đối chiếu ngay tên ca kiểm thử bị lỗi hoặc bị gián đoạn.
+4. **Cảnh báo tiến trình treo (`hanging-process` reporter):**
+   - Thêm reporter `hanging-process` trong cấu hình Vitest CI (`vitest.config.ts`) để in cảnh báo khi có socket hoặc timer chưa dọn dẹp.
+5. **Thêm `vitest.log` vào `.gitignore`:**
+   - Giữ cây làm việc cục bộ luôn sạch sẽ khi dev chạy thử lệnh kiểm thử có ghi log.
 
 
 
+
+
+
+
+## 31. Ngân sách hiệu năng 8 trùm vận chiêu + 50–100 người chơi (Mục 42 - Issue #936)
+
+### 31.1. Bối cảnh & Mục tiêu kiểm thử
+Khi bộ thực thi trùm nhiều chiêu (`server/src/systems/boss.ts`, PR T2) được tích hợp, máy chủ phải xử lý đồng thời logic vận chiêu, kiểm tra điều kiện khoảng cách/mục tiêu, tính toán hình học báo trước (`warn`) và đáp đòn cho các trùm trên bản đồ.
+Trước khi bộ dữ liệu trùm thật (#872) được nạp vào, bài đo hiệu năng thường trực `server/src/systems/boss-perf.test.ts` được thiết lập nhằm giữ vững ngân sách hiệu năng:
+- **Ngân sách CPU Tick:** Thời gian xử lý trung bình < 10.0 ms (p95 < 10.0 ms) trên `World` thật.
+- **Ngân sách Băng thông State Patch:** < 520 byte/tick/client (đo qua `StateView` và `Encoder`).
+- **Ngân sách Tần suất sự kiện `fx`:** Đo và đặt ngưỡng giới hạn số lượng tin `fx` một client nhận được khi đứng trong tầm trùm (< 15 fx/giây) để tránh nghẽn socket.
+- **Độ phức tạp thuật toán `pickCast`:** So sánh chi phí tick giữa 10 người và 100 người chơi cùng 8 trùm liên tục chọn chiêu: khẳng định tăng tuyến tính O(n), tỉ lệ tăng dưới 25x (chứng minh thuật toán không bị O(n^2)).
+- **Trạng thái ngủ (Idle State):** Ca 0 người chơi: trùm hoàn toàn ngủ, tiêu tốn ~0 ms CPU và 0 byte patch.
+
+### 31.2. Thiết lập bài đo (`server/src/systems/boss-perf.test.ts`)
+- **Bản đồ:** Lạc Hà Trấn (`DEFAULT_MAP`), cờ `bossMoves = true`.
+- **Số trùm:** 8 trùm loài `mang` (Xích Mãng) rải đều quanh trấn ngoài hoang dã (bán kính 1200 px cách tâm trấn, độc lập, không vướng khu an toàn hay chướng ngại vật).
+- **Bộ chiêu mô phỏng đầy đủ:** 8 chiêu phủ kín các dạng hình học và điều kiện:
+  + Vòng tròn tại mục tiêu (`circleAt`, r = 60).
+  + Vành khuyên quanh thân (`ring`, r0 = 80, r = 160).
+  + Nón quạt (`cone`, r = 180, arc = 60 độ).
+  + Đường thẳng / kích kiếm (`line`, len = 240, w = 80).
+  + Mưa vòng tròn rải rác (`rain`, r = 40, count = 3).
+  + Hấp lực trận kéo vào + nổ (`pull`, r = 200, pullPx = 60, blastR = 60, điều kiện `minTargets: 2`).
+  + Triệu hồi quái con (`summon`, gọi 2 Hôi Lang, điều kiện `maxTargets: 15`).
+  + Hộ thể giảm sát thương (`buff`, giảm 50% trong 3s, điều kiện `minTargets: 1`).
+  Bộ chiêu đạt chuẩn 100% qua bộ kiểm tra hợp đồng và luật né tránh `bossViolations`.
+- **Số người chơi:** 0, 10, 50, 100 người chơi Kim Đan rải quanh các con trùm trong tầm 160–240 px (nằm trong tầm aggro 800 px và bán kính điều kiện mục tiêu 320 px).
+
+### 31.3. Kết quả đo đạc thực tế (Mô phỏng 10–30 giây, 20 tick/giây)
+
+| Quy mô (Người chơi) | Số trùm | Tick TB (ms) | Tick p95 (ms) | Tick Max (ms) | Byte Patch / tick / client | fx / giây (1 client gần trùm) | Đánh giá |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| **0 người** | 8 | **0.00 ms** | 0.00 ms | 0.04 ms | **0.0 byte** | 0.00 | **ĐẠT:** Trùm ngủ, 0 byte patch, CPU ~0 |
+| **10 người** | 8 | **0.02 ms** | 0.04 ms | 0.24 ms | **1.7 byte** | 1.70 | Cực kỳ nhẹ |
+| **50 người** | 8 | **0.09–0.14 ms** | **0.20–0.36 ms** | 1.09–1.46 ms | **2.2–6.0 byte** | **1.13–1.60** | **ĐẠT:** Nằm sâu dưới trần 10 ms & 520 byte |
+| **100 người** | 8 | **0.20 ms** | 0.54 ms | 1.62 ms | **2.9 byte** | 1.20 | **ĐẠT:** Không nghẽn |
+
+### 31.4. Phân tích & Đánh giá chi tiết
+1. **CPU Tick máy chủ:**
+   - Ở quy mô chuẩn 50 người chơi và 8 trùm vận chiêu liên tục suốt 30 giây (600 tick), CPU tick trung bình chỉ tốn **0.14 ms** (p95 đạt 0.36 ms, đỉnh tối đa 1.46 ms). Máy chủ xử lý cực kỳ nhẹ nhàng, chỉ chiếm ~1.4% ngân sách 10 ms.
+2. **Độ phức tạp lựa chọn chiêu (`pickCast`):**
+   - Đo riêng `tickMonsters` của 8 trùm liên tục chọn chiêu qua mọi tick (xoá hồi chiêu và giáp để pickCast chạy thật, 3 lần đo lấy min): 10 người = 0.033 ms (warns: 864), 100 người = 0.120 ms (warns: 969).
+   - Tỉ lệ tăng chỉ 3.62x cho 10 lần số người chơi (nằm sâu dưới trần 25x), khẳng định thuật toán duyệt người chơi theo độ phức tạp O(n) tuyến tính, hoàn toàn loại bỏ nguy cơ nghẽn O(n^2).
+3. **Băng thông State đồng bộ (`StateView` & `Encoder`):**
+   - Lượng byte patch trung bình mỗi tick gửi tới mỗi client chỉ dao động từ **2.2 đến 6.0 byte/tick**, cách xa giới hạn trần 520 byte/tick.
+   - Toàn bộ cơ chế vận chiêu, giai đoạn và cuồng nộ của trùm được thiết kế hoàn toàn qua các gói tin sự kiện `fx` ngắn hạn, không thêm bất kỳ trường trạng thái công khai nào vào schema.
+4. **Tần suất tin nhắn `fx` gửi tới client:**
+   - Với quy định nghỉ giữa các lần chiêu `castGapMs >= 600 ms` và thời gian báo trước `telegraphMs >= 800 ms`, khoảng cách giữa 2 lần ra chiêu của trùm luôn >= 1.4 giây.
+   - Một client đứng trong tầm giao tranh nhận trung bình **~1.1–1.7 tin fx/giây** (bao gồm `warn`, `bossCast`, `bossSummon`, `bossArmor`). Con số này hoàn toàn nằm dưới ngưỡng an toàn 15 fx/giây, không gây áp lực lên hàng đợi socket hay FPS của client.
+5. **Trạng thái ngủ khi không có người chơi:**
+   - Khi không có người chơi trong tầm phát hiện, toàn bộ 8 trùm rơi vào trạng thái ngủ: không quét chiêu, không sinh bản tin `fx`, byte patch đồng bộ bằng đúng 0 byte.
+
+### 31.5. Chứng minh độ tin cậy bằng 4 đột biến ĐỎ (Mutations)
+Để bảo đảm bài đo `server/src/systems/boss-perf.test.ts` có khả năng phát hiện lỗi thực sự và không bao giờ bị 'xanh giả', 4 đột biến mã đã được thử nghiệm và đều làm bài test chuyển ĐỎ chính xác:
+1. **Đột biến 1 (Vòng lặp người chơi x người chơi O(n^2) bên trong nhánh đếm `near` của `pickCast`):**
+   - *Cách tạo đột biến:* Lồng vòng lặp duyệt người chơi O(n^2) bên trong `w.state.players.forEach` của nhánh đếm mục tiêu `near` trong `pickCast`.
+   - *Kết quả:* Thời gian `tickMonsters` ở 100 người chơi vọt lên **5.04 ms** (tỉ lệ tăng gấp 61.81x so với 10 người chơi = 0.082 ms).
+   - *Bắt lỗi:* Ca test 3 ĐỎ: `AssertionError: expected 5.040289950000021 to be less than 2`.
+2. **Đột biến 2 (Gửi `warn` mỗi tick thay vì một lần lúc bắt đầu):**
+   - *Cách tạo đột biến:* Trong `runCast`, gọi `emitWarn(w, cast)` mỗi tick của chiêu đang vận.
+   - *Kết quả:* Tần suất sự kiện gửi tới client vọt lên **16.67 fx/giây** (vượt ngưỡng trần 15 fx/giây).
+   - *Bắt lỗi:* Ca test 2 ĐỎ: `AssertionError: expected 16.666666666666668 to be less than 15`.
+3. **Đột biến 3 (Ghi thêm 1 trường vào state công khai mỗi tick):**
+   - *Cách tạo đột biến:* Trong `bossStep`, gán `m.x = m.x + (w.now % 2 === 0 ? 0.01 : -0.01)` làm dirty state Colyseus mỗi tick.
+   - *Kết quả:* Byte patch state vọt lên **24.37 byte/tick/client** (tăng gấp hơn 4 lần so với bình thường ~6 byte).
+   - *Bắt lỗi:* Ca test 2 ĐỎ: `AssertionError: expected 24.36596666666658 to be less than 15`.
+4. **Đột biến 4 (Bỏ điều kiện "ngủ khi không có người chơi"):**
+   - *Cách tạo đột biến:* Trong `updateMonster`, ép nhánh kiểm tra `nearest > MONSTER_WAKE_DIST` thành `false`.
+   - *Kết quả:* 8 con trùm tự động lang thang dù không có ai chơi, toạ độ vị trí trùm bị trôi lệch khỏi vị trí sinh ban đầu (x đổi từ 2736 về 2730.28).
+   - *Bắt lỗi:* Ca test 1 ĐỎ: `AssertionError: expected 2730.282771868729 to be 2736`.
+
+## 32. Đo bot né vùng cảnh báo trùm Xích Mãng trên máy chủ Colyseus thật (Mục 42 - Issue #876 T7)
+
+### 32.1. Bối cảnh & Mục tiêu kiểm thử
+Theo thiết kế trùm (mục 42 `QUYET_DINH_M3.md` và `docs/THIET_KE_TRUM.md`), mọi đòn đánh nguy hiểm của trùm đều phải có báo trước qua `fx` `warn` (hình tròn, vành khuyên, nón quạt, đường thẳng) với thời gian báo trước `telegraphMs >= 800 ms` để người chơi kịp né tránh.
+Nhiệm vụ T7 (Issue #876) tiến hành đo đạc bot né vùng cảnh báo với trùm Xích Mãng (`mang` tại Hắc Phong Cốc) khi bật cờ `BOSS_MOVES=on`:
+- **Lời hứa công bằng (Fair Reflex Promise):** Với độ trễ phản xạ `reflexMs = 400 ms` và tốc độ chạy chuẩn 150 px/s, bot phải né thoát kịp trước khi đòn đáp xuống.
+- **Đo lường đối chứng:** So sánh **tỉ lệ dính đòn** giữa nhánh bot bật né (`--boss --evade`) và nhánh bot không né (`--boss --no-evade`), đo trực tiếp bằng sự sụt giảm `hp` thật trên máy chủ.
+- **Đột biến chứng minh (Mutations):** Chứng minh test đỏ khi bot phản xạ quá chậm (> 800 ms), bỏ qua cảnh báo `warn`, hoặc đảo ngược hướng vector né.
+
+### 32.2. Mở rộng công cụ thử tải `server/scripts/bots.ts`
+1. **Cờ tham số dòng lệnh mới:**
+   - `--boss` (hoặc `--boss-hunt`): Tự động đặt bản đồ là `hac_phong`, nới tầm tìm kiếm quái lên 2500 px và đặt hệ số ưu tiên cao nhất cho trùm `mang` (penalty -2000 điểm khoảng cách).
+   - `--no-evade` (hoặc `--evade=false`): Ép tắt thuật toán né để chạy ca đối chứng khi săn trùm.
+   - `--reflex-ms=N` (hoặc `--reflex=N`): Đặt thời gian phản xạ (mặc định 400 ms). Bot chỉ bắt đầu di chuyển né sau khi `now >= warnAt + reflexMs`.
+2. **Cải tiến giải thuật vector né hình học (`computeEvadeVector`) và chống xung đột AI đuổi chém:**
+   - **Vành khuyên (`ring`):** So sánh khoảng cách tới lõi an toàn `(d - r0)` và khoảng cách tới rìa ngoài `(r - d)`. Nếu gần lõi hơn thì chạy vào tâm, nếu gần rìa hơn thì chạy ra ngoài.
+   - **Nón quạt (`cone`):** So sánh khoảng cách ra rìa ngoài `(r - d)` với khoảng cách vuông góc ngắn nhất ra 2 cạnh nón `d * sin(arc/2 - |diff|)`. Nếu ở gần cạnh nón hơn, chọn hướng thoát ly vuông góc với cạnh nón gần nhất.
+   - **Đường thẳng (`line`):** Thoát ly theo hướng pháp tuyến vuông góc với đoạn thẳng.
+   - **Ngăn bước ngược vào vùng nguy hiểm chưa nổ (`isPointInAnyActiveWarn`):** Khi bot vừa bước ra ngoài vùng nguy hiểm (`evadeVec === null`) nhưng cảnh báo vẫn đang đếm ngược chưa nổ (`w.expiresAt > now`), kiểm tra nếu bước di chuyển tiếp theo `(nextX, nextY)` của AI săn quái làm bot bước ngược vào vùng cảnh báo (`buffer = 16` px) thì lập tức dừng lại (`dx = 0, dy = 0`), giữ vị trí an toàn cho đến khi đòn nổ xong. Đồng thời tạm ngừng gửi `attack` / `skill` khi đang trong vùng nguy hiểm (`inEvadeDanger`).
+
+### 32.3. Bộ kiểm thử tự động (`server/scripts/boss-bot-stress.test.ts` - 11 ca kiểm thử)
+Bộ kiểm thử tách bạch rõ phần kiểm tra đơn vị hình học của bot và phần kiểm tra trùm thật `BOSS_MOVES=on` trên máy chủ Colyseus thật:
+- **Nhóm A – Kiểm thử đơn vị hình học của bot với tin `fx` `warn` do test phát (Ca 1–8):**
+  1. **Ca 1 (`[Hình học bot]`):** Bot nhận tin `fx` `warn` từ phòng và giải mã đúng các trường hình học.
+  2. **Ca 2 (`[Hình học bot]`):** Đối chứng vành khuyên: Bot bật evade né thoát 100%, Bot đứng yên dính đòn 100%.
+  3. **Ca 3 (`[Hình học bot]`):** Bot né nón quạt (`cone`) thành công trước khi đòn đáp.
+  4. **Ca 4 (`[Hình học bot]`):** Bot né đòn lao thẳng (`line`) thành công trước khi đòn đáp.
+  5. **Ca 5 (`[Hình học bot]`):** Thử tải 10 bot với tin `fx` `warn`: 5 bot né thoát 100% vs 5 bot đứng yên dính đòn 100%.
+  6. **Ca 6 (`[Hình học bot]`):** Lời hứa công bằng hình học: Bot phản xạ 400 ms vẫn né thoát 100% trước đòn báo trước 800 ms (6–8 tick = 45–60 px di chuyển).
+  7. **Ca 7 (`[Đột biến hình học 1]`):** Bot phản xạ chậm 900 ms (> 800 ms báo trước) -> không kịp cử động và dính đòn (ĐỎ).
+  8. **Ca 8 (`[Đột biến hình học 2]`):** Bot bỏ qua tin nhắn `fx` `warn` -> dính đòn 100% (ĐỎ).
+- **Nhóm B – Kiểm thử trùm Xích Mãng thật (`BOSS_MOVES=on`) và đột biến hướng né (Ca 9–11):**
+  9. **Ca 9 (`[Máy chủ Colyseus thật + BOSS_MOVES=on]`):** Sinh trùm Xích Mãng thật (`placeMonster`) tại bãi trống `(1300, 1000)`, trùm tự vận chiêu `quat_duoi` (`cone`, `r = 150`, `arc = 120°`, `ms = 1000`), bot gửi `input` di chuyển thật qua WebSocket lên phòng Colyseus, máy chủ chạy `applyInputs` và `boss.ts` trừ máu thật:
+     + Bot đứng yên tại `(1300, 1070)`: `pStand.hp` giảm từ `1000` xuống `804` HP (mất 196 HP đúng sát thương `140 * 1.4` sau `1000 ms`).
+     + Bot né (sau phản xạ 400 ms gửi `input` thoát sang cạnh nón): `pEvade.hp` giữ nguyên `1000` HP (không mất máu).
+  10. **Ca 10 (`[Đột biến đảo hướng né]`):** Đảo ngược vector `computeEvadeVector` (`dx = -vec.dx, dy = -vec.dy`) -> bot chạy sâu vào vùng nguy hiểm và dính đòn (ĐỎ).
+  11. **Ca 11 (`[Thực nghiệm 100 đòn x 3 lần + BOSS_MOVES=on]`):** Chạy đối chứng 3 lần × 100 đòn mỗi nhánh với trùm Xích Mãng thật vận cả 2 chiêu `quat_duoi` (`cone`) và `cuon_minh` (`line`), đo bằng `hp` thật trên máy chủ (Stand: 100% dính, Evade: 0% dính, Đột biến đảo hướng: > 50% dính).
+
+### 32.4. Kết quả thực nghiệm đối chứng & Phân tích nguyên nhân
+
+#### A. Số đo ban đầu (trước khi sửa xung đột giữa logic né và logic đuổi chém, 15 bot, 15s)
+
+| Kịch bản | Cờ chạy | Đòn nhắm tới | Đòn dính | Tỉ lệ dính đòn | Đòn không dính | Tick di chuyển né | Kết luận thực tế |
+|---|---|---:|---:|---:|---:|---:|---|
+| **Đối chứng (Không né)** | `--boss --no-evade` | 35 | 20 | **57.1%** (20/35) | 15 (42.9%) | **0 tick** | Bot không né, chỉ vô tình lệch vùng khi đuổi quái khác |
+| **Có né (Ban đầu, 400ms)** | `--boss --evade` | 25 | 17 | **68.0%** (17/25) | 8 (32.0%) | **180 tick** | **Bot né chưa giảm đòn trúng** (68.0% so với 57.1%, mẫu nhỏ) |
+
+- **Đánh giá trung thực số đo ban đầu:** Dù bot bật né có thực hiện 180 tick di chuyển né (tải CPU máy chủ TB 0.99 ms/tick, p95 1.43 ms, băng thông 1.89 KB/s), **tỉ lệ dính đòn thực tế là 68.0% (17/25), cao hơn mức 57.1% (20/35) của bot không né**. Tức ở phiên bản đầu, việc bật né chưa giúp bot giảm số đòn trúng trên trùm thật.
+
+#### B. Phân tích nguyên nhân (qua nhật ký từng `warn`: hình, khoảng cách, vector né, trạng thái chém)
+Khi ghi log chi tiết từng `warn` phát ra từ trùm Xích Mãng, nguyên nhân khiến bot bật né vẫn dính đòn được xác định rõ:
+1. **Hai logic giành quyền điều khiển (vừa bước ra mép đã lao ngược vào chém):** Khi bot né di chuyển vừa vượt qua mép vùng cảnh báo 1–2 px, `isPointInWarnZone` trả về `false` nên `computeEvadeVector` trả về `null`. Ngay ở tick kế tiếp (trong khi cảnh báo vẫn còn 200–400 ms mới nổ), logic AI săn quái thấy khoảng cách tới trùm lớn hơn tầm đánh thường (`dist > SKILLS.slash.range`) nên lập tức phát lệnh di chuyển **lao thẳng về phía chân trùm** để chém -> bot tự bước ngược trở lại vào vùng nguy hiểm đúng lúc đòn đáp xuống!
+2. **Xung đột hành động trong lúc né:** Khi đang ở trong vùng cảnh báo, bot vẫn tiếp tục gửi tin `attack` và `skill`.
+
+#### C. Số đo sau khi sửa xung đột (100 đòn × 3 lần chạy mỗi nhánh = 300 đòn/nhánh, `BOSS_MOVES=on`, đo bằng `hp` thật trên máy chủ)
+Sau khi bổ sung kiểm tra `isPointInAnyActiveWarn` (chặn không cho AI săn quái bước ngược vào vùng cảnh báo chưa nổ) và tạm dừng đánh khi đang né, kết quả đo với trùm Xích Mãng thật (đặt ở khoảng cách 130 px để trùm tung cả 2 chiêu `quat_duoi` `cone` và `cuon_minh` `line`):
+
+| Nhánh thử nghiệm | Lần chạy | Đòn nhắm tới (`cone` + `line`) | Đòn dính (mất `hp` thật trên server) | Đòn né thoát | Tỉ lệ dính đòn | Mẫu log thực tế (`shape`, `dist`, `hasVec` -> kết quả) |
+|---|---:|---:|---:|---:|---:|---|
+| **1. Đối chứng (`--no-evade`)** | Lần 1 | 100 | 100 | 0 | **100.0%** | `#1 [line] dist=130px hasVec=false -> HIT`, `#2 [cone] dist=130px -> HIT` |
+| **1. Đối chứng (`--no-evade`)** | Lần 2 | 100 | 100 | 0 | **100.0%** | Đứng yên trong vùng nguy hiểm chịu sát thương 100% |
+| **1. Đối chứng (`--no-evade`)** | Lần 3 | 100 | 100 | 0 | **100.0%** | **Trung bình 3 lần: 300 / 300 đòn dính (100.0%)** |
+| **2. Có né (`--evade`, 400ms)** | Lần 1 | 100 | **0** | 100 | **0.0%** | `#1 [line] dist=146px hasVec=true -> EVADED`, `#2 [cone] dist=175px -> EVADED` |
+| **2. Có né (`--evade`, 400ms)** | Lần 2 | 100 | **0** | 100 | **0.0%** | Thoát khỏi vùng nguy hiểm và giữ vị trí an toàn chờ đòn nổ xong |
+| **2. Có né (`--evade`, 400ms)** | Lần 3 | 100 | **0** | 100 | **0.0%** | **Trung bình 3 lần: 0 / 300 đòn dính (0.0%)** |
+| **3. Đột biến (Đảo hướng `-vec`)** | Lần 1–3 | 3 × 100 | **3 × 100** | 0 | **100.0%** | Đảo ngược vector thoát hiểm khiến tỉ lệ dính tăng từ 0% lên 100% |
+
+## 33. E2E thật Xã hội + trùm thế giới (M9, nghiệm thu #1034; `npm run e2e:xa-hoi -w server`)
+
+Server Colyseus thật trong tiến trình (thư mục dữ liệu tạm, `ACHIEVEMENTS` bật, `LeaderboardService` như `index.ts`, lịch trùm thế giới MẪU gắn vào `WorldRoom.hub.worldBoss.slots`: Xích Mãng ở Lạc Hà, mốc phút kế tiếp cách >= 60 giây, báo trước 1 phút) phục vụ `client/dist`; HAI tab Chrome headless đi qua giao diện thật. Luồng (mất ~1,5-2 phút vì chờ mốc phút của lịch): đăng nhập bằng form -> dòng hệ thống "sẽ xuất hiện sau 1 phút" -> trùm xuất hiện (banner tên + máu + đồng hồ) -> hai người đóng góp (máy chủ trừ máu bằng `dealMonsterDamage`, đúng đường `worldBossCredit`; hai người thấy hai phần trăm khác nhau, danh sách đủ hai người) -> hạ trùm: banner kết quả + toast + thưởng chia theo tỉ lệ (A nhiều hơn B, tổng không vượt thưởng của khung) -> thành tựu 'Hạ Xích Mãng' mới (chấm Mới ở nút HUD) -> bảng Xã hội: tab Thành tựu (đeo 'Thợ Săn Trùm': máy chủ ghi `Player.title`, tab người KHÁC thấy danh hiệu trên đầu nhân vật), tab Xếp hạng (bảng Tu vi có hạng của mình), tab Sự kiện. Không lỗi console, không cảnh báo mất tin. `E2E_SHOTS=<thư mục>` chụp ảnh (mỗi tab một tiền tố `A-` / `B-`); bộ ảnh nghiệm thu đã chuyển sang WebP ở `docs/screenshots/m9-*.webp`. Lịch MẪU không phải dữ liệu thật (lịch thật là việc của E, M9.10).
+
+## 34. E2E thật sáu chiêu hình mới (CT9 lát 1, #1054; `npm run e2e:chieu-moi -w server`)
+
+Lần ĐẦU các hình của CT11 (đạn bay, sét lan, vật thể bền, chiêu vận) chạy với chiêu THẬT chứ không phải mock. Server Colyseus thật trong tiến trình (thư mục dữ liệu tạm) + một tab Chrome headless trên `client/dist`; nhân vật Nguyên Anh đã học đủ sáu chiêu, bốn chiêu đầu gắn ô L U I O, hai chiêu sau gắn bằng tin `skillSlot` thật. Điều khiển bằng PHÍM THẬT (`Input.dispatchKeyEvent`). Quái là một Linh Thố ở chỗ thoáng theo hướng bắn (ba tia quạt +-27 độ phải dài >= 200 px), nâng máu để không chết, bị CHOÁNG dài để không trả đòn; các quái khác cất vào góc xa bản đồ ở mỗi lần đặt lại. Mỗi ca chạy ~1 phút.
+
+| Chiêu | Hình | Kiểm (máy chủ quyết định, client chỉ vẽ) |
+|---|---|---|
+| Độc Đằng Phục | bẫy | `fx trap`: vật thể hiện ngay, CHƯA kích hoạt (`armMs` 600) -> kích hoạt; quái chạm bán kính -> máy chủ `fxEnd` `pop`, chính tin đó vẽ vòng nổ + bụi, vật thể gỡ, quái mất máu |
+| Phi Kiếm Tam Liên | đạn bay | ba `fx pbolt`, lớp đạn đếm đủ +3, quái trúng đạn |
+| Liệt Diễm Trận | vùng | `fx zone`: quái trong vòng mất máu NHIỀU lần theo nhịp 800 ms; hết 4 s TỰ TẮT, KHÔNG có `fxEnd` |
+| Liên Châu Lôi | sét lan | `fx chain` có >= 2 điểm, CHÍNH tin đó vẽ >= số đoạn điểm hạt, quái mất máu |
+| Hồn Phiên Tượng | tượng | `fx totem`: quái trong tầm mất máu theo nhịp 1 s; hết 6 s TỰ TẮT |
+| Phá Sơn Nhất Kích | chiêu vận 1200 ms | `fx cast` chưa có sát thương, vòng tụ khí hiện ngay và TIẾN DẦN (0,36 -> 0,65); hết vận đòn mới đáp, vòng tắt |
+
+Còn kiểm: thanh chiêu máy tính hiện đủ bốn ô >= 44 px trong khung nhìn; 0 lỗi console / exception. Chrome khởi động với `--blink-settings=primaryPointerType=4,...` vì headless không có chuột nên `(pointer: fine)` sai và thanh chiêu L U I O bị ẩn (ảnh `E2E_SHOTS` cũng cần). **Đột biến (6 / 6 đỏ đúng bước):** bỏ `persists.add` (bẫy không hiện), bỏ `windups.begin` (không vòng tụ khí), bỏ `pbolts.add` (đạn không đếm), bỏ `playFxPoints` của `chain` (0 điểm hạt), bỏ vòng nổ của `fxEnd pop`, máy chủ bỏ `k.land()` của chiêu vận (đòn không đáp). Ảnh: `E2E_SHOTS=<thư mục>` ghi mỗi hình một ảnh. Chạy: `npm run build -w client && npm run e2e:chieu-moi -w server`; nằm trong `e2e:all`.

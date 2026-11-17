@@ -1,7 +1,14 @@
 // Vẽ bốn ô chiêu thức L U I O lên DOM (M7.6, #507). Chỉ GHI khi dấu hiệu của ô đổi (tên, tầng, trạng thái, số giây, phím), vòng quét hồi chiêu chỉ ghi
 // khi nhích >= 2%: gọi mỗi khung hình vẫn rẻ và không làm trình đọc màn hình đọc lại liên tục. Không biết Phaser; đối tượng DOM tối thiểu để test không cần jsdom.
-import { REALMS, SLOT_UNLOCK_REALM, type SkillSlot } from "@tien-gioi/shared";
-import { elementColor, levelPips, shortName, slotAriaLabel, type SlotView } from "./skill-bar";
+import { REALMS, SKILL_MAX_LEVEL, SLOT_UNLOCK_REALM, type SkillSlot } from "@tien-gioi/shared";
+import {
+  elementColor,
+  levelPips,
+  pipCap,
+  shortName,
+  slotAriaLabel,
+  type SlotView,
+} from "./skill-bar";
 import { lockIconSvg, skillIconSvg } from "./skill-icon";
 
 export interface BarChild {
@@ -33,10 +40,10 @@ export function slotCaption(v: SlotView): string {
   return String(v.slot);
 }
 
-/** Chấm tầng ("●●○"): rỗng khi không có chiêu. */
-export function pipsText(level: number): string {
-  const n = levelPips(level);
-  return n === 0 ? "" : "●".repeat(n) + "○".repeat(3 - n);
+/** Chấm tầng ("●●○", hoặc "●●●○○○" với chiêu Thiên phẩm): rỗng khi không có chiêu. `max` = tầng tối đa của chiêu (bỏ trống = 3). */
+export function pipsText(level: number, max: number = SKILL_MAX_LEVEL): string {
+  const n = levelPips(level, max);
+  return n === 0 ? "" : "●".repeat(n) + "○".repeat(pipCap(max) - n);
 }
 
 export class SkillBarDom {
@@ -93,7 +100,7 @@ export class SkillBarDom {
       const nm = el.querySelector(".nm");
       if (nm) nm.textContent = slotCaption(v);
       const pips = el.querySelector(".pips");
-      if (pips) pips.textContent = pipsText(v.level);
+      if (pips) pips.textContent = pipsText(v.level, v.maxLevel);
       const cdn = el.querySelector(".cdn");
       if (cdn) cdn.textContent = v.cdSec > 0 ? String(v.cdSec) : "";
     }

@@ -4,6 +4,7 @@ import {
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_LOG_MAX,
   SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
   type InvSlot,
   type SectVaultView,
 } from "@tien-gioi/shared";
@@ -21,6 +22,7 @@ import {
   sanitizeVaultView,
   vaultBlockText,
   vaultHasRoom,
+  vaultLockedNote,
   vaultLogLine,
   withdrawBlock,
 } from "./sect-vault";
@@ -50,6 +52,43 @@ describe("sanitizeVaultView: không tin ảnh chụp của máy chủ", () => {
     expect(v.slots).toHaveLength(SECT_VAULT_SLOTS);
     expect(v.slots[0]).toEqual({ itemId: POTION, qty: 5 });
     expect(v.slots[1]).toBeNull();
+  });
+
+  it("M8: `unlocked` quyết định số ô (kẹp 40..80); thiếu / hỏng thì 40; mảng dài hơn mà không có `unlocked` bị cắt về 40", () => {
+    const slotsOf = (n: number) =>
+      Array.from({ length: n }, (_, i) => (i === 45 ? { itemId: POTION, qty: 2 } : null));
+    const mk = (raw: Record<string, unknown>) =>
+      sanitizeVaultView({ log: [], drawPerDay: 3, myDrawsLeft: null, lockMs: 0, ...raw })!;
+    const v50 = mk({ slots: slotsOf(50), unlocked: 50 });
+    expect(v50.slots).toHaveLength(50);
+    expect(v50.unlocked).toBe(50);
+    expect(v50.slots[45]).toEqual({ itemId: POTION, qty: 2 });
+    expect(mk({ slots: slotsOf(80), unlocked: 80 }).slots).toHaveLength(SECT_VAULT_SLOTS_MAX);
+    expect(mk({ slots: slotsOf(80), unlocked: 999 }).slots).toHaveLength(SECT_VAULT_SLOTS_MAX);
+    expect(mk({ slots: slotsOf(80), unlocked: 10 }).slots).toHaveLength(SECT_VAULT_SLOTS);
+    expect(mk({ slots: slotsOf(80), unlocked: Number.NaN }).slots).toHaveLength(SECT_VAULT_SLOTS);
+    expect(mk({ slots: slotsOf(80), unlocked: "80" }).slots).toHaveLength(SECT_VAULT_SLOTS);
+    expect(mk({ slots: slotsOf(80) }).slots).toHaveLength(SECT_VAULT_SLOTS); // thiếu unlocked: máy chủ cũ
+    expect(mk({ slots: slotsOf(80) }).unlocked).toBe(SECT_VAULT_SLOTS);
+    // máy chủ nói 50 ô mở mà gửi thiếu mảng: bù ô trống đủ 50
+    expect(mk({ slots: slotsOf(40), unlocked: 50 }).slots).toHaveLength(50);
+    // ô vượt `unlocked` bị cắt (không vẽ ô khoá như ô dùng được)
+    expect(mk({ slots: slotsOf(80), unlocked: 50 }).slots).toHaveLength(50);
+  });
+
+  it("vaultLockedNote: nêu số ô còn khoá và cấp tông mở thêm (lấy từ bảng cấp); mở hết thì rỗng; số hỏng coi như 40 ô", () => {
+    expect(vaultLockedNote(SECT_VAULT_SLOTS_MAX)).toBe("");
+    expect(vaultLockedNote(SECT_VAULT_SLOTS_MAX + 5)).toBe("");
+    const n40 = vaultLockedNote(40);
+    expect(n40).toContain("Còn 40 ô chưa mở");
+    expect(n40).toContain("cấp tông 2");
+    expect(n40).toContain("mở thêm 10 ô");
+    const n50 = vaultLockedNote(50);
+    expect(n50).toContain("Còn 30 ô chưa mở");
+    expect(n50).toContain("cấp tông 3");
+    expect(vaultLockedNote(70)).toContain("cấp tông 5");
+    expect(vaultLockedNote(Number.NaN)).toBe(n40);
+    expect(vaultLockedNote(-5)).toContain("Còn 80 ô chưa mở"); // âm: coi như 0 ô mở
   });
 
   it("thiếu ô thì bù ô trống; thừa ô thì cắt; món lạ / độc / số lượng hỏng thành ô trống, qty kẹp theo chồng", () => {
@@ -301,9 +340,9 @@ describe("planStillValid: kiểm lại lúc xác nhận", () => {
 describe("vaultLogLine", () => {
   it("'hh:mm · Tên đã góp / rút Món ×N'", () => {
     const at = new Date(2026, 10, 16, 9, 5).getTime();
-    expect(vaultLogLine({ at, name: "Tiêu Viêm", kind: "deposit", itemId: POTION, qty: 5 })).toBe(
-      "09:05 · Tiêu Viêm đã góp Hồi Huyết Đan ×5",
-    );
+    expect(
+      vaultLogLine({ at, name: "Phó Hồng Ngạn", kind: "deposit", itemId: POTION, qty: 5 }),
+    ).toBe("09:05 · Phó Hồng Ngạn đã góp Hồi Huyết Đan ×5");
     expect(vaultLogLine({ at, name: "A", kind: "withdraw", itemId: SWORD, qty: 1 })).toBe(
       "09:05 · A đã rút Lang Nha Kiếm",
     );

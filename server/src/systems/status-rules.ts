@@ -4,7 +4,9 @@
 // Số liệu từng trạng thái (trần thời gian / cường độ, loại tác dụng) ở `shared/src/skills.ts`; chuỗi / id lạ bị bỏ, không bao giờ ném lỗi.
 import {
   MAX_STATUSES,
+  STATUS_UNCOUNTED,
   STUN_IMMUNE_MS,
+  markIndexOf,
   statusAmpMult,
   statusCarriesRatio,
   statusCdr,
@@ -73,9 +75,20 @@ function isControl(id: StatusId): boolean {
  * Vị trí buff CÓ LỢI hết hạn sớm nhất trong hộp (-1 nếu không có). `withBreakAid` = false thì bỏ qua đan hộ đạo (`breakAid`: đã tốn một viên
  * đan, chỉ mất khi là buff duy nhất).
  */
+/** Trạng thái KHÔNG tính vào `MAX_STATUSES` (`windup`, mục 51): không chiếm ô, không bao giờ là nạn nhân bị đẩy ra. */
+const UNCOUNTED: ReadonlySet<string> = new Set(STATUS_UNCOUNTED);
+
+/** Số trạng thái trong hộp TÍNH vào `MAX_STATUSES` (bỏ `windup`). */
+function countedLength(box: StatusBox): number {
+  let n = 0;
+  for (const s of box.list) if (!UNCOUNTED.has(s.id)) n++;
+  return n;
+}
+
 function earliestBuff(box: StatusBox, withBreakAid: boolean): number {
   let victim = -1;
   for (let i = 0; i < box.list.length; i++) {
+    if (UNCOUNTED.has(box.list[i].id)) continue;
     const d = statusOf(box.list[i].id);
     if (!d || d.harmful) continue;
     if (!withBreakAid && d.kind === "breakAid") continue;
@@ -160,7 +173,7 @@ export function addStatus(
     if (opts.src !== undefined) same.src = src;
     return "refreshed";
   }
-  if (box.list.length >= MAX_STATUSES) {
+  if (!UNCOUNTED.has(def.id) && countedLength(box) >= MAX_STATUSES) {
     if (def.harmful) {
       // Có hại luôn vào: nạn nhân là buff có lợi hết sớm nhất (đan hộ đạo chỉ bị đẩy khi không còn buff nào khác, và khi đó dùng luật cũ).
       let victim = earliestBuff(box, false);
@@ -169,7 +182,7 @@ export function addStatus(
         // trạng thái + một choáng" thành miễn choáng); nạn nhân là trạng thái KHÔNG phải khống chế hết sớm nhất; trạng thái thường chỉ vào
         // khi sống lâu hơn nạn nhân.
         for (let i = 0; i < box.list.length; i++) {
-          if (isControl(box.list[i].id)) continue;
+          if (isControl(box.list[i].id) || UNCOUNTED.has(box.list[i].id)) continue;
           if (victim < 0 || box.list[i].until < box.list[victim].until) victim = i;
         }
         if (victim < 0) return "full"; // toàn khống chế (không xảy ra: chỉ có hai loại khống chế nên tối đa hai mục)
@@ -282,6 +295,53 @@ export function takeDotDamage(s: StatusInst, now: number): number {
   if (whole < 1) return 0;
   s.last += (whole * 1000) / s.dps;
   return whole;
+}
+
+/**
+ * Hệ số sát thương mà quái GÂY RA (mục 51, `weaken` "suy"): `1 - ratio` của `weaken` còn hiệu lực (trần `WEAKEN_MAX_RATIO` = 40% đã kẹp lúc gắn); TRÙM chỉ chịu NỬA (`1 - ratio / 2`).
+ * 1 khi không có hộp / không có `weaken`. Áp cho đòn gây lên NGƯỜI CHƠI (đòn thường, đập đất, lao, đạn, chiêu trùm); không áp cho sát thương theo giây của trạng thái.
+ */
+export function dealtMult(box: StatusBox | undefined, now: number, boss = false): number {
+  if (!box || box.list.length === 0) return 1;
+  let r = 0;
+  for (const s of box.list) if (s.id === "weaken" && s.until > now && s.ratio > r) r = s.ratio;
+  return 1 - (boss ? r / 2 : r);
+}
+
+/** Sát thương `dmg` của một đòn quái gây ra sau khi trừ `weaken` (nguyên, tối thiểu 1); không có `weaken` thì trả đúng `dmg` (không đổi số, không đổi chuỗi ngẫu nhiên). */
+export function weakened(
+  mc: { st?: StatusBox; def: { boss?: boolean } },
+  now: number,
+  dmg: number,
+): number {
+  if (!mc.st) return dmg;
+  const m = dealtMult(mc.st, now, mc.def.boss === true);
+  return m === 1 ? dmg : Math.max(1, Math.round(dmg * m));
+}
+
+/** Trạng thái `id` đang còn hiệu lực trên `box` không. */
+export function hasStatus(box: StatusBox | undefined, id: string, now: number): boolean {
+  if (!box) return false;
+  for (const s of box.list) if (s.id === id && s.until > now) return true;
+  return false;
+}
+
+/**
+ * Chỉ số 1..9 (`markIndexOf`) của DẤU hệ MỚI NHẤT còn hiệu lực trên `box` (đặt vào `Monster.mark`); 0 khi không có dấu nào. "Mới nhất" = hết hạn muộn nhất (gắn sau cùng, cùng thời lượng),
+ * hoà thì dấu gắn vào hộp sau.
+ */
+export function newestMarkIndex(box: StatusBox, now: number): number {
+  let best = 0;
+  let until = -Infinity;
+  for (const s of box.list) {
+    if (s.until <= now || statusOf(s.id)?.kind !== "mark") continue;
+    const index = markIndexOf(s.id.slice("mark_".length));
+    if (index > 0 && s.until >= until) {
+      best = index;
+      until = s.until;
+    }
+  }
+  return best;
 }
 
 /** Mặt nạ bit công khai (`Monster.fx`, M7.3) của các trạng thái CÓ HẠI còn hiệu lực. */

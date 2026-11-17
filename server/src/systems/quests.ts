@@ -3,6 +3,7 @@
 import {
   QUEST_BY_ID,
   dayKey,
+  questDefAny,
   stepSatisfied,
   type QuestCtx,
   type QuestProgress,
@@ -19,7 +20,7 @@ export function sanitizeQuests(raw: unknown): QuestSave {
   const ids = new Set<string>();
   const active: QuestProgress[] = [];
   for (const a of Array.isArray(r.active) ? r.active : []) {
-    const def = byId(QUEST_BY_ID, a?.id);
+    const def = questDefAny(a?.id); // cả nhiệm vụ thường lẫn nhiệm vụ tông môn (M8.4): id lạ / độc (constructor...) -> undefined
     if (!def || ids.has(def.id)) continue;
     ids.add(def.id);
     const step = Math.min(def.steps.length, Math.max(0, Math.floor(Number(a.step)) || 0));
@@ -59,7 +60,7 @@ export function sendQuests(w: World, sid: string) {
 
 /** Chuyển sang bước sau chừng nào bước hiện tại đã đạt. Trả về true nếu có thay đổi. */
 function advance(prog: QuestProgress, ctx: QuestCtx): boolean {
-  const def = QUEST_BY_ID[prog.id];
+  const def = questDefAny(prog.id);
   let changed = false;
   while (
     def &&
@@ -97,7 +98,7 @@ function bump(w: World, sid: string, match: (prog: QuestProgress) => boolean): s
     if (match(a)) {
       a.count += 1;
       advance(a, ctx);
-      hit.push(QUEST_BY_ID[a.id].title);
+      hit.push(questDefAny(a.id)?.title ?? a.id);
       changed = true;
     }
   }
@@ -108,7 +109,7 @@ function bump(w: World, sid: string, match: (prog: QuestProgress) => boolean): s
 /** Người chơi góp phần hạ một con quái. */
 export function onMonsterKilled(w: World, sid: string, monster: string) {
   bump(w, sid, (a) => {
-    const s = QUEST_BY_ID[a.id]?.steps[a.step];
+    const s = questDefAny(a.id)?.steps[a.step];
     return s?.kind === "kill" && s.monster === monster;
   });
 }
@@ -116,7 +117,7 @@ export function onMonsterKilled(w: World, sid: string, monster: string) {
 /** Người chơi nói chuyện với NPC (đã kiểm tra khoảng cách). Trả về tên các nhiệm vụ vừa xong bước gặp NPC này. */
 export function onTalked(w: World, sid: string, npcId: string): string[] {
   return bump(w, sid, (a) => {
-    const s = QUEST_BY_ID[a.id]?.steps[a.step];
+    const s = questDefAny(a.id)?.steps[a.step];
     return s?.kind === "talk" && s.npcId === npcId;
   });
 }

@@ -1,0 +1,842 @@
+// Test kịch bản thử tải & đối kháng Bot né vùng cảnh báo trùm (M42, Issue #876 T7).
+// Kiểm tra:
+// 1. Bot kết nối phòng Colyseus thật, nhận tin fx "warn" từ máy chủ.
+// 2. Kiểm tra hình học né của bot với các loại hình cảnh báo (vành khuyên ring r0, nón cone, vệt lao line).
+// 3. Lời hứa công bằng hình học: bot phản xạ 400 ms vẫn né thoát kịp đòn báo trước 800 ms.
+// 4. [Máy chủ Colyseus thật + BOSS_MOVES=on] Trùm Xích Mãng thật thi triển chiêu 'quat_duoi' (cone),
+//    đo trực tiếp mất HP của bot: bot đối chứng đứng yên mất HP, bot né thoát hiểm không mất HP.
+// 5. Thực nghiệm mẫu lớn (100 đòn x 3 lần mỗi nhánh): bot né đạt 0% dính đòn, bot đứng yên 100% dính đòn,
+//    đột biến đảo hướng né 100% dính đòn.
+// 6. Các ca đột biến: phản xạ chậm 900 ms, bỏ qua cảnh báo, và đảo ngược vector né đều dính đòn (ĐỎ).
+
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { performance } from "node:perf_hooks";
+import { Server, matchMaker } from "colyseus";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+import { Client, type Room } from "colyseus.js";
+import {
+  BOSS_BY_KIND,
+  MONSTER_BY_ID,
+  PROTOCOL_VERSION,
+  ROOM_NAME,
+  type BossDef,
+} from "@tien-gioi/shared";
+import { listenWithRetry } from "../src/test-port";
+import { placeMonster } from "../src/systems/monster-place";
+import { tickMonsters } from "../src/systems/monsters";
+import { syncPublicPos } from "../src/systems/movement";
+import { addPlayer, makeWorld } from "../src/systems/test-helpers";
+import {
+  type BotState,
+  computeEvadeVector,
+  isPointInAnyActiveWarn,
+  isPointInWarnZone,
+  parseWarnZoneFromFx,
+  updateBotWarns,
+} from "./bots";
+
+const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-boss-bot-"));
+let PORT = 0;
+let server: Server;
+const rooms: Room[] = [];
+
+beforeAll(async () => {
+  process.env.DATA_DIR = dataDir;
+  const mod = await import("../src/rooms/WorldRoom");
+  server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
+  mod.defineRooms(server);
+  PORT = await listenWithRetry(server);
+});
+
+afterEach(async () => {
+  await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  await sleep(150);
+});
+
+afterAll(async () => {
+  await server.gracefullyShutdown(false);
+  rmSync(dataDir, { recursive: true, force: true });
+});
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function waitFor(fn: () => unknown, ms = 4000, what = "điều kiện") {
+  const end = Date.now() + ms;
+  while (!fn()) {
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ ${what}`);
+    await sleep(10);
+  }
+}
+
+const serverRoom = (room: Room) => matchMaker.getLocalRoomById(room.roomId) as any;
+const serverPlayer = (room: Room) => serverRoom(room).state.players.get(room.sessionId);
+
+let seq = 0;
+async function createTestBot(
+  evade = true,
+  startX = 1000,
+  startY = 1080,
+  targetRoomId?: string,
+  reflexMs = 400,
+  ignoreWarn = false,
+): Promise<{
+  room: Room;
+  bot: BotState;
+  receivedWarns: any[];
+}> {
+  const name = `BotBoss ${++seq}`;
+  const client = new Client(`ws://localhost:${PORT}`);
+  const options = {
+    name,
+    secret: `secret-${name}-0123456789abcdef`,
+    v: PROTOCOL_VERSION,
+  };
+
+  const room = targetRoomId
+    ? await client.joinById(targetRoomId, options)
+    : await client.create(ROOM_NAME, options);
+  rooms.push(room);
+
+  await waitFor(() => (room.state as any)?.players?.get(room.sessionId));
+  // Phòng KHÔNG có quái thật: các `warn` trong test đều do test tự phát (`broadcast`); một con quái thật (trùm, hổ lao, đập đất) đứng gần bot cũng gửi `warn` làm các khẳng định
+  // đếm "đúng 1 warn" đỏ chập chờn (CI của #898: `expected ... to have a length of 1 but got 2`). Không bật `BOSS_MOVES` vì test không cần trùm chạy bộ chiêu.
+  const world = serverRoom(room).world;
+  for (const id of [...world.state.monsters.keys()]) {
+    world.state.monsters.delete(id);
+    world.mctrl.delete(id);
+  }
+
+  const receivedWarns: any[] = [];
+  const bot = {
+    name,
+    room,
+    predX: startX,
+    predY: startY,
+    evade,
+    reflexMs,
+    warns: [],
+    evadeCount: 0,
+    warnsTargetedCount: 0,
+    warnsEvadedCount: 0,
+    warnsHitCount: 0,
+  } as unknown as BotState;
+
+  const p = serverPlayer(room);
+  p.x = startX;
+  p.y = startY;
+  syncPublicPos(p);
+
+  room.onMessage("fx", (msg: any) => {
+    if (msg.kind === "warn") {
+      receivedWarns.push(msg);
+      if (!ignoreWarn) {
+        const zone = parseWarnZoneFromFx(msg, performance.now(), bot.reflexMs ?? 400);
+        if (zone) {
+          zone.targeted = isPointInWarnZone(bot.predX, bot.predY, zone, 0);
+          if (zone.targeted) {
+            bot.warnsTargetedCount++;
+          }
+          bot.warns.push(zone);
+        }
+      }
+    }
+  });
+
+  return { room, bot, receivedWarns };
+}
+
+describe("Kịch bản thử tải Bot né vùng cảnh báo trùm (M42 T7, Issue #876)", () => {
+  it("1. [Hình học bot] Bot nhận tin fx warn từ phòng thật và giải mã đúng các trường hình học", async () => {
+    const { room, bot, receivedWarns } = await createTestBot(true, 1000, 1080);
+    const sr = serverRoom(room);
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 150,
+      r0: 50, // Vành khuyên
+      ms: 1000,
+    });
+
+    await waitFor(() => receivedWarns.length > 0, 2000, "bot nhận được tin fx warn");
+    expect(receivedWarns).toHaveLength(1);
+    expect(receivedWarns[0].shape).toBe("circle");
+    expect(receivedWarns[0].r0).toBe(50);
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].r0).toBe(50);
+    expect(bot.warns[0].targeted).toBe(true);
+  });
+
+  it("2. [Hình học bot] Đối chứng tỉ lệ né vành khuyên: Bot bật evade né thoát 100%, Bot không né dính đòn 100%", async () => {
+    const { room: r1, bot: botEvade } = await createTestBot(true, 1000, 1070);
+    const { room: _r2, bot: botStand } = await createTestBot(false, 1000, 1070, r1.roomId);
+    const sr = serverRoom(r1);
+
+    const warnDurationMs = 800; // Báo trước 800 ms chuẩn thiết kế
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 150,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(
+      () => botEvade.warns.length > 0 && botStand.warns.length > 0,
+      2000,
+      "cả 2 nhận warn",
+    );
+    expect(botEvade.warns).toHaveLength(1);
+    expect(botStand.warns).toHaveLength(1);
+
+    const warnZone = botEvade.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150; // px/s
+
+    // 16 tick (800 ms) di chuyển trước khi đòn đáp
+    for (let tick = 0; tick < 16; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(botEvade, curT, true);
+      updateBotWarns(botStand, curT, true);
+
+      if (botEvade.evade && botEvade.warns.length > 0) {
+        const vec = computeEvadeVector(botEvade.predX, botEvade.predY, botEvade.warns, curT);
+        if (vec) {
+          botEvade.predX += vec.dx * speed * 0.05;
+          botEvade.predY += vec.dy * speed * 0.05;
+          botEvade.evadeCount++;
+        }
+      }
+    }
+
+    // Kết thúc đòn đánh tại thời điểm hết hạn expiresAt
+    updateBotWarns(botEvade, expiresAt, true);
+    updateBotWarns(botStand, expiresAt, true);
+
+    // Bot né: đã di chuyển vào lõi an toàn hoặc ra ngoài rìa
+    expect(botEvade.warnsEvadedCount).toBe(1);
+    expect(botEvade.warnsHitCount).toBe(0);
+    expect(botEvade.evadeCount).toBeGreaterThan(0);
+
+    // Bot đứng: dính đòn 100%
+    expect(botStand.warnsHitCount).toBe(1);
+    expect(botStand.warnsEvadedCount).toBe(0);
+  });
+
+  it("3. [Hình học bot] Bot né nón quạt (cone) của trùm thành công trước khi đòn đáp", async () => {
+    // Trùm tại (1000, 1000), nón góc 0 (sang phải +x), góc mở pi/2, r = 250
+    // Bot đứng tại (1200, 1050) nằm ở nửa ngoài của nón (cách tâm ~206 px > 0.7 * r)
+    const { room, bot } = await createTestBot(true, 1200, 1050);
+    const sr = serverRoom(room);
+
+    const warnDurationMs = 1000;
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "cone",
+      x: 1000,
+      y: 1000,
+      r: 250,
+      angle: 0,
+      arc: Math.PI / 2,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn nón");
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].targeted).toBe(true);
+
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    // Mốc thời gian lấy từ warnAt (khi nhận cảnh báo) thay vì `expiresAt - warnDurationMs`: ms == warnDurationMs
+    // nên bằng nhau về toán, NHƯNG phép trừ hai số lớn (performance.now() ~ triệu ms) mất chữ số hạng thấp
+    // floating-point — cùng dạng flake #1115 (ca 5). Dùng warnAt trực tiếp loại bỏ sự trừ khử, nhất quán ca 2/5/6/7.
+    // (Ca này KHÔNG flake hiện nay, đổi để đồng bộ và ngừa rủi ro tương tự.)
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // 18 tick (900 ms) di chuyển né
+    for (let tick = 0; tick < 18; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Đòn đáp xuống
+    updateBotWarns(bot, expiresAt, true);
+    expect(bot.warnsEvadedCount).toBe(1);
+    expect(bot.warnsHitCount).toBe(0);
+    expect(bot.evadeCount).toBeGreaterThan(0);
+  });
+
+  it("4. [Hình học bot] Bot né đòn lao thẳng (line) của trùm thành công trước khi đòn đáp", async () => {
+    // Trùm tại (1000, 1000), lao thẳng sang phải (angle = 0), tầm xa r = 300, bề rộng vệt w = 60
+    // Bot đứng tại (1150, 1015) (cách trục lao 15 px < w/2 + 20 px nguy hiểm)
+    const { room, bot } = await createTestBot(true, 1150, 1015);
+    const sr = serverRoom(room);
+
+    const warnDurationMs = 800;
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "line",
+      x: 1000,
+      y: 1000,
+      r: 300,
+      w: 60,
+      angle: 0,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn đường lao");
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].targeted).toBe(true);
+
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    // Mốc thời gian lấy từ warnAt (khi nhận cảnh báo) thay vì `expiresAt - warnDurationMs`: ms == warnDurationMs
+    // nên bằng nhau về toán, NHƯNG phép trừ hai số lớn (performance.now() ~ triệu ms) mất chữ số hạng thấp
+    // floating-point — cùng dạng flake #1115 (ca 5). Dùng warnAt trực tiếp loại bỏ sự trừ khử, nhất quán ca 2/5/6/7.
+    // (Ca này KHÔNG flake hiện nay, đổi để đồng bộ và ngừa rủi ro tương tự.)
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // 14 tick (700 ms) di chuyển né vuông góc ra khỏi vệt lao
+    for (let tick = 0; tick < 14; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Đòn đáp xuống
+    updateBotWarns(bot, expiresAt, true);
+    expect(bot.warnsEvadedCount).toBe(1);
+    expect(bot.warnsHitCount).toBe(0);
+    expect(bot.evadeCount).toBeGreaterThan(0);
+  });
+
+  it("5. [Hình học bot] Thử tải đa bot (10 bot) với tin fx warn: 5 bot né thoát 100% vs 5 bot đứng yên dính đòn 100%", async () => {
+    // Tạo bot đầu tiên để lấy room ID
+    const firstBotResult = await createTestBot(true, 1000, 1080);
+    const primaryRoom = firstBotResult.room;
+    const evadeBots: BotState[] = [firstBotResult.bot];
+    const standBots: BotState[] = [];
+
+    // 4 bot né tiếp theo join vào cùng primaryRoom
+    for (let i = 1; i < 5; i++) {
+      const { bot } = await createTestBot(true, 1000 + i * 5, 1080, primaryRoom.roomId);
+      evadeBots.push(bot);
+    }
+    // 5 bot đứng yên join vào primaryRoom
+    for (let i = 0; i < 5; i++) {
+      const { bot } = await createTestBot(false, 1000 + i * 5, 1080, primaryRoom.roomId);
+      standBots.push(bot);
+    }
+
+    const sr = serverRoom(primaryRoom);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(
+      () =>
+        evadeBots.every((b) => b.warns.length > 0) && standBots.every((b) => b.warns.length > 0),
+      3000,
+      "toàn bộ 10 bot nhận được cảnh báo",
+    );
+
+    const speed = 150;
+    // Giả lập thời điểm tick `tick`: lấy mốc `warnAt` (khi nhận cảnh báo) + tick*50. Cảnh báo có ms ==
+    // warnDurationMs nên `warnAt` và `expiresAt - warnDurationMs` bằng nhau về toán, NHƯNG hiệu `expiresAt -
+    // warnDurationMs` trừ khử hai số lớn (performance.now() ~ triệu ms) làm mất chữ số thừa floating-point:
+    // `curT` tại tick ranh giới phản xạ (tick 8, curT == warnAt + reflexMs) đôi khi rơi một chút dưới mốc →
+    // điều kiện `now >= warnAt + reflexMs` trong computeEvadeVector trả false → bot THIẾU tick né đầu tiên,
+    // dừng ở d=42.5 > 39 (r0 - PLAYER_RADIUS) → dính đòn. Đó là flake #1115 (tái hiện được dưới tải full-suite,
+    // ~1/10 ca), KHÔNG phải lỗi mã game. Dùng warnAt trực tiếp loại bỏ sự trừ khử, tick ranh giới luôn kích hoạt.
+    const simTickT = (b: BotState, tick: number) =>
+      (b.warns[0]!.warnAt ?? b.warns[0]!.expiresAt - warnDurationMs) + tick * 50;
+
+    // 14 tick (700 ms) mô phỏng vòng lặp game
+    for (let tick = 0; tick < 14; tick++) {
+      for (const b of evadeBots) {
+        const curT = simTickT(b, tick);
+        updateBotWarns(b, curT, true);
+        if (b.evade && b.warns.length > 0) {
+          const vec = computeEvadeVector(b.predX, b.predY, b.warns, curT);
+          if (vec) {
+            b.predX += vec.dx * speed * 0.05;
+            b.predY += vec.dy * speed * 0.05;
+            b.evadeCount++;
+          }
+        }
+      }
+      for (const b of standBots) {
+        const curT = simTickT(b, tick);
+        updateBotWarns(b, curT, true);
+      }
+    }
+
+    // Đòn đáp xuống
+    for (const b of evadeBots) {
+      updateBotWarns(b, b.warns[0].expiresAt, true);
+    }
+    for (const b of standBots) {
+      updateBotWarns(b, b.warns[0].expiresAt, true);
+    }
+
+    // Kiểm tra kết quả 5 bot né: 100% thành công (5/5 né, 0 dính)
+    const totalEvaded = evadeBots.reduce((s, b) => s + b.warnsEvadedCount, 0);
+    const totalEvadeHit = evadeBots.reduce((s, b) => s + b.warnsHitCount, 0);
+    expect(totalEvaded).toBe(5);
+    expect(totalEvadeHit).toBe(0);
+
+    // Kiểm tra kết quả 5 bot đứng yên: 100% dính đòn (5/5 dính, 0 né)
+    const totalStandHit = standBots.reduce((s, b) => s + b.warnsHitCount, 0);
+    const totalStandEvaded = standBots.reduce((s, b) => s + b.warnsEvadedCount, 0);
+    expect(totalStandHit).toBe(5);
+    expect(totalStandEvaded).toBe(0);
+  });
+
+  it("6. [Hình học bot] Lời hứa công bằng: Bot phản xạ 400 ms vẫn né thoát 100% trước đòn báo trước 800 ms", async () => {
+    // Bot đứng ở vị trí (1000, 1070) trong vành khuyên trùm
+    const { room, bot } = await createTestBot(true, 1000, 1070, undefined, 400);
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn");
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].targeted).toBe(true);
+
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150; // 150 px/s
+
+    // 14 tick (700 ms) di chuyển
+    for (let tick = 0; tick < 14; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Đòn đáp xuống
+    updateBotWarns(bot, expiresAt, true);
+    // Dù chờ 400 ms phản xạ (chỉ còn 400 ms để chạy = 8 tick = 60 px), bot vẫn thoát hiểm thành công
+    expect(bot.warnsEvadedCount).toBe(1);
+    expect(bot.warnsHitCount).toBe(0);
+    expect(bot.evadeCount).toBeGreaterThan(0);
+  });
+
+  it("7. [Đột biến hình học 1] Bot phản xạ chậm 900 ms (lớn hơn thời gian báo trước 800 ms) -> dính đòn (ĐỎ)", async () => {
+    // Phản xạ 900 ms > 800 ms: khi đòn đáp thì bot vẫn chưa bắt đầu chạy né
+    const { room, bot } = await createTestBot(true, 1000, 1070, undefined, 900);
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn");
+    expect(bot.warns).toHaveLength(1);
+    expect(bot.warns[0].targeted).toBe(true);
+
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // Trong 800 ms đầu (16 tick), vì reflexMs = 900 ms nên bot không cử động
+    for (let tick = 0; tick < 16; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Đòn đáp xuống tại 800 ms
+    updateBotWarns(bot, expiresAt, true);
+    // Khẳng định bot bị dính đòn vì phản xạ quá chậm
+    expect(bot.warnsHitCount).toBe(1);
+    expect(bot.warnsEvadedCount).toBe(0);
+    expect(bot.evadeCount).toBe(0); // Chưa kịp chạy một bước nào
+  });
+
+  it("8. [Đột biến hình học 2] Bỏ qua tin nhắn fx warn -> bot không nhận diện được đòn và dính đòn 100% (ĐỎ)", async () => {
+    // ignoreWarn = true: bot nhận tin fx warn từ server nhưng bỏ qua (không phân tích vào danh sách warns)
+    const { room, bot, receivedWarns } = await createTestBot(
+      true,
+      1000,
+      1070,
+      undefined,
+      400,
+      true,
+    );
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => receivedWarns.length > 0, 2000, "bot nhận được tin fx");
+    // Vì bỏ qua phân tích warn nên bot.warns rỗng
+    expect(bot.warns).toHaveLength(0);
+
+    const warnZone = parseWarnZoneFromFx(receivedWarns[0], performance.now(), 0)!;
+    const expiresAt = warnZone.expiresAt;
+    const t0 = expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // Trong 800 ms báo trước, bot không hề có ý niệm né (computeEvadeVector luôn trả về null)
+    for (let tick = 0; tick < 16; tick++) {
+      const curT = t0 + tick * 50;
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        bot.predX += vec.dx * speed * 0.05;
+        bot.predY += vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    // Bot không di chuyển bước nào
+    expect(bot.evadeCount).toBe(0);
+    expect(bot.predX).toBe(1000);
+    expect(bot.predY).toBe(1070);
+
+    // Môi trường chấm điểm trúng đòn: bot vẫn ở trong vùng sát thương
+    const hit = isPointInWarnZone(bot.predX, bot.predY, warnZone, 0);
+    expect(hit).toBe(true);
+  });
+
+  it("9. [Máy chủ Colyseus thật + BOSS_MOVES=on] Trùm Xích Mãng thật thi triển chiêu, đo mất HP thực tế của bot", async () => {
+    // Khởi tạo bot né và bot đứng yên trong cùng 1 phòng Colyseus thật tại bãi trống rộng rãi (1300, 1070)
+    const { room: r1, bot: botEvade } = await createTestBot(true, 1300, 1070);
+    const { room: r2, bot: _botStand } = await createTestBot(false, 1300, 1070, r1.roomId);
+    const sr = serverRoom(r1);
+
+    // Bật bossMoves trên máy chủ Colyseus thật
+    sr.world.bossMoves = true;
+
+    // Kiểm tra kết nối và input đầu tiên được ghi nhận
+    r1.send("input", { seq: 1, dx: 0, dy: 0 });
+    await waitFor(() => serverPlayer(r1)?.lastSeq === 1, 2000, "r1 test input received");
+
+    // Sinh trùm Xích Mãng tại bãi trống (1300, 1000)
+    const bossId = placeMonster(sr.world, MONSTER_BY_ID["mang"]!, 1300, 1000);
+    const mc = sr.world.mctrl.get(bossId)!;
+    expect(mc.boss).toBeDefined();
+
+    // Cấu hình trùm: nhắm mục tiêu bot, khóa chiêu cuon_minh để thi triển chiêu nón quat_duoi (r: 150, arc: 120 độ, ms: 1000)
+    // Khoảng cách bot - trùm là 70 px thỏa mãn cond.maxDist (170) của quat_duoi
+    mc.target = r2.sessionId;
+    mc.boss!.engaged = true;
+    mc.boss!.cds.set("cuon_minh", sr.world.now + 1000000);
+    mc.boss!.nextCastAt = sr.world.now;
+
+    const pStand = serverPlayer(r2);
+    const pEvade = serverPlayer(r1);
+    // Đặt máu đủ lớn để không bị trúng một đòn chết luôn (one-shot vào limbo)
+    pStand.hp = pStand.maxHp = 1000;
+    pEvade.hp = pEvade.maxHp = 1000;
+    const initialHpStand = pStand.hp;
+    const initialHpEvade = pEvade.hp;
+
+    // Đợi trùm xuất chiêu và bot nhận tin fx warn từ phòng Colyseus
+    await waitFor(
+      () => botEvade.warns.length > 0,
+      3000,
+      "bot nhận được warn quat_duoi từ trùm thật",
+    );
+
+    const warnZone = botEvade.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - 1000;
+
+    // Trong 1000 ms báo trước: bot né gửi input di chuyển thật lên server Colyseus
+    // Bot chờ phản xạ reflexMs = 400ms rồi di chuyển thoát hiểm sang hai bên cạnh nón
+    let inputSeq = 1;
+    for (let tick = 0; tick < 22; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(botEvade, curT, true);
+      const vec = computeEvadeVector(botEvade.predX, botEvade.predY, botEvade.warns, curT);
+      if (vec) {
+        inputSeq++;
+        r1.send("input", { seq: inputSeq, dx: vec.dx, dy: vec.dy });
+        botEvade.predX += vec.dx * 150 * 0.05;
+        botEvade.predY += vec.dy * 150 * 0.05;
+      }
+      await sleep(50);
+    }
+
+    // Đợi đòn đáp xuống và server Colyseus thật giải quyết sát thương
+    await waitFor(
+      () => pStand.hp < initialHpStand,
+      3000,
+      "serverPlayer bot đứng yên bị giảm HP do trùm thật gây sát thương",
+    );
+
+    // Bot đứng yên: mất HP thật trên máy chủ Colyseus (pStand.hp < initialHpStand)
+    expect(pStand.hp).toBeLessThan(initialHpStand);
+
+    // Bot né: đã gửi input và máy chủ Colyseus đã cập nhật vị trí thoát khỏi vùng trúng -> HP giữ nguyên 100%!
+    expect(pEvade.hp).toBe(initialHpEvade);
+  });
+
+  it("10. [Đột biến đảo hướng né] Bot né đảo ngược vector (chạy vào sâu trong vùng) -> dính đòn (ĐỎ)", async () => {
+    const { room, bot } = await createTestBot(true, 1000, 1070, undefined, 400);
+    const sr = serverRoom(room);
+    const warnDurationMs = 800;
+
+    sr.broadcast("fx", {
+      kind: "warn",
+      shape: "circle",
+      x: 1000,
+      y: 1000,
+      r: 160,
+      r0: 50,
+      ms: warnDurationMs,
+    });
+
+    await waitFor(() => bot.warns.length > 0, 2000, "bot nhận warn");
+    const warnZone = bot.warns[0];
+    const expiresAt = warnZone.expiresAt;
+    const t0 = warnZone.warnAt ?? expiresAt - warnDurationMs;
+    const speed = 150;
+
+    // ĐỘT BIẾN: đảo ngược hoàn toàn vector né (dx = -vec.dx, dy = -vec.dy)
+    // Thay vì chạy ra mép hoặc vào lõi an toàn, bot chạy ngược vào giữa tâm vùng nguy hiểm
+    for (let tick = 0; tick < 14; tick++) {
+      const curT = t0 + tick * 50;
+      updateBotWarns(bot, curT, true);
+      const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, curT);
+      if (vec) {
+        // Đảo ngược vector: chạy ngược hướng thoát hiểm!
+        bot.predX -= vec.dx * speed * 0.05;
+        bot.predY -= vec.dy * speed * 0.05;
+        bot.evadeCount++;
+      }
+    }
+
+    updateBotWarns(bot, expiresAt, true);
+    // Khẳng định: khi đảo hướng né, bot chắc chắn dính đòn (chứng minh vector computeEvadeVector là đúng hướng thoát hiểm)
+    expect(bot.warnsHitCount).toBe(1);
+    expect(bot.warnsEvadedCount).toBe(0);
+  });
+
+  it("11. [Thực nghiệm 100 đòn x 3 lần + BOSS_MOVES=on] Đối chứng tỉ lệ dính đòn thật của trùm Xích Mãng (quat_duoi + cuon_minh)", () => {
+    function runBossTrial(
+      branch: "stand" | "evade" | "invert",
+      targetWarns: number,
+      runIdx: number,
+    ) {
+      const { w, fx } = makeWorld();
+      w.now = 10_000;
+      w.bossMoves = true;
+
+      // Bot đứng tại (1300, 1130), cách trùm 130 px (thỏa mãn cả quat_duoi maxDist 170 và cuon_minh minDist 120)
+      const { p: botP } = addPlayer(w, "bot");
+      botP.x = 1300;
+      botP.y = 1130;
+      botP.hp = botP.maxHp = 100000;
+
+      const bot: BotState = {
+        name: "bot",
+        room: null as any,
+        predX: 1300,
+        predY: 1130,
+        evade: branch !== "stand",
+        reflexMs: 400,
+        warns: [],
+        evadeCount: 0,
+        warnsTargetedCount: 0,
+        warnsEvadedCount: 0,
+        warnsHitCount: 0,
+      } as unknown as BotState;
+
+      const bossId = placeMonster(w, MONSTER_BY_ID["mang"]!, 1300, 1000);
+      const mc = w.mctrl.get(bossId)!;
+      mc.target = "bot";
+      mc.boss!.engaged = true;
+      mc.boss!.rng = (runIdx * 1234567) >>> 0 || 1;
+
+      let warnsResolved = 0;
+      let fxCursor = 0;
+      let serverHits = 0;
+      const speed = 150;
+      const dt = 50;
+
+      while (warnsResolved < targetWarns && w.now < 1_000_000) {
+        while (fxCursor < fx.length) {
+          const msg = fx[fxCursor++]!;
+          if (msg.kind === "warn") {
+            const zone = parseWarnZoneFromFx(msg, w.now, bot.reflexMs ?? 400);
+            if (zone) {
+              zone.targeted = isPointInWarnZone(bot.predX, bot.predY, zone, 0);
+              if (zone.targeted) bot.warnsTargetedCount++;
+              bot.warns.push(zone);
+            }
+          }
+        }
+
+        const prevTotal = bot.warnsHitCount + bot.warnsEvadedCount;
+        updateBotWarns(bot, w.now, true);
+        if (bot.warnsHitCount + bot.warnsEvadedCount > prevTotal) {
+          warnsResolved++;
+        }
+
+        let dx = 0;
+        let dy = 0;
+        if (branch !== "stand" && bot.warns.length > 0) {
+          const vec = computeEvadeVector(bot.predX, bot.predY, bot.warns, w.now, 12);
+          if (vec) {
+            // Nhánh invert đảo ngược vector để kiểm chứng đột biến
+            dx = branch === "invert" ? -vec.dx : vec.dx;
+            dy = branch === "invert" ? -vec.dy : vec.dy;
+            bot.evadeCount++;
+          } else if (branch === "evade") {
+            const stepPx = speed * (dt / 1000);
+            const toBossX = 1300 - bot.predX;
+            const toBossY = 1000 - bot.predY;
+            const d = Math.hypot(toBossX, toBossY);
+            if (d > 130) {
+              const testNextX = bot.predX + (toBossX / d) * stepPx;
+              const testNextY = bot.predY + (toBossY / d) * stepPx;
+              if (!isPointInAnyActiveWarn(testNextX, testNextY, bot.warns, w.now, 16)) {
+                dx = toBossX / d;
+                dy = toBossY / d;
+              }
+            }
+          }
+        } else if (bot.warns.length === 0) {
+          bot.predX = 1300;
+          bot.predY = 1130;
+        }
+
+        bot.predX += dx * speed * (dt / 1000);
+        bot.predY += dy * speed * (dt / 1000);
+        botP.x = bot.predX;
+        botP.y = bot.predY;
+        botP.hp = 100000;
+
+        const bossM = w.state.monsters.get(bossId)!;
+        bossM.x = 1300;
+        bossM.y = 1000;
+        mc.target = "bot";
+        mc.nextAttack = Number.MAX_SAFE_INTEGER;
+        mc.boss!.engaged = true;
+
+        w.now += dt;
+        tickMonsters(w, dt / 1000);
+        if (botP.hp < 100000) {
+          serverHits++;
+          botP.hp = 100000;
+        }
+      }
+
+      return {
+        totalWarns: warnsResolved,
+        serverHits,
+        botHits: bot.warnsHitCount,
+        hitRate: (serverHits / warnsResolved) * 100,
+      };
+    }
+
+    // Thí nghiệm này đo ĐÚNG hai chiêu `quat_duoi` (nón) + `cuon_minh` (lao), mỗi đòn một lần trúng / không trúng: dữ liệu thật của Xích Mãng nay còn `phun_doc` (vũng độc trúng NHIỀU
+    // lần mỗi vùng, mỗi giây một lần) và gọi rắn con, làm "số lần máu giảm" không còn bằng "số vùng cảnh báo". Nên cố định bộ chiêu của thí nghiệm, không theo dữ liệu hiện hành.
+    const realDef = BOSS_BY_KIND["mang"]!;
+    const twoMoves = {
+      ...realDef,
+      abilities: realDef.abilities.filter((a) => a.id === "quat_duoi" || a.id === "cuon_minh"),
+      phases: [
+        { ...realDef.phases[0]!, abilities: ["quat_duoi", "cuon_minh"], onEnter: undefined },
+      ],
+    };
+    let standRuns: ReturnType<typeof runBossTrial>[];
+    let evadeRuns: ReturnType<typeof runBossTrial>[];
+    let invertRuns: ReturnType<typeof runBossTrial>[];
+    (BOSS_BY_KIND as Record<string, BossDef>)["mang"] = twoMoves;
+    try {
+      standRuns = [1, 2, 3].map((i) => runBossTrial("stand", 100, i));
+      evadeRuns = [1, 2, 3].map((i) => runBossTrial("evade", 100, i));
+      invertRuns = [1, 2, 3].map((i) => runBossTrial("invert", 100, i));
+    } finally {
+      (BOSS_BY_KIND as Record<string, BossDef>)["mang"] = realDef;
+    }
+
+    // 1. Nhánh đứng yên: 100/100 dính đòn ở cả 3 lần chạy
+    for (const r of standRuns) {
+      expect(r.totalWarns).toBe(100);
+      expect(r.serverHits).toBe(100);
+      expect(r.hitRate).toBe(100);
+    }
+
+    // 2. Nhánh né chủ động: 0/100 dính đòn ở cả 3 lần chạy
+    for (const r of evadeRuns) {
+      expect(r.totalWarns).toBe(100);
+      expect(r.serverHits).toBe(0);
+      expect(r.hitRate).toBe(0);
+    }
+
+    // 3. Nhánh đột biến đảo hướng né: tỉ lệ dính đòn tăng vọt (> 50% dính đòn so với 0% của evade)
+    for (const r of invertRuns) {
+      expect(r.totalWarns).toBe(100);
+      expect(r.serverHits).toBeGreaterThan(50);
+    }
+  });
+});

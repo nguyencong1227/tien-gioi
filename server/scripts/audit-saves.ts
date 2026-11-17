@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import {
   COIN_CAP,
   DEFAULT_MAP,
+  AMBUSH_DAY_CAP,
   DUNGEON_DAILY_REWARDS,
   EQUIP_SLOTS,
   INVENTORY_SLOTS,
@@ -32,8 +33,6 @@ import {
   validateUsername,
   SECT_COIN_CAP,
   SECT_LOG_MAX,
-  SECT_MAX_MEMBERS,
-  SECT_ELDERS_MAX,
   SECT_NAME_MIN,
   SECT_NAME_MAX,
   SECT_TAG_MIN,
@@ -41,6 +40,18 @@ import {
   SECT_MOTD_MAX,
   SECT_RANKS,
   SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
+  SECT_POINTS_CAP,
+  SECT_CONTRIB_CAP,
+  SECT_EARN_DAY_CAP,
+  SECT_DEPOSIT_DAY_CAP,
+  SECT_DUNGEON_CH,
+  SECT_QUEST_CH,
+  SECT_QUEST_TEMPLATE_BY_ID,
+  SECT_SHOP,
+  isSectQuestTemplate,
+  sectLevelInfo,
+  sectLevelOf,
   SECT_VAULT_LOG_MAX,
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_QTY_MAX,
@@ -48,6 +59,8 @@ import {
   cleanSectName,
   cleanSectTag,
   sectKey,
+  SECT_QUEST_SLOTS,
+  questDefAny,
 } from "@tien-gioi/shared";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
@@ -448,7 +461,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         } else {
           for (const act of data.quests.active) {
             const qId = act?.id;
-            if (typeof qId !== "string" || !byId(QUEST_BY_ID, qId)) {
+            if (typeof qId !== "string" || !questDefAny(qId)) {
               errors.push({
                 code: "unknown_quest",
                 message: `Nhiệm vụ đang làm không tồn tại: ${show(qId)}`,
@@ -724,6 +737,53 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         });
       }
     }
+  }
+
+  // 12b. Bộ đếm chặn đường theo ngày (mục 52): ambushDaily { day, n } và mốc hồi ambushUntil
+  if (data.ambushDaily !== undefined) {
+    if (
+      typeof data.ambushDaily !== "object" ||
+      data.ambushDaily === null ||
+      Array.isArray(data.ambushDaily)
+    ) {
+      errors.push({
+        code: "invalid_ambush_daily",
+        message: "ambushDaily phải là một JSON Object { day, n }",
+      });
+    } else {
+      const { day, n } = data.ambushDaily;
+      if (!isValidDayKey(day)) {
+        errors.push({
+          code: "invalid_ambush_daily_day",
+          message: `ambushDaily.day (${typeof day === "string" ? `<chuỗi ${day.length} ký tự>` : show(day)}) phải là chuỗi ngày YYYY-MM-DD hợp lệ`,
+        });
+      }
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > AMBUSH_DAY_CAP) {
+        errors.push({
+          code: "invalid_ambush_daily_n",
+          message: `ambushDaily.n (${typeof n === "string" ? `<chuỗi ${n.length} ký tự>` : show(n)}) phải là số nguyên trong khoảng [0, ${AMBUSH_DAY_CAP}]`,
+        });
+      }
+    }
+  }
+  if (
+    data.ambushUntil !== undefined &&
+    (typeof data.ambushUntil !== "number" || !Number.isFinite(data.ambushUntil))
+  ) {
+    errors.push({
+      code: "invalid_ambush_until",
+      message: `ambushUntil (${typeof data.ambushUntil === "string" ? `<chuỗi ${data.ambushUntil.length} ký tự>` : show(data.ambushUntil)}) phải là số hữu hạn (ms)`,
+    });
+  }
+
+  if (
+    data.ambushReturnAt !== undefined &&
+    (typeof data.ambushReturnAt !== "number" || !Number.isFinite(data.ambushReturnAt))
+  ) {
+    errors.push({
+      code: "invalid_ambush_return_at",
+      message: `ambushReturnAt (${typeof data.ambushReturnAt === "string" ? `<chuỗi ${data.ambushReturnAt.length} ký tự>` : show(data.ambushReturnAt)}) phải là số hữu hạn (ms)`,
+    });
   }
 
   // 13. Sổ chiêu (skills, M7.2, #503)
@@ -1381,21 +1441,41 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
     }
   }
 
-  // 7. members: danh sách thành viên
+  // 6b. points: điểm tông môn (M8, mục 12.2: nguyên không âm 0..SECT_POINTS_CAP, thiếu = 0)
+  let sectPoints = 0;
+  if (data.points !== undefined) {
+    if (
+      typeof data.points !== "number" ||
+      !Number.isSafeInteger(data.points) ||
+      data.points < 0 ||
+      data.points > SECT_POINTS_CAP
+    ) {
+      errors.push({
+        code: "invalid_sect_points",
+        message: `points (${show(data.points)}) phải là số nguyên nằm trong khoảng 0..${SECT_POINTS_CAP}`,
+      });
+    } else {
+      sectPoints = data.points;
+    }
+  }
+
+  // 7. members: danh sách thành viên (giới hạn theo CẤP tông, M8: cấp tính từ `points`; thiếu / hỏng = 0 điểm = cấp 1 = 30 thành viên, 3 Trưởng lão)
+  const sectLimits = sectLevelInfo(sectLevelOf(sectPoints));
   if (
     !Array.isArray(data.members) ||
     data.members.length < 1 ||
-    data.members.length > SECT_MAX_MEMBERS
+    data.members.length > sectLimits.maxMembers
   ) {
     errors.push({
       code: "invalid_sect_members",
-      message: `members phải là mảng chứa 1–${SECT_MAX_MEMBERS} thành viên`,
+      message: `members phải là mảng chứa 1–${sectLimits.maxMembers} thành viên (cấp tông ${sectLimits.level})`,
     });
   } else {
     const seenSoulKeys = new Set<string>();
     let chuCount = 0;
     let elderCount = 0;
     let leaderFound = false;
+    let totalMembersMerit = 0;
 
     for (let i = 0; i < data.members.length; i++) {
       const m = data.members[i];
@@ -1472,6 +1552,217 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
           }
         }
       }
+
+      // M8 (mục 12.2): contrib, merit, today
+      let mContrib: number | undefined = undefined;
+      if (m.contrib !== undefined) {
+        if (
+          typeof m.contrib !== "number" ||
+          !Number.isSafeInteger(m.contrib) ||
+          m.contrib < 0 ||
+          m.contrib > SECT_CONTRIB_CAP
+        ) {
+          errors.push({
+            code: "invalid_sect_member_contrib",
+            message: `Thành viên thứ ${i} có contrib (${show(m.contrib)}) không hợp lệ (cần số nguyên 0..${SECT_CONTRIB_CAP})`,
+          });
+        } else {
+          mContrib = m.contrib;
+        }
+      }
+
+      let mMerit: number | undefined = undefined;
+      if (m.merit !== undefined) {
+        if (
+          typeof m.merit !== "number" ||
+          !Number.isSafeInteger(m.merit) ||
+          m.merit < 0 ||
+          m.merit > SECT_POINTS_CAP
+        ) {
+          errors.push({
+            code: "invalid_sect_member_merit",
+            message: `Thành viên thứ ${i} có merit (${show(m.merit)}) không hợp lệ (cần số nguyên 0..${SECT_POINTS_CAP})`,
+          });
+        } else {
+          mMerit = m.merit;
+          totalMembersMerit += m.merit;
+        }
+      }
+
+      // Bất biến mục 12.2: 0 <= contrib <= merit
+      if ((mContrib ?? 0) > (mMerit ?? 0)) {
+        errors.push({
+          code: "sect_member_contrib_exceeds_merit",
+          message: `Thành viên thứ ${i} có contrib (${mContrib ?? 0}) vượt quá merit (${mMerit ?? 0})`,
+        });
+      }
+
+      // today: sổ ghi chép trong ngày
+      if (m.today !== undefined) {
+        if (m.today === null || typeof m.today !== "object" || Array.isArray(m.today)) {
+          errors.push({
+            code: "invalid_sect_member_today",
+            message: `Thành viên thứ ${i} có today không phải là một JSON Object`,
+          });
+        } else {
+          if (typeof m.today.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(m.today.day)) {
+            errors.push({
+              code: "invalid_sect_member_today_day",
+              message: `Thành viên thứ ${i} có today.day (${show(m.today.day)}) không hợp lệ (cần định dạng YYYY-MM-DD)`,
+            });
+          }
+          if (
+            typeof m.today.earned !== "number" ||
+            !Number.isSafeInteger(m.today.earned) ||
+            m.today.earned < 0 ||
+            m.today.earned > SECT_EARN_DAY_CAP
+          ) {
+            errors.push({
+              code: "invalid_sect_member_today_earned",
+              message: `Thành viên thứ ${i} có today.earned (${show(m.today.earned)}) không hợp lệ (cần số nguyên 0..${SECT_EARN_DAY_CAP})`,
+            });
+          }
+          if (m.today.deposit !== undefined) {
+            if (
+              typeof m.today.deposit !== "number" ||
+              !Number.isSafeInteger(m.today.deposit) ||
+              m.today.deposit < 0 ||
+              m.today.deposit > SECT_DEPOSIT_DAY_CAP
+            ) {
+              errors.push({
+                code: "invalid_sect_member_today_deposit",
+                message: `Thành viên thứ ${i} có today.deposit (${show(m.today.deposit)}) không hợp lệ (cần số nguyên 0..${SECT_DEPOSIT_DAY_CAP})`,
+              });
+            } else if (
+              typeof m.today.earned === "number" &&
+              Number.isSafeInteger(m.today.earned) &&
+              m.today.deposit > m.today.earned
+            ) {
+              errors.push({
+                code: "invalid_sect_member_today_deposit_exceeds_earned",
+                message: `Thành viên thứ ${i} có today.deposit (${m.today.deposit}) vượt quá today.earned (${m.today.earned})`,
+              });
+            }
+          }
+          if (m.today.quests !== undefined) {
+            if (!Array.isArray(m.today.quests)) {
+              errors.push({
+                code: "invalid_sect_member_today_quests",
+                message: `Thành viên thứ ${i} có today.quests không phải là một mảng`,
+              });
+            } else {
+              if (m.today.quests.length > SECT_QUEST_SLOTS) {
+                errors.push({
+                  code: "sect_member_today_quests_exceed_slots",
+                  message: `Thành viên thứ ${i} có today.quests (${m.today.quests.length}) vượt quá số ô nhiệm vụ mỗi ngày (${SECT_QUEST_SLOTS})`,
+                });
+              }
+              const seenQuests = new Set<string>();
+              for (let q = 0; q < m.today.quests.length; q++) {
+                const qId = m.today.quests[q];
+                if (typeof qId !== "string" || !isSectQuestTemplate(qId)) {
+                  errors.push({
+                    code: "invalid_sect_member_today_quest_template",
+                    message: `Thành viên thứ ${i} có today.quests[${q}] (${show(qId)}) không phải mẫu nhiệm vụ tông môn hợp lệ`,
+                  });
+                } else if (seenQuests.has(qId)) {
+                  errors.push({
+                    code: "duplicate_sect_member_today_quest",
+                    message: `Thành viên thứ ${i} có today.quests chứa mẫu nhiệm vụ trùng lặp: ${show(qId)}`,
+                  });
+                } else {
+                  seenQuests.add(qId);
+                }
+              }
+            }
+          }
+          if (m.today.dungeon !== undefined && typeof m.today.dungeon !== "boolean") {
+            errors.push({
+              code: "invalid_sect_member_today_dungeon",
+              message: `Thành viên thứ ${i} có today.dungeon (${show(m.today.dungeon)}) phải là boolean`,
+            });
+          }
+
+          // Bất biến mục 12.2 / Issue #846: today.earned <= SECT_EARN_DAY_CAP + khớp các nguồn
+          // Các nguồn hợp lệ: deposit (m.today.deposit), dungeon (SECT_DUNGEON_CH nếu true), quests (cống hiến theo độ khó của từng mẫu)
+          let questsMaxCh = 0;
+          if (Array.isArray(m.today.quests)) {
+            for (const qId of m.today.quests) {
+              if (typeof qId === "string") {
+                const tpl = byId(SECT_QUEST_TEMPLATE_BY_ID, qId);
+                const diff = tpl && [1, 2, 3].includes(tpl.difficulty) ? tpl.difficulty : 3;
+                questsMaxCh += SECT_QUEST_CH[diff - 1] ?? 40;
+              }
+            }
+          }
+          const depositCh =
+            typeof m.today.deposit === "number" &&
+            Number.isSafeInteger(m.today.deposit) &&
+            m.today.deposit >= 0
+              ? m.today.deposit
+              : 0;
+          const dungeonCh = m.today.dungeon === true ? SECT_DUNGEON_CH : 0;
+          const maxFromSources = depositCh + dungeonCh + questsMaxCh;
+
+          if (
+            typeof m.today.earned === "number" &&
+            Number.isSafeInteger(m.today.earned) &&
+            m.today.earned > maxFromSources
+          ) {
+            errors.push({
+              code: "sect_member_today_earned_exceeds_sources",
+              message: `Thành viên thứ ${i} có today.earned (${m.today.earned}) vượt quá tổng cống hiến tối đa từ các nguồn đã ghi nhận (${maxFromSources} = góp kho ${depositCh} + bí cảnh ${dungeonCh} + nhiệm vụ ${questsMaxCh})`,
+            });
+          }
+          if (m.today.buys !== undefined) {
+            if (
+              m.today.buys === null ||
+              typeof m.today.buys !== "object" ||
+              Array.isArray(m.today.buys)
+            ) {
+              errors.push({
+                code: "invalid_sect_member_today_buys",
+                message: `Thành viên thứ ${i} có today.buys không phải là một JSON Object`,
+              });
+            } else {
+              for (const [itemId, qty] of Object.entries(m.today.buys)) {
+                const shopEntry = SECT_SHOP.find((e) => e.itemId === itemId);
+                if (!shopEntry) {
+                  errors.push({
+                    code: "invalid_sect_member_today_buy_item",
+                    message: `Thành viên thứ ${i} có today.buys chứa món không có trong SECT_SHOP: ${show(itemId)}`,
+                  });
+                }
+                const maxDayLimit = shopEntry ? shopEntry.limitDay : Number.MAX_SAFE_INTEGER;
+                if (
+                  typeof qty !== "number" ||
+                  !Number.isSafeInteger(qty) ||
+                  qty < 0 ||
+                  qty > maxDayLimit
+                ) {
+                  errors.push({
+                    code: "invalid_sect_member_today_buy_qty",
+                    message: `Thành viên thứ ${i} có today.buys[${itemId}] (${show(qty)}) không hợp lệ (cần số nguyên 0..${maxDayLimit})`,
+                  });
+                }
+                // Bất biến M8.10: điểm tông chỉ tăng nên cấp tông không bao giờ tụt; đã mua được món hôm nay
+                // thì cấp tông HIỆN TẠI >= `minLevel` của món (sectService.shopBuy từ chối `shop_locked` dưới cấp đó)
+                if (
+                  shopEntry &&
+                  typeof qty === "number" &&
+                  qty > 0 &&
+                  shopEntry.minLevel > sectLimits.level
+                ) {
+                  errors.push({
+                    code: "sect_member_today_buy_level_too_high",
+                    message: `Thành viên thứ ${i} có today.buys[${itemId}] = ${qty} nhưng món mở ở cấp tông ${shopEntry.minLevel}, tông đang cấp ${sectLimits.level}`,
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     if (chuCount !== 1 || !leaderFound) {
@@ -1481,10 +1772,18 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
       });
     }
 
-    if (elderCount > SECT_ELDERS_MAX) {
+    if (elderCount > sectLimits.maxElders) {
       errors.push({
         code: "too_many_elders",
-        message: `Số lượng Trưởng lão (${elderCount}) vượt quá giới hạn tối đa ${SECT_ELDERS_MAX}`,
+        message: `Số lượng Trưởng lão (${elderCount}) vượt quá giới hạn tối đa ${sectLimits.maxElders} (cấp tông ${sectLimits.level})`,
+      });
+    }
+
+    // Bất biến mục 12.2: points >= tổng merit thành viên hiện tại
+    if (sectPoints < totalMembersMerit) {
+      errors.push({
+        code: "sect_points_less_than_members_merit",
+        message: `Điểm tông môn points (${sectPoints}) nhỏ hơn tổng merit của các thành viên hiện tại (${totalMembersMerit})`,
       });
     }
   }
@@ -1560,16 +1859,26 @@ export function auditSectSaveData(rawText: string, byteLength: number): AuditErr
         message: "vault phải là một JSON Object",
       });
     } else {
-      // 10a. slots: mảng đúng SECT_VAULT_SLOTS ô
-      if (!Array.isArray(data.vault.slots) || data.vault.slots.length !== SECT_VAULT_SLOTS) {
+      // 10a. slots: mảng đúng SECT_VAULT_SLOTS ô (bản ghi trước M8, chưa ghi lại) hoặc SECT_VAULT_SLOTS_MAX ô (M8)
+      if (
+        !Array.isArray(data.vault.slots) ||
+        (data.vault.slots.length !== SECT_VAULT_SLOTS &&
+          data.vault.slots.length !== SECT_VAULT_SLOTS_MAX)
+      ) {
         errors.push({
           code: "invalid_sect_vault_slots",
-          message: `vault.slots phải là mảng đúng ${SECT_VAULT_SLOTS} ô`,
+          message: `vault.slots phải là mảng đúng ${SECT_VAULT_SLOTS} hoặc ${SECT_VAULT_SLOTS_MAX} ô`,
         });
       } else {
         for (let i = 0; i < data.vault.slots.length; i++) {
           const sl = data.vault.slots[i];
           if (sl === null || sl === undefined) continue;
+          if (i >= sectLimits.vaultSlots) {
+            errors.push({
+              code: "sect_vault_locked_slot_not_empty",
+              message: `Ô kho đồ thứ ${i} bị khoá theo cấp tông môn (${sectLimits.level}, mở ${sectLimits.vaultSlots} ô) nhưng vẫn chứa vật phẩm`,
+            });
+          }
           if (typeof sl !== "object" || Array.isArray(sl)) {
             errors.push({
               code: "invalid_sect_vault_slot",

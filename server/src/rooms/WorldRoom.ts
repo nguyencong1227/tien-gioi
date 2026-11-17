@@ -6,6 +6,13 @@ import { randomBytes } from "node:crypto";
 import { Room, Client, ServerError, matchMaker, type RoomException, type Server } from "colyseus";
 import {
   TICK_MS,
+  type SoulSocial,
+  SOCIAL_MSG,
+  ACHIEVEMENT_BY_ID,
+  achievementsDue,
+  newSocial,
+  parseBoardsGet,
+  parseTitleSet,
   MAX_PLAYERS_PER_ROOM,
   MONSTER_RESPAWN_MS,
   DEFAULT_MAP_ID,
@@ -20,13 +27,17 @@ import {
   DUNGEON_MSG,
   DUEL_MSG,
   HEARTBEAT_MSG,
+  AMBUSH_MSG,
   NET_MSG,
   NET_RECONNECT_GRACE_S,
   parseBeatMs,
   parsePing,
   type PongMsg,
   SECT_MSG,
+  ARENA_MAPS,
   DUNGEON_MAPS,
+  arenaMapIdOf,
+  isArenaMap,
   JOIN_NOT_IN_RUN,
   dungeonOf,
   dungeonOfMap,
@@ -155,6 +166,10 @@ import {
   sectOnJoin,
   sectRank,
   sectTransfer,
+  sectHallGet,
+  sectQuestAccept,
+  sectQuestTurnIn,
+  sectShopBuy,
   sectVaultDeposit,
   sectVaultPolicy,
   sectVaultWithdraw,
@@ -175,7 +190,31 @@ import {
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
+import { bossMovesOf } from "../systems/boss-config";
+import { ambushOn } from "../systems/ambush-config";
+import {
+  ambushDropOffer,
+  ambushResend,
+  applyReturnGrace,
+  createAmbushRuntime,
+  onAmbushChoose,
+  onAmbushSeen,
+  protoOf,
+} from "../systems/ambush";
+import {
+  arenaDrop,
+  arenaJoined,
+  arenaResend,
+  createArena,
+  onAmbushFlee,
+  openTicket,
+  type AmbushTicket,
+} from "../systems/arena";
 import { testExpMultFor } from "../test-exp";
+import type { LeaderboardService } from "../leaderboard";
+import { achievementsMsgOf, grantDue, unlockedTitles, wornTitle } from "../systems/achievements";
+import { trackSocial } from "../systems/social";
+import { worldBossStatus } from "../systems/world-boss";
 import { defaultHub, type Hub } from "../hub";
 
 const SAVE_EVERY_MS = 30_000;
@@ -236,6 +275,15 @@ export class WorldRoom extends Room<WorldState> {
    * (biến môi trường) gỡ tính năng: không có dịch vụ, mọi tin tông môn bị từ chối.
    */
   static sects: SectService | null = null;
+  /** Dịch vụ bảng xếp hạng (M9, `leaderboard.ts`; đặt ở `index.ts`, `LEADERBOARD=off` gỡ). `null`: tin `boardsGet` trả bảng trống. */
+  static leaderboards: LeaderboardService | null = null;
+  /**
+   * Cấp thành tựu + Duyên thưởng + danh hiệu (M9.5). MẶC ĐỊNH TẮT (test và bản chạy thật hiện tại không đổi): bộ đếm xã hội vẫn được ghi (thành tựu đến hạn sẽ cấp ngay khi bật), nhưng không cấp
+   * thành tựu / không thưởng Duyên / không tin `achievementNew`. `index.ts` bật khi `ACHIEVEMENTS=on`; PR cuối của M9 đổi mặc định thành bật.
+   */
+  static achievements = false;
+  /** "Chờ sang ngày mới kiếm được cống hiến" (M8; mặc định BẬT; `index.ts` đặt từ `SECT_EARN_WARMUP`, `off` chỉ để dev / E2E). */
+  static sectEarnWarmup = true;
   private static defaultSects: SectService | undefined;
   static sectService(): SectService | null {
     if (process.env.SECTS === "off") return null;
@@ -264,7 +312,8 @@ export class WorldRoom extends Room<WorldState> {
         sys: (text) =>
           this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
         // Chat người chơi là của CẢ SERVER (mọi bản đồ / phòng); thông báo hệ thống (`sys`) chỉ trong phòng
-        chat: (from, text) => this.hub.chat({ from, text } satisfies ChatOut),
+        chat: (from, text, titleId) =>
+          this.hub.chat({ from, text, ...(titleId ? { titleId } : {}) } satisfies ChatOut),
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
@@ -289,16 +338,36 @@ export class WorldRoom extends Room<WorldState> {
         sectPresence: (sid, msg) => this.sendTo(sid, SECT_MSG.presence, msg),
         sectInvited: (sid, msg) => this.sendTo(sid, SECT_MSG.invited, msg),
         sectVault: (sid, msg) => this.sendTo(sid, SECT_MSG.vault, msg),
+        sectHall: (sid, msg) => this.sendTo(sid, SECT_MSG.hall, msg),
         netShield: (sid, msg) => this.sendTo(sid, NET_MSG.shield, msg),
+        ambushOffer: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.offer, msg),
+        ambushEnd: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.end, msg),
+        ambushState: (sid, msg) => this.sendTo(sid, AMBUSH_MSG.state, msg),
+        worldBoss: (sid, msg) => this.sendTo(sid, SOCIAL_MSG.worldBoss, msg),
       },
       map,
       this.hub,
     );
     // Chết do quái = luân hồi: lưu hồ sơ ở trạng thái Hoàng Tuyền, cộng Duyên, gửi màn hình Hoàng Tuyền
     w.reincarnate = true;
+    w.bossMoves = bossMovesOf(process.env); // bộ chiêu trùm (mục 42): mặc định tắt, `BOSS_MOVES=on` để bật
+    // Gặp chặn đường (mục 52): mặc định TẮT (`w.ambush` null), `AMBUSH=on` để bật; ngẫu nhiên do phòng tiêm vào (system không gọi `Math.random` trong tick)
+    if (ambushOn(process.env)) {
+      w.ambush = createAmbushRuntime({ random: Math.random });
+      // "Chiến": lập vé, mở phòng đấu trường solo rồi đưa người chơi sang (chỗ cũ luôn được lưu trước)
+      w.ambush.startFight = (world, sid, offer) => {
+        const ticket = openTicket(world, sid, offer);
+        if (!ticket) return false;
+        void this.openArenaRoom(world, sid, ticket);
+        return true;
+      };
+    }
+    w.onArenaExit = (sid) => void this.exitArenaRoom(sid);
     w.onLimbo = (sid) => void this.enterLimbo(sid);
+    w.onSocial = (soulKey, fn) => void this.socialUpdate(soulKey, fn); // M9: thống kê PK / thành tựu theo linh hồn (`systems/social.ts`)
     // Tông môn (M3.6): dịch vụ dùng chung (`SECTS=off` gỡ gấp); lưu hồ sơ NGAY khi chuyển Linh thạch sang kho
     w.sectService = WorldRoom.sectService();
+    w.sectEarnWarmup = WorldRoom.sectEarnWarmup;
     w.sectNewLifeLockMs = newLifeLockMsOf(process.env); // cờ kiếp mới chưa được rút (mặc định tắt)
     // Nhật ký kiểm toán (M4 2.4): chỉ ghi khi `startAudit` đã bật ở index.ts
     w.audit = audit;
@@ -360,13 +429,15 @@ export class WorldRoom extends Room<WorldState> {
     // thế giới: ném lỗi ở đây thì không rò một `World` vào `Hub.worlds`. `joinOrCreate` của client (kể cả tên phòng đúng)
     // không có `runId` hợp lệ nên bị từ chối tại đây.
     const run = isDungeonMap(this.mapId) ? this.claimRun(options?.runId) : null;
+    // Phòng ĐẤU TRƯỜNG chặn đường (mục 52): cũng chỉ do server mở cho đúng một vé còn hiệu lực (`ambushId`), kiểm TRƯỚC khi dựng thế giới
+    const ticket = isArenaMap(this.mapId) ? this.claimTicket((options as any)?.ambushId) : null;
     this.world = this.createWorld(map);
     this.world.roomId = this.roomId;
     this.removeChatSink = this.hub.addChatSink((msg) => this.broadcast("chat", msg));
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
     if (run) spawnDungeonMonsters(this.world);
-    else spawnInitial(this.world);
+    else if (!ticket) spawnInitial(this.world); // đấu trường: kẻ địch do `createArena` đặt, không sinh tự nhiên
     this.clock.setInterval(() => this.saveAll(), SAVE_EVERY_MS);
     if (run) {
       // Quái nhỏ dọn một lần (không hồi sinh); phòng trống thì huỷ (`autoDispose` bật ở lần vào đầu tiên: bật ngay bây giờ
@@ -374,6 +445,11 @@ export class WorldRoom extends Room<WorldState> {
       this.world.runId = run.id;
       this.maxClients = dungeonOf(run.dungeonId)?.partyMax ?? this.maxClients;
       this.clock.setInterval(() => this.watchRun(), 1000);
+    } else if (ticket) {
+      // Đấu trường: MỘT người, quái không sinh lại; phòng chưa ai vào mà vé hết hạn thì tự đóng (`autoDispose` bật ở lần vào đầu tiên, như bí cảnh)
+      createArena(this.world, ticket);
+      this.maxClients = 1;
+      this.clock.setInterval(() => this.watchArena(), 1000);
     } else {
       this.clock.setInterval(() => topUpMonsters(this.world), MONSTER_RESPAWN_MS);
     }
@@ -425,6 +501,10 @@ export class WorldRoom extends Room<WorldState> {
     this.on(DUEL_MSG.accept, (sid, m) => duelAnswer(w, sid, m, true));
     this.on(DUEL_MSG.decline, (sid, m) => duelAnswer(w, sid, m, false));
     this.on(DUEL_MSG.yield, (sid) => duelYield(w, sid));
+    // Gặp chặn đường (mục 52, docs/THIET_KE_CHAN_DUONG.md): chỉ chọn / xác nhận đã thấy; mọi kết quả do máy chủ quyết, không tin số nào từ client
+    this.on(AMBUSH_MSG.seen, (sid, m) => onAmbushSeen(w, sid, m));
+    this.on(AMBUSH_MSG.choose, (sid, m) => void onAmbushChoose(w, sid, m));
+    this.on(AMBUSH_MSG.flee, (sid, m) => void onAmbushFlee(w, sid, m)); // bỏ chạy giữa trận (đấu trường)
     // Tông môn (docs/THIET_KE_TONG_MON.md): gắn với linh hồn, chung mọi phòng; thao tác bất đồng bộ (kho lưu)
     this.on(SECT_MSG.create, (sid, m) => void sectCreate(w, sid, m));
     this.on(SECT_MSG.invite, (sid, m) => void sectInvite(w, sid, m));
@@ -438,6 +518,32 @@ export class WorldRoom extends Room<WorldState> {
     this.on(SECT_MSG.motd, (sid, m) => void sectMotd(w, sid, m));
     this.on(SECT_MSG.deposit, (sid, m) => void sectDeposit(w, sid, m));
     this.on(SECT_MSG.withdraw, (sid, m) => void sectWithdraw(w, sid, m));
+    this.on(SECT_MSG.hallGet, (sid, m) => void sectHallGet(w, sid, m));
+    this.on(SOCIAL_MSG.achievementsGet, (sid) => this.sendAchievements(sid)); // sổ thành tựu (M9.5): chỉ chủ, từ bản chân linh đang giữ
+    this.on(SOCIAL_MSG.titleSet, (sid, m) => void this.titleSet(sid, m));
+    // Bảng xếp hạng (M9.3): tra bản chụp trong bộ nhớ (không I/O), chỉ cho người hỏi
+    this.on(SOCIAL_MSG.boardsGet, (sid, m) => {
+      const board = parseBoardsGet(m);
+      if (board === null) return;
+      const view = WorldRoom.leaderboards?.view(
+        board,
+        this.state.players.get(sid)?.name ?? null,
+        this.world.ctrl.get(sid)?.identity.soulKey ?? null,
+      ) ?? {
+        board,
+        rows: [],
+        mine: { rank: null, reason: "none" as const },
+        ageMs: 0,
+      };
+      this.sendTo(sid, SOCIAL_MSG.boards, view);
+    });
+    // Trùm thế giới (M9.4): trả MỘT tin trạng thái (đang diễn ra / sắp tới / không có lịch) cho người ở BẤT KỲ phòng nào; không tải, chỉ đọc sổ trong bộ nhớ
+    this.on(SOCIAL_MSG.worldBossGet, (sid) =>
+      this.sendTo(sid, SOCIAL_MSG.worldBoss, worldBossStatus(this.world, sid)),
+    );
+    this.on(SECT_MSG.questAccept, (sid, m) => void sectQuestAccept(w, sid, m));
+    this.on(SECT_MSG.questTurnIn, (sid, m) => void sectQuestTurnIn(w, sid, m));
+    this.on(SECT_MSG.shopBuy, (sid, m) => void sectShopBuy(w, sid, m));
     this.on(SECT_MSG.vaultDeposit, (sid, m) => void sectVaultDeposit(w, sid, m));
     this.on(SECT_MSG.vaultWithdraw, (sid, m) => void sectVaultWithdraw(w, sid, m));
     this.on(SECT_MSG.vaultPolicy, (sid, m) => void sectVaultPolicy(w, sid, m));
@@ -502,7 +608,9 @@ export class WorldRoom extends Room<WorldState> {
     if (secret.length < 16 || secret.length > MAX_SECRET_LEN)
       throw new ServerError(400, "Thiếu mã nhân vật.");
     // Chỉ chính chủ (đúng mã) được huỷ chờ của nhân vật đang rớt mạng
-    await this.takeSeat(name, (c) => c.save.secretHash === hashSecret(secret));
+    const owns = (c: PlayerCtrl) => c.save.secretHash === hashSecret(secret);
+    await this.takeSeat(name, owns);
+    await this.takeArena(name, owns); // TRƯỚC khi nạp hồ sơ: đấu trường trả giá + lưu xong thì hồ sơ nạp mới là bản mới nhất
     const identity = legacyIdentity(name);
     const existing = await this.players.load(name);
     if (existing) {
@@ -529,7 +637,9 @@ export class WorldRoom extends Room<WorldState> {
       throw new ServerError(JOIN_NEED_CHARACTER, "Tài khoản chưa có đạo hiệu.");
     const name = account.name;
     // Chỉ chính tài khoản đó được huỷ chờ của nhân vật đang rớt mạng
-    await this.takeSeat(name, (c) => c.identity.accountId === account.id);
+    const owns = (c: PlayerCtrl) => c.identity.accountId === account.id;
+    await this.takeSeat(name, owns);
+    await this.takeArena(name, owns);
     const identity: Identity = { name, soulKey: account.id, accountId: account.id };
     const existing = await this.players.load(name);
     if (existing) return this.resume(existing, identity);
@@ -565,6 +675,13 @@ export class WorldRoom extends Room<WorldState> {
       this.checkRunSeat(identity.name);
       return { save: existing, identity, soul: await this.soulOf(existing, identity) };
     }
+    // Đấu trường chặn đường: hồ sơ ghi CHỖ CŨ (bản đồ thường); chỉ cần đúng vé của người này (mục 52)
+    if (this.world.arena !== null) {
+      this.checkArenaSeat(identity.name);
+      return { save: existing, identity, soul: await this.soulOf(existing, identity) };
+    }
+    // Phòng thường: người đang có vé đấu trường (đang ở đấu trường hoặc đang được đưa sang) KHÔNG được vào chỗ cũ lúc này (không hai bản của một nhân vật; không đăng nhập đè)
+
     // Chỉ sau khi xác thực xong mới tiết lộ nhân vật đang ở bản đồ nào. Server quyết định bản đồ; `options.mapId`
     // chỉ là gợi ý chọn phòng, sai thì báo bản đồ đúng để client vào lại (shared/src/travel.ts).
     const home = mapIdOf(existing);
@@ -575,7 +692,7 @@ export class WorldRoom extends Room<WorldState> {
   /** Nhân vật mới luôn bắt đầu ở bản đồ mặc định (không tạo file ở phòng sai). */
   private async createFresh(name: string, secretHash: string, identity: Identity) {
     // Phòng bí cảnh không tạo nhân vật: người chưa có hồ sơ không thể là thành viên của run nào
-    if (this.world.runId !== null)
+    if (this.world.runId !== null || this.world.arena !== null)
       throw new ServerError(JOIN_NOT_IN_RUN, "Không có lần vào bí cảnh nào cho ngươi.");
     if (this.mapId !== DEFAULT_MAP_ID)
       throw new ServerError(JOIN_WRONG_MAP, wrongMapMessage(DEFAULT_MAP_ID));
@@ -619,7 +736,7 @@ export class WorldRoom extends Room<WorldState> {
     p.tier = Math.min(save.tier, REALMS[p.realm].tiers.length - 1);
     p.exp = save.exp;
     // Phòng bí cảnh: luôn xuất hiện ở cổng vào (toạ độ trong file là của Lạc Hà, vô nghĩa ở đây)
-    const inRun = this.world.runId !== null;
+    const inRun = this.world.runId !== null || this.world.arena !== null;
     const spot = inRun ? safeSpot(this.world.map) : safeSpot(this.world.map, save.x, save.y);
     p.x = spot.x;
     p.y = spot.y;
@@ -633,6 +750,7 @@ export class WorldRoom extends Room<WorldState> {
     // Hệ số tu vi thử nghiệm (mục 34): chỉ khi đạo hiệu có trong cấu hình; CHỈ ở phía máy chủ (không vào state), ghi audit mỗi lần vào phòng
     const testMult = testExpMultFor(WorldRoom.testExpMult, p.name);
     if (testMult > 1) audit("test.exp_mult", { name: p.name, mult: testMult, map: this.mapId });
+    p.title = wornTitle(soul.social); // danh hiệu đang đeo (M9.5), chỉ khi còn hợp lệ
     this.state.players.set(client.sessionId, p);
     this.world.ctrl.set(client.sessionId, {
       testExpMult: testMult > 1 ? testMult : undefined,
@@ -640,6 +758,7 @@ export class WorldRoom extends Room<WorldState> {
       identity,
       // Mục 33: client có khai nhịp gửi tin (`JoinOptions.beatMs`) thì máy chủ áp luật im lặng cho người này; client cũ thì không
       beatMs: parseBeatMs(_options?.beatMs) ?? undefined,
+      proto: protoOf(_options?.v), // chặn đường chỉ kích hoạt cho client đủ mới (`AMBUSH_MIN_PROTOCOL`)
       lastHeardAt: Date.now(),
       inputs: [],
       moveBudget: 4,
@@ -671,16 +790,28 @@ export class WorldRoom extends Room<WorldState> {
     this.state.online = this.state.players.size;
     sendInv(this.world, client.sessionId);
     sendQuests(this.world, client.sessionId);
-    sendSkills(this.world, client.sessionId);
+    sendSkills(this.world, client.sessionId, true); // ÉP kèm `mastery` (`{}` nếu chưa có): client hiện thanh luyện 0 / N ngay, không đợi điểm đầu tiên (B, #1112)
     sendWallet(this.world, client.sessionId);
     this.world.events.soul(client.sessionId, soulView(soul)); // HUD ghi "Kiếp N" ngay từ lúc vào (không chỉ sau khi mua)
+    // Thành tựu (M9.5): ghi nhận MỘT lần cho cả nhóm (bản đồ đã tới, kiếp, cảnh giới cao nhất); chân linh cũ được cấp thành tựu đến hạn ngay lần vào đầu tiên
+    if (WorldRoom.achievements)
+      trackSocial(
+        this.world,
+        client.sessionId,
+        [`map:${this.mapId}`, 1],
+        ["kiep", soul.kiep],
+        ["realm_step", Math.max(soul.best.step, stepOf(p.realm, p.tier))],
+      );
+    applyReturnGrace(this.world, client.sessionId, this.world.ctrl.get(client.sessionId)!); // vừa được đưa về từ đấu trường chặn đường: bảo hộ 5 giây
     partyResync(this.world, client.sessionId); // vừa qua cổng từ bản đồ khác: vẫn ở trong đội, nhận đội hình ngay
     void sectOnJoin(this.world, client.sessionId); // tông môn theo linh hồn: nhận ảnh chụp + đặt biệt hiệu (bất đồng bộ)
     this.world.events.sys(`${p.name} (${realmLabel(p.realm, p.tier)}) đã nhập thế.`);
+    this.sendWorldBoss(client.sessionId); // trùm thế giới (M9.4): vào giữa lúc báo trước / đang diễn ra thì biết ngay
     if (limbo) void this.resumeLimbo(client.sessionId); // vào lại giữa lúc ở Hoàng Tuyền: cộng Duyên nếu còn thiếu, hiện lại màn hình
     if (inRun) {
       const run = runOfWorld(this.world);
       if (run) memberJoined(this.world, run, save.name.toLowerCase());
+      if (this.world.arena) arenaJoined(this.world, client.sessionId); // đồng hồ trận bắt đầu, chốt giá giữa trận
       this.autoDispose = true; // có người rồi: trống thì huỷ phòng ngay
     }
   }
@@ -728,9 +859,12 @@ export class WorldRoom extends Room<WorldState> {
         reconnected(this.world, sid, c, Math.max(0, Date.now() - droppedAt)); // hết hồn lìa xác, hộ thể 3 giây + quái mất mục tiêu (mục 33)
         sendInv(this.world, sid);
         sendQuests(this.world, sid);
-        sendSkills(this.world, sid);
+        sendSkills(this.world, sid, true); // nối lại: phòng mới, client mới nhận lại cả điểm luyện
         sendStatus(this.world, sid); // client mất hệ số tốc độ sau rớt mạng sẽ bị kéo giật nếu không gửi lại
         sendWallet(this.world, sid);
+        ambushResend(this.world, sid); // đang giữa hộp thoại chặn đường: gửi LẠI (cùng id, thời gian còn thật) cho Room mới
+        arenaResend(this.world, sid); // đang giữa trận ở đấu trường: gửi LẠI trạng thái (hoặc kết cục) cho Room mới
+        this.sendWorldBoss(sid); // trùm thế giới (M9.4): sự kiện bắt đầu / kết thúc lúc rớt mạng thì Room mới vẫn biết (thưởng + `ended` không bị lỡ)
         resolveDone();
         return;
       } catch {
@@ -739,6 +873,8 @@ export class WorldRoom extends Room<WorldState> {
     }
     try {
       if (p && c) {
+        arenaDrop(this.world, sid); // thoát / rớt khỏi ĐẤU TRƯỜNG lúc đang đánh = giá giữa trận bằng tu vi, TRƯỚC lần lưu cuối
+        ambushDropOffer(this.world, sid); // thoát / rớt quá hạn lúc hộp thoại chặn đường mở = bỏ chạy bằng tu vi (chống né giá), TRƯỚC khi lưu cuối
         await this.persist(p, c).catch((e) => console.error("save failed", e));
         this.world.events.sys(`${p.name} đã rời đi.`);
       }
@@ -748,6 +884,12 @@ export class WorldRoom extends Room<WorldState> {
       this.world.ghosts.delete(sid);
       resolveDone();
     }
+  }
+
+  /** Gửi cho `sid` trạng thái trùm thế giới hiện tại (chỉ khi có lịch và chưa tắt): lúc vào phòng và lúc nối lại sau rớt mạng. */
+  private sendWorldBoss(sid: string) {
+    if (!this.world.hub.worldBoss.active) return;
+    this.sendTo(sid, SOCIAL_MSG.worldBoss, worldBossStatus(this.world, sid));
   }
 
   /**
@@ -786,12 +928,15 @@ export class WorldRoom extends Room<WorldState> {
    */
   private async handOff(
     sid: string,
-    plan: { mapId: string; x: number; y: number },
+    plan: { mapId: string; x: number; y: number; allowDead?: boolean },
     dest?: { mapId: string; roomId?: string; valid?: () => boolean },
-  ) {
+  ): Promise<boolean> {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
-    if (!p || !c) return;
+    if (!p || !c) return false;
+    // Rời đấu trường lúc ĐANG đánh bằng đường nào khác ngoài về chỗ cũ sau kết cục (nhận lời mời bí cảnh, đầu thai...) = bỏ trận: trả giá giữa trận bằng tu vi TRƯỚC khi lưu, không né
+    // được giá bằng cách chuyển phòng (review B ở #1091)
+    if (this.world.arena?.phase === "fighting") arenaDrop(this.world, sid);
     c.travelling = true;
     c.inputs.length = 0;
     try {
@@ -800,22 +945,23 @@ export class WorldRoom extends Room<WorldState> {
       console.error("save failed (travel)", e);
       c.travelling = false;
       this.world.events.toast(sid, { text: "Cổng chưa mở được, thử lại sau.", tone: "bad" });
-      return;
+      return false;
     }
     // Trong lúc lưu có thể chết, rớt mạng hoặc bị ngắt: huỷ, ghi lại bản đồ của phòng này (tự chữa)
     const client = this.clients.find((x) => x.sessionId === sid);
     const here = this.state.players.get(sid);
-    if (!client || !here || here.dead || this.ghosts.has(sid)) {
+    // `allowDead`: chết THẬT trong đấu trường chặn đường (mục 53): người chơi đang nằm ở Hoàng Tuyền và ĐƯỢC đưa về phòng của chỗ cũ (hồ sơ đã ghi bản ghi Hoàng Tuyền); chết do dịp khác trong lúc lưu vẫn huỷ
+    if (!client || !here || (here.dead && !plan.allowDead) || this.ghosts.has(sid)) {
       c.travelling = false;
       if (here) await this.persist(here, c).catch((e) => console.error("save failed", e));
-      return;
+      return false;
     }
     // Đích là một phòng tạm (bí cảnh): run có thể đã hết hạn / bị huỷ trong lúc lưu. Huỷ, ghi lại chỗ hiện tại (tự chữa)
     if (dest?.valid && !dest.valid()) {
       c.travelling = false;
       await this.persist(here, c).catch((e) => console.error("save failed", e));
       this.world.events.toast(sid, { text: "Lời mời đã hết hạn.", tone: "bad" });
-      return;
+      return false;
     }
     this.dropPlayer(sid, true);
     client.send("travelTo", {
@@ -823,6 +969,7 @@ export class WorldRoom extends Room<WorldState> {
       ...(dest?.roomId ? { roomId: dest.roomId } : {}),
     } satisfies TravelToMsg);
     client.leave(CLOSE_TRAVEL);
+    return true;
   }
 
   // ---------------- Bí cảnh (docs/THIET_KE_BI_CANH.md mục 4) ----------------
@@ -909,6 +1056,120 @@ export class WorldRoom extends Room<WorldState> {
     await this.handOff(sid, { mapId: entry.def.id, x: spot.x, y: spot.y });
   }
 
+  // ---------------- Đấu trường chặn đường (docs/THIET_KE_CHAN_DUONG.md mục 5, `systems/arena.ts`) ----------------
+
+  /** `onCreate` của phòng đấu trường: nhận vé `ambushId` (chưa có phòng, đúng bản đồ, chưa kết thúc) hoặc ném lỗi. */
+  private claimTicket(ambushId: unknown): AmbushTicket {
+    const t = this.hub.ambushes.get(ambushId);
+    if (!t || t.roomId !== null || t.ended || arenaMapIdOf(t.origin.mapId) !== this.mapId)
+      throw new Error("Phòng đấu trường chỉ do server mở cho một vé còn hiệu lực");
+    t.roomId = this.roomId;
+    return t;
+  }
+
+  /** `onAuth` của phòng đấu trường: chỉ chủ vé (đúng tên), vé còn trong sổ, đúng phòng này và chưa hết hạn vào phòng. */
+  private checkArenaSeat(name: string) {
+    const t = this.world.arena?.ticket;
+    if (
+      !t ||
+      t.key !== name.toLowerCase() ||
+      t.roomId !== this.roomId ||
+      this.hub.ambushes.get(t.id) !== t
+    )
+      throw new ServerError(JOIN_NOT_IN_RUN, "Không có đấu trường nào cho ngươi.");
+  }
+
+  /** Phòng đấu trường chưa có ai mà vé đã hết hạn / bị dọn: đóng, không để phòng treo; vé luôn được dọn khi phòng đóng (`onDispose`). */
+  private watchArena() {
+    const a = this.world.arena;
+    const t = a?.ticket;
+    // Chỉ khi CHƯA ai vào (`startedAt === null`): người đã vào mà rớt mạng thì phòng phải chờ nối lại (`allowReconnection`), không được đóng giữa trận
+    if (!a || !t || a.startedAt !== null || this.clients.length > 0) return;
+    if (this.hub.ambushes.get(t.id) !== t || this.world.now >= t.expiresAt) void this.disconnect();
+  }
+
+  /** Báo người chơi vé bị huỷ (không phạt, vào hồi): dọn vé, `ambushEnd { canceled }` để hộp thoại phía client không treo. */
+  private abortArena(w: World, sid: string, ticket: AmbushTicket) {
+    ticket.ended = true;
+    this.hub.ambushes._remove(ticket);
+    w.events.ambushEnd(sid, { result: "canceled" });
+  }
+
+  /**
+   * Mở phòng đấu trường cho vé rồi đưa người chơi sang. Hồ sơ luôn được lưu với CHỖ CŨ (`handOff` ghi bản đồ + toạ độ của vé): sập máy / rớt mạng giữa trận thì lần sau đăng nhập ở chỗ cũ.
+   * Không mở được phòng hoặc không đưa sang được thì huỷ vé lặng lẽ (không phạt).
+   */
+  private async openArenaRoom(w: World, sid: string, ticket: AmbushTicket) {
+    const arenaId = arenaMapIdOf(ticket.origin.mapId);
+    try {
+      const listing = await matchMaker.createRoom(roomNameOf(arenaId), { ambushId: ticket.id });
+      ticket.roomId = listing.roomId;
+    } catch (e) {
+      console.error("[chặn đường] tạo phòng đấu trường thất bại", e);
+      return this.abortArena(w, sid, ticket);
+    }
+    const ok = await this.handOff(
+      sid,
+      { mapId: ticket.origin.mapId, x: ticket.origin.x, y: ticket.origin.y },
+      {
+        mapId: arenaId,
+        roomId: ticket.roomId!,
+        valid: () =>
+          this.hub.ambushes.get(ticket.id) === ticket &&
+          !ticket.ended &&
+          this.world.now < ticket.expiresAt,
+      },
+    );
+    if (!ok) this.abortArena(w, sid, ticket);
+  }
+
+  /**
+   * Phòng thường: chính chủ (`owns` đúng, như `takeSeat`) đăng nhập khi nhân vật còn vé đấu trường. Đang rớt mạng (hồn lìa xác) ở đấu trường thì HUỶ chờ rồi mới nạp hồ sơ (phòng đấu trường trả giá
+   * giữa trận bằng tu vi, LƯU, dọn vé: không để hồ sơ cũ ghi đè hồ sơ mới khi hết hạn chờ); đang kết nối thật hoặc vé chưa có ai thì 409.
+   */
+  private async takeArena(name: string, owns: (c: PlayerCtrl) => boolean) {
+    if (this.world.arena !== null) return; // phòng đấu trường tự kiểm vé ở `checkArenaSeat`
+    const t = this.hub.ambushes.ofKey(name.toLowerCase());
+    if (!t) return;
+    const room = t.roomId
+      ? (matchMaker.getLocalRoomById(t.roomId) as WorldRoom | undefined)
+      : undefined;
+    if (!room || !(await room.evictFromArena(t, owns)))
+      throw new ServerError(409, "Nhân vật này đang ở đấu trường chặn đường.");
+  }
+
+  /** Gọi từ phòng KHÁC (`takeArena`): đuổi hồn lìa xác của chủ vé khỏi đấu trường này (huỷ chờ, trả giá, lưu, dọn vé). `false` nếu người đó đang kết nối thật hoặc không phải phòng của vé. */
+  async evictFromArena(t: AmbushTicket, owns: (c: PlayerCtrl) => boolean): Promise<boolean> {
+    if (this.world?.arena?.ticket !== t) return false;
+    let sid: string | undefined;
+    this.state.players.forEach((p, k) => {
+      if (p.name.toLowerCase() === t.key) sid = k;
+    });
+    if (sid === undefined) return false;
+    const g = this.ghosts.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!g || !c || !owns(c)) return false; // đang kết nối thật, hoặc không đúng chủ
+    g.cancel();
+    await g.done;
+    this.hub.ambushes._remove(t);
+    return true;
+  }
+
+  /** Hook `World.onArenaExit`: đưa người chơi từ đấu trường về CHỖ CŨ của vé; xong thì dọn vé NGAY (người chơi vào lại phòng thường không bị chặn bởi vé cũ). */
+  private async exitArenaRoom(sid: string) {
+    const t = this.world.arena?.ticket;
+    if (!t) return;
+    const c = this.world.ctrl.get(sid);
+    if (c) c.save = { ...c.save, ambushReturnAt: Date.now() }; // phòng nhận người chơi bảo hộ 5 giây (`applyReturnGrace`); `persist` của `handOff` mang theo
+    const ok = await this.handOff(sid, {
+      mapId: t.origin.mapId,
+      x: t.origin.x,
+      y: t.origin.y,
+      allowDead: c?.limbo !== undefined, // chết thật ở đấu trường (mục 53): về phòng gốc ở trạng thái Hoàng Tuyền
+    });
+    if (ok) this.hub.ambushes._remove(t);
+  }
+
   // ---------------- Luân hồi (docs/THIET_KE_LUAN_HOI.md mục 4) ----------------
 
   private get players(): PlayerStore {
@@ -949,6 +1210,89 @@ export class WorldRoom extends Room<WorldState> {
   }
 
   /** Cộng Duyên của kiếp vừa qua vào chân linh (idempotent theo `endedLifeId`) và ghi "đã cộng" vào hồ sơ. */
+  /**
+   * M9: ghi phần xã hội của chân linh `soulKey` (nguyên tử theo chân linh, `SoulStore.update`) NGOÀI tick: áp `fn` lên `Soul.social`, rồi CẤP mọi thành tựu đến hạn + cộng Duyên thưởng
+   * (`grantDue`) TRONG CÙNG lần ghi (sập máy không cấp một nửa). Sau đó cập nhật `PlayerCtrl.soul` của người đang trực tuyến cùng chân linh và báo họ (`achievementNew`, toast, `achievements`).
+   * Không ghi kho khi KHÔNG đổi gì (dò trên bản chân linh đang giữ: vào phòng mà bộ đếm `max` không tăng thì khỏi tốn một lần ghi tệp). Lỗi chỉ ghi log: mất một lần thống kê còn hơn làm hỏng ván.
+   */
+  private async socialUpdate(soulKey: string, fn: (s: SoulSocial | undefined) => SoulSocial) {
+    try {
+      const online = [...this.world.ctrl.values()].find((c) => c.identity.soulKey === soulKey);
+      if (online) {
+        const next = fn(online.soul.social);
+        if (
+          next === online.soul.social &&
+          (!WorldRoom.achievements || achievementsDue(next).length === 0)
+        )
+          return;
+      }
+      let granted: string[] = [];
+      const at = new Date().toISOString();
+      const soul = await this.souls.update(soulKey, (s) => {
+        const base = { ...s, social: fn(s.social) };
+        const r = WorldRoom.achievements
+          ? grantDue(base, at)
+          : { soul: base, granted: [] as string[] }; // gán lại mỗi lần chạy (PostgreSQL có thể thử lại)
+        granted = r.granted;
+        return r.soul;
+      });
+      for (const [sid, c] of this.world.ctrl) {
+        if (c.identity.soulKey !== soulKey) continue;
+        c.soul = soul;
+        if (granted.length === 0) continue;
+        for (const id of granted) {
+          this.sendTo(sid, SOCIAL_MSG.achievementNew, { id });
+          const def = ACHIEVEMENT_BY_ID[id];
+          if (def)
+            this.world.events.toast(sid, { text: `Đạt thành tựu: ${def.name}`, tone: "good" });
+        }
+        this.sendAchievements(sid);
+        this.world.events.soul(sid, soulView(soul)); // Duyên thưởng hiện ngay trên HUD
+      }
+      if (granted.length > 0)
+        audit("achievement.grant", { soul: soulKey, ids: granted.join(","), map: this.mapId });
+    } catch (e) {
+      console.error("[xã hội] ghi chân linh thất bại", e);
+    }
+  }
+
+  /** Gửi `achievements` (đúng `Soul.social` rút gọn) cho chủ, từ bản chân linh đang giữ. */
+  private sendAchievements(sid: string) {
+    const c = this.world.ctrl.get(sid);
+    if (c) this.sendTo(sid, SOCIAL_MSG.achievements, achievementsMsgOf(c.soul.social));
+  }
+
+  /**
+   * `titleSet`: đeo danh hiệu đã mở / gỡ (`id: null`). Kiểm "đã mở" TRONG `SoulStore.update` (trên bản mới nhất, không tin cache). `Player.title` (state công khai) đổi theo kết quả.
+   * Hợp đồng: LUÔN gửi lại `achievements` (có `title` hiện tại) sau mỗi tin hợp lệ, thành công hay bị từ chối. Tin sai kiểu bị bỏ không trả lời.
+   */
+  private async titleSet(sid: string, m: unknown) {
+    const msg = parseTitleSet(m);
+    const c = this.world.ctrl.get(sid);
+    if (!msg || !c) return;
+    // Mỗi `SoulStore.update` là MỘT lần ghi tệp (kể cả khi không đổi gì): bỏ qua khi bản đang giữ cho thấy việc này vô ích, khỏi biến tin rác hợp lệ thành tải ghi đĩa.
+    // Giới hạn tần suất của tin này đã chặt (`rate-limit.ts`); phần dưới chỉ là lớp thứ hai và KHÔNG thay việc kiểm "đã mở" trong `update` (bản mới nhất là bản quyết định).
+    const held = c.soul.social;
+    const noop =
+      (held?.title ?? null) === msg.id || // đã đeo đúng cái này (hoặc đã gỡ rồi mà gỡ tiếp)
+      (msg.id !== null && !unlockedTitles(held).has(msg.id)); // rõ ràng chưa mở: chắc chắn bị từ chối
+    if (noop) {
+      this.sendAchievements(sid);
+      return;
+    }
+    try {
+      c.soul = await this.souls.update(c.identity.soulKey, (s) => {
+        if (msg.id !== null && !unlockedTitles(s.social).has(msg.id)) return s; // chưa mở: giữ nguyên
+        return { ...s, social: { ...(s.social ?? newSocial()), title: msg.id } };
+      });
+      const p = this.state.players.get(sid);
+      if (p) p.title = wornTitle(c.soul.social);
+    } catch (e) {
+      console.error("[xã hội] đổi danh hiệu thất bại", e);
+    }
+    this.sendAchievements(sid);
+  }
+
   private async creditLimbo(sid: string): Promise<boolean> {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
@@ -1045,6 +1389,9 @@ export class WorldRoom extends Room<WorldState> {
     // Phòng bí cảnh đóng: run còn sót (mọi người đã rời, sập giữa chừng) thì xoá để giải phóng thành viên và chỗ ở `MAX_DUNGEON_RUNS`
     const run = this.world ? runOfWorld(this.world) : undefined;
     if (run && run.roomId === this.roomId) this.hub.runs._remove(run);
+    // Phòng đấu trường đóng: dọn vé (mọi đường đóng phòng: về chỗ cũ, thoát, hết hạn không ai vào)
+    const ticket = this.world?.arena?.ticket;
+    if (ticket && ticket.roomId === this.roomId) this.hub.ambushes._remove(ticket);
     this.removeChatSink?.();
     this.removeChatSink = null;
     this.world?.dispose();
@@ -1058,6 +1405,8 @@ export class WorldRoom extends Room<WorldState> {
    * `travelAt`. Người đang đi qua cổng (`c.travelling`) không bị lưu đè bởi lưu định kỳ / lúc rớt mạng.
    */
   private async persist(p: Player, c: PlayerCtrl, at?: { mapId: string; x: number; y: number }) {
+    // Đấu trường chặn đường: hồ sơ LUÔN ghi CHỖ CŨ của vé (bản đồ thường + toạ độ), không bao giờ ghi bản đồ / vị trí đấu trường (không kẹt khi sập máy / rớt mạng giữa trận)
+    at ??= this.world.arena?.ticket.origin;
     if (c.travelling && !at) return;
     // Không lưu vị trí trong trấn hoặc lúc trọng thương: lần sau vào thì xuất hiện ở trấn
     // Bí cảnh (phòng tạm): không bao giờ ghi bản đồ / vị trí trong đó, chỉ bản đồ vào (Lạc Hà), không toạ độ (xuất hiện ở trấn)
@@ -1120,6 +1469,30 @@ export class WorldRoom extends Room<WorldState> {
 }
 
 /**
+ * Tạo sẵn phòng thế giới của các bản đồ có trùm theo giờ trong lịch (M9.4). Phòng Colyseus chỉ sinh khi có người vào lần đầu; bản đồ chưa ai vào thì không có phòng để sinh
+ * trùm, mà tin "xuất hiện" đã gửi cho cả máy chủ (sự kiện kết thúc "bỏ chạy" dù trùm chưa từng có). Gọi sau `defineRooms` + `listen`; chỉ tạo bản đồ CHƯA có phòng thường
+ * (không phải bí cảnh / đấu trường), nên gọi lại không tạo thêm; phòng chính `autoDispose = false` nên sống tiếp. Không có lịch / `WORLD_BOSS=off` thì không làm gì.
+ */
+export async function ensureWorldBossRooms(): Promise<void> {
+  const book = WorldRoom.hub.worldBoss;
+  if (!book.active) return;
+  for (const mapId of new Set(book.slots.map((s) => s.mapId))) {
+    const has = [...WorldRoom.hub.worlds].some(
+      (w) => w.map.def.id === mapId && w.runId === null && w.arena === null,
+    );
+    if (has) continue;
+    try {
+      await matchMaker.createRoom(roomNameOf(mapId), {});
+    } catch (e) {
+      console.error(
+        `[trùm thế giới] không tạo được phòng ${mapId}:`,
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+}
+
+/**
  * Đăng ký phòng thế giới: mỗi bản đồ một phòng với tên phòng riêng (`roomNameOf`, shared/src/travel.ts).
  * Dùng chung cho `index.ts` và test tích hợp để cấu hình không lệch nhau.
  */
@@ -1127,4 +1500,6 @@ export function defineRooms(gameServer: Server) {
   for (const m of MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
   // Bí cảnh: có tên phòng nhưng client không tạo được (`onCreate` đòi `runId` hợp lệ do server cấp); vào bằng `joinById`
   for (const m of DUNGEON_MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
+  // Đấu trường chặn đường (mục 52): cũng chỉ do server mở cho một vé (`onCreate` đòi `ambushId` hợp lệ); vào bằng `joinById`
+  for (const m of ARENA_MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
 }

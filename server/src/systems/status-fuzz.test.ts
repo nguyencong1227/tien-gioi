@@ -1,7 +1,7 @@
 // Fuzz kiểm tra luật trạng thái thuần (M7.2b + #514 nghề nhỏ, Refs #514, issue #770).
 // Chuỗi thao tác NGẪU NHIÊN có hạt giống gắn / làm mới / hết hạn / vào khu an toàn gỡ DoT / tiêu hao đan hộ đạo.
 // Sau MỖI bước kiểm các bất biến của chính sách (a) (docs/THIET_KE_NGHE_NHO.md mục 8.5):
-//  1. Hộp luôn <= MAX_STATUSES (4).
+//  1. Số trạng thái TÍNH vào trần luôn <= MAX_STATUSES (4); `windup` (vận khí, mục 51, `STATUS_UNCOUNTED`) KHÔNG tính: luôn vào được và không bao giờ bị đẩy ra / đẩy ai ra.
 //  2. Không trùng id trong hộp.
 //  3. Mọi trạng thái trong hộp đều còn hạn (`until > now`).
 //  4. Trạng thái CÓ HẠI mới (không bị miễn choáng / hết ô chặn) luôn VÀO khi hộp còn buff có lợi (khác dao_ho) để đẩy;
@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_STATUSES,
   STATUSES,
+  STATUS_UNCOUNTED,
   statusOf,
   type SkillEffect,
   type StatusDef,
@@ -52,9 +53,14 @@ function isControl(id: StatusId): boolean {
   return kind === "stun" || kind === "vuln";
 }
 
+const uncounted = (id: string) => (STATUS_UNCOUNTED as readonly string[]).includes(id);
+/** Số trạng thái trong hộp TÍNH vào `MAX_STATUSES` (bỏ `windup`). */
+const countedLen = (b: StatusBox) => b.list.filter((s) => !uncounted(s.id)).length;
+
 function earliestBuff(box: StatusBox, withBreakAid: boolean): number {
   let victim = -1;
   for (let i = 0; i < box.list.length; i++) {
+    if (uncounted(box.list[i].id)) continue;
     const d = statusOf(box.list[i].id);
     if (!d || d.harmful) continue;
     if (!withBreakAid && d.kind === "breakAid") continue;
@@ -130,9 +136,20 @@ function runStatusFuzz(seed: number, stepCount: number, counters?: FuzzCounters)
 
       // --- Kiểm các bất biến cốt lõi ---
       // Bất biến 1: Trần MAX_STATUSES (4)
-      expect(after.list.length, `${where}: số trạng thái vượt ${MAX_STATUSES}`).toBeLessThanOrEqual(
-        MAX_STATUSES,
-      );
+      expect(
+        countedLen(after),
+        `${where}: số trạng thái tính vào trần vượt ${MAX_STATUSES}`,
+      ).toBeLessThanOrEqual(MAX_STATUSES);
+      // `windup` luôn vào được (không bao giờ "full"), và nếu đang có thì thêm trạng thái khác không làm nó mất
+      if (statusId === "windup" && ms > 0) {
+        expect(["added", "refreshed"], `${where}: windup bị từ chối`).toContain(res);
+      }
+      if (prunedBefore.list.some((x) => x.id === "windup")) {
+        expect(
+          after.list.some((x) => x.id === "windup"),
+          `${where}: windup bị đẩy ra`,
+        ).toBe(true);
+      }
 
       // Bất biến 2: Không trùng id
       const ids = after.list.map((s) => s.id);
@@ -153,7 +170,7 @@ function runStatusFuzz(seed: number, stepCount: number, counters?: FuzzCounters)
           // Khi còn buff có lợi (khác dao_ho) và không bị miễn choáng: CÓ HẠI LUÔN VÀO!
           expect(res, `${where}: có hại bị chặn dù còn buff có lợi để đẩy`).not.toBe("full");
 
-          if (res === "added" && prunedBefore.list.length >= MAX_STATUSES) {
+          if (res === "added" && countedLen(prunedBefore) >= MAX_STATUSES) {
             const victim = prunedBefore.list[victimBuffIdx];
             // Nạn nhân bị loại bỏ phải là victim
             const stillThere = after.list.some((s) => s.id === victim.id);
@@ -175,7 +192,8 @@ function runStatusFuzz(seed: number, stepCount: number, counters?: FuzzCounters)
         }
         if (
           ms > 0 &&
-          prunedBefore.list.length >= MAX_STATUSES &&
+          !uncounted(def.id) &&
+          countedLen(prunedBefore) >= MAX_STATUSES &&
           earliestBuff(prunedBefore, true) < 0
         ) {
           expect(res, `${where}: buff mới phải bị từ chối khi chỉ toàn trạng thái có hại`).toBe(

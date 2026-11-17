@@ -1,6 +1,8 @@
 // Tu luyện: chỉ số theo cảnh giới, tu vi, đột phá, hồi phục / đả tọa.
 import {
   MEDITATE,
+  SECT_BUFF_EXP_MAX,
+  SECT_BUFF_REGEN_MAX,
   meditateExpPerSec,
   BREAK_FAIL_EXP_LOSS,
   REALMS,
@@ -9,6 +11,7 @@ import {
   canAttemptBreakthrough,
   isLastTier,
   isPeak,
+  stepOf,
   breakthroughChanceWith,
   type StatMult,
   expMultOf,
@@ -17,6 +20,7 @@ import type { Player } from "../schema";
 import { takeWhole, type World, type PlayerCtrl } from "../world";
 import { refreshQuests } from "./quests";
 import { consumeBreakAid } from "./status";
+import { trackSocial } from "./social";
 
 const BREAK_COOLDOWN_MS = 3000;
 
@@ -43,6 +47,9 @@ export function applyStats(p: Player, heal: boolean, mult?: StatMult) {
  */
 export function gainExp(w: World, sid: string, p: Player, amount: number, scale = 1) {
   amount *= scale;
+  // Buff tông môn (M8.3b, mục 12.5): nhân SAU `scale`, TRƯỚC hệ số thử nghiệm; hệ số ngoài khoảng (1, `SECT_BUFF_EXP_MAX`] bị coi là 1 (hàng rào thứ hai sau `sectBuffOf`)
+  const sb = w.ctrl.get(sid)?.sectBuff?.exp;
+  if (sb !== undefined && sb > 1 && sb <= SECT_BUFF_EXP_MAX) amount *= sb;
   const test = w.ctrl.get(sid)?.testExpMult;
   if (test !== undefined && test > 1 && test <= 10) amount *= test;
   if (isPeak(p.realm, p.tier)) {
@@ -57,6 +64,7 @@ export function gainExp(w: World, sid: string, p: Player, amount: number, scale 
     } // cần Đột phá
     p.exp -= p.expMax;
     p.tier += 1;
+    trackSocial(w, sid, ["realm_step", stepOf(p.realm, p.tier)]); // thành tựu (M9.5): bậc cao nhất từng đạt
     applyStats(p, true, w.ctrl.get(sid)?.mult);
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: false });
     refreshQuests(w, sid); // bước "reachRealm"
@@ -92,6 +100,7 @@ export function breakthrough(w: World, sid: string) {
     p.realm += 1;
     p.tier = 0;
     p.exp = 0;
+    trackSocial(w, sid, ["realm_step", stepOf(p.realm, p.tier)]);
     applyStats(p, true, c.mult);
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: true });
     refreshQuests(w, sid);
@@ -131,6 +140,12 @@ export function tickRecovery(w: World, sid: string, p: Player, c: PlayerCtrl, dt
     }
   } else if (w.now - c.lastHitAt > 5000) {
     hpRate = w.map.inTown(p.x, p.y) ? 0.08 : 0.01;
+  }
+  // Buff tông môn (M8.3b): hồi nhanh hơn NGOÀI đả tọa (đả tọa vốn đã hồi nhanh); chỉ khi cấp >= 2
+  const rg = c.sectBuff?.regen;
+  if (!p.meditating && rg !== undefined && rg > 1 && rg <= SECT_BUFF_REGEN_MAX) {
+    hpRate *= rg;
+    mpRate *= rg;
   }
   regen(c, "hp", p.hp, p.maxHp, p.maxHp * hpRate * dt, (v) => (p.hp = v));
   regen(c, "mp", p.mp, p.maxMp, p.maxMp * mpRate * dt, (v) => (p.mp = v));

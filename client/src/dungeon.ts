@@ -210,7 +210,7 @@ export function buildMockThuMonDialog(opts: {
 /** Tạo dữ liệu mẫu cho máy chủ giả `?dungeon=mock` phục vụ thử nghiệm và chụp ảnh. */
 export const MOCK_DUNGEON_SAMPLES = {
   invite(
-    from = "Trương Tiểu Phàm",
+    from = "Tô Vân Hạc",
     expiresInMs = DUNGEON_INVITE_MS,
     rewardsLeft = DUNGEON_DAILY_REWARDS,
   ): DungeonInviteMsg {
@@ -229,9 +229,9 @@ export const MOCK_DUNGEON_SAMPLES = {
       mobsLeft: 3,
       boss: { hp: 68_000, maxHp: 100_000 },
       members: [
-        { name: "Trương Tiểu Phàm", alive: true },
-        { name: "Lục Tuyết Kỳ", alive: true },
-        { name: "Lâm Kinh Vũ", alive: false },
+        { name: "Tô Vân Hạc", alive: true },
+        { name: "Hạ Thanh Linh", alive: true },
+        { name: "Mạc Khinh Trần", alive: false },
       ],
     };
   },
@@ -242,9 +242,9 @@ export const MOCK_DUNGEON_SAMPLES = {
       mobsLeft: 0,
       boss: null,
       members: [
-        { name: "Trương Tiểu Phàm", alive: true },
-        { name: "Lục Tuyết Kỳ", alive: true },
-        { name: "Lâm Kinh Vũ", alive: false },
+        { name: "Tô Vân Hạc", alive: true },
+        { name: "Hạ Thanh Linh", alive: true },
+        { name: "Mạc Khinh Trần", alive: false },
       ],
     };
   },

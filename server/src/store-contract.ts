@@ -1,6 +1,15 @@
 // Bộ ca kiểm thử hợp đồng store (M3 bước 3f, Issue #176, docs/THIET_KE_TAI_KHOAN.md mục 6).
 // Module này chỉ chứa định nghĩa hợp đồng kiểm thử, tái sử dụng cho cả File* và Pg*.
-import { SECT_COIN_CAP, SECT_LOG_MAX } from "@tien-gioi/shared";
+import {
+  SECT_COIN_CAP,
+  socialTrack,
+  SECT_CONTRIB_CAP,
+  SECT_DEPOSIT_DAY_CAP,
+  SECT_EARN_DAY_CAP,
+  SECT_LOG_MAX,
+  SECT_POINTS_CAP,
+  SECT_QUESTS,
+} from "@tien-gioi/shared";
 import { describe, expect, it } from "vitest";
 import type { AccountStore, NewAccount, SessionRecord, SessionStore } from "./account-store";
 import { hashToken } from "./auth";
@@ -10,7 +19,7 @@ import {
   ITEMS,
   SECT_VAULT_DRAW_DEFAULT,
   SECT_VAULT_DRAW_MAX,
-  SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
 } from "@tien-gioi/shared";
 import type { SoulStore } from "./soul";
 import type { SavedPlayer } from "./store";
@@ -70,9 +79,25 @@ export function describePlayerStoreContract(
       expect(nonExistent).toBeNull();
     });
 
+    it("listProfiles (M9): kho trống -> []; chỉ các trường xếp hạng (không mật khẩu / túi đồ), tối đa limit, sắp theo tên chuẩn hoá", async () => {
+      const store = await createStore();
+      expect(store.listProfiles, "kho thật phải có listProfiles").toBeDefined();
+      expect(await store.listProfiles!()).toEqual([]);
+      await store.save(makeSavedPlayer("Bao Thanh", { realm: 2, tier: 1, exp: 50 }));
+      await store.save(makeSavedPlayer("An Nhien", { realm: 1, tier: 0, exp: 5 }));
+      await store.save(makeSavedPlayer("Chau Huong", { realm: 0, tier: 3, exp: 1 }));
+      const rows = await store.listProfiles!();
+      expect(rows.map((r) => r.name)).toEqual(["An Nhien", "Bao Thanh", "Chau Huong"]);
+      expect(rows[1]).toEqual({ name: "Bao Thanh", realm: 2, tier: 1, exp: 50, limbo: false });
+      for (const r of rows)
+        expect(Object.keys(r).sort()).toEqual(["exp", "limbo", "name", "realm", "tier"]);
+      expect((await store.listProfiles!(2)).map((r) => r.name)).toEqual(["An Nhien", "Bao Thanh"]);
+      expect(await store.listProfiles!(0)).toEqual([]);
+    });
+
     it("save rồi load trả về đúng dữ liệu đã lưu", async () => {
       const store = await createStore();
-      const player = makeSavedPlayer("Hàn Lập", {
+      const player = makeSavedPlayer("Giang Tĩnh Uyên", {
         realm: 2,
         tier: 3,
         exp: 1500,
@@ -80,10 +105,10 @@ export function describePlayerStoreContract(
       });
 
       await store.save(player);
-      const loaded = await store.load("Hàn Lập");
+      const loaded = await store.load("Giang Tĩnh Uyên");
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.name).toBe("Hàn Lập");
+      expect(loaded?.name).toBe("Giang Tĩnh Uyên");
       expect(loaded?.realm).toBe(2);
       expect(loaded?.tier).toBe(3);
       expect(loaded?.exp).toBe(1500);
@@ -199,6 +224,25 @@ export function describeSoulStoreContract(
     it("get chân linh chưa có trả về null", async () => {
       const store = await createStore();
       expect(await store.get("chua_co_linh_hon")).toBeNull();
+    });
+
+    it("all (M9): kho trống -> []; liệt kê mọi chân linh theo id, tối đa limit, giữ phần xã hội đã ghi", async () => {
+      const store = await createStore();
+      expect(store.all, "kho thật phải có all").toBeDefined();
+      expect(await store.all!()).toEqual([]);
+      await store.create("b_linh", (s) => ({ ...s, duyen: 7 }));
+      await store.create("a_linh");
+      await store.update("a_linh", (s) => ({
+        ...s,
+        social: socialTrack(socialTrack(s.social, "pk_won", 2).social, "kiep", 3).social,
+      }));
+      const all = await store.all!();
+      expect(all.map((s) => s.id)).toEqual(["a_linh", "b_linh"]);
+      expect(all[1].duyen).toBe(7);
+      expect(all[0].social?.counters).toEqual({ pk_won: 2, kiep: 3 });
+      expect("social" in all[1]).toBe(false);
+      expect((await store.all!(1)).map((s) => s.id)).toEqual(["a_linh"]);
+      expect(await store.all!(0)).toEqual([]);
     });
 
     it("create tạo mới chân linh kiếp 1, duyên 0; gọi lại lần hai không ghi đè", async () => {
@@ -420,7 +464,7 @@ export function describeAccountStoreContract(
     it("update: cập nhật mật khẩu, mã khôi phục, lần đăng nhập, khoá; giữ nguyên id, username, name", async () => {
       const store = await createStore();
       const acc = (await store.create(makeNewAccount("user_cap_nhat")))!;
-      await store.setName(acc.id, "Hàn Lập");
+      await store.setName(acc.id, "Giang Tĩnh Uyên");
 
       const updated = await store.update(acc.id, {
         passHash: "pass-hash-moi",
@@ -432,7 +476,7 @@ export function describeAccountStoreContract(
       expect(updated).not.toBeNull();
       expect(updated?.id).toBe(acc.id);
       expect(updated?.username).toBe("user_cap_nhat");
-      expect(updated?.name).toBe("Hàn Lập");
+      expect(updated?.name).toBe("Giang Tĩnh Uyên");
       expect(updated?.passHash).toBe("pass-hash-moi");
       expect(updated?.recoveryHash).toBe("recovery-hash-moi");
       expect(updated?.lastLoginAt).toBe("2026-11-11T12:00:00.000Z");
@@ -1038,7 +1082,7 @@ export function describeSectStoreContract(
       sect.members[0].draw = { day: "2026-11-16", n: 2 };
       await store.create(sect);
       const got = await store.get("c1");
-      expect(got?.vault.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(got?.vault.slots).toHaveLength(SECT_VAULT_SLOTS_MAX);
       expect(got?.vault.slots[3]).toEqual({ itemId: bigStack.id, qty: 7 });
       expect(got?.vault.slots[39]).toEqual({ itemId: ITEMS[0].id, qty: 1 });
       expect(got?.vault.slots[0]).toBeNull();
@@ -1053,7 +1097,7 @@ export function describeSectStoreContract(
       const store = await createStore();
       await store.create(makeSect("c1", { vault: undefined as never }));
       const got = await store.get("c1");
-      expect(got?.vault.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(got?.vault.slots).toHaveLength(SECT_VAULT_SLOTS_MAX);
       expect(got?.vault.slots.every((x) => x === null)).toBe(true);
       expect(got?.vault.drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
       expect(got?.vault.log).toEqual([]);
@@ -1106,9 +1150,141 @@ export function describeSectStoreContract(
       const kept = await store.get("c1");
       expect(kept?.vault.slots[0]).toEqual({ itemId: bigStack.id, qty: 3 });
       expect(kept?.vault.slots[1]).toBeNull();
-      expect(kept?.vault.slots).toHaveLength(SECT_VAULT_SLOTS);
+      expect(kept?.vault.slots).toHaveLength(SECT_VAULT_SLOTS_MAX);
       expect(kept?.vault.drawPerDay).toBe(SECT_VAULT_DRAW_DEFAULT);
       expect(kept?.members[0].draw).toBeUndefined();
+    });
+
+    // ----- M8: cống hiến / công tích / sổ ngày / điểm tông / ô kho theo cấp (docs/THIET_KE_TONG_MON.md mục 12.2) -----
+    const questId = SECT_QUESTS[0]!.id; // sổ ngày lưu id MẪU (không phải id cụ thể có hậu tố bậc)
+    const day = (over: Record<string, unknown> = {}) => ({
+      day: "2026-11-17",
+      earned: 50,
+      deposit: 10,
+      quests: [questId],
+      dungeon: true,
+      buys: { hoi_huyet_dan: 2 },
+      ...over,
+    });
+
+    it("M8: cống hiến / công tích / sổ ngày / điểm tông ghi rồi đọc lại đúng; trường bằng 0 KHÔNG lưu; bản ghi trước M8 đọc ra 0", async () => {
+      const store = await createStore();
+      const plain = makeSect("p1"); // không trường M8
+      await store.create(plain);
+      const old = await store.get("p1");
+      expect(old?.points).toBeUndefined();
+      expect(old?.members[0].contrib).toBeUndefined();
+      expect(old?.members[0].merit).toBeUndefined();
+      expect(old?.members[0].today).toBeUndefined();
+
+      const sect = makeSect("c1");
+      sect.points = 1200;
+      sect.members[0] = { ...sect.members[0], contrib: 20, merit: 50, today: day() };
+      await store.create(sect);
+      const got = await store.get("c1");
+      expect(got?.points).toBe(1200);
+      expect(got?.members[0].contrib).toBe(20);
+      expect(got?.members[0].merit).toBe(50);
+      expect(got?.members[0].today).toEqual(day());
+      got!.members[0].today!.quests.push("sua_ban_sao"); // sửa bản sao không ảnh hưởng kho
+      expect((await store.get("c1"))?.members[0].today?.quests).toEqual([questId]);
+
+      // sổ ngày RỖNG và số 0 được chuẩn hoá thành "không có" (không lưu)
+      const upd = await store.update("c1", (x) => ({
+        ...x,
+        members: x.members.map((m) => ({
+          ...m,
+          contrib: 0,
+          today: day({ earned: 0, deposit: 0, quests: [], dungeon: false, buys: {} }),
+        })),
+      }));
+      expect(upd?.members[0].contrib).toBeUndefined();
+      expect(upd?.members[0].today).toBeUndefined();
+      expect(upd?.members[0].merit).toBe(50);
+    });
+
+    it("M8: ghi sai bất biến cống hiến / điểm / sổ ngày bị TỪ CHỐI (không im lặng sửa), không ghi gì", async () => {
+      const store = await createStore();
+      const sect = makeSect("c1");
+      sect.points = 100;
+      sect.members[0] = { ...sect.members[0], contrib: 10, merit: 40 };
+      sect.members.push({
+        soulKey: "k2",
+        name: "Hai",
+        rank: "de_tu",
+        joinedAt: 5,
+        merit: 60,
+        contrib: 5,
+      });
+      await store.create(sect);
+      const bads: ((s: Sect) => void)[] = [
+        (s) => (s.members[0].contrib = 41), // contrib > merit: cống hiến tự sinh ra
+        (s) => (s.members[0].contrib = -1),
+        (s) => (s.members[0].merit = 1.5),
+        (s) => (s.members[0].merit = SECT_POINTS_CAP + 1),
+        (s) => (s.members[0].contrib = SECT_CONTRIB_CAP + 1),
+        (s) => (s.points = 99), // điểm tông < tổng công tích thành viên (40 + 60 = 100)
+        (s) => (s.points = -5),
+        (s) => (s.points = SECT_POINTS_CAP + 1),
+        (s) => (s.members[0].today = day({ earned: SECT_EARN_DAY_CAP + 1 }) as never),
+        (s) =>
+          (s.members[0].today = day({ deposit: SECT_DEPOSIT_DAY_CAP + 1, earned: 140 }) as never),
+        (s) => (s.members[0].today = day({ deposit: 20, earned: 10 }) as never), // góp > tổng kiếm
+        (s) => (s.members[0].today = day({ quests: ["khong_co.t0"] }) as never),
+        (s) => (s.members[0].today = day({ buys: { khong_co: 1 } }) as never),
+        (s) => (s.members[0].today = day({ day: "hôm nay" }) as never),
+      ];
+      for (const bad of bads) {
+        await expect(
+          store.update("c1", (s) => {
+            bad(s);
+            return s;
+          }),
+        ).rejects.toThrow();
+      }
+      const kept = await store.get("c1");
+      expect(kept?.points).toBe(100);
+      expect(kept?.members[0].contrib).toBe(10);
+      expect(kept?.members[0].merit).toBe(40);
+      expect(kept?.members[0].today).toBeUndefined();
+    });
+
+    it("M8: ô kho chưa mở theo cấp tông phải trống: đồ ở ô khoá bị TỪ CHỐI; lên cấp thì ô mở ra dùng được", async () => {
+      const store = await createStore();
+      const sect = makeSect("c1"); // cấp 1: 40 ô
+      await store.create(sect);
+      const put = (i: number, points?: number) => (s: Sect) => {
+        if (points !== undefined) s.points = points;
+        s.vault.slots[i] = { itemId: bigStack.id, qty: 1 };
+        return s;
+      };
+      await expect(store.update("c1", put(40))).rejects.toThrow(); // ô 40 chưa mở ở cấp 1
+      await expect(store.update("c1", put(79, 1000))).rejects.toThrow(); // cấp 2 mở 50 ô: 79 vẫn khoá
+      await expect(store.update("c1", put(50, 1000))).rejects.toThrow(); // ô 50 là ô đầu tiên còn khoá ở cấp 2
+      const ok = await store.update("c1", put(49, 1000)); // ô 49 là ô cuối đã mở ở cấp 2
+      expect(ok?.vault.slots[49]).toEqual({ itemId: bigStack.id, qty: 1 });
+      const top = await store.update("c1", put(79, 30_000)); // cấp 5 mở đủ 80 ô
+      expect(top?.vault.slots[79]).toEqual({ itemId: bigStack.id, qty: 1 });
+      expect((await store.get("c1"))?.vault.slots).toHaveLength(SECT_VAULT_SLOTS_MAX);
+    });
+
+    it("M8: 30 lần cộng cống hiến đồng thời qua update: không mất lần nào, điểm tông = tổng công tích", async () => {
+      const store = await createStore();
+      await store.create(makeSect("c1"));
+      const add = (s: Sect): Sect => ({
+        ...s,
+        points: (s.points ?? 0) + 1,
+        members: s.members.map((m) => ({
+          ...m,
+          contrib: (m.contrib ?? 0) + 1,
+          merit: (m.merit ?? 0) + 1,
+        })),
+      });
+      await Promise.all(Array.from({ length: 30 }, () => store.update("c1", add)));
+      const got = await store.get("c1");
+      expect(got?.points).toBe(30);
+      expect(got?.members[0].contrib).toBe(30);
+      expect(got?.members[0].merit).toBe(30);
     });
   });
 }

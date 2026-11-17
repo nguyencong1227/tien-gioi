@@ -119,6 +119,41 @@ describe("TelegraphLayer: vùng báo trước", () => {
     expect(layer.stats().drawnWarns).toBe(1);
   });
 
+  it("bù độ trễ (#873): rttMs rút ngắn thời gian đếm tới đầy (ms - clamp(RTT + 10, 0, min(250, 0,3 ms))); không truyền / null thì giữ nguyên", () => {
+    const { layer } = make();
+    layer.warn(warn({ ms: 1000 }), 0); // không bù
+    layer.warn(warn({ ms: 1000 }), 0, null); // RTT chưa biết
+    layer.warn(warn({ ms: 1000 }), 0, 160); // bù 170
+    layer.warn(warn({ ms: 800 }), 0, 1000); // RTT hỏng: kẹp 30 % = 240
+    layer.warn(warn({ ms: 1500 }), 0, 1000); // kẹp 250
+    expect(layer.snapshot(0).warns.map((w) => w.ms)).toEqual([1000, 1000, 830, 560, 1250]);
+  });
+
+  it("bù độ trễ: vùng đầy (tiến độ 1) và hết sống đúng theo ms đã rút ngắn; cùng giờ nhận thì tiến độ nhanh hơn không bù", () => {
+    const { layer } = make();
+    layer.warn(warn({ ms: 1000 }), 0);
+    layer.warn(warn({ ms: 1000 }), 0, 160); // ms hiệu dụng 830
+    const at = (t: number) => layer.snapshot(t).warns.map((w) => w.progress);
+    expect(at(415)[1]!).toBeCloseTo(0.5, 6); // một nửa của 830
+    expect(at(415)[0]!).toBeCloseTo(0.415, 6);
+    expect(at(830)[1]!).toBe(1);
+    expect(at(829)[1]!).toBeLessThan(1);
+    expect(at(830)[0]!).toBeCloseTo(0.83, 6);
+    // hết ms + WARN_FADE_MS thì gỡ: cái có bù gỡ sớm hơn đúng độ bù
+    layer.update(830 + WARN_FADE_MS + 1);
+    expect(layer.stats().warns).toBe(1);
+    layer.update(1000 + WARN_FADE_MS + 1);
+    expect(layer.stats().warns).toBe(0);
+  });
+
+  it("bù độ trễ: tin hỏng vẫn bị từ chối, không vì rttMs mà lọt", () => {
+    const { layer } = make();
+    expect(layer.warn(warn({ ms: 0 }), 0, 100)).toBe(false);
+    expect(layer.warn(warn({ ms: Number.NaN }), 0, 100)).toBe(false);
+    expect(layer.warn(warn({ r: -5 }), 0, 100)).toBe(false);
+    expect(layer.stats().rejected).toBe(3);
+  });
+
   it("circle vẽ hình tròn; cone / line vẽ đa giác với đúng số đỉnh", () => {
     const { layer, made } = make(24); // bậc Cao: 12 đoạn cung
     layer.warn(warn({ shape: "circle" }), 0);

@@ -298,12 +298,12 @@ async function main() {
       );
       await evalJs(`window.__sent.length = 0`);
       await openShop();
-      // tăng số lượng lên 3 bằng nút +
+      // tăng số lượng lên 3 bằng nút + của ô số lượng dùng chung (mục 47)
       const iq = await cardOf("Đại Hồi Huyết Đan");
       for (let k = 0; k < 2; k++) {
-        // nút "+" tăng số lượng ở pointerdown (giữ để tăng nhanh): chạm / bấm THẬT, rồi chờ vẽ lại
+        // nút "+" tăng số lượng ở pointerdown (giữ để tăng nhanh): chạm / bấm THẬT
         const plus = await center(
-          `#shop-sell-list .shop-card:nth-child(${iq + 1}) .shop-qty-btn:last-of-type`,
+          `#shop-sell-list .shop-card:nth-child(${iq + 1}) [data-nav$=":plus"]`,
         );
         await tap(plus.x, plus.y);
         await sleep(300);

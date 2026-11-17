@@ -16,6 +16,7 @@ import {
   PARTY_MAX,
   PARTY_SHARE_RANGE,
   rollCoin,
+  SUMMON_ONLY_KINDS,
 } from "@tien-gioi/shared";
 import { killMonster } from "./combat";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
@@ -240,7 +241,12 @@ describe("chia thưởng khi hạ quái: tổng Linh thạch đúng số tung, �
   });
 
   it("phủ MỌI loài quái của game (kể cả quái Kim Đan và trùm hac_giao, M6 #405): mỗi loài có bảng tiền + bảng rơi nên đều vào mô phỏng", () => {
-    expect([...KINDS].sort()).toEqual(MONSTERS.map((m) => m.id).sort());
+    // Quái con của trùm (SUMMON_ONLY_KINDS, #887) không rơi tiền / đồ nên không vào mô phỏng chia thưởng
+    expect([...KINDS].sort()).toEqual(
+      MONSTERS.filter((m) => !SUMMON_ONLY_KINDS.includes(m.id))
+        .map((m) => m.id)
+        .sort(),
+    );
   });
 
   it("độ phủ: các nhánh quan trọng đều xảy ra (đội chia tiền, tiền mất vì không ai đủ điều kiện, người ngã bị bỏ qua, đồ có chủ)", () => {

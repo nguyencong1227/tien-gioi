@@ -665,10 +665,11 @@ async function main() {
     // ---- 10. Nói chuyện NPC chỉ bằng phím ----
     const npc = NPC_BY_ID["truong_tran"];
     me.x = npc.x;
-    me.y = npc.y + 50;
+    // đứng sát Trưởng trấn (20 px): từ khi có Lão Phù ở (+40, -40) quanh tâm trấn (G, #1071) điểm cách 50 px cách đều hai NPC nên `closestNpcId` thành `lao_phu`
+    me.y = npc.y + 20;
     world.ctrl.get(sid).lastHitAt = 0;
     await t.waitFor(
-      `Math.abs(window.__scene.predX - ${Math.round(npc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(npc.y + 50)}) < 40 && window.__scene.closestNpcId === 'truong_tran'`,
+      `Math.abs(window.__scene.predX - ${Math.round(npc.x)}) < 40 && Math.abs(window.__scene.predY - ${Math.round(npc.y + 20)}) < 40 && window.__scene.closestNpcId === 'truong_tran'`,
       "đứng cạnh Trưởng trấn",
     );
     await t.waitFor(
@@ -796,9 +797,7 @@ async function main() {
       String(await navKey()),
     );
     const qtyText = () =>
-      ev(
-        `document.querySelector('#shop-modal [data-nav="buy:hoi_huyet_dan:plus"]').parentElement.querySelector('.shop-qty-val').textContent`,
-      );
+      ev(`document.querySelector('#shop-modal [data-nav="buy:hoi_huyet_dan:input"]').value`);
     const q0 = Number(await qtyText());
     await press(t, K.enter);
     check(
@@ -807,7 +806,7 @@ async function main() {
       `${q0} -> ${await qtyText()}`,
     );
     check(
-      "Bảng vẽ lại nhưng focus VẪN ở nút + (không rơi về đầu bảng)",
+      "Sau khi đổi số: focus VẪN ở nút + (không rơi về đầu bảng)",
       (await navKey()) === "buy:hoi_huyet_dan:plus",
       String(await navKey()),
     );
@@ -817,10 +816,16 @@ async function main() {
       Number(await qtyText()) === q0 + 2,
       `${await qtyText()}`,
     );
-    await press(t, K.right);
+    // sau nút + còn ×10 / ×100 / Tối đa của ô số lượng dùng chung (mục 47): mũi tên đi tới nút Mua của ĐÚNG hàng này
+    await arrowTo(
+      t,
+      '#shop-modal .shop-card:has([data-nav="buy:hoi_huyet_dan:plus"]) .shop-act-btn.buy',
+    );
     check(
-      "Mũi tên Phải: focus sang nút Mua cùng hàng",
-      !!(await ev(`document.activeElement && document.activeElement.classList.contains('buy')`)),
+      "Mũi tên đưa focus tới nút Mua cùng hàng",
+      !!(await ev(
+        `document.activeElement && document.activeElement.classList.contains('buy') && document.activeElement.closest('.shop-card').contains(document.querySelector('[data-nav="buy:hoi_huyet_dan:plus"]'))`,
+      )),
       String(await ev(`document.activeElement && document.activeElement.className`)),
     );
     await press(t, K.enter);

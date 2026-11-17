@@ -14,10 +14,12 @@ import { angleDiff, quantAngle, type World, type PlayerCtrl, type MonsterCtrl } 
 import { applyStats, gainExp } from "./progression";
 import { safeSpot, syncPublicPos } from "./movement";
 import { dropLoot } from "./loot";
+import { bossArmorMult, bossDespawnAdds } from "./boss-state";
 import { bossKilled } from "./dungeon";
 import { onMonsterKilled } from "./quests";
 import { killShares } from "./party";
 import { dungeonFall } from "./dungeon";
+import { arenaFall } from "./arena";
 import { isShielded, spareFromNetDeath } from "./net-guard";
 import { beginLimbo } from "./reincarnation";
 import { rollDamage } from "./damage";
@@ -26,6 +28,9 @@ import { duelBeam, duelSlash, reviveInPlace } from "./duel";
 import { changeCoin, splitCoin } from "./wallet";
 import { absorbShield, entriesOf, takenMult } from "./status-rules";
 import { ELITE_COIN_MULT } from "./elite";
+import { isEvading } from "./nav-chase";
+import { trackSocial } from "./social";
+import { worldBossCredit, worldBossKilled } from "./world-boss";
 
 /** Kiếm chém: hình quạt trước mặt. */
 export function slash(w: World, sid: string, angle: unknown) {
@@ -102,20 +107,50 @@ export function dealMonsterDamage(
   dmg: number,
   crit: boolean,
   aggro = true,
+  combo = false,
 ) {
   const mc = w.mctrl.get(id);
   if (!mc) return;
   if (mc.st && mc.st.list.length > 0) dmg = Math.max(1, Math.round(dmg * takenMult(mc.st, w.now)));
+  if (mc.boss) dmg = Math.max(1, Math.round(dmg * bossArmorMult(mc, w.now))); // giáp của trùm (`buff`, mục 42)
+  const hpBefore = mon.hp;
   mon.hp = Math.max(0, mon.hp - dmg);
   if (by) mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
-  if (aggro && by) mc.target = by;
-  w.events.dmg({ target: id, amount: dmg, x: mon.x, y: mon.y - 18, crit });
+  if (mc.wboss && by) worldBossCredit(w, id, by, Math.min(dmg, hpBefore)); // trùm thế giới (M9.4): điểm đóng góp theo LINH HỒN, chỉ phần máu thật sự trừ
+  if (aggro && by) {
+    const bc = w.ctrl.get(by);
+    if (bc) bc.lastDealtAt = w.now; // chặn đường (mục 52): vừa đánh thì chưa bị chặn
+  }
+  if (aggro && by && !isEvading(w, mc)) mc.target = by; // đang rút về chỗ sinh (mục 48): không bị đòn đánh kéo lại
+  // `combo` (mục 51): đòn ăn combo (gỡ dấu, nhân sát thương): client vẽ vụ nổ dấu; chỉ thêm trường khi đúng (tin thường không đổi)
+  w.events.dmg({
+    target: id,
+    amount: dmg,
+    x: mon.x,
+    y: mon.y - 18,
+    crit,
+    ...(combo ? { combo: true } : {}),
+  });
   if (mon.hp <= 0) killMonster(w, id, mc);
 }
 
 /** Chia tu vi theo tỉ lệ sát thương cho những người còn sống, rơi đồ, rồi xóa quái. */
 export function killMonster(w: World, id: string, mc: MonsterCtrl) {
   const mon = w.state.monsters.get(id);
+  if (mc.addOf !== undefined) {
+    // Quái con do trùm gọi (mục 42): KHÔNG tu vi, KHÔNG rơi đồ / Linh thạch, KHÔNG tính nhiệm vụ hay kiếp: chỉ biến mất (chống cày)
+    w.state.monsters.delete(id);
+    w.mctrl.delete(id);
+    return;
+  }
+  if (mc.wboss) return worldBossKilled(w, id, mc); // trùm thế giới (M9.4): KHÔNG tu vi / đồ / Linh thạch theo đường quái thường, thưởng chia theo đóng góp ở `world-boss.ts`
+  if (mc.boss) bossDespawnAdds(w, mc.boss); // trùm chết: quái con biến mất theo, không để chúng đứng lại
+  if (mc.arena) {
+    // Quái của đấu trường chặn đường (mục 52): KHÔNG tu vi / đồ / Linh thạch / nhiệm vụ (thưởng đi một đường riêng khi thắng, `arena.ts`); chỉ biến mất
+    w.state.monsters.delete(id);
+    w.mctrl.delete(id);
+    return;
+  }
   // Hệ số tu vi của từng người (đội chia đều có thưởng, người lẻ theo sát thương: xem killShares)
   const shares = killShares(w, mc.damageBy, mon?.x ?? 0, mon?.y ?? 0);
   for (const [sid, frac] of shares) {
@@ -131,6 +166,7 @@ export function killMonster(w: World, id: string, mc: MonsterCtrl) {
       life.kills++;
       if (mc.def.boss) life.bossKills++;
     }
+    if (mc.def.boss) trackSocial(w, sid, [`boss:${mc.def.id}`, 1]); // thành tựu theo linh hồn (M9.5): số lần hạ từng loài trùm
   }
   if (mon) dropCoin(w, mc, mon.x, mon.y);
   if (mc.def.boss) w.events.sys(`🐉 ${mc.def.name} đã bị hạ!`);
@@ -244,6 +280,8 @@ function damagePlayer(
     if (spareFromNetDeath(w, sid, p, c)) return;
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
     if (dungeonFall(w, sid, p, c)) return;
+    // Trong ĐẤU TRƯỜNG chặn đường (mục 52): gục cũng KHÔNG mất kiếp (`arenaFall`)
+    if (arenaFall(w, sid, p, c)) return;
     // Chết thật = luân hồi (docs/THIET_KE_LUAN_HOI.md): nhân vật của kiếp mất hẳn, linh hồn vào Hoàng Tuyền
     if (w.reincarnate) return beginLimbo(w, sid, p, c);
     // Nhánh hồi sinh (chết không mất kiếp, vd PK thách đấu ở bước 5): nằm tại chỗ RESPAWN_MS rồi hồi sinh ở trấn, không mất gì

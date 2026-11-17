@@ -43,6 +43,8 @@ export class Player extends Schema {
   @type("boolean") duel = false;
   /** Biệt hiệu tông môn (2-4 ký tự, "" = không có): người ngoài vẽ `[xxxx]` cạnh tên; đổi chỉ lúc vào / rời / lập / giải tán / bị mời ra. */
   @type("string") sect = "";
+  /** Danh hiệu đang đeo (M9.5): ID NGẮN (`TITLE_ID_RE`, <= 4 ký tự), "" = không đeo; client tra `TITLES` ra chữ. Đổi chỉ khi vào phòng / đeo / gỡ (`WorldRoom.titleSet`). */
+  @type("string") title = "";
   // input cuối server đã xử lý (để client đối chiếu); chỉ chủ nhân vật nhận
   @view(TAG_OWNER) @type("uint32") lastSeq = 0;
   // Đồ đang mặc (itemId, "" = trống). Công khai để mọi người thấy ngoại hình; kiểu Equipment trong shared/src/items.ts.
@@ -73,6 +75,11 @@ export class Monster extends Schema {
    * Tinh anh (M7.3, #504): 0 = quái thường, 1 = tinh anh. Đặt MỘT lần lúc sinh (không đổi giữa chừng). Hiện mọi quái đều 0: bước tinh anh của M7.3 mới bật.
    */
   @type("uint8") elite = 0;
+  /**
+   * DẤU hệ mới nhất đang dính (mục 51, CT2): 1-9 = hệ theo `markIndexOf` (`AMP_ELEMENTS`), 0 = không có dấu (không tốn byte). Máy chủ giữ nhiều dấu trong `MonsterCtrl.st`; lên đầu quái
+   * CHỈ MỘT dấu (client vẽ vụ nổ dấu khi combo, `DmgMsg.combo`). Đổi khi dấu gắn / gỡ / hết hạn (hiếm).
+   */
+  @type("uint8") mark = 0;
 }
 
 /** Đồ rơi trên đất. Kiểu dùng chung cho client: LootView trong shared/src/items.ts */

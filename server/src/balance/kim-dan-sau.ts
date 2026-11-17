@@ -190,7 +190,7 @@ ${bossRows.join("\n")}
 
 ### 3. Nhịp cả cảnh giới Kim Đan (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
 
-"Tối ưu" = người chơi săn bãi tốt nhất kể cả Xích Mãng; "bãi mới" = không đụng Xích Mãng. Tổng: **${n1(hoursOf(optimal))} giờ** (tối ưu), **${n1(hoursOf(designed))} giờ** (bãi mới); mục tiêu 5-7 giờ. Trước M6: ${n1(386 / 60)} giờ nhưng nhờ đường tắt (Sơ kỳ 4,1 giờ rồi hai bậc sau ~2,3 giờ).
+"Tối ưu" = người chơi săn bãi tốt nhất kể cả Xích Mãng; "bãi mới" = không đụng Xích Mãng. Tổng: **${n1(hoursOf(optimal))} giờ** (tối ưu), **${n1(hoursOf(designed))} giờ** (bãi mới); mục tiêu M6 5-7 giờ (QUYET_DINH_M3 mục 30 chủ ý rút còn ~4 giờ: tu vi x2, máu x1,5). Trước M6: ${n1(386 / 60)} giờ nhưng nhờ đường tắt (Sơ kỳ 4,1 giờ rồi hai bậc sau ~2,3 giờ).
 
 | Bậc | Thanh | Tối ưu: nguồn | phút | Bãi mới: nguồn | phút |
 |---|---:|---|---:|---|---:|

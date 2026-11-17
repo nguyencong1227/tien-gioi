@@ -11,7 +11,14 @@ import {
   pipsOf,
   targetLabelRise,
 } from "../monster-status";
+import { parseChainPts, planChainFx, planComboBurst } from "../gfx/fx/ct2-fx";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
+import { PBoltLayer } from "../gfx/fx/pbolt-layer";
+import { WindupLayer, type WindupWatchResult } from "../gfx/fx/windup-layer";
+import { PersistLayer, type PersistAnchor } from "../gfx/fx/persist-layer";
+import { parsePersist, parsePersistEnd, persistPlan, planPersistPop } from "../gfx/fx/persist-fx";
+import { planWindup, type WindupPlan } from "../gfx/fx/windup-fx";
+import { parsePBolt, pboltEnd, pboltPlan, planPBoltEnd } from "../gfx/fx/pbolt-fx";
 import { recipeIds } from "../gfx/fx/recipes";
 import {
   planSlashEdges,
@@ -89,7 +96,7 @@ import {
   NPC_BY_ID,
   NPC_RANGE,
   npcsOfMap,
-  QUEST_BY_ID,
+  questDefAny,
   npcMarker,
   questReady,
   statsFor,
@@ -135,6 +142,7 @@ import {
   type DungeonStateMsg,
   type DungeonEndMsg,
   DUEL_MSG,
+  AMBUSH_MSG,
   DUEL_KO_MS,
   isDungeonMap,
   type DuelInvitedMsg,
@@ -142,13 +150,17 @@ import {
   type DuelEndMsg,
   type DuelChallengeCheck,
   SECT_MSG,
+  SOCIAL_MSG,
   type SectMsg,
   type SectVaultMsg,
+  type SectHallMsg,
   type SectPresenceMsg,
   type SectInvitedMsg,
 } from "@tien-gioi/shared";
 import { preloadAssets, makeTextures, dirFromAngle, TILESET_KEY, ATLAS_KEY } from "../textures";
 import { ui } from "../ui";
+import { playerLabelText } from "../player-label";
+import { socialEnabled } from "../social-tabs";
 import { StatusTracker } from "../status-track";
 import { BAR_SLOTS, SkillTracker, aimMode, blockedToast, slotView } from "../skill-bar";
 import { SkillBarDom } from "../skill-bar-dom";
@@ -226,7 +238,27 @@ import {
   fitView,
 } from "../map-render";
 import { moveVector } from "../move-input";
+import {
+  BOSS_SFX_VIEW,
+  BossFxTracker,
+  bossAbilityElement,
+  pickBossForBar,
+  type BossCand,
+} from "../boss-bar";
+import { warnShownMs } from "../net-latency";
+import {
+  BOSS_STRIKE_MS,
+  NEUTRAL_POSE,
+  bossCastPose,
+  bossGlowStep,
+  bossGlowTint,
+  composeTween,
+  type BossCastPose,
+} from "../boss-cast-anim";
+import { BossBarDom } from "../boss-bar-ui";
 import { MoveKeys } from "../move-keys";
+import { StopBurst } from "../move-stop";
+import { absorbJump, decayCorr } from "../move-smooth";
 import { IME_HINT_TEXT, ImeSniffer } from "../ime-hint";
 import { isTypingElement, isReducedMotion } from "../a11y";
 import {
@@ -284,9 +316,14 @@ interface Entity {
   /** Tinh anh (M7.3 bước 6, `Monster.elite`): cờ đã áp dụng + vầng sáng dưới chân (dựng lười một lần, `elite.ts`) */
   elite?: boolean;
   eliteAura?: Phaser.GameObjects.Ellipse;
+  /** Vầng giáp của TRÙM đang có giáp (`bossArmor`, T4 #873): vòng tròn bao quanh thân, dựng lười, ẩn khi giáp hết */
+  armorAura?: Phaser.GameObjects.Arc;
   /** Huy hiệu trạng thái có hại trên đầu quái (M7.7 bước 3b, #508): Graphics dựng lười, mặt nạ `Monster.fx` đã vẽ và số chấm */
   statusG?: Phaser.GameObjects.Graphics;
   lastFx?: number;
+  /** Dấu hệ (`Monster.mark` 1-9) cuối cùng còn thấy trên quái này và lúc thấy (`time.now`): màu vụ nổ khi `dmg.combo` tới sau khi máy chủ đã gỡ dấu */
+  lastMark?: number;
+  lastMarkAt?: number;
   pipCount?: number;
   /** Mép trên của hàng chấm (px phía trên tâm quái; 0 = không có chấm): nhãn mục tiêu khoá nâng lên trên đó (`targetLabelRise`) */
   pipTop?: number;
@@ -315,6 +352,8 @@ interface Entity {
   spriteBaseY?: number;
   tweenPhase?: number;
   tweenActive?: boolean;
+  /** Bậc ánh đỏ cam đang áp lên sprite trùm khi vận chiêu (0 = không; `boss-cast-anim.ts`), để chỉ gọi `setTint` khi đổi bậc */
+  bossGlow?: number;
   /** Khoảng cách tới nhân vật của mình (px) do `animDue` tính ở khung này; `stepTween` dùng lại (không tính `Math.hypot` lần nữa). */
   distMe?: number;
 }
@@ -375,6 +414,11 @@ export class WorldScene extends Phaser.Scene {
   /** Phím di chuyển do người chơi đổi được (`move.*` trong `keybinds.ts`): tra hướng theo bảng phím hiện tại mỗi lần. */
   private moveKeys = new MoveKeys((code) => moveDirOf(code));
 
+  /** Trùm (mục 42, T4 #873): trạng thái theo `fx` (`bossCast` / `bossPhase` / `bossEnrage`) + thanh máu trùm (DOM, `boss-bar-ui.ts`), cập nhật ~10 lần / giây */
+  private bossFx = new BossFxTracker();
+  private bossBar = new BossBarDom(document);
+  private nextBossBarAt = 0;
+
   // Đoán trước di chuyển của chính mình
   private seq = 0;
   private pending: InputMsg[] = [];
@@ -397,11 +441,24 @@ export class WorldScene extends Phaser.Scene {
   private cursorPos: CursorPos | null = null;
   private predX = 0;
   private predY = 0;
+  /**
+   * Độ lệch bù để VẼ mượt (QUYET_DINH_M3 mục 41.3, `move-smooth.ts`): vị trí vẽ của mình = `pred` + `corr`. `reconcile` làm `pred` nhảy thì `corr` bù đúng đoạn nhảy rồi
+   * tan dần (~120 ms); lệch lớn thì dịch chuyển tức thì (`snapMe`). Logic chơi (nhắm, nhặt, chạm cổng) vẫn dùng `pred` thật.
+   */
+  private corrX = 0;
+  private corrY = 0;
+  /** `reconcile` vừa thấy lệch quá lớn: lần vẽ kế tiếp đặt thẳng nhân vật vào `pred` (không trượt) */
+  private snapMe = false;
+  /** Tin DỪNG khi nhả phím (mục 41.2, `move-stop.ts`): gửi ngay ở khung vẽ đầu tiên rồi lặp ở các bước kế */
+  private stopBurst = new StopBurst();
   private hasMe = false;
   private acc = 0;
   private facing = Math.PI / 2;
   private moving = false;
   private isReconnecting = false;
+  /** Cờ `?social=1` (M9, đến khi phát hành): bật thì hiện danh hiệu cạnh đạo hiệu. Đọc MỘT lần (đổi cờ phải tải lại trang). */
+  private readonly socialOn =
+    typeof window !== "undefined" && socialEnabled(window.location.search);
   private duelKoUntil = 0;
   private dungeonFallUntil = 0;
 
@@ -478,8 +535,23 @@ export class WorldScene extends Phaser.Scene {
   fx!: FxSystem;
   /** Báo trước đòn + đạn tầm xa của quái (M7.7, #508): Graphics từ pool, không tốn ngân sách hạt */
   telegraphs!: TelegraphLayer;
+  /** Đạn bay của người chơi (`fx` `pbolt`, CT11b bước 2): vẽ theo từng đoạn máy chủ gửi, không mô phỏng */
+  pbolts!: PBoltLayer;
+  /** Vòng tụ khí của chiêu vận (`SkillDef.windupMs`, CT11b bước 3): hiệu ứng đáp hoãn tới hết `windupMs`, bỏ nếu người vận bị huỷ */
+  windups!: WindupLayer;
+  /** Vật thể bền `zone` / `trap` / `totem` / `aura` (`fx` + `fxEnd`, CT11b bước 3b): vẽ theo tin máy chủ, tự tắt khi hết `ms` hoặc khi có `fxEnd` */
+  persists!: PersistLayer;
   /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
   dangerCues = 0;
+  /**
+   * Nguồn RTT (ms, trung vị vài pong gần nhất; `null` = chưa biết) cho độ bù vùng cảnh báo (`net-latency.ts`, #873). `main.ts` nối vào `HeartbeatController.lastRttMs`
+   * (đổi theo phòng đang nối); mặc định `null` = không bù (chế độ mock, test). Script `?debug` đặt được để thử các mức RTT.
+   */
+  rttSource: () => number | null = () => null;
+  /** RTT hiện tại (ms) hoặc `null`; ĐỘC NHẤT một chỗ đọc, vùng báo (`warn`) và thanh gồng (`bossCast`) dùng chung nên không bao giờ lệch nhau. */
+  private rttMs(): number | null {
+    return this.rttSource();
+  }
 
   // Bảng đo hiệu năng (?perf=1, #71)
   private perfEnabled = false;
@@ -574,6 +646,24 @@ export class WorldScene extends Phaser.Scene {
         sound.warn();
       },
     });
+    this.pbolts = new PBoltLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+    });
+    this.windups = new WindupLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+      watch: (by, mine) => this.windupWatch(by, mine),
+      onRelease: (plan, x, y) => this.onWindupRelease(plan, x, y),
+    });
+    this.persists = new PersistLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+      anchor: (by, mine) => this.persistAnchor(by, mine),
+    });
     ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
@@ -589,6 +679,9 @@ export class WorldScene extends Phaser.Scene {
       offQuality();
       this.fx.destroy();
       this.telegraphs.destroy();
+      this.pbolts.destroy();
+      this.windups.destroy();
+      this.persists.destroy();
     });
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
@@ -638,7 +731,7 @@ export class WorldScene extends Phaser.Scene {
         else if (action.kind === "trade") this.room.send("trade", { tradeId: action.tradeId });
         else if (action.kind === "dungeon") {
           if (isMockDungeonEnabled()) {
-            ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite(this.me()?.name || "Trương Tiểu Phàm"));
+            ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite(this.me()?.name || "Tô Vân Hạc"));
           } else {
             this.room.send(DUNGEON_MSG.open, { dungeonId: action.dungeonId });
           }
@@ -712,6 +805,24 @@ export class WorldScene extends Phaser.Scene {
         !this.isReconnecting && this.room.send(SECT_MSG.vaultWithdraw, msg),
       onSectVaultPolicy: (drawPerDay) =>
         !this.isReconnecting && this.room.send(SECT_MSG.vaultPolicy, { drawPerDay }),
+      onSectHallGet: () => !this.isReconnecting && this.room.send(SECT_MSG.hallGet, {}),
+      onBoardsGet: (board) =>
+        !this.isReconnecting && this.room.send(SOCIAL_MSG.boardsGet, { board }),
+      onWorldBossGet: () => !this.isReconnecting && this.room.send(SOCIAL_MSG.worldBossGet, {}),
+      // Gặp chặn đường (mục 52): trả `true` chỉ khi tin thật sự đi (đang nối lại thì không gửi, hộp thoại thử lại sau)
+      onAmbushSeen: (m) => this.sendAmbush(AMBUSH_MSG.seen, m),
+      onAmbushChoose: (m) => this.sendAmbush(AMBUSH_MSG.choose, m),
+      onAmbushFlee: (m) => this.sendAmbush(AMBUSH_MSG.flee, m),
+      onAchievementsGet: () =>
+        !this.isReconnecting && this.room.send(SOCIAL_MSG.achievementsGet, {}),
+      onTitleSet: (id) => !this.isReconnecting && this.room.send(SOCIAL_MSG.titleSet, { id }),
+      onSectQuestAccept: (questId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.questAccept, { questId }),
+      onSectQuestTurnIn: (questId) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.questTurnIn, { questId }),
+      onSectShopBuy: (itemId, qty) =>
+        !this.isReconnecting && this.room.send(SECT_MSG.shopBuy, { itemId, qty: qty ?? 1 }),
+      isSectDown: () => Boolean(this.me()?.dead) || ui.isLimboOpen(),
     });
 
     this.setupInput();
@@ -725,6 +836,8 @@ export class WorldScene extends Phaser.Scene {
       (window as any).__game = this.game;
       (window as any).__scene = this;
       (window as any).__fx = this.fx;
+      // Cho `check-boss-bar.mjs`: bắt lời gọi `sound.boss` (headless không có âm thanh thật) để kiểm tiếng trùm đúng lúc, đúng hệ
+      (window as any).__sound = sound;
       // Cho `leak:test`: danh sách mọi công thức hạt đã đăng ký, để khởi động phát MỖI công thức một lần (mỗi công thức tạo MỘT emitter ở lần phát đầu, `fx.ts` emitterFor)
       (window as any).__fxRecipeIds = recipeIds;
       // Cho `leak:test` (client/scripts/leak-test.mjs) dựng lại hình ảnh của từng bản đồ ngay trong trang (#408 bước 4)
@@ -1260,6 +1373,7 @@ export class WorldScene extends Phaser.Scene {
         ui.isMapModalOpen() ||
         ui.isSettingsModalOpen() ||
         ui.isSkillsModalOpen() ||
+        ui.isSocialModalOpen() ||
         ui.isDialogOpen()
       )
         return;
@@ -1400,6 +1514,9 @@ export class WorldScene extends Phaser.Scene {
       case "panel.sect":
         ui.toggleSectModal();
         break;
+      case "panel.social":
+        ui.toggleSocialModal();
+        break;
       case "panel.skills":
         ui.toggleSkillsModal();
         break;
@@ -1527,7 +1644,16 @@ export class WorldScene extends Phaser.Scene {
     this.applyTargetState(stepTarget("auto", this.targetState(), this.targetCandidates(true)));
   }
 
+  /** Gửi tin chặn đường; `false` (không gửi) khi đang nối lại. */
+  private sendAmbush(type: string, msg: unknown): boolean {
+    if (this.isReconnecting) return false;
+    this.room.send(type, msg);
+    return true;
+  }
+
   private moveDir() {
+    // hộp thoại chặn đường đang mở: nhân vật đứng yên (máy chủ cũng tiêu thụ input mà không đi); cần điều khiển ảo cũng không đi, để không đoán trước sai
+    if (ui.isAmbushOpen()) return { dx: 0, dy: 0 };
     // chỉ ô NHẬP CHỮ chặn đi bộ (trước đây mọi `<input>`, kể cả ô đánh dấu / thanh trượt còn giữ focus sau khi đóng bảng, làm nhân vật đứng im)
     if (isTypingElement(document.activeElement)) return { dx: 0, dy: 0 };
     const k = this.moveKeys.state();
@@ -2061,6 +2187,10 @@ export class WorldScene extends Phaser.Scene {
     // hasMe = false: lấy lại vị trí từ state của Room mới ở lần reconcile đầu
     this.hasMe = false;
     this.pending.length = 0;
+    this.corrX = 0;
+    this.corrY = 0;
+    this.snapMe = false;
+    this.stopBurst.reset();
     // Trạng thái của Room cũ không còn đúng (qua cổng = phòng mới; nối lại = server gửi lại danh sách ngay sau đó): xoá để không đoán trước theo hệ số cũ
     this.status.clear();
     this.statusBadges.render([]);
@@ -2083,6 +2213,8 @@ export class WorldScene extends Phaser.Scene {
       e.root.destroy();
     }
     this.monsters.clear();
+    this.bossFx.clear();
+    this.bossBar.update(null);
     this.recentHit.clear();
     this.setLockedTarget(null);
 
@@ -2097,6 +2229,9 @@ export class WorldScene extends Phaser.Scene {
     }
     this.activeSlashes.length = 0;
     this.telegraphs.clear();
+    this.pbolts.clear();
+    this.windups.clear();
+    this.persists.clear();
 
     for (const it of this.activeSwords) {
       it.img.setVisible(false);
@@ -2319,6 +2454,18 @@ export class WorldScene extends Phaser.Scene {
     });
     reg(SECT_MSG.snapshot, (m: SectMsg) => ui.onSect(m));
     reg(SECT_MSG.vault, (m: SectVaultMsg) => ui.onSectVault(m));
+    reg(SECT_MSG.hall, (m: SectHallMsg) => ui.onSectHall(m));
+    // Bảng Xã hội (M9.6): máy chủ trả bảng xếp hạng cho người hỏi; `setBoards` tự làm sạch (tin sai kiểu bị bỏ)
+    reg(SOCIAL_MSG.boards, (m: unknown) => ui.setBoards(m));
+    // Trùm thế giới (M9.7): thông báo trước / xuất hiện / kết thúc (mọi phòng) + cập nhật máu / đóng góp (phòng đích); `setWorldBoss` tự làm sạch + tôn trọng cờ ?social=1
+    reg(SOCIAL_MSG.worldBoss, (m: unknown) => ui.setWorldBoss(m));
+    // Gặp chặn đường (mục 52, CD7): hộp thoại + kết cục; gửi lại cùng `id` sau nối lại là bản CẬP NHẬT (`ui.onAmbushOffer` tự phân biệt)
+    reg(AMBUSH_MSG.offer, (m: unknown) => ui.onAmbushOffer(m));
+    reg(AMBUSH_MSG.end, (m: unknown) => ui.onAmbushEnd(m));
+    reg(AMBUSH_MSG.state, (m: unknown) => ui.onAmbushState(m)); // đấu trường: mỗi giây `{ msLeft, giá giữa trận }`
+    // Thành tựu + danh hiệu (M9.8): sổ (cũng là câu trả lời của `titleSet`) + thông báo mới đạt; `ui` tự làm sạch + tôn trọng cờ ?social=1
+    reg(SOCIAL_MSG.achievements, (m: unknown) => ui.setAchievements(m));
+    reg(SOCIAL_MSG.achievementNew, (m: unknown) => ui.onAchievementNew(m));
     reg(SECT_MSG.presence, (m: SectPresenceMsg) => ui.onSectPresence(m));
     reg(SECT_MSG.invited, (m: SectInvitedMsg) => ui.onSectInvited(m));
     replayEarlyMessages(this.room, handlers);
@@ -2343,14 +2490,21 @@ export class WorldScene extends Phaser.Scene {
       this.hasMe = true;
       this.predX = me.x;
       this.predY = me.y;
+      this.corrX = 0;
+      this.corrY = 0;
     }
     if (me.dead) {
       this.pending.length = 0;
       this.predX = me.x;
       this.predY = me.y;
+      this.corrX = 0;
+      this.corrY = 0;
+      this.snapMe = true;
       ui.closeAllModals();
       return;
     }
+    const oldX = this.predX;
+    const oldY = this.predY;
     this.pending = this.pending.filter((i) => i.seq > me.lastSeq);
     const now = performance.now();
     // Hệ số tăng tốc / tê cóng nhân vào tốc độ y như server (`moveSpeedMul`); đang choáng thì server tiêu thụ input mà không di chuyển nên không chạy lại chúng
@@ -2363,32 +2517,69 @@ export class WorldScene extends Phaser.Scene {
         ({ x, y } = this.map.moveWithCollision(x, y, i.dx * speed, i.dy * speed, PLAYER_RADIUS));
     this.predX = x;
     this.predY = y;
+    // Mục 41.3: `pred` vừa nhảy (máy chủ bỏ / xoá input cũ, đụng tường khác, hệ số tốc độ lệch...): vị trí VẼ giữ nguyên rồi trượt về trong ~120 ms; lệch lớn thì dịch chuyển tức thì
+    const c = absorbJump({ x: this.corrX, y: this.corrY }, x - oldX, y - oldY);
+    if (c) {
+      this.corrX = c.x;
+      this.corrY = c.y;
+    } else {
+      this.corrX = 0;
+      this.corrY = 0;
+      this.snapMe = true;
+    }
+  }
+
+  /** Gửi `n` tin DỪNG (`dx = dy = 0`, mục 41.2). Không đẩy vào `pending`: chúng không di chuyển nên không cần chạy lại khi đối chiếu. */
+  private sendStops(n: number) {
+    for (let i = 0; i < n; i++)
+      this.room.send("input", { seq: ++this.seq, dx: 0, dy: 0 } as InputMsg);
+  }
+
+  /**
+   * Mỗi KHUNG VẼ (không chờ nhịp 50 ms của `fixedStep`): hết ý định đi (nhả phím / cần điều khiển, bị choáng, mở bảng chặn phím) sau khi đã gửi input di chuyển thì gửi NGAY tin dừng
+   * (mục 41.2): máy chủ có hàng input còn tồn sẽ không tiếp tục đẩy nhân vật đi sau khi người chơi đã nhả phím. Các tin lặp do `fixedStep` gửi ở các bước kế tiếp.
+   */
+  private stepMoveStop() {
+    const me = this.me();
+    if (this.isReconnecting || ui.isLimboOpen() || !me || me.dead) {
+      this.stopBurst.reset();
+      return;
+    }
+    const { dx, dy } = this.moveDir();
+    const active = !this.status.stunned(performance.now()) && Math.hypot(dx, dy) >= 0.05;
+    if (!active) this.moving = false; // dừng cả hoạt ảnh chạy ngay, không chờ bước kế
+    this.sendStops(this.stopBurst.frame(active));
   }
 
   private fixedStep() {
     if (this.isReconnecting || ui.isLimboOpen()) {
       this.moving = false;
+      this.stopBurst.reset();
       return;
     }
     const me = this.me();
     if (!me || me.dead) {
       this.moving = false;
+      this.stopBurst.reset();
       return;
     }
     const now = performance.now();
-    // Choáng: không đoán trước, không gửi `input` (server nếu vẫn nhận thì tiêu thụ mà không di chuyển)
+    // Choáng: không đoán trước, không gửi input di chuyển (server nếu vẫn nhận thì tiêu thụ mà không di chuyển); vẫn gửi nốt các tin dừng còn nợ
     if (this.status.stunned(now)) {
       this.moving = false;
+      this.sendStops(this.stopBurst.tick(false));
       return;
     }
     const { dx, dy } = this.moveDir();
     if (Math.hypot(dx, dy) < 0.05) {
       this.moving = false;
+      this.sendStops(this.stopBurst.tick(false));
       return;
     }
     this.moving = true;
     const msg: InputMsg = { seq: ++this.seq, dx, dy };
     this.room.send("input", msg);
+    this.stopBurst.moved();
     this.pending.push(msg);
     // Hệ số tăng tốc / tê cóng: CÙNG `moveSpeedMul` với server (`applyInputs`), nên đoán trước khớp
     const speed =
@@ -2416,10 +2607,12 @@ export class WorldScene extends Phaser.Scene {
     if (!this.state?.players) return;
     const t0 = this.perfEnabled ? performance.now() : 0;
     this.acc = Math.min(this.acc + deltaMs, 250);
+    this.stepMoveStop();
     while (this.acc >= TICK_MS) {
       this.acc -= TICK_MS;
       this.fixedStep();
     }
+    ({ x: this.corrX, y: this.corrY } = decayCorr({ x: this.corrX, y: this.corrY }, deltaMs));
 
     // Nhịp sóng dùng chung cho hào quang đả tọa, hộ phù và đồ rơi (thay cho hàng trăm tween lặp vô hạn)
     this.auraWave = 0.5 - 0.5 * Math.cos((_t * Math.PI) / 900);
@@ -2429,6 +2622,7 @@ export class WorldScene extends Phaser.Scene {
     const k = 1 - Math.exp(-LERP_RATE * (deltaMs / 1000));
     this.syncPlayers(k, deltaMs);
     this.syncMonsters(k);
+    this.syncBossBar(this.time.now);
     this.tickAutoTarget();
     this.syncShield();
     this.syncTargetLock();
@@ -2518,6 +2712,7 @@ export class WorldScene extends Phaser.Scene {
           lootsAvg: Number((this.perfLootsSum / frames).toFixed(1)),
           tweensAvg: Number((this.perfTweenSum / frames).toFixed(1)),
           tweensMax: this.perfTweenMax,
+          rttMs: this.rttMs(),
         };
       },
     };
@@ -2563,6 +2758,7 @@ export class WorldScene extends Phaser.Scene {
       monsters: this.monsters.size,
       loots: this.loots.size,
       tweens: tweensCount,
+      rttMs: this.rttMs(),
     });
   }
 
@@ -2690,7 +2886,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private resolveQuestTarget(questId: string): { x: number; y: number; hop?: NavHop } | null {
-    const def = QUEST_BY_ID[questId];
+    const def = questDefAny(questId);
     if (!def) return null;
     const qLog = ui.getQuestLog();
     const prog = qLog.active.find((a) => a.id === questId);
@@ -2840,6 +3036,7 @@ export class WorldScene extends Phaser.Scene {
     this.mapCtl.reset({ worldW: ov.w * TILE, worldH: ov.h * TILE }, viewId === null);
     const title = document.getElementById("map-title");
     if (title) title.textContent = `Sơn Hà Đồ · ${ov.name}`;
+    ui.setMapPanelCard(viewId ?? this.map.def.id);
     const sub = document.getElementById("map-coords");
     if (sub) {
       sub.textContent =
@@ -2983,7 +3180,7 @@ export class WorldScene extends Phaser.Scene {
       if (target) {
         questTarget = target;
         // ghim đích nhiệm vụ: ở bản đồ KHÁC thì đích là cổng kế tiếp trên đường tới đó ("Qua <cổng>")
-        const name = QUEST_BY_ID[trackId ?? ""]?.title ?? "Nhiệm vụ";
+        const name = questDefAny(trackId)?.title ?? "Nhiệm vụ";
         pins.push({ x: target.x, y: target.y, text: target.hop ? hopLabel(target.hop) : name });
       }
     }
@@ -3181,8 +3378,17 @@ export class WorldScene extends Phaser.Scene {
       if (isMe) {
         // Bám sát vị trí đoán trước; làm mượt các lần chỉnh nhỏ từ server
         const kk = 1 - Math.exp(-30 * (deltaMs / 1000));
-        e.root.x += (this.predX - e.root.x) * kk;
-        e.root.y += (this.predY - e.root.y) * kk;
+        const wantX = this.predX + this.corrX;
+        const wantY = this.predY + this.corrY;
+        if (this.snapMe) {
+          // lệch lớn (mục 41.3): dịch chuyển tức thì, không lao ngang màn hình
+          this.snapMe = false;
+          e.root.x = wantX;
+          e.root.y = wantY;
+        } else {
+          e.root.x += (wantX - e.root.x) * kk;
+          e.root.y += (wantY - e.root.y) * kk;
+        }
         e.root.setVisible(true);
         if (e.sprite.anims.isPaused) e.sprite.anims.resume();
         this.applyPlayerEquip(e, p, true);
@@ -3313,12 +3519,14 @@ export class WorldScene extends Phaser.Scene {
       this.syncShadow(e);
       e.label!.setVisible(showLabel);
       if (showLabel) {
-        const isDuel = Boolean((p as any).duel);
-        const duelPrefix = isDuel ? "⚔ " : "";
-        const sectTag = (p as any).sect ? `[${(p as any).sect}]` : "";
-        const label = sectTag
-          ? `${sectTag}\n${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`
-          : `${duelPrefix}${p.name}\n${realmLabel(p.realm, p.tier)}`;
+        const label = playerLabelText({
+          name: p.name,
+          realm: realmLabel(p.realm, p.tier),
+          sect: (p as any).sect,
+          title: (p as any).title, // danh hiệu (M9.8, `Player.title` id ngắn); chỉ hiện khi cờ ?social=1
+          duel: Boolean((p as any).duel),
+          showTitle: this.socialOn,
+        });
         if (label !== e.lastLabel) {
           e.label!.setText(label);
           e.lastLabel = label;
@@ -3381,6 +3589,7 @@ export class WorldScene extends Phaser.Scene {
       if (!e.root.visible) e.root.setVisible(true);
       if (e.sprite.anims.isPaused) e.sprite.anims.resume();
       if (this.animDue(e)) this.updateMonsterAnim(e);
+      const pose = def.boss ? this.bossPose(e, id) : NEUTRAL_POSE;
       this.stepTween(
         e,
         false,
@@ -3388,6 +3597,7 @@ export class WorldScene extends Phaser.Scene {
         false,
         e.monAnim ? sinceStart(this.time.now, e.monAnim.attackUntil, monAnimMs("attack")) : -1,
         e.monAnim ? sinceStart(this.time.now, e.monAnim.hurtUntil, monAnimMs("hurt")) : -1,
+        pose,
       );
       this.syncShadow(e);
       e.root.setDepth(e.root.y);
@@ -3408,11 +3618,16 @@ export class WorldScene extends Phaser.Scene {
         elite || m.hp < m.maxHp,
         elite,
       );
-      this.syncMonsterStatus(e, m.fx, def.radius, !!def.boss || elite);
+      this.syncMonsterStatus(e, m.fx, m.mark, def.radius, !!def.boss || elite);
+      if (def.boss) this.syncBossArmor(e, id, def.radius);
     });
     for (const [id, e] of this.monsters) {
       if (seen.has(id)) continue;
       this.stepTween(e, false, false, true, -1, -1); // gục: trả sprite về tỉ lệ gốc (nhát chí mạng đang nén dở thì không kẹt tỉ lệ lệch)
+      if (e.bossGlow) {
+        e.bossGlow = 0;
+        e.sprite.clearTint(); // trùm gục giữa lúc vận chiêu: không giữ ánh đỏ cam lên hình đổ
+      }
       if (e.root.visible) {
         // Quái biến khỏi state khi đang hiện trong màn hình = gục: tan thành điểm sáng (ngoài camera thì root ẩn, không vào đây)
         // Chỉ khi còn gần mình: quái rời vùng nhìn của server (xa hơn 1100 px) cũng biến khỏi state nhưng KHÔNG gục
@@ -3451,7 +3666,24 @@ export class WorldScene extends Phaser.Scene {
         e.root.destroy();
       }
       this.monsters.delete(id);
+      this.bossFx.forget(id);
     }
+  }
+
+  /**
+   * Thanh máu trùm (mục 42, T4 #873): chọn MỘT trùm (gần nhất trong tầm; bí cảnh luôn hiện trùm của run) từ state công khai rồi vẽ mô hình; không việc mỗi khung (~10 lần / giây).
+   * Chỉ trùm ĐANG ĐÁNH / ở gần mới hiện thanh: 8 Hắc Giao rải bản đồ không thành 8 thanh.
+   */
+  private syncBossBar(now: number) {
+    if (now < this.nextBossBarAt) return;
+    this.nextBossBarAt = now + 100;
+    const cands: BossCand[] = [];
+    this.state.monsters.forEach((m: any, id: string) => {
+      cands.push({ id, kind: m.kind, x: m.x, y: m.y, hp: m.hp, maxHp: m.maxHp });
+    });
+    const me = this.hasMe ? { x: this.predX, y: this.predY } : null;
+    const pick = pickBossForBar(cands, me, { always: isDungeonMap(this.map.def.id) });
+    this.bossBar.update(pick ? this.bossFx.modelOf(pick, now) : null);
   }
 
   /** Phát hoạt ảnh theo máy trạng thái (gfx/anim/mon-anim.ts); chỉ đổi khi trạng thái đổi. */
@@ -3592,6 +3824,44 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /**
+   * Vầng GIÁP của trùm `id` (`bossArmor`, T4 #873): vòng tròn xanh bao quanh thân suốt thời gian giáp, mờ dần khi sắp hết, nhịp chung của cảnh (`auraWave`); giảm chuyển động thì đứng yên.
+   * Dựng lười MỘT lần, giáp hết thì ẩn. Hình tròn có viền (không chỉ màu) nên người mù màu vẫn thấy; chữ "Có giáp" trên thanh trùm là kênh chính.
+   */
+  private syncBossArmor(e: Entity, id: string, radius: number) {
+    const a = this.bossFx.armorOf(id, this.time.now);
+    if (!a) {
+      if (e.armorAura?.visible) e.armorAura.setVisible(false);
+      return;
+    }
+    if (!e.armorAura) {
+      e.armorAura = this.add
+        .circle(0, -radius * 0.35, radius + 16, 0x7fc4ff, 0.16)
+        .setStrokeStyle(3, 0xdff2ff, 0.9);
+      e.root.add(e.armorAura); // trên sprite: là vầng bao quanh, không phải bóng dưới chân
+    }
+    const pulse = animReducedMotion() ? 0.5 : this.auraWave;
+    e.armorAura
+      .setVisible(true)
+      .setScale(1 + 0.05 * pulse)
+      .setAlpha(Math.min(1, 0.35 + 0.65 * Math.min(1, a.frac * 3)) * (0.75 + 0.25 * pulse));
+  }
+
+  /**
+   * Tư thế gồng / đáp của trùm `id` lúc này (`boss-cast-anim.ts`) và áp ánh đỏ cam lên sprite (chỉ gọi `setTint` khi đổi bậc). Không vận chiêu: trung tính, trả sprite về màu gốc đúng một lần.
+   */
+  private bossPose(e: Entity, id: string): Readonly<BossCastPose> {
+    const tm = this.bossFx.castTiming(id, this.time.now, BOSS_STRIKE_MS);
+    const pose = tm ? bossCastPose(tm.elapsedMs, tm.castMs, animReducedMotion()) : NEUTRAL_POSE;
+    const step = bossGlowStep(pose.glow);
+    if (step !== (e.bossGlow ?? 0)) {
+      e.bossGlow = step;
+      if (step === 0) e.sprite.clearTint();
+      else e.sprite.setTint(bossGlowTint(step));
+    }
+    return pose;
+  }
+
+  /**
    * Tween nhẹ mỗi khung (gfx/anim/tween.ts): nhấp nhô khi đi, co giãn khi đánh / bị đánh. Tắt khi giảm chuyển động, bậc Thấp, ở xa
    * (`tweenEnabled`); lúc tắt trả sprite về vị trí / tỉ lệ gốc đúng MỘT lần rồi không ghi gì nữa (không tốn mỗi khung).
    */
@@ -3602,9 +3872,10 @@ export class WorldScene extends Phaser.Scene {
     dead: boolean,
     strikeSince: number,
     hurtSince: number,
+    pose: Readonly<BossCastPose> = NEUTRAL_POSE,
   ) {
     const near = me || (e.distMe ?? Number.POSITIVE_INFINITY) < FAR_ANIM_DIST;
-    const t = spriteTween({
+    const base = spriteTween({
       enabled: tweenEnabled(getQuality(), near),
       nowMs: this.time.now,
       moving,
@@ -3613,6 +3884,8 @@ export class WorldScene extends Phaser.Scene {
       hurtSince,
       phaseMs: (e.tweenPhase ??= Math.random() * WALK_BOB_PERIOD_MS),
     });
+    // Trùm đang vận chiêu: gồng / đáp nhân lên tween nền (kể cả bậc Thấp / ở xa: đây là tín hiệu chiến đấu, không phải trang trí)
+    const t = composeTween(base, pose);
     if (t === NEUTRAL_TWEEN) {
       if (!e.tweenActive) return;
       e.tweenActive = false;
@@ -3691,11 +3964,20 @@ export class WorldScene extends Phaser.Scene {
    * Huy hiệu trạng thái có hại trên đầu quái từ `Monster.fx` (mặt nạ bit công khai, #559): chỉ vẽ lại khi mặt nạ ĐỔI (hiếm), Graphics dựng lười ở lần đầu cần.
    * Máy chủ cũ chưa có `fx` (undefined) hoặc giá trị rác thì coi như 0. Trùm có tên ở -radius-22 nên hàng chấm nằm cao hơn một nấc.
    */
-  private syncMonsterStatus(e: Entity, fx: unknown, radius: number, boss: boolean) {
+  private syncMonsterStatus(e: Entity, fx: unknown, mark: unknown, radius: number, boss: boolean) {
     const mask = typeof fx === "number" && Number.isInteger(fx) && fx > 0 ? fx : 0;
-    if (mask === (e.lastFx ?? 0)) return;
-    e.lastFx = mask;
-    const pips = pipsOf(mask);
+    // DẤU hệ (`Monster.mark`, mục 51 CT2): chỉ số 1-9; máy chủ cũ chưa có trường (undefined) hoặc giá trị rác thì coi như 0. Nhớ dấu cuối còn thấy để vụ nổ combo biết màu
+    // (máy chủ gỡ dấu cùng lúc đánh nên lúc `dmg.combo` tới state có thể đã về 0).
+    const mk =
+      typeof mark === "number" && Number.isInteger(mark) && mark >= 1 && mark <= 9 ? mark : 0;
+    if (mk > 0) {
+      e.lastMark = mk;
+      e.lastMarkAt = this.time.now;
+    }
+    const key = mask * 16 + mk;
+    if (key === (e.lastFx ?? 0)) return;
+    e.lastFx = key;
+    const pips = pipsOf(mask, mk);
     e.pipCount = pips.length;
     e.pipText = pipsLabel(pips);
     if (pips.length === 0) {
@@ -3813,6 +4095,9 @@ export class WorldScene extends Phaser.Scene {
   private stepTransientFx(now: number) {
     // 0. Báo trước đòn + đạn của quái: vẽ lại theo đồng hồ cảnh (vị trí đạn tính từ lúc bắn, không từ khung)
     this.telegraphs.update(now);
+    this.pbolts.update(now);
+    this.windups.update(now);
+    this.persists.update(now);
 
     // 1. Vệt chém (180ms)
     for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
@@ -3876,6 +4161,20 @@ export class WorldScene extends Phaser.Scene {
     }
     this.onHitFx(m);
     sound.hit(m.crit);
+    if (m.combo === true) {
+      // đòn ĂN COMBO (mục 51, CT11b): vụ nổ dấu ngay chỗ trúng, màu theo hệ của dấu vừa bị gỡ (nhớ từ `syncMonsterStatus`, tối đa 2 giây trước)
+      const e = m.toPlayer ? undefined : this.monsters.get(m.target);
+      const fresh = e?.lastMarkAt !== undefined && this.time.now - e.lastMarkAt < 2000;
+      this.playFxPoints(
+        planComboBurst({
+          x: m.x,
+          y: m.y,
+          markIndex: fresh ? e?.lastMark : 0,
+          mine: !m.toPlayer && this.recentHit.has(m.target),
+          emitterBudget: getQuality().emitterBudget,
+        }),
+      );
+    }
   }
 
   private onFx(m: FxMsg) {
@@ -3905,34 +4204,103 @@ export class WorldScene extends Phaser.Scene {
         // Dùng chiêu (M7.7, #508): hạt theo hình / hệ của chiêu (`cast-fx.ts`); client chỉ vẽ, kết quả đánh do máy chủ quyết định
         const def = skillOf(m.skill);
         if (!def) return; // id lạ: bỏ qua
-        const mine = m.by === this.sid;
-        if (mine) {
-          // đòn của mình: số sát thương trúng quái trong tầm được tô như đòn của mình (như chém / kiếm khí)
-          this.lastAttack = { at: this.time.now, range: m.range };
-          const me = this.players.get(this.sid);
-          if (me) me.slashUntil = this.time.now + SLASH_MS;
-        } else {
-          const other = this.players.get(m.by);
-          if (other) other.slashUntil = this.time.now + SLASH_MS;
+        // CHIÊU VẬN (`windupMs`, CT5 lát 2): `fx cast` là lúc BẮT ĐẦU vận; máy chủ đáp (sát thương + hiệu ứng hình) sau `windupMs`. Vẽ vòng tụ khí ngay, hoãn tiếng + hạt đáp
+        // tới hết `windupMs` (WindupLayer gọi `onWindupRelease`), bỏ nếu người vận chết / rời vùng nhìn / (của mình) bị choáng.
+        const wind = planWindup(m, def, m.by === this.sid);
+        if (wind !== null) {
+          this.windups.begin(wind, this.time.now);
+          return;
         }
-        // Tiếng chiêu (#508 (a), tổng hợp bằng mã): của mình luôn nghe; của người khác chỉ khi trong tầm nhìn (nhỏ hơn)
-        if (mine || this.inView(m.x, m.y, m.range + 96)) sound.cast(def.element, def.shape, mine);
-        if (!this.inView(m.x, m.y, m.range + 96)) return;
+        return this.castVisuals(def, m.by, m.x, m.y, m.angle, m.range);
+      }
+      case "chain": {
+        // Sét lan (mục 51, CT11b): tia nối tiếp từng đoạn giữa các mục tiêu máy chủ đã chọn, màu theo hệ; client chỉ vẽ, sát thương đã có `dmg`. Tin hỏng: bỏ cả tin
+        const def = skillOf(m.skill);
+        const pts = parseChainPts(m.pts);
+        if (!def || !pts) return;
+        if (!this.inView(m.x, m.y, 480)) return;
         return this.playFxPoints(
-          planCastFx({
+          planChainFx({
             skill: def,
-            x: m.x,
-            y: m.y,
-            angle: m.angle,
-            range: m.range,
-            mine,
+            pts,
+            mine: m.by === this.sid,
             emitterBudget: getQuality().emitterBudget,
           }),
         );
       }
+      case "pbolt": {
+        // Đạn của người chơi (mục 51, CT11b bước 2): MỖI tin là một đoạn thẳng máy chủ đã tính (tới ô chặn / trúng / hết tầm); nảy là một tin MỚI từ chỗ nảy. Client chỉ
+        // bay hình theo `speed` / `angle` trong `ms` rồi bụi ở cuối đoạn; sát thương đã có `dmg`. Tin hỏng / chiêu lạ / ngoài tầm nhìn: bỏ, không lỗi.
+        const def = skillOf(m.skill);
+        const p = parsePBolt(m);
+        if (!def || !p) return;
+        const end = pboltEnd(p);
+        // nhìn thấy khi điểm đầu HOẶC điểm cuối trong tầm (đạn bay ngang màn hình)
+        if (!this.inView(p.x, p.y, 480) && !this.inView(end.x, end.y, 480)) return;
+        const plan = pboltPlan(p, def.element, p.by === this.sid);
+        this.pbolts.add(plan, this.time.now);
+        return this.playFxPoints(planPBoltEnd(plan));
+      }
+      case "zone":
+      case "trap":
+      case "totem":
+      case "aura": {
+        // Vật thể bền (mục 51, CT11b bước 3b): MỘT tin lúc dựng (id tăng theo phòng, tâm, bán kính, tồn tại tối đa `ms`); hết `ms` thì lớp tự tắt, `fxEnd` chỉ báo kết thúc sớm.
+        // Bẫy chờ `armMs` của chiêu rồi mới sáng. Tin hỏng / chiêu lạ / ngoài tầm nhìn: bỏ, không lỗi. Người vào vùng nhìn SAU lúc dựng không nhận tin nên không thấy (chấp nhận).
+        const def = skillOf(m.skill);
+        const p = parsePersist(m);
+        if (!def || !p) return;
+        const near = p.kind === "aura" ? (this.persistAnchor(p.by, false) ?? p) : p;
+        if (!this.inView(near.x, near.y, p.r + 160)) return;
+        this.persists.add(persistPlan(p, def, p.by === this.sid), this.time.now);
+        return;
+      }
+      case "fxEnd": {
+        // Vật thể bền kết thúc SỚM: `pop` (bẫy nổ) thì vòng nổ + bụi tại chỗ bẫy, `gone` thì mờ dần. `id` không giữ (vào vùng nhìn sau lúc dựng / đã bị thay) thì bỏ qua.
+        const e = parsePersistEnd(m);
+        if (!e) return;
+        const ended = this.persists.endOne(e.id, e.why, this.time.now);
+        if (ended && e.why === "pop")
+          this.playFxPoints(planPersistPop(ended.plan, ended.x, ended.y));
+        return;
+      }
       case "warn":
         // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
-        this.telegraphs.warn(m, this.time.now);
+        // Đếm tới "đầy" rút ngắn theo RTT (`net-latency.ts`, #873): cùng một nguồn RTT với thanh gồng của trùm bên dưới
+        this.telegraphs.warn(m, this.time.now, this.rttMs());
+        return;
+      case "bossCast":
+        // Trùm bắt đầu vận chiêu (mục 42): tên chiêu lên thanh máu trùm; vùng cảnh báo trên đất do `fx` `warn` đi kèm lo.
+        // `ms` rút ngắn đúng như vùng báo (`warnShownMs`, cùng RTT): thanh tiến độ + hoạt ảnh gồng đầy cùng lúc với vành khuyên / nón / đường
+        this.bossFx.onCast(m.by, m.ability, warnShownMs(m.ms, this.rttMs()), this.time.now);
+        this.bossCastSound(m);
+        return;
+      case "bossPhase":
+        // Trùm chuyển giai đoạn: thanh chớp + rung nhẹ khung hình (bỏ rung khi giảm chuyển động)
+        this.bossFx.onPhase(m.by, this.time.now);
+        if (!getQuality().reducedMotion && this.inView(m.x, m.y, 240))
+          this.cameras.main.shake(320, 0.004);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) sound.boss("phase");
+        return;
+      case "bossEnrage":
+        this.bossFx.onEnrage(m.by, this.time.now);
+        sound.boss("enrage"); // một lần duy nhất (bí cảnh), cả đội cần nghe dù đang đứng xa
+        return;
+      case "bossArmor":
+        // Trùm dựng giáp (mục 42, T4): chữ "Có giáp" + đếm ngược trên thanh trùm, vầng giáp quanh thân (`syncBossArmor`), số bay xanh nhạt (`planHitNumber`); `fx` hỏng bị bỏ ở `onArmor`
+        this.bossFx.onArmor(m.by, m.ms, m.mult, this.time.now);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) {
+          this.fx.play("boss-armor", m.x, m.y - 8, { priority: 1 });
+          sound.boss("armor");
+        }
+        return;
+      case "bossSummon":
+        // Trùm gọi quái con: chữ "Gọi N quái con" trên thanh trùm + hồn bốc lên ở chỗ trùm đứng + tiếng; quái con tự hiện qua state như quái thường
+        this.bossFx.onSummon(m.by, m.n, this.time.now);
+        if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) {
+          this.fx.play("boss-summon", m.x, m.y - 8, { priority: 1 });
+          sound.boss("summon");
+        }
         return;
       case "bolt":
         // Đạn tầm xa của quái: client tự bay theo `speed` / `angle` tới hết `range` (đạn không là state)
@@ -3945,6 +4313,20 @@ export class WorldScene extends Phaser.Scene {
         if (!this.inView(m.x, m.y, 120)) return;
         return this.fxBreakFail(m.x, m.y, m.by === this.sid);
     }
+  }
+
+  /**
+   * Tiếng của trùm khi vận chiêu (`sfx-recipes.ts` `bossSfx`): tiếng gồng ngay lúc báo, tiếng đòn rơi đúng lúc đáp (`ms` sau), sắc theo hệ của chiêu. Chỉ khi trùm trong / sát tầm nhìn
+   * (`BOSS_SFX_VIEW`). Người đã rời cảnh giữa chừng thì tiếng đòn rơi bị huỷ cùng đồng hồ cảnh.
+   */
+  private bossCastSound(m: { by: string; x: number; y: number; ability: string; ms: number }) {
+    if (!this.inView(m.x, m.y, BOSS_SFX_VIEW)) return;
+    const el = bossAbilityElement(this.state.monsters.get(m.by)?.kind, m.ability);
+    sound.boss("cast", el);
+    const ms = Number.isFinite(m.ms) ? Math.min(Math.max(m.ms, 0), 8000) : 0;
+    this.time.delayedCall(ms, () => {
+      if (this.inView(m.x, m.y, BOSS_SFX_VIEW)) sound.boss("strike", el);
+    });
   }
 
   private fxSlash(x: number, y: number, angle: number, color: number, scale = 1, mine = false) {
@@ -3983,6 +4365,73 @@ export class WorldScene extends Phaser.Scene {
   }
 
   /** Phát các điểm hạt của một kế hoạch (có trễ thì hẹn giờ theo đồng hồ cảnh; đóng cảnh thì tự huỷ). */
+  /**
+   * Hình + tiếng của MỘT lần dùng chiêu (hạt theo hình / hệ, tô số sát thương đòn của mình, hoạt ảnh chém): chiêu tức thời gọi ngay khi nhận `fx cast`; chiêu vận gọi lúc ĐÁP
+   * (hết `windupMs`) với vị trí HIỆN TẠI của người vận (máy chủ đáp từ đó) và hướng lúc bắt đầu.
+   */
+  private castVisuals(
+    def: SkillDef,
+    by: string,
+    x: number,
+    y: number,
+    angle: number,
+    range: number,
+  ) {
+    const mine = by === this.sid;
+    if (mine) {
+      // đòn của mình: số sát thương trúng quái trong tầm được tô như đòn của mình (như chém / kiếm khí)
+      this.lastAttack = { at: this.time.now, range };
+      const me = this.players.get(this.sid);
+      if (me) me.slashUntil = this.time.now + SLASH_MS;
+    } else {
+      const other = this.players.get(by);
+      if (other) other.slashUntil = this.time.now + SLASH_MS;
+    }
+    // Tiếng chiêu (#508 (a), tổng hợp bằng mã): của mình luôn nghe; của người khác chỉ khi trong tầm nhìn (nhỏ hơn)
+    if (mine || this.inView(x, y, range + 96)) sound.cast(def.element, def.shape, mine);
+    if (!this.inView(x, y, range + 96)) return;
+    return this.playFxPoints(
+      planCastFx({
+        skill: def,
+        x,
+        y,
+        angle,
+        range,
+        mine,
+        emitterBudget: getQuality().emitterBudget,
+      }),
+    );
+  }
+
+  /** Người đang vận khí: vị trí hiện tại (của mình: vị trí đoán trước) và cờ chết / choáng (choáng chỉ biết với chính mình); `null` khi không còn trong state. */
+  private windupWatch(by: string, mine: boolean): WindupWatchResult | null {
+    const e = this.players.get(by);
+    const p = this.state?.players?.get(by);
+    if (!e || !p) return null;
+    const self = by === this.sid && this.hasMe;
+    return {
+      x: self ? this.predX : e.root.x,
+      y: self ? this.predY : e.root.y,
+      dead: p.dead,
+      stunned: mine && this.status.stunned(performance.now()),
+    };
+  }
+
+  /** Người dùng hào quang: vị trí hiện tại (của mình: vị trí đoán trước) và cờ chết; `null` khi không còn trong state. */
+  private persistAnchor(by: string, mine: boolean): PersistAnchor | null {
+    const e = this.players.get(by);
+    const p = this.state?.players?.get(by);
+    if (!e || !p) return null;
+    const self = (mine || by === this.sid) && this.hasMe;
+    return { x: self ? this.predX : e.root.x, y: self ? this.predY : e.root.y, dead: p.dead };
+  }
+
+  /** Vận xong không bị huỷ: hiệu ứng + tiếng đáp tại chỗ người vận đứng LÚC NÀY (như máy chủ). Chiêu đã bị gỡ khỏi bảng giữa chừng thì bỏ. */
+  private onWindupRelease(plan: WindupPlan, x: number, y: number) {
+    const def = skillOf(plan.skill);
+    if (def) this.castVisuals(def, plan.by, x, y, plan.angle, plan.range);
+  }
+
   private playFxPoints(points: FxPoint[]) {
     for (const p of points) {
       const play = () =>
@@ -4082,6 +4531,8 @@ export class WorldScene extends Phaser.Scene {
       targetMaxHp: maxHp,
       // Loại quái bị đánh (từ state; `planHitFx` tự bỏ id lạ): trùm / quái Kim Đan có hiệu ứng riêng
       kind: m.toPlayer ? undefined : (target as { kind?: string } | undefined)?.kind,
+      // Trùm đang có giáp: số bay xanh nhạt, nhỏ hơn (người đánh biết sát thương đang bị giảm)
+      armored: !m.toPlayer && this.bossFx.armorOf(m.target, this.time.now) !== null,
       mine:
         !targetIsMe &&
         !m.toPlayer &&

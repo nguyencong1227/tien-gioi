@@ -6,7 +6,10 @@ import {
   SECT_VAULT_DRAW_MAX,
   SECT_VAULT_LOG_MAX,
   SECT_VAULT_QTY_MAX,
+  SECT_LEVELS,
+  SECT_TERMS,
   SECT_VAULT_SLOTS,
+  SECT_VAULT_SLOTS_MAX,
   sectVaultAccepts,
   sectVaultDrawQtyCap,
   type InvSlot,
@@ -53,15 +56,22 @@ function cleanLog(raw: unknown): SectVaultLogEntry | null {
 }
 
 /**
- * Làm sạch ảnh chụp kho đồ nhận từ máy chủ (client không tin tin nhắn): đúng `SECT_VAULT_SLOTS` ô, món lạ / số lượng hỏng thành ô trống, số lượng kẹp theo chồng của món, sổ tối đa
+ * Làm sạch ảnh chụp kho đồ nhận từ máy chủ (client không tin tin nhắn): `SECT_VAULT_SLOTS` ô trở lên (các ô ĐÃ MỞ theo cấp tông, tới `SECT_VAULT_SLOTS_MAX`), món lạ / số lượng hỏng thành ô trống, số lượng kẹp theo chồng của món, sổ tối đa
  * `SECT_VAULT_LOG_MAX` dòng, `drawPerDay` kẹp [0, `SECT_VAULT_DRAW_MAX`], `myDrawsLeft` `null` hoặc số nguyên không âm, `lockMs` không âm. Hỏng hẳn: `null` (coi như chưa có kho).
  */
 export function sanitizeVaultView(raw: unknown): SectVaultView | null {
   if (typeof raw !== "object" || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const rawSlots = Array.isArray(r.slots) ? r.slots : [];
+  // M8: máy chủ chỉ gửi các ô ĐÃ MỞ theo cấp tông (độ dài = `unlocked`; cấp 1 = 40 như trước M8). Chỉ tin `unlocked` (không suy từ độ dài mảng: mảng dài hơn mà thiếu `unlocked` là rác);
+  // máy chủ cũ không có `unlocked` thì luôn `SECT_VAULT_SLOTS`. Kẹp trong [SECT_VAULT_SLOTS, SECT_VAULT_SLOTS_MAX]: ô khoá không bao giờ vẽ như ô dùng được.
+  const wantRaw =
+    typeof r.unlocked === "number" && Number.isFinite(r.unlocked)
+      ? Math.floor(r.unlocked)
+      : SECT_VAULT_SLOTS;
+  const open = Math.min(SECT_VAULT_SLOTS_MAX, Math.max(SECT_VAULT_SLOTS, wantRaw));
   const slots: (InvSlot | null)[] = [];
-  for (let i = 0; i < SECT_VAULT_SLOTS; i++) slots.push(cleanSlot(rawSlots[i]));
+  for (let i = 0; i < open; i++) slots.push(cleanSlot(rawSlots[i]));
   const log: SectVaultLogEntry[] = [];
   if (Array.isArray(r.log))
     for (const e of r.log) {
@@ -81,7 +91,21 @@ export function sanitizeVaultView(raw: unknown): SectVaultView | null {
     typeof r.lockMs === "number" && Number.isFinite(r.lockMs) && r.lockMs > 0
       ? Math.floor(r.lockMs)
       : 0;
-  return { slots, log, drawPerDay: dpd, myDrawsLeft: left, lockMs: lock };
+  return { slots, unlocked: open, log, drawPerDay: dpd, myDrawsLeft: left, lockMs: lock };
+}
+
+/**
+ * Ghi chú về các ô CHƯA MỞ của kho (M8, mục 12.4): kho có tối đa `SECT_VAULT_SLOTS_MAX` ô, chỉ `unlocked` ô đầu dùng được theo cấp tông. Trả "" khi đã mở hết;
+ * không thì nêu số ô còn khoá và cấp tông gần nhất mở thêm ô (lấy từ bảng `SECT_LEVELS`, không chép số).
+ */
+export function vaultLockedNote(unlocked: number): string {
+  const open = Number.isFinite(unlocked) ? Math.max(0, Math.floor(unlocked)) : SECT_VAULT_SLOTS;
+  if (open >= SECT_VAULT_SLOTS_MAX) return "";
+  const next = SECT_LEVELS.find((l) => l.vaultSlots > open);
+  const locked = SECT_VAULT_SLOTS_MAX - open;
+  return next
+    ? `Còn ${locked} ô chưa mở: ${SECT_TERMS.level.toLowerCase()} ${next.level} (${next.name}) mở thêm ${next.vaultSlots - open} ô.`
+    : `Còn ${locked} ô chưa mở.`;
 }
 
 /** Lý do một nút Góp / Rút không bấm được (hiện bằng chữ cạnh nút, không chỉ bằng màu). */
@@ -280,7 +304,7 @@ export function planStillValid(
   return !!s && s.itemId === plan.itemId && s.qty >= plan.qty;
 }
 
-/** Dòng sổ kho đồ: "10:30 · Tiêu Viêm đã góp Hồi Huyết Đan ×5" (giờ theo máy người xem). */
+/** Dòng sổ kho đồ: "10:30 · Phó Hồng Ngạn đã góp Hồi Huyết Đan ×5" (giờ theo máy người xem). */
 export function vaultLogLine(e: SectVaultLogEntry): string {
   const d = new Date(e.at);
   const hh = String(d.getHours()).padStart(2, "0");

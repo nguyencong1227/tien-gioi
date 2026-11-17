@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
-import { ITEMS, MONSTERS, NPCS } from "@tien-gioi/shared";
+import { ITEMS, MONSTERS, NPCS, SUMMON_ONLY_KINDS } from "@tien-gioi/shared";
 import { MON_ONE_SHOT } from "./gfx/anim/mon-anim";
 
 // Atlas do `client/scripts/gen-assets.mjs` sinh (tất định, không tệp ngoài). Test này giữ hợp đồng giữa script sinh,
@@ -49,6 +49,13 @@ describe("atlas.json / atlas.png (sinh bằng gen-assets.mjs)", () => {
     // M6 #407: không còn quái nào rơi về ảnh dự phòng vẽ bằng mã (textures.ts) vì thiếu khung trong atlas
     expect(MONSTERS.length).toBeGreaterThanOrEqual(9);
     for (const m of MONSTERS) {
+      // Quái con do trùm triệu hồi (#887): CHƯA có tranh thì dùng ảnh dự phòng vẽ bằng mã (`textures.ts`); nhưng đã có tranh thì phải ĐỦ khung (không nửa vời)
+      if (SUMMON_ONLY_KINDS.includes(m.id)) {
+        const have = Object.keys(atlas.frames).filter((k) => k.startsWith(`mon-${m.id}`));
+        const need = 2 + Object.values(MON_ONE_SHOT).reduce((n, shot) => n + shot.frames.length, 0);
+        if (have.length === 0) continue;
+        expect(have.length, `${m.id}: có tranh thì phải đủ khung`).toBeGreaterThanOrEqual(need);
+      }
       const base = atlas.frames[`mon-${m.id}-0`];
       expect(base, `mon-${m.id}-0`).toBeDefined();
       expect(atlas.frames[`mon-${m.id}`], `mon-${m.id}`).toBeDefined();

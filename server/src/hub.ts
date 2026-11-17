@@ -5,8 +5,11 @@ import type { Player } from "./schema";
 import type { World } from "./world";
 import { Parties } from "./systems/party";
 import { Runs } from "./systems/dungeon";
+import { Ambushes } from "./systems/arena";
 import { SectBook } from "./systems/sect";
 import { WriteGauge } from "./metrics";
+import { PkLedger } from "./systems/pk-ledger";
+import { WorldBossBook } from "./systems/world-boss-book";
 
 /** Nơi nhận chat toàn server của một phòng (thường là `room.broadcast("chat", msg)`). */
 export type ChatSink = (msg: ChatOut) => void;
@@ -29,8 +32,14 @@ export class Hub {
   readonly parties = new Parties();
   /** Sổ lần chạy bí cảnh của cả tiến trình (docs/THIET_KE_BI_CANH.md mục 4.2); khoá thành viên theo đạo hiệu viết thường như `parties`. */
   readonly runs = new Runs();
+  /** Vé vào đấu trường chặn đường (mục 52, `systems/arena.ts`): mỗi người tối đa một, tổng tối đa `MAX_AMBUSH_ROOMS`. */
+  readonly ambushes = new Ambushes();
   /** Lời mời tông môn đang chờ, thành viên trực tuyến và bản ghi nhớ của cả tiến trình (systems/sect.ts). */
   readonly sects = new SectBook();
+  /** Sổ chống đổi thắng PK của cả tiến trình (M9, `systems/pk-ledger.ts`): mỗi cặp (thắng, thua) tối đa `BOARD_PK_PAIR_DAY_CAP` trận thắng tính mỗi ngày. */
+  readonly pkPairs = new PkLedger();
+  /** Sổ trùm thế giới theo giờ của cả tiến trình (M9.4, `systems/world-boss-book.ts`): lịch, sự kiện đang diễn ra, bảng đóng góp theo linh hồn. Lịch rỗng / `WORLD_BOSS=off` thì không chạy. */
+  readonly worldBoss = new WorldBossBook();
   /** Hàng đợi ghi hồ sơ nhân vật của cả tiến trình (đo ở `WorldRoom.persist`, đọc ở `/metrics`: M4 3.3). */
   readonly writes = new WriteGauge();
 

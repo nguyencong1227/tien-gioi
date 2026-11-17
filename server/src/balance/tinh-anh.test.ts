@@ -34,8 +34,16 @@ describe("mô hình tinh anh", () => {
       "doc_tuoc",
     ])
       expect(by[id].eliteDanger, id).toBeGreaterThan(0.5);
-    // nhưng loài thường cùng bậc vẫn trong ngưỡng an toàn của mô hình (<= 50 %): tinh anh là NGOẠI LỆ hiếm, không phải mặt bằng
-    for (const r of rows) expect(r.normalDanger, r.id).toBeLessThanOrEqual(0.5);
+    // nhưng loài thường cùng bậc vẫn trong ngưỡng an toàn của mô hình (<= 50 %): tinh anh là NGOẠI LỆ hiếm, không phải mặt bằng. NGOẠI LỆ mục 30: Độc Thiềm (máu x1,5) thường cũng đã
+    // vượt ngưỡng ở bậc đo (0,70): cần đội 2 (khoá bằng cận để biết nếu xấu thêm).
+    // Phong Nha thường cũng vượt nhẹ ở bậc đo (0,52 > 0,5; Sơ kỳ Nguyên Anh): cần đội 2 hoặc lên Trung kỳ.
+    const OVER = ["doc_thiem", "phong_nha", "doc_tuoc"]; // Độc Tước (bậc đo): 0,75
+    for (const r of rows)
+      if (!OVER.includes(r.id)) expect(r.normalDanger, r.id).toBeLessThanOrEqual(0.5);
+    for (const id of OVER) {
+      expect(by[id].normalDanger, id).toBeGreaterThan(0.5);
+      expect(by[id].normalDanger, id).toBeLessThan(0.8);
+    }
   });
 
   it("mục Markdown nêu rủi ro mất kiếp (mini-trùm, Hoàng Tuyền) và đủ mọi loài trong bảng", () => {
