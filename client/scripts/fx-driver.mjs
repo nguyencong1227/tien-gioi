@@ -10,9 +10,9 @@
  *   - mình bị đánh (`hurt-self`, ưu tiên 2) kèm chữ đỏ;
  *   - công pháp lớn: kiếm khí (`sword-qi` rải dọc đường bay + `sword-tip` ở mũi) và `slash-edge`;
  *   - quái gục (`mon-vanish`);
- *   - kế hoạch `burst-cast` / `boss-cast` (#515, đề xuất của B sau #722): thêm HIỆU ỨNG DÙNG CHIÊU M7 của cả 18 chiêu (`FX_CAST_SKILLS`) cứ `castMs` (300 ms:
+ *   - kế hoạch `burst-cast` / `boss-cast` (#515, đề xuất của B sau #722): thêm HIỆU ỨNG DÙNG CHIÊU M7 của mọi chiêu học được (`FX_CAST_SKILLS`) cứ `castMs` (300 ms:
  *     một đội 3-4 người cùng dùng chiêu) qua ĐÚNG đường của game: tin `fx {kind: "cast"}` phát bằng `window.__scene.room.emit` -> `WorldScene.onFx` -> `planCastFx`
- *     -> `playFxPoints` -> `FxSystem.play` (có bộ chặn ngân sách emitter của bậc). Trước đây kịch bản `burst` / `boss` chỉ bắn Kiếm khí nên 18 chiêu chưa bị
+ *     -> `playFxPoints` -> `FxSystem.play` (có bộ chặn ngân sách emitter của bậc). Trước đây kịch bản `burst` / `boss` chỉ bắn Kiếm khí nên các chiêu học được chưa bị
  *     `perf-gate` kiểm; hai lần trong ba là chiêu của MÌNH (ưu tiên 2, ca nặng), một lần là của đồng đội (ưu tiên 1), chiêu và hướng theo chuỗi tất định;
  *   - kế hoạch `boss` (M6 #409, nit của A ở #450): đòn thường lên TRÙM là `boss-hit` (thay `hit-spark`) và trùm gục nổ `boss-vanish` (ưu tiên 2
  *     như `planMonsterDeath`), đo bằng số thật chứ không chỉ bằng test `FxBudget`.
@@ -30,7 +30,7 @@
  */
 
 /**
- * 18 chiêu (12 đợt 1 + 6 Nguyên Anh đợt 2, #722) của kế hoạch `*-cast`. Test `fx-driver.test.ts` đòi danh sách này TRÙNG đúng các chiêu trong `SKILLS` của `shared/`
+ * Mọi chiêu học được (12 đợt 1 + 6 Nguyên Anh đợt 2 #722 + 6 Kim / Thổ CT6 lát 1 = 24) của kế hoạch `*-cast`. Test `fx-driver.test.ts` đòi danh sách này TRÙNG đúng các chiêu trong `SKILLS` của `shared/`
  * (thêm chiêu mà quên ở đây là test đỏ), nên hiệu năng của chiêu mới luôn được đo.
  */
 export const FX_CAST_SKILLS = [
@@ -52,6 +52,13 @@ export const FX_CAST_SKILLS = [
   "bang_hoa_loan",
   "liet_hoa_kiem",
   "van_hanh_bo",
+  // Kim + Thổ (CT6 lát 1)
+  "thanh_van_kiem_khi",
+  "ban_thach_ho_the",
+  "thu_thuy_kiem_anh",
+  "liet_dia_nhat_quyen",
+  "phan_nhac_tram",
+  "van_kiem_quy_tong",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */

@@ -971,6 +971,13 @@ const BOOKS = {
   kinh_bang_hoa_loan: [0xa8dcf0, 0xffffff, "hoa"],
   kinh_liet_hoa_kiem: [0xd9433b, 0xffd0a0, "kiem"],
   kinh_van_hanh_bo: [0x9ad0b8, 0xe6fff4, "bo"],
+  // Kim + Thổ (CT6 lát 1, A): màu bìa theo hệ; chiêu kiếm có dấu "kiem" như đợt 2
+  kinh_thanh_van_kiem_khi: [0xb8bcc8, 0xf2e6a0, "kiem"],
+  kinh_ban_thach_ho_the: [0x8f6a2e, 0xe6c98a],
+  kinh_thu_thuy_kiem_anh: [0xa8c4d8, 0xe6f6ff, "kiem"],
+  kinh_liet_dia_nhat_quyen: [0xa8803a, 0xf0d9a0],
+  kinh_phan_nhac_tram: [0x8a6a2a, 0xffd34d, "kiem"],
+  kinh_van_kiem_quy_tong: [0xc8ccd4, 0x5a626e, "kiem"],
 };
 
 /**
