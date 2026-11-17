@@ -36,8 +36,11 @@
  * vật phẩm / NPC / công thức nghề mới; client cũ không hiểu hiệu ứng `status` của vật phẩm (không số liệu, không chip đếm ngược) và gọi lò đan là
  * "Lò Rèn". Tăng TRƯỚC khi PR dữ liệu nghề đầu tiên (NPC Lò đan + đan hộ đạo, issue #763) vào `main`. `MIN_PROTOCOL_VERSION` KHÔNG đổi: nâng nó là
  * quyết định lúc phát hành bản có nghề.
+ * 5 (chặn đường, mục 52, issue #1061, `docs/THIET_KE_CHAN_DUONG.md`): tin `ambushOffer` / `ambushChoose` / `ambushState` / `ambushFlee` / `ambushEnd` (`ambush.ts`), bản đồ
+ * đấu trường `arena_*` (`MapDef.kind` "arena"). Client cũ không có hộp thoại Chiến / Bỏ chạy nên máy chủ CHỈ chặn đường người chơi có `v >= AMBUSH_MIN_PROTOCOL` (= 5);
+ * client cũ vẫn vào chơi bình thường. `MIN_PROTOCOL_VERSION` KHÔNG đổi.
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 /** Phiên bản thấp nhất server còn nhận. 0 = nhận cả client chưa biết tới `v`. */
 export const MIN_PROTOCOL_VERSION = 0;

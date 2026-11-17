@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SKILLS_M7 } from "@tien-gioi/shared";
+import { LEARNABLE_SKILLS } from "@tien-gioi/shared";
 import {
   AI_ASSET_DIR,
   aiAssetDirs,
@@ -197,7 +197,7 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
 });
 
 /**
- * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `SKILLS_M7` nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
+ * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `LEARNABLE_SKILLS` (18 chiêu gốc + tệp nhóm `skills-*.ts`) nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
  * (Dev D, Dev A...) thêm id vào đây; chiêu lấy từ nguồn thì thêm DÒNG ở bảng nguồn thay vì thêm vào đây.
  *
  * 6 chiêu Nguyên Anh đợt 2 (M7.9, #654): do Dev D soạn theo thế giới Tiên Giới, KHÔNG lấy từ nguồn nào.
@@ -216,7 +216,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 khai báo đúng MỘT nơi", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của LEARNABLE_SKILLS khai báo đúng MỘT nơi", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
@@ -239,9 +239,9 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     expect(audit.unrecordedVkttFiles).toEqual([]);
     expect(audit.unrecordedCreditsVktt).toEqual([]);
 
-    // Hai chiều: mỗi chiêu của SKILLS_M7 PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
+    // Hai chiều: mỗi chiêu của LEARNABLE_SKILLS PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
     // `ORIGINAL_SKILL_IDS` bên dưới (chiêu GỐC của Tiên Giới, không lấy từ nguồn). Thêm chiêu mới mà không khai báo thì đỏ; không dòng nào trỏ id không tồn tại.
-    const ids = SKILLS_M7.map((s) => s.id);
+    const ids = LEARNABLE_SKILLS.map((s) => s.id);
     const rowsOf = (id: string) =>
       audit.entries.filter(
         (e) => e.inRepo.includes(`id \`${id}\``) || e.inRepo.includes(`id ${id}`),
@@ -260,7 +260,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     // Dòng dữ liệu khác (du_lieu -> items.ts, trang_bi/phap_bao... sau này) KHÔNG chứa id chiêu nên bỏ qua;
     // thêm dòng dữ liệu không phải chiêu mà không muốn sửa test này thì để inRepo KHÔNG có cụm "id <id>".
     for (const e of audit.entries) {
-      if (!e.inRepo.includes("skills.ts")) continue;
+      if (!/skills[a-z-]*\.ts/.test(e.inRepo)) continue; // `skills.ts` và các tệp nhóm `skills-kim-tho.ts`...
       const m = /id `?([a-z_]+)`?/.exec(e.inRepo);
       expect(
         m && ids.includes(m[1]),
