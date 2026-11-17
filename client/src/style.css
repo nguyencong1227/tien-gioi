@@ -883,6 +883,33 @@ html[data-input="touch"] .mm-foot small {
   border-bottom: 1px solid var(--line);
   padding-bottom: 6px;
 }
+/* Chân dung NPC (ảnh AI 1:1, npc-portrait.ts): chỉ hiện khi ảnh đã tải xong; nhỏ hơn ở điện thoại ngang thấp để hộp thoại không cao thêm nhiều */
+.dlg-head > .dlg-npc-art {
+  display: block;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  margin-right: 10px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  pointer-events: none;
+  user-select: none;
+}
+.dlg-head > .dlg-npc-art[hidden] {
+  display: none;
+}
+.dlg-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+@media (max-height: 420px) {
+  .dlg-head > .dlg-npc-art {
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+  }
+}
 #dlg-npc-name {
   font-size: var(--fs-17);
   color: #ffe08a;
@@ -7433,6 +7460,29 @@ body.ui-hidden
 }
 .boss-bar-head b {
   color: #ffb0a0;
+}
+/* Ảnh đại diện trùm (thẻ minh hoạ AI, boss-card.ts): chỉ hiện khi ảnh đã tải xong; điện thoại ngang thấp thì nhỏ hơn để thanh không cao thêm nhiều.
+   Hàng giữ `align-items: baseline` (chữ không đổi gì khi chưa có ảnh); riêng ảnh tự căn giữa theo chiều dọc. */
+.boss-bar-art {
+  display: block;
+  align-self: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 120, 90, 0.55);
+  pointer-events: none;
+  user-select: none;
+}
+.boss-bar-art[hidden] {
+  display: none;
+}
+@media (max-height: 420px) {
+  .boss-bar-art {
+    width: 28px;
+    height: 28px;
+  }
 }
 .boss-bar-phase {
   font-size: var(--fs-12);

@@ -380,6 +380,15 @@
       <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ, giáp + gọi quái con (vẽ bằng boss-bar-ui.ts) -->
       <section id="boss-bar" class="boss-bar" hidden aria-label="Trùm">
         <div class="boss-bar-head">
+          <img
+            id="boss-bar-art"
+            class="boss-bar-art"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable="false"
+            hidden
+          />
           <b id="boss-bar-name"></b>
           <span id="boss-bar-phase" class="boss-bar-phase" hidden></span>
           <span id="boss-bar-enrage" class="boss-bar-enrage" hidden>🔥 Cuồng nộ</span>
@@ -1229,6 +1238,15 @@
         tabindex="-1"
       >
         <header class="dlg-head">
+          <img
+            id="dlg-npc-art"
+            class="dlg-npc-art"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable="false"
+            hidden
+          />
           <div>
             <b id="dlg-npc-name">NPC</b>
             <span id="dlg-npc-title" class="dlg-badge"></span>

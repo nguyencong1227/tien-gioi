@@ -45,8 +45,8 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 |---|---|---|---|---|---|---|
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
 | **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`; ĐÃ nối: `ui.setMapPanelCard`, thẻ của bản đồ ĐANG XEM, 60x40 px, bỏ ở màn cao <= 480 px) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 ĐÃ VÀO GAME (17/11/2026, mục 5)** |
-| thẻ trùm | bảng / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2 (mục 5b), vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
-| chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3, vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
+| thẻ trùm | ảnh đại diện ở đầu thanh máu trùm (ĐÃ nối: `client/src/boss-card.ts`, danh sách `BOSS_CARDS` rỗng tới khi có ảnh; ảnh dự phòng là chữ) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2 (mục 5b), vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
+| chân dung NPC | đầu khung hội thoại (ĐÃ nối: `client/src/npc-portrait.ts`, danh sách `NPC_PORTRAITS` rỗng tới khi có ảnh; ảnh dự phòng là chữ) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3 (mục 5c), vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
 
 **Ngân sách gói tải NGAY** (`client/perf-budget.json` `static.aiAssets`: mỗi ảnh <= 150 KB, tổng <= 300 KB; ảnh ở `client/public/assets/ai/` vào `dist/` nên vào cả APK lẫn bộ nhớ đệm PWA của mọi người chơi web): `login_bg` 72 KB + 5 thẻ bản đồ (23-34 KB mỗi ảnh, thực đo 146,5 KB) = **218,7 KB <= 300 KB**. **A giữ trần 300 KB** (quyết định ở #998): lô 2 và lô 3 KHÔNG vào đây mà vào gói tải theo nhu cầu `art` (mục 4b).
 
@@ -58,7 +58,7 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 - **Nơi dùng** gọi `showArtImage(img, { packId: artPackId("trum"), file: "art-trum/<tên>.webp" })` (`client/src/art-image.ts`): thẻ `<img>` ẨN cho tới khi ảnh giải mã xong; chưa có gói / lỗi / hết giờ chờ 3 giây / tệp không có trong gói thì thẻ vẫn ẩn và nơi dùng giữ ảnh dự phòng (chữ, màu); gói về muộn thì áp dụng nếu nơi dùng còn cần; đổi nội dung thì yêu cầu cũ bị bỏ.
 - **Kiểm nguồn:** ảnh AI trong gói `art` chịu ĐÚNG luật của `assets/ai` (`check-credits` `aiAssetDirs`): JSON nguồn cùng tên, băm khớp, WebP / PNG sạch, dòng ở `CREDITS.md` mục 7, prompt qua `promptViolations`; hai ảnh cùng tên ở hai thư mục bị từ chối; một tệp lạ bỏ vào gói `art` làm `check:credits` ĐỎ (đã thử).
 - **Đo `client/dist` trước / sau** (gói THỬ gồm 4 + 15 tệp ngẫu nhiên 30 / 20 KB, đã xoá): `dist` 2.486.955 B -> 2.920.522 B (+433.567 B = gói 420 KB + manifest); **số URL precache 101 -> 101, băm danh sách precache giống hệt, tệp JS chính không đổi**; `check-perf-budget`: `art:trum` 120 KB và `art:npc` 300 KB, cả hai <= 512 KB; bậc đồ hoạ thấp / vừa / cao / rất cao vẫn 10,18 MB (ảnh `<img>` giải mã khi hiện, một lúc chỉ 1 - 2 ảnh).
-- **Việc sau gói này:** (1) B đưa prompt lô 2 (4 trùm: Xích Mãng, Hắc Giao, Thiên Hàn Vương, Linh Hư Yêu Vương) cho C sau khi PR gói được duyệt; (2) B nối thẻ vào bảng trùm / hội thoại bằng `showArtImage` ở các PR riêng, kèm `capture-viewports` năm khung.
+- **Việc sau gói này:** (1) B đưa prompt lô 2 (4 trùm: Xích Mãng, Hắc Giao, Thiên Hàn Vương, Linh Hư Yêu Vương) cho C sau khi PR gói được duyệt; (2) Thẻ trùm ĐÃ nối vào thanh máu trùm bằng `showArtImage` (`boss-card.ts`; thêm một thẻ = một dòng `BOSS_CARDS` cùng PR với ảnh + nguồn + CREDITS + `npm run build:packs`; `check-boss-card.mjs` kiểm qua gói giả); chân dung NPC ở hội thoại sẽ nối ở PR riêng sau lô 3.
 
 ## 5. LÔ 1: năm thẻ bản đồ (việc của C)
 Mỗi bản đồ một thẻ, **ba hạt giống** mỗi thẻ để B chọn một (15 ảnh thô). Cỡ thô 1216x832; cùng cài đặt KSampler của lô pilot (`euler`, `normal`, 25 bước, CFG 7.0, denoise 1.0) và cùng prompt âm ở mục 3. Tên tệp thô `<id>_raw_<n>_00001_.png` (n = 1..3 theo thứ tự hạt giống) vào `/mnt/data/comfyui/output/`. Prompt dương của từng thẻ (đã qua `promptViolations`, KHÔNG sửa tay: cần đổi thì sửa `MAP_CARD_BATCH` trong `prompt-rules.mjs` rồi cập nhật trang này):
@@ -109,6 +109,69 @@ towering colossus of living glacier ice standing on a frozen lake, armor-like pl
 ### `the_yeu_vuong` (trùm `yeu_vuong`; hạt giống `2026111831`, `2026111832`, `2026111833`, `2026111834`)
 ```text
 ancient spirit beast lord with huge branching luminous antlers and long fur drifting like mist, standing in a crystal cavern with glowing mushrooms, jade teal and cyan glow with deep violet accents against blue-black shadows, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+## 5c. LÔ 3: mười hai chân dung NPC (việc của C, SAU lô 2)
+Mỗi NPC có hội thoại một chân dung vuông (trừ `cao_thi`: là bảng cáo thị, không có người), **ba hạt giống** mỗi chân dung (36 ảnh thô). Cỡ thô 1024x1024, ảnh cuối 256x256 WebP <= 20 KB, vào gói `art:npc` (`client/public/packs/art-npc/`, mục 4b). Cùng cài đặt KSampler của lô 1 (`euler`, `normal`, 25 bước, CFG 7.0, denoise 1.0), cùng prompt âm ở mục 3, chỉ SDXL base. Tên tệp thô `<id>_raw_<n>_00001_.png` (n = 1..3). **NPC là NGƯỜI, nên luật riêng:** dáng nhìn nghiêng hoặc từ sau, nửa thân, **mặt khuất bóng nón / mũ trùm / sương** (mọi prompt có đúng mệnh đề `face hidden in shadow`; test bắt thiếu), KHÔNG nét mặt người, KHÔNG người nổi tiếng, không trang phục đặc trưng của nhân vật game khác; prompt âm chuẩn đã có `human face`. Khi duyệt ảnh, B loại ảnh nào lộ mặt rõ. Màu theo bản đồ của NPC (bảng màu mục 2). Prompt dương (đã qua `promptViolations`, KHÔNG sửa tay: cần đổi thì sửa `NPC_PORTRAIT_BATCH` trong `prompt-rules.mjs` rồi cập nhật trang này):
+
+### `npc_truong_tran` (NPC `truong_tran`; hạt giống `2026111911`, `2026111912`, `2026111913`)
+```text
+middle-aged village headman in a long dark blue robe seen from the side, wide-brimmed straw hat, hands folded, timber houses behind him, face hidden in shadow, warm peach and amber light, soft rose haze, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_duoc_su` (NPC `duoc_su`; hạt giống `2026111921`, `2026111922`, `2026111923`)
+```text
+stooped old herbalist in a green robe seen from behind, cloth headwrap, carrying a basket of drying herbs, face hidden in shadow, warm amber and sage light, soft cream haze, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_tho_ren` (NPC `tho_ren`; hạt giống `2026111931`, `2026111932`, `2026111933`)
+```text
+broad-shouldered blacksmith in a leather apron seen in profile, holding a hammer, a glowing forge behind him, hooded, face hidden in shadow, warm amber with ember glow, soft rose haze, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_lai_buon` (NPC `lai_buon`; hạt giống `2026111941`, `2026111942`, `2026111943`)
+```text
+travelling merchant with a heavy pack and a long windblown coat seen from the side, hat brim pulled low, face hidden in shadow, slate grey and cold blue shadows, pale grey haze, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_tram_truong` (NPC `tram_truong`; hạt giống `2026111951`, `2026111952`, `2026111953`)
+```text
+station master in a long coat holding a hooded lantern, standing on a stone platform, brimmed hat, face hidden in shadow, moss green and grey-green mist, faint pale lantern light, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_lai_buon_suong` (NPC `lai_buon_suong`; hạt giống `2026111961`, `2026111962`, `2026111963`)
+```text
+merchant poling a small cargo boat through a foggy swamp, conical hat, sacks piled behind him, face hidden in shadow, moss green and grey-green mist, dim sickly glow, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_tho_ren_suong` (NPC `tho_ren_suong`; hạt giống `2026111971`, `2026111972`, `2026111973`)
+```text
+swamp blacksmith in a heavy damp apron seen in profile, hooded, a forge glowing red in the fog, face hidden in shadow, moss green mist with a warm ember glow, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_tram_truong_han` (NPC `tram_truong_han`; hạt giống `2026111981`, `2026111982`, `2026111983`)
+```text
+station master in a thick fur-trimmed coat and deep hood standing in drifting snow, one hand raised against the wind, face hidden in shadow, pale ice blue and white haze, cold silver light, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_lai_buon_han` (NPC `lai_buon_han`; hạt giống `2026111991`, `2026111992`, `2026111993`)
+```text
+merchant in a fur hood leading a loaded pack animal through deep snow, seen from the side, face hidden in shadow, pale ice blue and white haze, cold silver light, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_tho_ren_han` (NPC `tho_ren_han`; hạt giống `2026112001`, `2026112002`, `2026112003`)
+```text
+blacksmith at an outdoor forge in falling snow, fur-lined hood, raising a hammer, seen in profile, face hidden in shadow, pale ice blue haze with a warm ember glow, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_thu_mon` (NPC `thu_mon`; hạt giống `2026112011`, `2026112012`, `2026112013`)
+```text
+gatekeeper in layered robes seen from behind, holding a long staff, standing before a glowing jade cavern gate, face hidden in shadow, jade teal and cyan glow against deep blue-black shadows, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
+```
+
+### `npc_lao_dan` (NPC `lao_dan`; hạt giống `2026112021`, `2026112022`, `2026112023`)
+```text
+old alchemist in a long robe bending over a clay furnace, wisps of pale smoke rising, hooded, face hidden in shadow, warm amber and sage light, soft cream haze, painterly soft ink wash and gouache half-length figure study, single figure centered, muted colors, misty depth, eastern mountain cultivation fantasy, no text
 ```
 
 ## 6. Quy trình sau khi C sinh xong
