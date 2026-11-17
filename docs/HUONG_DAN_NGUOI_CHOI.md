@@ -14,6 +14,7 @@ Mục lục:
 - [Cửa hàng, rèn, đổi đồ](#cửa-hàng-rèn-đổi-đồ)
 - [Tổ đội](#tổ-đội)
 - [Bí cảnh](#bí-cảnh)
+- [Trùm nhiều chiêu: học né](#trùm-nhiều-chiêu-học-né)
 - [Luân hồi và Hoàng Tuyền](#luân-hồi-và-hoàng-tuyền)
 - [PK thách đấu](#pk-thách-đấu)
 - [Tông môn](#tông-môn)
@@ -226,6 +227,41 @@ Chi tiết thiết kế: [docs/THIET_KE_BI_CANH.md](THIET_KE_BI_CANH.md).
 
 ---
 
+## Trùm nhiều chiêu: học né
+
+Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh) không còn chỉ đứng đánh: mỗi con có **bộ chiêu** riêng, đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
+
+### Đọc vùng cảnh báo
+
+- Trước MỌI đòn có sát thương, trên đất hiện **vùng cảnh báo** (có viền, nền mờ, vòng thời gian co lại). Thời gian báo trước **ít nhất 0,8 giây**: bước ra khỏi vùng trước khi đòn đáp là **không bị trúng**. Cuồng nộ cũng không rút ngắn thời gian báo trước.
+- Hình vùng cho biết cách né:
+  - **Vòng tròn** (đập đất, đòn nhắm vào người): bước ra ngoài vòng.
+  - **Nón** (quất đuôi): bước sang **bên**, đừng lùi thẳng ra sau.
+  - **Đường** (sóng nước, lao tới): bước **ngang**, không chạy dọc theo đường.
+  - **Vành khuyên** (vòng nổ, hàn khí): **lỗ ở giữa** vành và **phía ngoài rìa** đều an toàn; dải vành nằm giữa hai vòng mới là trúng. Chạy vào lỗ giữa hoặc ra ngoài rìa, đứng gần cái nào hơn thì chạy về cái đó.
+  - **Mưa**: nhiều vòng rơi **lần lượt**, mỗi vòng có báo trước riêng; di chuyển liên tục, đừng đứng một chỗ.
+  - **Vũng**: để lại vũng gây sát thương mỗi giây (có thể kèm độc hoặc tê cóng); đừng đứng lại trong vũng.
+  - **Vực xoáy**: kéo bạn vào giữa rồi nổ; chạy ra khỏi tầm nổ ngay sau khi bị kéo.
+- Trên thanh máu trùm (đầu màn hình) có **tên chiêu đang vận**, **vạch giai đoạn** và, khi có, **chỉ báo cuồng nộ**. Đang vận chiêu thì trùm đứng yên một nhịp: đó là lúc đánh trả.
+- Mạng chậm không sao: màn hình tự rút ngắn vòng đếm theo độ trễ của bạn để vòng đầy đúng lúc bạn còn né kịp (mạng quá chậm trên khoảng 190 ms vẫn thiệt thòi, hãy chơi gần đường truyền tốt).
+
+### Bốn trùm
+
+| Trùm | Chiêu chính | Khi máu xuống thấp |
+| --- | --- | --- |
+| **Xích Mãng** (Trúc Cơ, nên đi đội) | Quất đuôi (nón), Phun độc bủa vũng, Cuộn mình lao tới | Dưới 50% máu: gọi hai **Rắn Con**, nhanh hơn |
+| **Hắc Giao** (Kim Đan, đội 3-4) | Sóng nước (đường), Vực xoáy (kéo rồi nổ), **Vảy giáp** (giảm 40% sát thương nhận trong 4 giây: có vầng giáp thấy được, đợi hết giáp rồi dồn sát thương) | Dưới 40% máu: cuồng nộ nhẹ (đánh mạnh hơn, ra chiêu dày hơn) |
+| **Thiên Hàn Vương** (Nguyên Anh, đội 3-4) | Đập đất, Hàn long lao tới, **Mưa băng**, Vùng băng giá (làm chậm) | Dưới 50%: **hàn khí** quanh thân gây tê cóng; dưới 25%: triệu hai **Hàn Lang** |
+| **Linh Hư Yêu Vương** (bí cảnh) | Vòng nổ yêu khí, Truy kích kẻ đứng **xa nhất**, Dịch chuyển chớp | Dưới 70%: dịch chuyển chớp; dưới 35%: **phân thân**; sau **5 phút**: cuồng nộ (đòn nặng hơn, nhanh hơn) |
+
+- **Quái con** do trùm gọi (Rắn Con, Hàn Lang, phân thân) **không rơi đồ, không cho tu vi**: hạ chúng để bớt sát thương, đừng cày chúng.
+- **Linh Hư Yêu Vương** đánh nhẹ nhưng trận dài: đội 4 người vẫn hạ được khi trúng vài đòn; đội 3 người nên **né** gần như mọi đòn. Mang đủ đan hồi máu.
+- Thứ tự an toàn: **quan sát vùng, bước ra, rồi đánh**. Đừng tham thêm một đòn trong lúc vùng đã hiện.
+
+> **Mẹo:** Cả đội đứng sát nhau thì một vòng tròn trúng cả đội. Chia nhau ra vừa phải: một người chịu mục tiêu của trùm, người còn lại đứng nghiêng ra ngoài vùng của đòn quét.
+
+---
+
 ## Luân hồi và Hoàng Tuyền
 
 Đây là cơ chế quan trọng nhất cần hiểu rõ:
@@ -239,7 +275,7 @@ Khi đầu thai:
 - Bạn chọn lại **xuất thân** (gia thế thường, kiếm khách, thể tu, linh tu), mỗi loại cho một chỉ số ban đầu khác nhau.
 
 > **Mẹo bảo mạng (rất quan trọng):**
-> - **Giữ kết nối.** Rớt mạng bất thường, nhân vật vẫn được giữ lại một lúc để nối lại — đừng hoảng, hãy thử nối lại ngay. Thoát chủ động hoặc ngắt vì spam thì không được giữ.
+> - **Giữ kết nối.** Rớt mạng bất thường, nhân vật vẫn được giữ lại khoảng **90 giây** để nối lại — đừng hoảng, hãy thử nối lại ngay. Thoát chủ động hoặc ngắt vì spam thì không được giữ.
 > - Đừng lao vào quái mạnh hơn cảnh giới của bạn. Quái càng xa trấn càng mạnh.
 > - Luôn mang đan hồi máu; uống trước khi máu xuống nửa.
 > - Với trùm, đi đội. Một người thường không hạ nổi.
@@ -268,7 +304,14 @@ Chi tiết thiết kế: [docs/THIET_KE_PK.md](THIET_KE_PK.md).
 - **Chức vụ:** Tông chủ, Trưởng lão, Đệ tử. Tông chủ có thể phong Trưởng lão / Đệ tử và chuyển ngôi.
 - **Mời thành viên:** qua menu đồng đạo; lời mời hết hạn 30 giây. Rời rồi gia nhập lại phải chờ 10 phút.
 - **Kho đồ chung:** các thành viên góp / rút đồ. Số ô kho mở rộng theo cấp tông (từ 40 ô lên tới 80 ô); Đệ tử rút có hạn mỗi ngày.
-- **Cống hiến và cấp tông:** thành viên cống hiến (thường qua hoạt động vì tông) để tăng điểm tông. Cấp tông có 5 bậc (từ **Sơ Lập** tới **Đỉnh Thịnh**), mỗi bậc tăng dần **buff** cho mọi thành viên: tăng tu vi, tăng tỉ lệ rơi đồ, tăng hồi phục.
+- **Cống hiến và cấp tông:** bạn kiếm **cống hiến** bằng ba nguồn: **nhiệm vụ tông môn** hằng ngày, **góp Linh thạch / đồ vào kho** (tối đa 30 cống hiến mỗi ngày từ nguồn này) và **hoàn thành bí cảnh cùng nhóm có ít nhất hai thành viên cùng tông** (20 cống hiến mỗi người, một lần mỗi ngày). **Tối đa 140 cống hiến mỗi ngày mỗi người** (nhiệm vụ 90 + góp 30 + bí cảnh 20). Chỉ kiếm được khi bạn đã vào tông **từ trước hôm nay**. Cống hiến của bạn cũng cộng vào **điểm tông**; điểm tông không bao giờ giảm và quyết định **cấp tông**.
+- **Nội vụ (mở tab "Nội vụ" ở bảng Tông môn, phím G):**
+  - **Ba nhiệm vụ mỗi ngày** (độ khó 20 / 30 / 40 cống hiến), theo bậc của bạn: hạ quái, nộp nguyên liệu... Mỗi mẫu nhiệm vụ chỉ trả một lần mỗi ngày; hết ngày thì làm mới.
+  - **Cửa hàng tông môn** (28 món, hai gian): **Bảo khố** (đan, nguyên liệu, đồ) và **Tàng Kinh Các** (kinh quyển chiêu thức). Mua bằng cống hiến; món mở dần theo cấp tông (nhóm "Mở ở cấp tông N" gập lại ở những cấp bạn chưa tới); mỗi món có **hạn mức mua mỗi ngày**; kinh quyển đã học thì khoá. Cống hiến mua hàng bị trừ nhưng **không làm tông hạ cấp**.
+  - Ảnh chụp bảng luôn là số của máy chủ; thấy lệch thì mở lại bảng.
+- **Cấp tông** có 5 bậc theo điểm tông: **Sơ Lập** (0), **Tiểu Thành** (1.000), **Trung Hưng** (4.000), **Hưng Vượng** (12.000), **Đỉnh Thịnh** (30.000); lên cấp thì thêm chỗ thành viên, thêm ô kho và mở thêm hàng ở cửa hàng. **Buff cho mọi thành viên đang trực tuyến**: tu vi +2% / +3% / +4% / +5% (cấp 2-5), cơ hội rơi đồ +3% / +5% / +5% (cấp 3-5), hồi phục ngoài đả tọa +10% / +15% (cấp 4-5). Tông 3 người làm đủ trần mỗi ngày lên cấp 5 trong khoảng 10 tuần; làm chỉ nhiệm vụ thì khoảng 16 tuần.
+- **Gõ số lượng trực tiếp:** khi góp / rút đồ ở kho tông, góp / rút Linh thạch ở quỹ và đổi nhiều món ở cửa hàng tông (nút **Nhiều…** cạnh **Đổi**), bạn có một **ô nhập số** (điện thoại hiện bàn phím số) cùng nút **− / +**, **×10 / ×100** (nhân số đang có), **Tối đa** và giữ nút để tăng nhanh dần. Gõ quá giới hạn thì ô tự kẹp về mức tối đa và báo rõ; chỉ nhận số nguyên dương viết liền hoặc có dấu nghìn đúng kiểu (`1.000`), gõ `2.5` là sai chứ không bị đoán thành số khác. **Enter** xác nhận, **Esc** huỷ; đang gõ trong ô thì phím không điều khiển nhân vật.
+- **Rời tông thì MẤT cống hiến** của bạn (hộp xác nhận hiện đúng số sẽ mất). Cống hiến gắn với **linh hồn**: qua đầu thai vẫn còn, nhưng nhảy sang tông khác để lấy lại trần ngày là không được.
 
 > **Mẹo:** Tham gia tông môn mang lại buff vĩnh viễn cho mọi hoạt động cày cuốc. Góp đồ vào kho chung để cả tông mạnh lên — đó cũng là cách tích cống hiến của riêng bạn.
 

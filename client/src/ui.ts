@@ -152,7 +152,9 @@ import {
   depositPreviewText,
   hallLeaveWarning,
   hallRefreshDelayMs,
+  hallShopRows,
   sanitizeHallView,
+  shopBuyPreviewText,
 } from "./sect-hall";
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
@@ -350,7 +352,7 @@ export interface UiCallbacks {
   onSectHallGet?: () => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
-  onSectShopBuy?: (itemId: string) => void;
+  onSectShopBuy?: (itemId: string, qty?: number) => void;
   /** Đã gục / ở Hoàng Tuyền (khoá nhận / trả / mua ở tab Nội vụ; máy chủ vẫn kiểm lại) */
   isSectDown?: () => boolean;
   /** Bảng Công pháp: gắn chiêu vào ô 2-5 (`skillId` "" = gỡ); máy chủ trả `skills` (sổ đúng) */
@@ -469,6 +471,9 @@ let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: numb
 const hallBusy = new Set<string>();
 /** Trạng thái mở / thu của các nhóm cửa hàng tông môn do người chơi đổi (khác mặc định); xoá khi rời / hết tông môn */
 const hallGroupOpen = new Map<string, boolean>();
+/** Khung "mua nhiều" của cửa hàng tông (ô số lượng dùng chung): hàng đang mở và MỘT ô số lượng dùng lại cho mọi hàng (`setQty` / `setMax` mỗi lần mở) */
+let hallBuyOpen: string | null = null;
+let hallBuyStepper: QtyStepper | null = null;
 let hallBusyTimer: ReturnType<typeof setTimeout> | null = null;
 const HALL_BUSY_MS = 5000;
 /** Đồng hồ đếm ngược của tab Nội vụ (mỗi giây, chỉ chạy khi tab đang xem) và mốc đặt lại đã xin ảnh chụp mới (mỗi mốc xin MỘT lần). */
@@ -3370,10 +3375,95 @@ function hallUiState(): HallUiState {
     down: callbacks?.isSectDown?.() ?? false,
     busy: hallBusy,
     groupOpen: hallGroupOpen,
+    buy:
+      hallBuyOpen && hallBuyStepper ? { itemId: hallBuyOpen, stepperEl: hallBuyStepper.el } : null,
   };
 }
 
+/** Hàng cửa hàng tông đang mở khung mua nhiều (theo ảnh chụp mới nhất), hoặc `null` nếu hàng không còn / đã khoá / hết lượt. */
+function hallBuyRow() {
+  const v = sectHall?.view;
+  if (!v || !hallBuyOpen) return null;
+  const row = hallShopRows(v, { down: callbacks?.isSectDown?.() ?? false }).find(
+    (r) => r.itemId === hallBuyOpen,
+  );
+  return row && row.maxBuy >= 1 ? row : null;
+}
+
+function closeHallBuy() {
+  hallBuyOpen = null;
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+/** Mở / gấp khung "mua nhiều" của một hàng: một ô số lượng dùng chung, đặt lại về 1 mỗi lần mở sang hàng khác. */
+function toggleHallBuy(itemId: string) {
+  if (hallBuyOpen === itemId) return closeHallBuy();
+  hallBuyOpen = itemId;
+  const row = hallBuyRow();
+  if (!row) {
+    hallBuyOpen = null;
+    return;
+  }
+  if (!hallBuyStepper) {
+    hallBuyStepper = createQtyStepper({
+      label: "Số lượng đổi ở cửa hàng tông môn",
+      max: row.maxBuy,
+      initial: 1,
+      ids: { input: "sect-shop-qty" },
+      preview: (q) => {
+        const r = hallBuyRow();
+        return r ? shopBuyPreviewText(q, r.cost, sectHall?.view?.me.contrib ?? 0) : "";
+      },
+      onConfirm: () => runHallBuy(),
+      onCancel: () => closeHallBuy(),
+    });
+  }
+  hallBuyStepper.setMax(row.maxBuy);
+  hallBuyStepper.setQty(1);
+  renderSectHallTab();
+  hallBuyStepper.focus();
+}
+
+/** Xác nhận khung mua nhiều: đọc lại chữ trong ô (không tin số cũ), rồi gửi MỘT tin với số lượng đó (máy chủ vẫn kiểm lại tất cả). */
+function runHallBuy() {
+  const row = hallBuyRow();
+  if (!row) return closeHallBuy();
+  const qty = hallBuyStepper?.read() ?? null;
+  if (qty === null) {
+    ui.toast({ text: "Nhập số lượng từ 1 trở lên.", tone: "bad" });
+    return;
+  }
+  beginHallBusy(`shop:${row.itemId}`);
+  callbacks?.onSectShopBuy?.(row.itemId, qty);
+  hallBuyOpen = null; // đóng khung ngay; ảnh chụp mới về thì vẽ lại số lượt còn
+  if (sectModalOpen && sectTab === "hall") renderSectHallTab();
+}
+
+/**
+ * Vẽ lại tab Nội vụ nhưng GIỮ focus và vùng chọn của ô số lượng mua nhiều: `renderHall` thay cả cây DOM nên phần tử ô bị gỡ ra rồi gắn lại, mà gỡ phần tử đang focus thì
+ * mất focus (người chơi đang gõ dở sẽ bị ngắt mỗi khi ảnh chụp Nội vụ mới về).
+ */
 function renderSectHallTab() {
+  const input = hallBuyOpen
+    ? (document.getElementById("sect-shop-qty") as HTMLInputElement | null)
+    : null;
+  const keep = input !== null && document.activeElement === input;
+  const from = keep ? input.selectionStart : null;
+  const to = keep ? input.selectionEnd : null;
+  renderSectHallTabImpl();
+  if (keep && hallBuyOpen && input.isConnected) {
+    input.focus();
+    if (from !== null && to !== null) input.setSelectionRange(from, to);
+  }
+}
+
+function renderSectHallTabImpl() {
+  // khung mua nhiều: giới hạn theo ảnh chụp MỚI (cống hiến / lượt còn đổi); hàng khoá hoặc hết thì đóng khung
+  if (hallBuyOpen) {
+    const row = hallBuyRow();
+    if (!row) hallBuyOpen = null;
+    else hallBuyStepper?.setMax(row.maxBuy);
+  }
   renderHall($("sect-tab-hall"), hallUiState(), {
     onAccept: (id) => {
       beginHallBusy(`quest:${id}`);
@@ -3387,6 +3477,9 @@ function renderSectHallTab() {
       beginHallBusy(`shop:${itemId}`);
       callbacks?.onSectShopBuy?.(itemId);
     },
+    onBuyMore: (itemId) => toggleHallBuy(itemId),
+    onBuyConfirm: () => runHallBuy(),
+    onBuyCancel: () => closeHallBuy(),
     onGroupToggle: (key, open, defaultOpen) => {
       // chỉ nhớ lựa chọn KHÁC mặc định (mặc định đổi theo cấp tông thì nhóm theo mặc định mới)
       if (open === defaultOpen) hallGroupOpen.delete(key);
@@ -6236,6 +6329,7 @@ export const ui = {
       endVaultBusy();
       sectHall = null;
       hallGroupOpen.clear();
+      hallBuyOpen = null;
       scheduleHallRefresh(); // bỏ hẹn giờ: không còn tông môn thì không xin gì
       endHallBusy();
     }

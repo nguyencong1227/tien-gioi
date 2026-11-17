@@ -7346,6 +7346,24 @@ body.ui-hidden
   min-height: 44px; /* chạm được trên điện thoại */
 }
 
+/* Khung "mua nhiều" của một hàng cửa hàng tông (ô số lượng dùng chung, mục 47): nằm ngay dưới hàng, hai nút xác nhận / huỷ có khoảng cách */
+.sect-hall-buy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 224, 138, 0.35);
+}
+.sect-hall-buy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sect-hall-buy-actions .sect-hall-btn {
+  flex: 1 1 120px;
+}
+
 /* Ô kho còn khoá theo cấp tông (M8): ghi chú dưới lưới kho */
 .sect-vault-locked {
   margin: 4px 0 0;
