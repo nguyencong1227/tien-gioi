@@ -120,7 +120,8 @@ export interface BossFight {
 
 /**
  * Trận đánh trùm `def` của đội `party` người đúng bậc, bằng mã server thật (`tickMonsters` chạy bộ chiêu): người đứng cạnh trùm đánh thường liên tục, uống đan khi
- * khí huyết dưới ngưỡng, KHÔNG né (ca khó nhất: trùm trúng mọi đòn có người trong vùng, kể cả đòn đánh thường).
+ * khí huyết dưới ngưỡng, KHÔNG né (ca khó nhất: trùm trúng mọi đòn có người trong vùng, kể cả đòn đánh thường). Có quái con của trùm thì đánh quái con gần nhất trước (chúng đông
+ * và đánh đau; đứng chém trùm mặc cho chúng đánh không phải lối chơi hợp lý), hết quái con mới quay lại trùm.
  */
 export function fightBossMoves(def: BossDef, party: number, seed: number): BossFight {
   const boss = MONSTER_BY_ID[def.kind]!;
@@ -159,8 +160,20 @@ export function fightBossMoves(def: BossDef, party: number, seed: number): BossF
         const p = w.state.players.get(sid)!;
         const c = w.ctrl.get(sid)!;
         if (p.dead) continue;
-        const m = w.state.monsters.get(id);
-        if (!m) break;
+        const boss = w.state.monsters.get(id);
+        if (!boss) break;
+        // Người chơi hợp lý hạ QUÁI CON gần nhất trước (chúng đông và đánh đau), hết quái con mới quay lại trùm
+        let m = boss;
+        let near = Infinity;
+        for (const aid of mc.boss.adds) {
+          const a = w.state.monsters.get(aid);
+          if (!a) continue;
+          const d = Math.hypot(a.x - p.x, a.y - p.y);
+          if (d < near) {
+            near = d;
+            m = a;
+          }
+        }
         const stack = c.inv[0]?.qty ?? 0;
         if (
           p.hp < p.maxHp * ASSUME_DUNGEON.potionBelow &&
