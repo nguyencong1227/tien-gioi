@@ -1170,3 +1170,85 @@ describe("đạn của người chơi (mục 51, CT3 #1048)", () => {
     }
   });
 });
+
+describe("vật thể bền của người chơi (mục 51, CT4 #1049)", () => {
+  it("100 người liên tục đặt vùng / hào quang / tượng / bẫy vào đám quái đông: tick < 10 ms (trung bình), vật thể <= trần phòng, fx mỗi tick bị chặn (không tăng theo số tick)", () => {
+    const { w, fx, dmgs } = makeWorld();
+    const mk = (id: string, shape: string, extra: Record<string, unknown>) => {
+      (SKILL_BY_ID as Record<string, SkillDef>)[id] = {
+        ...SKILL_BY_ID["bon_thach_quyen"]!,
+        id,
+        shape,
+        mult: 0.05,
+        range: 90,
+        reach: 60,
+        element: "none",
+        effects: [],
+        ...extra,
+      } as SkillDef;
+      return id;
+    };
+    const ids = [
+      mk("pf_zone", "zone", { durationMs: 8000, tickMs: 400 }),
+      mk("pf_aura", "aura", { durationMs: 12_000, tickMs: 500, reach: 0 }),
+      mk("pf_totem", "totem", { durationMs: 8000, tickMs: 800, range: 200 }),
+      mk("pf_trap", "trap", { durationMs: 20_000, armMs: 400 }),
+    ];
+    try {
+      w.now = 2_000_000;
+      const heroes: { sid: string; c: ReturnType<typeof addPlayer>["c"] }[] = [];
+      for (let i = 0; i < 100; i++) {
+        const sid = `vp_${i}`;
+        const { p, c } = addPlayer(w, sid, 4, 0);
+        p.x = w.map.townPx.x + 260 + (i % 10) * 24;
+        p.y = w.map.townPx.y + 260 + Math.floor(i / 10) * 24;
+        p.hp = p.maxHp = 1e9;
+        p.mp = p.maxMp = 1e9;
+        syncPublicPos(p);
+        c.skills = {
+          learned: Object.fromEntries(ids.map((id) => [id, 1])),
+          slots: ids as unknown as typeof c.skills.slots,
+        };
+        heroes.push({ sid, c });
+      }
+      for (let k = 0; k < 80; k++) {
+        const m = addMonster(
+          w,
+          "tho",
+          w.map.townPx.x + 280 + (k % 10) * 28,
+          w.map.townPx.y + 250 + Math.floor(k / 10) * 30,
+        );
+        m.m.hp = m.m.maxHp = 1e12;
+        m.mc.homeX = m.m.x;
+        m.mc.homeY = m.m.y;
+      }
+      const ticks = 80;
+      const durations: number[] = [];
+      let peak = 0;
+      let maxFxPerTick = 0;
+      for (let t = 0; t < ticks; t++) {
+        w.now += TICK_MS;
+        const fx0 = fx.length;
+        durations.push(
+          measureSyncStepMs(() => {
+            for (const h of heroes) {
+              h.c.skillCd = [0, 0, 0, 0];
+              cast(w, h.sid, { slot: (2 + (t % 4)) as 2 | 3 | 4 | 5, angle: 0 });
+            }
+            tickWorld(w, TICK_MS);
+          }),
+        );
+        peak = Math.max(peak, w.objs.length);
+        maxFxPerTick = Math.max(maxFxPerTick, fx.length - fx0);
+      }
+      expect(summarizeTickMs(durations).avgMs).toBeLessThan(10); // trung bình: đo cả 100 lần dựng + dọn trần + tick
+      expect(peak).toBeGreaterThan(0);
+      expect(peak).toBeLessThanOrEqual(60); // persistPerRoomMax
+      expect(dmgs.length).toBeGreaterThan(0); // vật thể thật sự tác dụng
+      // mỗi tick: tối đa 100 `fx cast` + 100 `fx` dựng + (<= 100 đẩy trần + <= số vật thể nổ / mất) `fxEnd`: chặn theo số người, không theo số tick
+      expect(maxFxPerTick).toBeLessThanOrEqual(100 * 4);
+    } finally {
+      for (const id of ids) delete (SKILL_BY_ID as Record<string, SkillDef>)[id];
+    }
+  });
+});
