@@ -15,6 +15,8 @@ import { parseChainPts, planChainFx, planComboBurst } from "../gfx/fx/ct2-fx";
 import { TelegraphLayer } from "../gfx/fx/telegraph-layer";
 import { PBoltLayer } from "../gfx/fx/pbolt-layer";
 import { WindupLayer, type WindupWatchResult } from "../gfx/fx/windup-layer";
+import { PersistLayer, type PersistAnchor } from "../gfx/fx/persist-layer";
+import { parsePersist, parsePersistEnd, persistPlan, planPersistPop } from "../gfx/fx/persist-fx";
 import { planWindup, type WindupPlan } from "../gfx/fx/windup-fx";
 import { parsePBolt, pboltEnd, pboltPlan, planPBoltEnd } from "../gfx/fx/pbolt-fx";
 import { recipeIds } from "../gfx/fx/recipes";
@@ -537,6 +539,8 @@ export class WorldScene extends Phaser.Scene {
   pbolts!: PBoltLayer;
   /** Vòng tụ khí của chiêu vận (`SkillDef.windupMs`, CT11b bước 3): hiệu ứng đáp hoãn tới hết `windupMs`, bỏ nếu người vận bị huỷ */
   windups!: WindupLayer;
+  /** Vật thể bền `zone` / `trap` / `totem` / `aura` (`fx` + `fxEnd`, CT11b bước 3b): vẽ theo tin máy chủ, tự tắt khi hết `ms` hoặc khi có `fxEnd` */
+  persists!: PersistLayer;
   /** Số tiếng báo "đang trong vùng nguy hiểm" đã phát (script kiểm `?debug`) */
   dangerCues = 0;
   /**
@@ -654,6 +658,12 @@ export class WorldScene extends Phaser.Scene {
       watch: (by, mine) => this.windupWatch(by, mine),
       onRelease: (plan, x, y) => this.onWindupRelease(plan, x, y),
     });
+    this.persists = new PersistLayer(this, {
+      emitterBudget: () => getQuality().emitterBudget,
+      reduced: () => getQuality().reducedMotion,
+      inView: (x, y, pad) => this.inView(x, y, pad),
+      anchor: (by, mine) => this.persistAnchor(by, mine),
+    });
     ensureShadowTexture(this);
     this.weatherPaused =
       typeof window !== "undefined" && !weatherEnabledByUrl(window.location.search);
@@ -671,6 +681,7 @@ export class WorldScene extends Phaser.Scene {
       this.telegraphs.destroy();
       this.pbolts.destroy();
       this.windups.destroy();
+      this.persists.destroy();
     });
 
     // Mũi tên chỉ hướng nhiệm vụ xoay quanh người chơi
@@ -2220,6 +2231,7 @@ export class WorldScene extends Phaser.Scene {
     this.telegraphs.clear();
     this.pbolts.clear();
     this.windups.clear();
+    this.persists.clear();
 
     for (const it of this.activeSwords) {
       it.img.setVisible(false);
@@ -4085,6 +4097,7 @@ export class WorldScene extends Phaser.Scene {
     this.telegraphs.update(now);
     this.pbolts.update(now);
     this.windups.update(now);
+    this.persists.update(now);
 
     // 1. Vệt chém (180ms)
     for (let i = this.activeSlashes.length - 1; i >= 0; i--) {
@@ -4227,6 +4240,29 @@ export class WorldScene extends Phaser.Scene {
         const plan = pboltPlan(p, def.element, p.by === this.sid);
         this.pbolts.add(plan, this.time.now);
         return this.playFxPoints(planPBoltEnd(plan));
+      }
+      case "zone":
+      case "trap":
+      case "totem":
+      case "aura": {
+        // Vật thể bền (mục 51, CT11b bước 3b): MỘT tin lúc dựng (id tăng theo phòng, tâm, bán kính, tồn tại tối đa `ms`); hết `ms` thì lớp tự tắt, `fxEnd` chỉ báo kết thúc sớm.
+        // Bẫy chờ `armMs` của chiêu rồi mới sáng. Tin hỏng / chiêu lạ / ngoài tầm nhìn: bỏ, không lỗi. Người vào vùng nhìn SAU lúc dựng không nhận tin nên không thấy (chấp nhận).
+        const def = skillOf(m.skill);
+        const p = parsePersist(m);
+        if (!def || !p) return;
+        const near = p.kind === "aura" ? (this.persistAnchor(p.by, false) ?? p) : p;
+        if (!this.inView(near.x, near.y, p.r + 160)) return;
+        this.persists.add(persistPlan(p, def, p.by === this.sid), this.time.now);
+        return;
+      }
+      case "fxEnd": {
+        // Vật thể bền kết thúc SỚM: `pop` (bẫy nổ) thì vòng nổ + bụi tại chỗ bẫy, `gone` thì mờ dần. `id` không giữ (vào vùng nhìn sau lúc dựng / đã bị thay) thì bỏ qua.
+        const e = parsePersistEnd(m);
+        if (!e) return;
+        const ended = this.persists.endOne(e.id, e.why, this.time.now);
+        if (ended && e.why === "pop")
+          this.playFxPoints(planPersistPop(ended.plan, ended.x, ended.y));
+        return;
       }
       case "warn":
         // Báo trước đòn của quái (M7.7, #508): vùng tô đặc lớn dần tới lúc đòn đáp xuống; client chỉ vẽ, máy chủ quyết định trúng / trượt
@@ -4379,6 +4415,15 @@ export class WorldScene extends Phaser.Scene {
       dead: p.dead,
       stunned: mine && this.status.stunned(performance.now()),
     };
+  }
+
+  /** Người dùng hào quang: vị trí hiện tại (của mình: vị trí đoán trước) và cờ chết; `null` khi không còn trong state. */
+  private persistAnchor(by: string, mine: boolean): PersistAnchor | null {
+    const e = this.players.get(by);
+    const p = this.state?.players?.get(by);
+    if (!e || !p) return null;
+    const self = (mine || by === this.sid) && this.hasMe;
+    return { x: self ? this.predX : e.root.x, y: self ? this.predY : e.root.y, dead: p.dead };
   }
 
   /** Vận xong không bị huỷ: hiệu ứng + tiếng đáp tại chỗ người vận đứng LÚC NÀY (như máy chủ). Chiêu đã bị gỡ khỏi bảng giữa chừng thì bỏ. */
