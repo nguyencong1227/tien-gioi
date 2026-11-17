@@ -1040,11 +1040,15 @@ async function main() {
         `JSON.stringify(window.__scene.telegraphs.snapshot(window.__scene.time.now).warns)`,
       )) as string,
     ) as Array<{ shape: string; x: number; y: number; r: number; ms: number }>;
+    // `ms` của vùng báo là thời gian đếm SAU KHI client bù độ trễ (`warnShownMs`, #873): bằng `windupMs` khi chưa đo được RTT, rút ngắn tới 30 % khi đã đo
+    // (runner CI đo ~45 ms => 1046,5 / 1100; nightly 17/11 đỏ vì đòi bằng CHÍNH XÁC). Chỉ kiểm khoảng [0,7 x windupMs, windupMs]: thiếu thì vùng báo
+    // sai tin, thừa thì bù sai (đầy sau hạn chót); mức bù đúng theo RTT đã có e2e:nhip-tim kiểm.
     must(
       snap9.length === 1 &&
         snap9[0].shape === "circle" &&
         snap9[0].r === slam!.radius &&
-        snap9[0].ms === slam!.windupMs &&
+        snap9[0].ms <= slam!.windupMs &&
+        snap9[0].ms >= slam!.windupMs * 0.7 - 1e-6 &&
         Math.abs(snap9[0].x - at9.x) <= 1 &&
         Math.abs(snap9[0].y - at9.y) <= 1,
       `vùng báo của client là MỘT hình tròn tâm quái (${at9.x.toFixed(0)}, ${at9.y.toFixed(0)}), r ${slam!.radius}, ${slam!.windupMs} ms: ${JSON.stringify(snap9)}`,

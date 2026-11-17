@@ -979,6 +979,10 @@ async function main() {
     out(
       "\n--- Ca 7: Độ trễ mạng giả lập (proxy): RTT đo được từ pong, vùng báo + thanh gồng rút ngắn đúng mức, HUD ?perf=1 ---",
     );
+    // Mô phỏng runner CI chậm (nightly 17/11 đo RTT ~45 ms vì pong chờ luồng chính của Chrome WebGL mềm): E2E_NEN_MS = độ trễ MỖI CHIỀU (ms) làm "nền" của ca 7
+    // (RTT nền ~ 2 x giá trị này; 22 -> ~45 ms). Mặc định 0 = mạng cục bộ thật.
+    const NEN_MS = Math.max(0, Number(process.env.E2E_NEN_MS ?? "0") || 0);
+    proxy.setDelay(NEN_MS);
     const NAME_7 = "Do Tre Mang";
     const SECRET_7 = "e2e_secret_heartbeat_77777777";
     await setIdentity(NAME_7, SECRET_7);
@@ -1018,8 +1022,16 @@ async function main() {
         return { rings: w.length, ringMs: w[0]?.ms, castMs: c?.castMs, rtt: window.__heartbeat.lastRttMs };
       })()`)) as { rings: number; ringMs: number; castMs: number; rtt: number };
 
-    // (a) mạng cục bộ (không trễ): RTT nhỏ, bù ~ 10-50 ms
-    const rtt0 = await waitRtt(0, 40, "RTT đo được trên đường cục bộ (< 40 ms)");
+    /**
+     * Thời gian vùng báo / thanh gồng DỰ KIẾN (ms) khi máy chủ báo `ms` và RTT đo được là `rtt`: `ms` trừ độ bù = clamp(RTT + 10, 0, min(250, 30 % x ms))
+     * (cùng công thức `warnCompMs` ở `client/src/net-latency.ts`; sao lại ở đây để kịch bản không phụ thuộc mã dưới test). RTT đọc CÙNG lúc với vùng báo
+     * (`castAndRead.rtt`), nên không lệch do trung vị trôi giữa hai lần đọc.
+     */
+    const expectShown = (ms: number, rtt: number) =>
+      ms - Math.min(250, 0.3 * ms, Math.max(0, rtt + 10));
+    // (a) mạng cục bộ (không trễ): RTT nhỏ. Trần 120 ms (không phải 40): máy chủ chạy chung với Chrome WebGL mềm trên runner CI hai lõi đo ~40-50 ms
+    // vì pong chờ luồng chính của Chrome (nightly 17/11: 'RTT < 40 ms' hết giờ ở CẢ HAI lần thử), nhưng vẫn thấp hơn xa mức 150+ của ca (b)
+    const rtt0 = await waitRtt(0, 120, "RTT đo được trên đường cục bộ (< 120 ms)");
     out(`  ✓ Không trễ: lastRttMs = ${rtt0.toFixed(1)} ms (trung vị 5 pong)`);
     if (Number(await tab.ev(`typeof window.__scene.rttSource() === 'number' ? 1 : 0`)) !== 1)
       throw new Error("Ca 7: rttSource của cảnh không đọc được số từ nhịp tim thật");
@@ -1029,13 +1041,24 @@ async function main() {
       5000,
     );
     const c0 = await castAndRead(1000);
-    if (c0.rings !== 1 || c0.ringMs < 920 || c0.ringMs > 995 || c0.castMs !== c0.ringMs)
-      throw new Error(`Ca 7: không trễ nhưng vùng báo ${c0.ringMs} / thanh gồng ${c0.castMs}`);
-    out(`  ✓ Vùng báo = thanh gồng = ${c0.ringMs.toFixed(1)} ms (bù = RTT + 10, báo trước 1000)`);
+    // bù = RTT + 10 nên vùng báo phải NGẮN HƠN 1000 (đã bù) và bằng đúng 1000 - (RTT + 10) theo RTT lúc phát; thanh gồng PHẢI bằng vùng báo
+    if (
+      c0.rings !== 1 ||
+      c0.ringMs > 995 ||
+      Math.abs(c0.ringMs - expectShown(1000, c0.rtt)) > 1 ||
+      c0.castMs !== c0.ringMs
+    )
+      throw new Error(
+        `Ca 7: không trễ (RTT ${c0.rtt}) nhưng vùng báo ${c0.ringMs} (cần ${expectShown(1000, c0.rtt)}) / thanh gồng ${c0.castMs}`,
+      );
+    out(
+      `  ✓ Vùng báo = thanh gồng = ${c0.ringMs.toFixed(1)} ms (bù = RTT ${c0.rtt.toFixed(1)} + 10, báo trước 1000)`,
+    );
 
     // (b) trễ 80 ms mỗi chiều (RTT ~160): trung vị đo được ~160; vùng báo ~ 1000 - (RTT + 10)
     proxy.setDelay(80);
-    const rtt1 = await waitRtt(150, 260, "RTT ~160 ms sau khi đặt trễ 80 ms mỗi chiều");
+    // 160 ms do proxy + nền của máy (~1 ms máy nhanh, ~45 ms runner CI): trần 320 giữ chỗ cho nền chậm, vẫn tách xa ca (c) 650+
+    const rtt1 = await waitRtt(150, 320, "RTT ~160 ms sau khi đặt trễ 80 ms mỗi chiều");
     out(`  ✓ Trễ 80 ms mỗi chiều: lastRttMs = ${rtt1.toFixed(1)} ms`);
     // HUD cập nhật ~4 lần / giây (chậm hơn nhịp pong một chút): chờ tới khi ghi đúng số trung vị hiện tại
     await tab.waitFor(
@@ -1050,7 +1073,7 @@ async function main() {
     const hud1 = String(await tab.ev(`document.getElementById('perf-rtt').textContent`));
     out(`  ✓ HUD ?perf=1 ghi "${hud1}"`);
     const c1 = await castAndRead(1000);
-    // RTT 150..260 -> bù 160..270 -> vùng 730..840 (và thanh gồng PHẢI bằng vùng báo)
+    // RTT 150..320 -> bù 160..270, KẸP 250 -> vùng 750..840 (và thanh gồng PHẢI bằng vùng báo)
     if (c1.rings !== 1 || c1.ringMs < 720 || c1.ringMs > 845 || c1.castMs !== c1.ringMs)
       throw new Error(`Ca 7: trễ 160 ms mà vùng báo ${c1.ringMs} / thanh gồng ${c1.castMs}`);
     out(
@@ -1071,11 +1094,18 @@ async function main() {
       throw new Error("Ca 7: banner nối lại hiện khi chỉ có độ trễ");
 
     // (d) hết trễ: trung vị trôi về nhỏ, vùng báo trở lại gần nguyên
-    proxy.setDelay(0);
-    await waitRtt(0, 60, "RTT về nhỏ sau khi bỏ độ trễ", 30000);
+    proxy.setDelay(NEN_MS);
+    await waitRtt(0, 120, "RTT về nhỏ sau khi bỏ độ trễ", 30000);
     const c4 = await castAndRead(1000);
-    if (c4.rings !== 1 || c4.ringMs < 930 || c4.castMs !== c4.ringMs)
-      throw new Error(`Ca 7: hết trễ mà vùng báo ${c4.ringMs}`);
+    if (
+      c4.rings !== 1 ||
+      Math.abs(c4.ringMs - expectShown(1000, c4.rtt)) > 1 ||
+      c4.ringMs < 800 ||
+      c4.castMs !== c4.ringMs
+    )
+      throw new Error(
+        `Ca 7: hết trễ (RTT ${c4.rtt}) mà vùng báo ${c4.ringMs} (cần ${expectShown(1000, c4.rtt)})`,
+      );
     out(`  ✓ Hết trễ: vùng báo trở lại ${c4.ringMs.toFixed(1)} ms`);
 
     if (tab.errors.length) {
