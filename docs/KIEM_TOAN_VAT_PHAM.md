@@ -10,8 +10,8 @@ Mọi vật phẩm trong game phải có **ít nhất một đường vào** (ng
 
 Kiểm bằng hai hàm thuần trong `shared/src/item-sources.test.ts`:
 
-- `sourcesOf(itemId)` — mọi cách người chơi **nhận** vật phẩm: `drop` (rơi quái, `DROP_TABLES`), `shop` (`SHOPS`), `sect_shop` (mua ở cửa hàng tông `SECT_SHOP`), `recipe` (thành phẩm `RECIPES[].output`), `quest` (thưởng `QUESTS[].rewards.items`), `sect_quest` (thưởng nhiệm vụ tông `SECT_QUESTS[].byTier[*].rewards.items`), `trade` (NPC cho `TRADES[].give`), `dungeon` (thưởng `DUNGEONS[].reward.items`).
-- `consumedBy(itemId)` — mọi cách nguyên liệu bị **tiêu thụ**: `recipe` (nguyên liệu đầu vào `RECIPES[].inputs`), `quest` (bước thu thập `steps[].kind === "collect"`), `sect_quest` (bước thu thập `collect` của nhiệm vụ tông), `trade` (`TRADES[].get`).
+- `sourcesOf(itemId)` — mọi cách người chơi **nhận** vật phẩm: `drop` (rơi quái, `DROP_TABLES`), `shop` (`SHOPS`), `sect_shop` (mua ở cửa hàng tông `SECT_SHOP`), `recipe` (thành phẩm `RECIPES[].output`), `quest` (thưởng `QUESTS[].rewards.items`), `sect_quest` (thưởng nhiệm vụ tông `SECT_QUESTS[].byTier[*].rewards.items`), `trade` (NPC cho: `TRADES[].get` là thứ người chơi NHẬN), `dungeon` (thưởng `DUNGEONS[].reward.items`).
+- `consumedBy(itemId)` — mọi cách nguyên liệu bị **tiêu thụ**: `recipe` (nguyên liệu đầu vào `RECIPES[].inputs`), `quest` (bước thu thập `steps[].kind === "collect"`), `sect_quest` (bước thu thập `collect` của nhiệm vụ tông), `trade` (`TRADES[].give` là thứ người chơi NỘP).
 
 Test gồm 4 điều kiện (xem tệp test): mọi vật phẩm có ≥1 nguồn vào; mọi nguyên liệu được ≥1 nơi dùng; mọi itemId trong các bảng nguồn đều trỏ tới vật phẩm có thật; mọi mục ngoại lệ (nếu có) đều hợp lệ và nêu lý do.
 
@@ -38,8 +38,8 @@ Kí hiệu: `S:` = nguồn vào (sources), `C:` = nơi tiêu thụ (consumed). D
 
 | Id | S (nguồn vào) | C (tiêu thụ) | Ghi chú |
 | --- | --- | --- | --- |
-| `hoi_huyet_dan` | drop, shop, sect_shop, quest, sect_quest | trade | Đan hồi máu cơ bản; cũng bán ở cửa hàng tông & thưởng nhiệm vụ tông |
-| `hoi_linh_dan` | drop, shop, sect_shop, quest | trade | Đan hồi linh lực; cũng bán ở cửa hàng tông |
+| `hoi_huyet_dan` | drop, shop, sect_shop, quest, sect_quest, trade | | Đan hồi máu cơ bản; cũng bán ở cửa hàng tông & thưởng nhiệm vụ tông |
+| `hoi_linh_dan` | drop, shop, sect_shop, quest, trade | | Đan hồi linh lực; cũng bán ở cửa hàng tông |
 | `tu_khi_dan` | drop, sect_shop, quest, dungeon | - | Thưởng bí cảnh Linh Hư; cũng bán ở cửa hàng tông |
 | `dai_hoi_huyet_dan` | drop, shop, quest | - | |
 | `dai_hoi_linh_dan` | drop, shop, quest | - | |
@@ -53,8 +53,8 @@ Kí hiệu: `S:` = nguồn vào (sources), `C:` = nơi tiêu thụ (consumed). D
 
 | Id | S (nguồn vào) | C (tiêu thụ) | Ghi chú |
 | --- | --- | --- | --- |
-| `long_tho` | drop, trade | recipe, quest | |
-| `nanh_soi` | drop, trade | recipe, quest | |
+| `long_tho` | drop | recipe, quest, trade | |
+| `nanh_soi` | drop | recipe, quest, trade | |
 | `da_ho` | drop | recipe, quest | Vừa là nguyên liệu công thức, vừa là mục thu thập nhiệm vụ |
 | `vay_mang` | drop, dungeon | recipe, quest | Thưởng bí cảnh Linh Hư |
 | `suong_mao` | drop | recipe, quest | |
