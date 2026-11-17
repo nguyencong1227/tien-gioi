@@ -1,6 +1,6 @@
 // Sự kiện XÃ HỘI của người chơi (M9, docs/PHAN_CONG_M9.md): ghi thống kê PK vào chân linh. Phần thành tựu / danh hiệu (`trackSocial`) làm ở M9.5 cùng chỗ này.
 // Mọi thay đổi `Soul.social` đi qua `World.onSocial` (phòng chạy `SoulStore.update` ngoài tick); system KHÔNG chạm kho.
-import { dayKey, socialPkRecord } from "@tien-gioi/shared";
+import { dayKey, newSocial, socialPkRecord, socialTrack } from "@tien-gioi/shared";
 import type { World } from "../world";
 
 /**
@@ -23,4 +23,19 @@ export function recordPkResult(w: World, winnerSid: string, loserSid: string): b
   w.onSocial(wk, (s) => socialPkRecord(s, "won"));
   w.onSocial(lk, (s) => socialPkRecord(s, "lost"));
   return true;
+}
+
+/**
+ * Ghi MỘT HOẶC NHIỀU bộ đếm xã hội cho người chơi `sid` (`[khoá, giá trị]`, chế độ `add` / `max` theo khoá, `socialTrack`): MỘT lần ghi chân linh cho cả nhóm (vào phòng ghi bản đồ + kiếp +
+ * cảnh giới cùng lúc). Thành tựu đến hạn được cấp ở `WorldRoom.socialUpdate` cùng lần ghi (nguyên tử). Không có hook (`World.onSocial`, test / bench) hoặc người chơi không còn thì bỏ qua.
+ * Khoá lạ / giá trị xấu bị `socialTrack` bỏ qua im lặng.
+ */
+export function trackSocial(w: World, sid: string, ...entries: Array<[string, number]>): void {
+  const c = w.ctrl.get(sid);
+  if (!c || !w.onSocial || entries.length === 0) return;
+  w.onSocial(c.identity.soulKey, (s) => {
+    let social = s;
+    for (const [key, value] of entries) social = socialTrack(social, key, value).social;
+    return social ?? newSocial(); // chưa có phần xã hội mà không có gì đổi: bản trống (người gọi so sánh tham chiếu để bỏ qua ghi thừa)
+  });
 }

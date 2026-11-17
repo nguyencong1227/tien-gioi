@@ -2,7 +2,7 @@
 // Client bình thường không bao giờ chạm giới hạn; vượt thì tin nhắn bị bỏ qua.
 // Bỏ qua quá nhiều trong thời gian ngắn (spam có chủ đích) thì báo để phòng ngắt kết nối.
 
-import { SKILL_MSG } from "@tien-gioi/shared";
+import { SKILL_MSG, SOCIAL_MSG } from "@tien-gioi/shared";
 
 export interface Limit {
   /** Số tin nhắn hồi lại mỗi giây */
@@ -27,6 +27,9 @@ export const MESSAGE_LIMITS: Record<string, Limit> = {
   [SKILL_MSG.slot]: { perSec: 4, burst: 8 },
   // Xin bảng xếp hạng (M9.3, `boardsGet`): mở bảng / đổi tab, tra bản chụp trong bộ nhớ; chặn spam
   boardsGet: { perSec: 2, burst: 6 },
+  // Danh hiệu / thành tựu (M9.5): mỗi `titleSet` hợp lệ có thể là MỘT lần ghi tệp chân linh, `achievementsGet` gửi lại cả sổ; người thật bấm vài lần / phút
+  [SOCIAL_MSG.titleSet]: { perSec: 1, burst: 3 },
+  [SOCIAL_MSG.achievementsGet]: { perSec: 1, burst: 3 },
   chat: { perSec: 2, burst: 5 },
   // Nhịp tim: client gửi mỗi `NET_BEAT_MS` = 1 giây (mục 33; bản cũ 5 giây) + 1 lần lúc quay lại tiền cảnh; chặn vì mỗi ping tốn một tin trả lời
   ping: { perSec: 2, burst: 6 },

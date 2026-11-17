@@ -50,6 +50,7 @@ async function main() {
   WorldRoom.sects = new SectService(stores.sects); // tông môn cùng backend với nhân vật / chân linh (`SECTS=off` gỡ tính năng)
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
   // Bảng xếp hạng (M9.3): làm mới mỗi 5 phút ngoài tick; `LEADERBOARD=off` gỡ. Chế độ tài khoản: đạo hiệu nằm ở tài khoản.
+  WorldRoom.achievements = process.env.ACHIEVEMENTS === "on"; // cấp thành tựu / Duyên / danh hiệu (M9.5): MẶC ĐỊNH TẮT cho tới khi M9 phát hành
   if (process.env.LEADERBOARD !== "off") {
     const lb = new LeaderboardService({
       souls: stores.souls,
