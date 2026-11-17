@@ -19,6 +19,14 @@ const SHAPE_PATH: Readonly<Record<SkillShape, string>> = {
     '<ellipse cx="12" cy="14" rx="9" ry="5.2" fill="none" stroke-width="2.4" stroke-dasharray="4 2.6" /><circle cx="12" cy="14" r="2" />',
   // hai mũi tên lao tới
   dash: '<path d="M4.5 5.5 L11 12 L4.5 18.5 M12.5 5.5 L19 12 L12.5 18.5" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" />',
+  // hình mới (mục 51, CT1b): biểu tượng TẠM theo hình gần nhất; B vẽ riêng ở CT11a / CT11b
+  chain:
+    '<path d="M4 18 L9 8 L13 15 L20 4" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />',
+  bolt: '<path d="M12 2.5 L16.5 8 H13.5 V21 H10.5 V8 H7.5 Z" />',
+  zone: '<ellipse cx="12" cy="14" rx="9" ry="5.2" fill="none" stroke-width="2.4" stroke-dasharray="4 2.6" /><circle cx="12" cy="14" r="2" />',
+  trap: '<path d="M4 18 L9 8 L12 14 L15 8 L20 18 Z" />',
+  aura: '<circle cx="12" cy="12" r="8" fill="none" stroke-width="2.6" /><circle cx="12" cy="12" r="2.6" />',
+  totem: '<path d="M9 21 V9 L12 3 L15 9 V21 Z" />',
   // hộ thể: khiên
   self: '<path d="M12 2.8 L19.2 5.8 V12 C19.2 16.8 15.6 19.8 12 21.2 C8.4 19.8 4.8 16.8 4.8 12 V5.8 Z" />',
 };

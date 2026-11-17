@@ -70,7 +70,7 @@ describe("LEARNABLE_SKILLS: gom 18 chiêu gốc + các tệp dữ liệu theo nh
     expect(SKILL_STYLES).toContain("khac");
     expect([...SKILL_GRADES]).toEqual([0, 1, 2, 3]);
     expect(SKILL_GRADE_NAMES).toEqual(["Hoàng", "Huyền", "Địa", "Thiên"]);
-    expect(SKILL_SHAPES.length).toBe(7);
+    expect(SKILL_SHAPES.length).toBe(13);
   });
 });
 
