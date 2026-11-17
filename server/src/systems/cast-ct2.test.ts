@@ -77,7 +77,7 @@ describe("chainTargets: chọn mục tiêu sét lan", () => {
 
   it("quái ngoài tầm đầu hoặc phía SAU lưng không được chọn làm mục tiêu đầu; không có mục tiêu thì rỗng", () => {
     const t = setup();
-    mon(t, 700, 1000); // sau lưng (hướng đánh 0 = sang phải)
+    mon(t, 900, 1000); // sau lưng (hướng đánh 0 = sang phải), TRONG tầm 200: chỉ nửa mặt phía trước mới được chọn làm mục tiêu đầu
     mon(t, 1500, 1000); // quá tầm 200
     const out = chainTargets(
       t.w,
