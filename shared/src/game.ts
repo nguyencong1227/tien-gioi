@@ -366,6 +366,44 @@ export const MONSTERS: MonsterKind[] = [
     color: 0x5b2a8c,
     boss: true,
   },
+  // ---------- Quái con do TRÙM triệu hồi (mục 42, #887 G3; `BossAction` `summon`, `docs/THIET_KE_TRUM.md` mục 6) ----------
+  // QUY ƯỚC: không sinh ngoài hoang (`MONSTER_CAP` = 0, bản đồ không khai báo), chỉ xuất hiện khi trùm gọi (`summonAdds`, `maxAdds` giữ số con sống). `exp: 0`
+  // và KHÔNG có mục trong `DROP_TABLES`: server còn chặn thêm ở `killMonster` (`MonsterCtrl.addOf`: không tu vi, không rơi đồ / Linh thạch, không nhiệm vụ, không kiếp),
+  // nên giết quái con để cày là vô ích. Không `boss`, không `element` (không làm đổi sát thương chiêu của người chơi). Hình ảnh: ảnh dự phòng vẽ bằng code (B vẽ sau).
+  // Số là ĐỀ XUẤT khởi đầu (Dev D chốt bằng mô phỏng T5): mỗi con yếu hơn nhiều so với trùm, nguy hiểm vì ĐÔNG và ép người chơi chia sự chú ý, không vì một đòn nặng.
+  {
+    // Rắn con của Xích Mãng (Trúc Cơ): nhỏ, nhanh, cắn nhẹ; chừng 3% máu và 30% công của trùm, hai con cùng lúc (`maxAdds` 2) bằng ~60% công của trùm.
+    id: "ran_con",
+    name: "Rắn Con",
+    minDanger: 0.78,
+    hp: 320,
+    atk: 42,
+    speed: 140,
+    radius: 11,
+    aggro: 260,
+    attackRange: 28,
+    attackCd: 1200,
+    exp: 0,
+    level: 12,
+    color: 0xd9644a,
+  },
+  {
+    // Phân thân Linh Hư Yêu Vương (bí cảnh Kim Đan): máu rất thấp, bị hạ nhanh. HÀNH VI DỰ KIẾN (server làm ở T2 / #871, KHÔNG ở bước dữ liệu này): nổ vòng nhỏ sau `ttl` giây kể
+    // từ lúc xuất hiện hoặc khi bị hạ, nên phải đánh nhanh hoặc tránh ra; hiện tại là quái cận chiến thường (đúng với `BossAction` `summon`: chưa có nổ).
+    id: "phan_than_yeu_vuong",
+    name: "Phân Thân Yêu Vương",
+    minDanger: 0.8,
+    hp: 700,
+    atk: 90,
+    speed: 150,
+    radius: 14,
+    aggro: 320,
+    attackRange: 34,
+    attackCd: 1300,
+    exp: 0,
+    level: 14,
+    color: 0x9b6fd0,
+  },
 ];
 
 /** Người chơi cao hơn quái quá số bậc này thì tu vi bắt đầu giảm */
@@ -393,6 +431,9 @@ export const MONSTER_CAP: Record<string, number> = {
   ho: 16,
   mang: 2,
   yeu_vuong: 0, // trùm bí cảnh: không sinh ở bản đồ thường
+  // Quái con do trùm triệu hồi (#887): KHÔNG sinh tự nhiên ở bản đồ nào; chỉ `summonAdds` dựng
+  ran_con: 0,
+  phan_than_yeu_vuong: 0,
   // Quái Kim Đan: không sinh ở bản đồ mặc định; Âm Sương Trạch khai báo số lượng riêng (`MapDef.monsterCap`, #404)
   suong_ho: 0,
   thach_quy: 0,
@@ -405,6 +446,11 @@ export const MONSTER_CAP: Record<string, number> = {
   doc_tuoc: 0,
   thien_han_vuong: 0,
 };
+/**
+ * Loài quái CHỈ do trùm triệu hồi (#887): không sinh ngoài hoang, `exp` 0, không bảng rơi đồ / Linh thạch (`DROP_TABLES` / `COIN_DROPS` KHÔNG có mục), không nhiệm vụ / kiếp
+ * (server chặn ở `killMonster` qua `MonsterCtrl.addOf`). Test dữ liệu (`boss-adds.test.ts`) giữ quy ước; hai test "mọi quái có bảng rơi" miễn cho các loài này.
+ */
+export const SUMMON_ONLY_KINDS: readonly string[] = ["ran_con", "phan_than_yeu_vuong"];
 export const MONSTER_RESPAWN_MS = 10000;
 
 /**
