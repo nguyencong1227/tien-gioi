@@ -170,20 +170,20 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`**${scanned.length} tệp**`);
   });
 
-  it("số tệp theo thư mục khớp tài liệu: assets 109, icons 5, fonts 5; icon vật phẩm 106 = 69 vật phẩm của game + 12 icon Hàn Vân + 6 icon kinh quyển đợt 2 vẽ trước + 6 icon kinh quyển Kim / Thổ CT6 + 6 icon chiêu dạng mới CT9 + 7 icon kinh quyển Mộc / Thủy CT7", () => {
+  it("số tệp theo thư mục khớp tài liệu: assets 115, icons 5, fonts 5; icon vật phẩm 112 = 69 vật phẩm của game + 12 icon Hàn Vân + 6 icon kinh quyển đợt 2 vẽ trước + 6 icon kinh quyển Kim / Thổ CT6 + 6 icon chiêu dạng mới CT9 + 7 icon kinh quyển Mộc / Thủy CT7 + 6 icon kinh quyển Hỏa / Băng / Âm / Lôi / Phong CT8", () => {
     const under = (d: string) =>
       scanned.filter((f) => f.replace(/\\/g, "/").includes(`client/public/${d}/`));
     const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
-    // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 109 tệp tài sản thường + số ảnh AI
+    // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 115 tệp tài sản thường + số ảnh AI
     const ai = under("assets/ai");
     expect(ai).toHaveLength(6); // login_bg.webp + 5 thẻ bản đồ (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
-    expect(under("assets")).toHaveLength(109 + ai.length);
+    expect(under("assets")).toHaveLength(115 + ai.length);
     expect(under("icons")).toHaveLength(5);
     expect(under("fonts")).toHaveLength(5);
-    expect(items).toHaveLength(106);
+    expect(items).toHaveLength(112);
     const credits = doc("CREDITS.md");
-    expect(credits).toContain(`\`client/public/assets/\`: ${109 + ai.length} tệp`);
-    expect(credits).toContain("106 biểu tượng vật phẩm");
+    expect(credits).toContain(`\`client/public/assets/\`: ${115 + ai.length} tệp`);
+    expect(credits).toContain("112 biểu tượng vật phẩm");
   });
 
   it("mọi icon vật phẩm có một hàng trong bảng của docs/RA_SOAT_TAI_SAN.md (thiếu hàng thì đỏ)", () => {
