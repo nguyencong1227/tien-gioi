@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import {
+  BOARD_SCAN_MAX,
   DEFAULT_MAP_ID,
   DEFAULT_ORIGIN,
   ITEM_BY_ID,
@@ -192,6 +193,60 @@ export const hashSecret = (s: string) => createHash("sha256").update(s).digest("
 function fileFor(name: string) {
   const key = createHash("sha1").update(name.normalize("NFC").toLowerCase()).digest("hex");
   return path.join(getDir(), `${key}.json`);
+}
+
+/**
+ * Hàng xếp hạng của một nhân vật (M9, bảng `tuvi`): CHỈ các trường cần, không kéo túi đồ / mật khẩu về. `limbo: true` = đang ở Hoàng Tuyền (hồ sơ đã đặt lại, không xếp hạng kiếp hiện tại).
+ */
+export interface ProfileRow {
+  name: string;
+  realm: number;
+  tier: number;
+  exp: number;
+  limbo: boolean;
+}
+
+/** Rút `ProfileRow` từ dữ liệu nhân vật thô (file / jsonb); không tin kiểu: thiếu tên hoặc sai kiểu thì `null`. */
+export function profileRowOf(raw: unknown): ProfileRow | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.name !== "string" || r.name === "") return null;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  return {
+    name: r.name,
+    realm: n(r.realm),
+    tier: n(r.tier),
+    exp: n(r.exp),
+    limbo: r.limbo !== undefined && r.limbo !== null,
+  };
+}
+
+/** Liệt kê hồ sơ nhân vật từ thư mục dữ liệu (M9): chỉ `*.json` ở cấp trên cùng (không vào `souls/`), tối đa `limit`, sắp theo tên chuẩn hoá. Bản ghi hỏng bị bỏ qua. */
+export async function listPlayerProfiles(limit = BOARD_SCAN_MAX): Promise<ProfileRow[]> {
+  let names: string[];
+  try {
+    names = await fs.readdir(getDir());
+  } catch (e: any) {
+    if (e?.code === "ENOENT") return [];
+    throw e;
+  }
+  const out: ProfileRow[] = [];
+  for (const name of names.filter((n) => n.endsWith(".json")).sort()) {
+    if (out.length >= BOARD_SCAN_MAX) break; // trần quét (tên tệp là băm nên muốn cắt theo tên phải đọc đủ rồi mới sắp)
+    try {
+      const row = profileRowOf(JSON.parse(await fs.readFile(path.join(getDir(), name), "utf8")));
+      if (row) out.push(row);
+    } catch {
+      // tệp hỏng / đang ghi dở: bỏ qua
+    }
+  }
+  return out
+    .sort((a, b) => {
+      const x = a.name.normalize("NFC").toLowerCase();
+      const y = b.name.normalize("NFC").toLowerCase();
+      return x < y ? -1 : x > y ? 1 : 0;
+    })
+    .slice(0, limit);
 }
 
 export async function loadPlayer(name: string): Promise<SavedPlayer | null> {
