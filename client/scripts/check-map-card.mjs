@@ -2,7 +2,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, fetch, Buffer */
 /**
  * Kiểm THẺ MINH HOẠ BẢN ĐỒ ở màn chuyển cảnh qua cổng (`client/src/map-card.ts`, M7.12 / #513) trong Chrome THẬT, chế độ mock
- * (không cần máy chủ / Vite), ở năm khung nhìn:
+ * (không cần máy chủ / Vite), ở sáu khung nhìn (năm khung chuẩn + điện thoại ngang nhỏ 568x320):
  *
  *   npm run build -w client && node client/scripts/check-map-card.mjs [--shots <thư mục>] [--vp <khung>]
  *
@@ -31,13 +31,15 @@ const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
 
-/** Năm khung nhìn như `check-forge-shop.mjs`. */
+/** Năm khung nhìn như `check-forge-shop.mjs` + một khung điện thoại ngang nhỏ. */
 export const VIEWPORTS = [
   { name: "1280x720", w: 1280, h: 720, dpr: 1, mobile: false },
   { name: "768x1024", w: 768, h: 1024, dpr: 2, mobile: true },
   { name: "844x390", w: 844, h: 390, dpr: 2, mobile: true },
   { name: "390x844", w: 390, h: 844, dpr: 2, mobile: true },
   { name: "360x640", w: 360, h: 640, dpr: 2, mobile: true },
+  // Điện thoại ngang NHỎ (iPhone SE ngang): khung duy nhất mà trần theo chiều cao (`40vh`) của thẻ có tác dụng
+  { name: "568x320", w: 568, h: 320, dpr: 2, mobile: true },
 ];
 
 /** Ảnh thế chỗ có thật trong `dist` (vuông 1024x1024). */
