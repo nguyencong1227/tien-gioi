@@ -8231,3 +8231,172 @@ body.ui-hidden
   background: #ffe08a;
   border: 2px solid #1d1a16;
 }
+
+/* ---- Gặp chặn đường (mục 52, CD7): hộp thoại Chiến / Bỏ chạy ---- */
+.ambush-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+  background: rgba(8, 6, 4, 0.72);
+}
+.ambush-modal[hidden] {
+  display: none;
+}
+.ambush-modal:focus {
+  outline: none;
+}
+.ambush-box {
+  width: min(100%, 420px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(24, 21, 18, 0.97);
+  border: 1px solid #e57373;
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+  color: #f1e7c8;
+}
+.ambush-title {
+  margin: 0;
+  font-size: var(--fs-16, 16px);
+  color: #ff9a8a;
+  letter-spacing: 0.02em;
+}
+.ambush-foe {
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 700;
+  color: #ffe08a;
+}
+.ambush-scene {
+  margin: 0;
+  font-size: var(--fs-13);
+  line-height: 1.45;
+  font-style: italic;
+  color: #e6dcc0;
+}
+.ambush-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ambush-countdown {
+  flex: none;
+  min-width: 3.4em;
+  font-size: var(--fs-13);
+  font-variant-numeric: tabular-nums;
+  color: #ffe08a;
+}
+.ambush-bar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.ambush-bar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #e57373;
+}
+.ambush-btn {
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(201, 162, 74, 0.6);
+  background: rgba(201, 162, 74, 0.16);
+  color: #fff6dc;
+  font-size: var(--fs-13);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+  cursor: pointer;
+}
+.ambush-btn .ab-label {
+  font-weight: 700;
+}
+.ambush-btn .ab-sub {
+  font-size: var(--fs-11);
+  color: #e9d9a8;
+}
+.ambush-btn:hover:not([aria-disabled="true"]) {
+  background: rgba(201, 162, 74, 0.38);
+  border-color: #ffe08a;
+}
+.ambush-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+.ambush-fight {
+  min-height: 56px;
+  background: rgba(163, 29, 29, 0.8);
+  border-color: #e57373;
+}
+.ambush-fight:hover:not([aria-disabled="true"]) {
+  background: rgba(190, 40, 40, 0.9);
+  border-color: #ffb4a8;
+}
+.ambush-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+.ambush-or {
+  margin: 6px 0 0;
+  font-size: var(--fs-11);
+  color: #b9b3a6;
+  text-align: center;
+}
+.ambush-flee {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ambush-note {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: var(--fs-11);
+  color: #ffd2a8;
+  text-align: center;
+}
+/* điện thoại dọc: hộp thoại dính đáy (dưới ngón cái), chừa vùng an toàn */
+@media (pointer: coarse) and (orientation: portrait) {
+  .ambush-modal {
+    align-items: flex-end;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* màn ngang thấp (844 x 390): gọn lại để cả ba nút vẫn hiện, không phải cuộn */
+@media (max-height: 460px) {
+  .ambush-box {
+    padding: 10px;
+    gap: 5px;
+  }
+  .ambush-scene {
+    font-size: var(--fs-12, 12px);
+    line-height: 1.35;
+  }
+  .ambush-btn {
+    min-height: 48px;
+    padding: 5px 8px;
+  }
+  .ambush-fight {
+    min-height: 48px;
+  }
+  .ambush-or {
+    margin-top: 2px;
+  }
+}
