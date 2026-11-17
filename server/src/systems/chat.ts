@@ -1,5 +1,6 @@
 // Truyền âm (chat toàn server): lọc ký tự điều khiển, giới hạn độ dài và tần suất.
 import type { World } from "../world";
+import { titleOf } from "./chat-title";
 import { giveCommand } from "./inventory";
 import { partyChat } from "./party";
 import { sectChat } from "./sect";
@@ -37,5 +38,5 @@ export function chat(w: World, sid: string, raw: unknown) {
     return sectChat(w, sid, msg);
   }
   c.nextChat = w.now + COOLDOWN_MS;
-  w.events.chat(p.name, text);
+  w.events.chat(p.name, text, titleOf(p));
 }

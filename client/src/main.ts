@@ -606,6 +606,8 @@ function setupRoomLifecycle(room: Room) {
     isTraveling = true;
     stopLiveness();
     activeScene?.setReconnecting(true);
+    // chọn Chiến ở hộp thoại chặn đường: máy chủ KHÔNG gửi `ambushEnd` lúc bắt đầu trận, hộp thoại ("Đang xử lý…") còn mở tới lúc đổi phòng -> đóng ngay, không để nó đè lên màn chuyển cảnh và phòng mới
+    ui.hideAmbush();
     ui.showTransition(targetMap.def.name, msg.mapId);
 
     try {

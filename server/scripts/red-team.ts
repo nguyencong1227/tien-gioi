@@ -103,6 +103,7 @@ export const EXPECTED_MESSAGE_TYPES = [
   SECT_MSG.questTurnIn, // M8.4: trả nhiệm vụ tông môn
   SECT_MSG.shopBuy, // M8.5: mua ở cửa hàng tông môn
   AMBUSH_MSG.seen, // M9+ mục 52: hộp thoại chặn đường đã hiện (CD2; chỉ máy chủ so với id lời đang chờ)
+  AMBUSH_MSG.flee, // mục 52 (CD3): bỏ chạy giữa trận ở đấu trường (máy chủ trừ ĐÚNG giá đã chốt, client chỉ gửi cách trả)
   AMBUSH_MSG.choose, // mục 52: chọn Chiến / Bỏ chạy ở hộp thoại (CD2; máy chủ trừ ĐÚNG giá đã chốt, client không gửi số nào)
   // Luân hồi
   "soulBuy",

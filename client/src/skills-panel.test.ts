@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   SKILLS_M7,
+  TILE,
+  sampleSkills,
   skillCooldownMs,
   skillDamageMult,
   skillMpCost,
   skillOf,
+  skillEffect,
+  type SkillDef,
   type SkillsMsg,
 } from "@tien-gioi/shared";
 import { SkillTracker, type SlotMe } from "./skill-bar";
@@ -98,6 +102,110 @@ describe("statLines: số THẬT của máy chủ", () => {
   });
 });
 
+/** Chiêu mới của mục 51 dựng tay với con số TÒN: kiểm từng dòng số liệu (CT11a). Nền: một chiêu mẫu cùng hình, ghi đè các trường cần. */
+function mk(shape: SkillDef["shape"], over: Partial<SkillDef> = {}): SkillDef {
+  const base = sampleSkills(60).find((d) => d.shape === shape)!;
+  return { ...base, mult: 1, range: TILE * 5, reach: TILE * 3, ...over };
+}
+const joined = (d: SkillDef, level = 1) => statLines(d, level, 1000).join("|");
+
+describe("statLines: số liệu riêng của hình mới (mục 51)", () => {
+  it("chain: nảy bao nhiêu lần, tầm nhảy theo ô, mỗi lần còn bao nhiêu %, dòng sát thương nói 'ở đòn đầu'", () => {
+    const d = mk("chain", { bounces: 3, chainReach: TILE * 4, falloff: 0.8 });
+    const l = joined(d);
+    expect(l).toContain("Tầm: 5 ô");
+    expect(l).toContain("Sét lan: nảy 3 lần, tầm nhảy 4 ô, mỗi lần còn 80% sát thương");
+    expect(l).toMatch(/Sát thương: [\d,]+ lần công ở đòn đầu/);
+    // thiếu `falloff` thì dùng mặc định 85% của hợp đồng
+    expect(joined(mk("chain", { bounces: 1, chainReach: TILE * 4, falloff: undefined }))).toContain(
+      "còn 85% sát thương",
+    );
+    // không nảy: không nói "ở đòn đầu", không in "nảy 0 lần"
+    const none = joined(mk("chain", { bounces: 0 }));
+    expect(none).toContain("Sét lan: không nảy");
+    expect(none).not.toContain("ở đòn đầu");
+  });
+  it("bolt: tầm, tốc độ theo ô / giây, số viên, xuyên, nảy; 'mỗi viên' chỉ khi nhiều viên", () => {
+    const d = mk("bolt", { count: 3, speed: TILE * 15, pierce: 2, bounce: 1 });
+    const l = joined(d);
+    expect(l).toContain("Tầm: 5 ô, bay 15 ô/giây, 3 viên, xuyên 2 quái, nảy 1 lần");
+    expect(l).toMatch(/lần công mỗi viên/);
+    const one = joined(mk("bolt", { count: 1, speed: TILE * 10, pierce: 0, bounce: 0 }));
+    expect(one).toContain("Tầm: 5 ô, bay 10 ô/giây");
+    expect(one).not.toMatch(/viên|xuyên|nảy/);
+  });
+  it("zone / aura / totem: tồn tại bao lâu, mỗi nhịp bao lâu, 'mỗi nhịp' ở dòng sát thương", () => {
+    expect(joined(mk("zone", { durationMs: 4000, tickMs: 1000 }))).toContain(
+      "Vùng: bán kính 5 ô, đặt cách 3 ô, tồn tại 4 giây, mỗi 1 giây",
+    );
+    expect(joined(mk("aura", { durationMs: 6000, tickMs: 1500 }))).toContain(
+      "Hào quang: bán kính 5 ô, bám theo người, tồn tại 6 giây, mỗi 1,5 giây",
+    );
+    expect(joined(mk("totem", { durationMs: 5000, tickMs: 1000, taunt: true }))).toContain(
+      "Tượng: tầm 5 ô, đặt cách 3 ô, tồn tại 5 giây, mỗi 1 giây, thu hút quái",
+    );
+    expect(joined(mk("totem", { durationMs: 5000, tickMs: 1000, taunt: false }))).not.toContain(
+      "thu hút",
+    );
+    for (const sh of ["zone", "aura", "totem"] as const)
+      expect(joined(mk(sh, { durationMs: 4000, tickMs: 1000 }))).toMatch(/lần công mỗi nhịp/);
+  });
+  it("trap: bán kính, kích hoạt sau bao lâu, tồn tại, nổ một lần", () => {
+    expect(joined(mk("trap", { armMs: 600, durationMs: 10_000 }))).toContain(
+      "Bẫy: bán kính 5 ô, đặt cách 3 ô, kích hoạt sau 0,6 giây, tồn tại 10 giây, nổ một lần",
+    );
+  });
+  it("thiếu số thì bỏ phần đó, KHÔNG in '0 giây' / NaN / undefined", () => {
+    for (const sh of ["zone", "aura", "totem"] as const) {
+      const l = joined(mk(sh, { durationMs: undefined, tickMs: undefined }));
+      expect(l).not.toMatch(/0 giây|NaN|undefined|Infinity/);
+      expect(l).not.toContain("tồn tại");
+    }
+  });
+  it("trường chung: vận khí, kéo / đẩy, combo (kèm gỡ dấu và hiệu ứng), đồng đội", () => {
+    expect(joined(mk("nova", { windupMs: 1500 }))).toContain(
+      "Vận khí: 1,5 giây rồi mới đáp (lúc vận đi chậm 50%, bị choáng thì huỷ)",
+    );
+    expect(joined(mk("cone", { displace: { dir: "pull", px: TILE * 3 } }))).toContain(
+      "Kéo mục tiêu 3 ô (trùm miễn, tinh anh nửa quãng)",
+    );
+    expect(joined(mk("cone", { displace: { dir: "push", px: TILE * 2 } }))).toContain(
+      "Đẩy mục tiêu 2 ô",
+    );
+    const combo = joined(
+      mk("cone", {
+        combo: {
+          needs: "mark_hoa",
+          mult: 1.6,
+          consume: true,
+          apply: skillEffect("burn", 2, 0.3, 1),
+        },
+      }),
+    );
+    expect(combo).toContain(
+      "Combo: đánh vào mục tiêu đang mang Dấu Hỏa thì sát thương x1,6, gỡ Dấu Hỏa, gắn Bỏng",
+    );
+    // thiếu `mult` dùng mặc định 1,4; không `consume` thì không nói gỡ
+    const dflt = joined(mk("cone", { combo: { needs: "mark_kim" } }));
+    expect(dflt).toContain("x1,4");
+    expect(dflt).not.toContain("gỡ");
+    expect(joined(mk("self", { ally: { range: TILE * 6 } }))).toContain(
+      "Hiệu ứng có lợi cũng lên đồng đội trong 6 ô",
+    );
+    // chiêu không có trường chung thì không có dòng nào của chúng
+    expect(joined(mk("cone"))).not.toMatch(/Vận khí|Kéo|Đẩy|Combo|đồng đội/);
+  });
+  it("mọi chiêu mẫu (đủ 13 hình, mọi trường): dòng số liệu sạch, đúng một dòng 'Tầm' hay tương đương", () => {
+    for (const d of sampleSkills(60)) {
+      const lines = statLines(d, 1, 1000);
+      expect(lines.length, d.id).toBeGreaterThanOrEqual(3);
+      expect(lines.join("|"), d.id).not.toMatch(/NaN|undefined|Infinity|\b0 giây/);
+      for (const l of lines)
+        if (/^(Tầm|Vùng|Bẫy|Hào quang|Tượng|Lao):/.test(l)) expect(l, d.id).not.toMatch(/\d{3,}/);
+    }
+  });
+});
+
 describe("effectText: hiệu ứng gắn kèm", () => {
   it("tên, thời gian, cường độ theo loại, xác suất; trạng thái lạ rỗng", () => {
     expect(effectText({ status: "burn", ms: 3000, ratio: 0.12, chance: 0.4 })).toBe(
@@ -128,6 +236,28 @@ describe("effectText: hiệu ứng gắn kèm", () => {
         expect(t.length).toBeGreaterThan(0);
         expect(t).not.toMatch(/NaN|undefined/);
       }
+  });
+});
+
+describe("effectText: trạng thái mới của mục 51", () => {
+  it("cường lực (tự buff), suy yếu (có hại, trùm chịu nửa), dấu hệ (combo)", () => {
+    expect(effectText(skillEffect("empower", 4, 0.3, 1))).toBe(
+      "Cường Lực 6 giây (tăng 30% sát thương mọi chiêu), cho bản thân",
+    );
+    expect(effectText(skillEffect("weaken", 4, 0.25, 0.5))).toBe(
+      "50% khả năng: Suy Yếu 6 giây (gây ít hơn 25% sát thương, trùm chỉ chịu một nửa)",
+    );
+    expect(effectText(skillEffect("mark_hoa", 4, 0, 1))).toBe(
+      "Dấu Hỏa 6 giây (chiêu cùng hệ đánh vào sẽ ăn combo)",
+    );
+    expect(effectText(skillEffect("mark_loi", 2, 0, 1))).toContain("Dấu Lôi");
+  });
+  it("mọi trạng thái trong bảng đều có chữ (không rỗng, không NaN)", () => {
+    for (const id of ["empower", "weaken", "mark_kim", "mark_am", "windup"] as const) {
+      const t = effectText(skillEffect(id, 2, 0.2, 1));
+      expect(t, id).not.toBe("");
+      expect(t, id).not.toMatch(/NaN|undefined/);
+    }
   });
 });
 
