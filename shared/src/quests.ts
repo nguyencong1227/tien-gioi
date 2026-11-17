@@ -903,6 +903,60 @@ export const QUESTS: QuestDef[] = [
       complete: ["Ba con Hắc Hổ trong một ngày. Người trong trấn sẽ còn nhắc tên ngươi."],
     },
   },
+  // ---------- Nhiệm vụ lặp ở Trạm úy Thanh Lộ (Hắc Phong, D7 #755) ----------
+  {
+    id: "hp_lang_quay",
+    title: "Hôi Lang quấy phá",
+    giver: "tran_uy",
+    desc: "Hạ 15 Hôi Lang.",
+    steps: [{ kind: "kill", monster: "lang", count: 15 }],
+    rewards: { exp: 450, items: [{ itemId: "hoi_linh_dan", qty: 3 }] },
+    minRealm: { realm: 2, tier: 0 },
+    daily: true,
+    talk: {
+      offer: [
+        "Bầy Hôi Lang tràn ra đường trạm, xe vận chuyển đã mất hai người. Ngươi dám vào sâu thì hạ mười lăm con, ta trả công.",
+      ],
+      progress: ["Hôi Lang sống thành bầy, gặp một con là cả đàn kéo tới."],
+      complete: ["Mười lăm bộ da lang. Đường trạm lại thông, đạo hữu có công lớn."],
+    },
+  },
+  {
+    id: "hp_ho_sach",
+    title: "Hắc Hổ gây họa",
+    giver: "tran_uy",
+    desc: "Hạ 6 Hắc Hổ.",
+    steps: [{ kind: "kill", monster: "ho", count: 6 }],
+    rewards: { exp: 480, items: [{ itemId: "tu_khi_dan", qty: 1 }] },
+    minRealm: { realm: 2, tier: 0 },
+    daily: true,
+    talk: {
+      offer: [
+        "Hắc Hổ xuống quấy phá cuối cốc nhiều hơn mọi năm. Cần đạo hữu Trúc Cơ mới dám vào sâu, hạ sáu con cho ta.",
+      ],
+      progress: ["Hắc Hổ da dày đòn nặng, đừng đứng yên chịu trận."],
+      complete: ["Sáu con Hắc Hổ trong một ngày. Tụ Khí Đan này tặng ngươi, coi như cảm tạ."],
+    },
+  },
+  {
+    id: "hp_da_ho_nop",
+    title: "Nộp da hổ",
+    giver: "tran_uy",
+    desc: "Nộp 8 da hổ.",
+    steps: [{ kind: "collect", itemId: "da_ho", count: 8 }],
+    rewards: { exp: 500 },
+    minRealm: { realm: 2, tier: 1 },
+    daily: true,
+    talk: {
+      offer: [
+        "Da Hắc Hổ là hàng hiếm, lái buôn Mạc Thông trả giá tốt. Mỗi ngày ta thu tám tấm cho trạm.",
+      ],
+      progress: ["Chưa đủ tám tấm da hổ."],
+      complete: [
+        "Da còn tươi, dày lại đều. Bán sang Mạc Thông được giá đấy, đạo hữu cứ mang sang.",
+      ],
+    },
+  },
   // ---------- Nhiệm vụ lặp ở Vọng Sương Trạm (M6, #404) ----------
   {
     id: "suong_ho_quay",
