@@ -424,15 +424,12 @@ async function main() {
       tab.ev(
         `(() => { const b = [...document.querySelectorAll('#${grid} .inv-slot')].find(e => e.querySelector('.slot-name')?.textContent === ${JSON.stringify(POTION_NAME)}); if (!b) throw new Error('không có ô ${POTION_NAME} ở ${grid}'); b.focus(); return 1; })()`,
       );
-    /** Chỉnh ô số lượng (nút +/-) về `n`: số lượng đang chọn có thể còn lại từ lần trước nếu chọn lại đúng ô cũ. */
+    /** Chỉnh ô số lượng (ô nhập số dùng chung, mục 47) về `n` bằng cách GÕ số như người chơi; số lượng đang chọn có thể còn lại từ lần trước nếu chọn lại đúng ô cũ. */
     const setQty = async (tab: Tab, n: number) => {
-      for (let i = 0; i < 12; i++) {
-        const cur = Number(await text(tab, "sect-vault-qty"));
-        if (cur === n) return;
-        await press(tab, cur < n ? "sect-vault-plus" : "sect-vault-minus");
-        await sleep(80);
-      }
-      throw new Error(`Không chỉnh được số lượng về ${n}`);
+      await fill(tab, "sect-vault-qty", String(n));
+      await sleep(80);
+      const cur = Number(await tab.ev(`document.getElementById('sect-vault-qty').value`));
+      if (cur !== n) throw new Error(`Không chỉnh được số lượng về ${n} (ô đang ${cur})`);
     };
     const clickAct = (tab: Tab) => tab.ev(`document.getElementById('sect-vault-act').click(); 1`);
     giveItem(world, sids.get(B.name)!, POTION, GIVEN);
@@ -450,13 +447,18 @@ async function main() {
     await pickSlot(tb, "sect-vault-bag");
     await setQty(tb, 3);
     await tb.waitFor(
-      `document.getElementById('sect-vault-qty')?.textContent === '3'`,
+      `document.getElementById('sect-vault-qty')?.value === '3'`,
       "số lượng góp = 3",
     );
     await clickAct(tb);
     await waitServer(() => vaultCount() === 3, "kho có 3 Hồi Huyết Đan trên đĩa");
-    if (bagCount(B.name) !== GIVEN - 3)
+    // tệp kho (đĩa) và túi (bộ nhớ) cập nhật ở hai thời điểm: CHỜ theo điều kiện thay vì đọc túi ngay (trước đây thi thoảng đọc trước khi túi kịp đổi)
+    await waitServer(
+      () => bagCount(B.name) === GIVEN - 3,
+      `túi B còn ${GIVEN - 3} sau khi góp`,
+    ).catch(() => {
       throw new Error(`Túi B phải còn ${GIVEN - 3}, thực tế ${bagCount(B.name)}`);
+    });
     await tb.waitFor(
       `[...document.querySelectorAll('#sect-vault-grid .slot-name')].some(e => e.textContent === ${JSON.stringify(POTION_NAME)})`,
       "ảnh chụp kho mới của B có đan (nút mở khoá)",
@@ -482,13 +484,18 @@ async function main() {
     await pickSlot(ta, "sect-vault-grid");
     await setQty(ta, 3);
     await ta.waitFor(
-      `document.getElementById('sect-vault-qty')?.textContent === '3'`,
+      `document.getElementById('sect-vault-qty')?.value === '3'`,
       "số lượng rút = 3",
     );
     await clickAct(ta);
     await waitServer(() => vaultCount() === 0, "kho rỗng sau khi A rút");
-    if (bagCount(A.name) !== 3)
+    // rút: máy chủ ghi kho trước rồi mới đưa đồ vào túi, nên tệp kho rỗng chưa có nghĩa túi A đã nhận: CHỜ theo điều kiện (race chập chờn thi thoảng đỏ "thực tế 0")
+    await waitServer(
+      () => bagCount(A.name) === 3,
+      "túi A nhận đủ 3 Hồi Huyết Đan sau khi rút",
+    ).catch(() => {
       throw new Error(`Túi A phải có 3 Hồi Huyết Đan, thực tế ${bagCount(A.name)}`);
+    });
     // B (Đệ tử): góp 1 rồi rút 1 CÓ HỘP XÁC NHẬN nêu hạn mức, trừ đúng MỘT lượt
     await pickSlot(tb, "sect-vault-bag");
     await tb.waitFor(
@@ -702,6 +709,9 @@ async function main() {
         throw new Error(
           `Đổi xong: cống hiến phải còn ${500 - item.cost}, thực tế ${memberB().contrib}`,
         );
+      // cống hiến (tệp tông môn) trừ trước, đồ vào túi (bộ nhớ) sau: CHỜ theo điều kiện, đừng đọc túi ngay (race chập chờn thi thoảng đỏ ở đây)
+      for (let i = 0; i < 50 && countItem(ctrlOf(B.name).inv, item.itemId) !== have0 + 1; i++)
+        await sleep(100);
       if (countItem(ctrlOf(B.name).inv, item.itemId) !== have0 + 1)
         throw new Error("Đổi xong: túi phải thêm đúng 1 món");
       if ((memberB().today.buys?.[item.itemId] ?? 0) !== 1)

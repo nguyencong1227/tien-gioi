@@ -1598,31 +1598,16 @@
               <!-- Góp quỹ -->
               <form id="sect-form-deposit" class="sect-treasury-form">
                 <h4>Góp quỹ tông môn</h4>
-                <div class="sect-input-row">
-                  <input
-                    type="number"
-                    id="sect-input-deposit"
-                    min="1"
-                    max="999999999"
-                    placeholder="Số lượng..."
-                  />
-                  <button type="submit" id="sect-btn-deposit" class="sect-primary-btn">Góp</button>
-                </div>
+                <!-- Ô nhập SỐ LƯỢNG dùng chung (qty-stepper.ts, mục 47): ui.ts gắn vào đây; ô gõ giữ id sect-input-deposit -->
+                <div id="sect-deposit-qty" class="sect-qty-mount"></div>
+                <button type="submit" id="sect-btn-deposit" class="sect-primary-btn">Góp</button>
               </form>
 
               <!-- Rút quỹ (chỉ Tông chủ) -->
               <form id="sect-form-withdraw" class="sect-treasury-form" hidden>
                 <h4>Rút từ kho tông môn (Tông chủ)</h4>
-                <div class="sect-input-row">
-                  <input
-                    type="number"
-                    id="sect-input-withdraw"
-                    min="1"
-                    max="999999999"
-                    placeholder="Số lượng..."
-                  />
-                  <button type="submit" id="sect-btn-withdraw" class="sect-danger-btn">Rút</button>
-                </div>
+                <div id="sect-withdraw-qty" class="sect-qty-mount"></div>
+                <button type="submit" id="sect-btn-withdraw" class="sect-danger-btn">Rút</button>
               </form>
             </div>
 
@@ -1652,11 +1637,8 @@
             ></div>
             <div id="sect-vault-actions" class="sect-vault-actions">
               <div id="sect-vault-sel" class="sect-vault-sel" role="status">Chưa chọn món nào.</div>
-              <div id="sect-vault-qty-box" class="sect-vault-qty" hidden>
-                <button type="button" id="sect-vault-minus" aria-label="Bớt một">-</button>
-                <b id="sect-vault-qty" aria-live="polite">1</b>
-                <button type="button" id="sect-vault-plus" aria-label="Thêm một">+</button>
-              </div>
+              <!-- Ô nhập SỐ LƯỢNG dùng chung (qty-stepper.ts): ui.ts gắn vào đây; giữ id sect-vault-qty (ô gõ), sect-vault-minus, sect-vault-plus -->
+              <div id="sect-vault-qty-box" class="sect-vault-qty" hidden></div>
               <button type="button" id="sect-vault-act" class="sect-primary-btn" disabled>
                 Chọn món
               </button>
