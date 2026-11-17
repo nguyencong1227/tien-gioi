@@ -80,7 +80,7 @@ export function describePlayerStoreContract(
 
     it("save rồi load trả về đúng dữ liệu đã lưu", async () => {
       const store = await createStore();
-      const player = makeSavedPlayer("Hàn Lập", {
+      const player = makeSavedPlayer("Giang Tĩnh Uyên", {
         realm: 2,
         tier: 3,
         exp: 1500,
@@ -88,10 +88,10 @@ export function describePlayerStoreContract(
       });
 
       await store.save(player);
-      const loaded = await store.load("Hàn Lập");
+      const loaded = await store.load("Giang Tĩnh Uyên");
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.name).toBe("Hàn Lập");
+      expect(loaded?.name).toBe("Giang Tĩnh Uyên");
       expect(loaded?.realm).toBe(2);
       expect(loaded?.tier).toBe(3);
       expect(loaded?.exp).toBe(1500);
@@ -428,7 +428,7 @@ export function describeAccountStoreContract(
     it("update: cập nhật mật khẩu, mã khôi phục, lần đăng nhập, khoá; giữ nguyên id, username, name", async () => {
       const store = await createStore();
       const acc = (await store.create(makeNewAccount("user_cap_nhat")))!;
-      await store.setName(acc.id, "Hàn Lập");
+      await store.setName(acc.id, "Giang Tĩnh Uyên");
 
       const updated = await store.update(acc.id, {
         passHash: "pass-hash-moi",
@@ -440,7 +440,7 @@ export function describeAccountStoreContract(
       expect(updated).not.toBeNull();
       expect(updated?.id).toBe(acc.id);
       expect(updated?.username).toBe("user_cap_nhat");
-      expect(updated?.name).toBe("Hàn Lập");
+      expect(updated?.name).toBe("Giang Tĩnh Uyên");
       expect(updated?.passHash).toBe("pass-hash-moi");
       expect(updated?.recoveryHash).toBe("recovery-hash-moi");
       expect(updated?.lastLoginAt).toBe("2026-11-11T12:00:00.000Z");

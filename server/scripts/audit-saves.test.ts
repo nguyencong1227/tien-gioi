@@ -812,7 +812,7 @@ describe("audit-saves (Issue #112)", () => {
       createdAt: "2026-11-10T00:00:00.000Z",
       lastLoginAt: "2026-11-10T00:00:00.000Z",
       disabled: false,
-      name: "Hàn Lập",
+      name: "Giang Tĩnh Uyên",
     };
 
     const validSession = {
