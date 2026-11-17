@@ -22,6 +22,7 @@ import {
 } from "./cast";
 import { tickMonsters } from "./monsters";
 import { fireBolt } from "./bolt";
+import { placeMonster } from "./monster-place";
 import { MONSTER_BY_ID } from "@tien-gioi/shared";
 import { dealtMult } from "./status-rules";
 import { applyMonsterStatus, applyPlayerStatus, monsterHasStatus, tickStatuses } from "./status";
@@ -637,30 +638,37 @@ describe("weaken: các đường gây sát thương khác của quái (đạn, �
     expect(t.w.bolts[2]!.dmg).toBe(base);
   });
 
-  /** Chạy `tickMonsters` tới khi người chơi mất máu (tối đa 120 tick = 6 giây); trả máu mất. */
-  function lossBy(kind: string, weaken: boolean) {
+  /** Chạy `tickMonsters` tới khi người chơi mất máu (tối đa 200 tick = 10 giây); trả máu mất. `dist` = khoảng cách ban đầu; `bossMoves` bật bộ chiêu trùm. */
+  function lossBy(kind: string, weaken: boolean, dist = 30, bossMoves = false) {
     const t = setup();
-    t.p.hp = t.p.maxHp = 1_000_000;
+    t.p.hp = t.p.maxHp = 1_000_000_000;
     t.w.now = 100_000;
-    const m = addMonster(t.w, kind, t.p.x + 30, t.p.y);
-    m.mc.target = "a";
-    m.mc.nextAttack = 0;
-    if (weaken) applyMonsterStatus(t.w, m.id, weakEffect, 0, "a");
+    t.w.bossMoves = bossMoves;
+    const id = placeMonster(t.w, MONSTER_BY_ID[kind]!, t.p.x + dist, t.p.y);
+    const mc = t.w.mctrl.get(id)!;
+    mc.target = "a";
+    mc.nextAttack = 0;
+    if (weaken) applyMonsterStatus(t.w, id, weakEffect, 0, "a");
     const hp0 = t.p.hp;
-    for (let i = 0; i < 120 && t.p.hp === hp0; i++) {
+    for (let i = 0; i < 200 && t.p.hp === hp0; i++) {
       t.w.now += TICK_MS;
       tickMonsters(t.w, TICK_MS / 1000);
     }
     return hp0 - t.p.hp;
   }
 
-  it("đập đất (`cot_tuong`) và lao (`ho`) cũng giảm 40% khi quái bị suy yếu", () => {
-    for (const kind of ["cot_tuong", "ho"]) {
+  it("đập đất (`cot_tuong`), đòn LAO (`ho`, đứng xa để gồng rồi lao) và chiêu của TRÙM cũng giảm khi quái bị suy yếu (trùm chỉ nửa)", () => {
+    const cases: [string, number, boolean, number][] = [
+      ["cot_tuong", 30, false, 0.6],
+      ["ho", 150, false, 0.6],
+      ["mang", 60, true, 0.8],
+    ];
+    for (const [kind, dist, bossMoves, ratio] of cases) {
       expect(MONSTER_BY_ID[kind]).toBeDefined();
-      const base = lossBy(kind, false);
-      const weak = lossBy(kind, true);
+      const base = lossBy(kind, false, dist, bossMoves);
+      const weak = lossBy(kind, true, dist, bossMoves);
       expect(base, kind).toBeGreaterThan(0);
-      expect(weak / base, kind).toBeCloseTo(0.6, 1);
+      expect(weak / base, kind).toBeCloseTo(ratio, 1);
     }
   });
 });
