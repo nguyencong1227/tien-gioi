@@ -1849,7 +1849,7 @@ Trước khi bộ dữ liệu trùm thật (#872) được nạp vào, bài đo 
 ### 31.5. Chứng minh độ tin cậy bằng 4 đột biến ĐỎ (Mutations)
 Để bảo đảm bài đo `server/src/systems/boss-perf.test.ts` có khả năng phát hiện lỗi thực sự và không bao giờ bị 'xanh giả', 4 đột biến mã đã được thử nghiệm và đều làm bài test chuyển ĐỎ chính xác:
 1. **Đột biến 1 (Vòng lặp người chơi x người chơi O(n^2) bên trong nhánh đếm `near` của `pickCast`):**
-   - *Cách tạo đột biến:* Lồng vòng lặp duyệt người chơi $O(n^2)$ bên trong `w.state.players.forEach` của nhánh đếm mục tiêu `near` trong `pickCast`.
+   - *Cách tạo đột biến:* Lồng vòng lặp duyệt người chơi O(n^2) bên trong `w.state.players.forEach` của nhánh đếm mục tiêu `near` trong `pickCast`.
    - *Kết quả:* Thời gian `tickMonsters` ở 100 người chơi vọt lên **5.04 ms** (tỉ lệ tăng gấp 61.81x so với 10 người chơi = 0.082 ms).
    - *Bắt lỗi:* Ca test 3 ĐỎ: `AssertionError: expected 5.040289950000021 to be less than 2`.
 2. **Đột biến 2 (Gửi `warn` mỗi tick thay vì một lần lúc bắt đầu):**
