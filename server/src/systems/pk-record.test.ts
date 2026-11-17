@@ -74,6 +74,9 @@ const B = "Bravo";
 
 function setup() {
   const t = makeWorld(DEFAULT_MAP, new Hub());
+  // Ghim đồng hồ phòng GIỮA ngày (12:00 giờ Việt Nam): mỗi `playout` trôi 2 phút, dùng đồng hồ thật thì gần 24:00 các trận đầu chạy qua nửa đêm và hạn mức cặp-trong-ngày đặt lại giữa chừng
+  // (đỏ ổn định 23:40-24:00 giờ VN, cả trên CI lúc 16:40-17:00 UTC; issue #1125)
+  t.w.now = Date.UTC(2026, 10, 17, 5, 0, 0);
   const pa = addPlayer(t.w, A, 1, 8);
   const pb = addPlayer(t.w, B, 1, 8);
   pb.p.x += 45;
