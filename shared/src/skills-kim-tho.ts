@@ -105,7 +105,7 @@ export const SKILLS_KIM_THO: readonly SkillDef[] = [
     mpPct: 0.1,
     range: 100,
     arc: Math.PI * 0.9,
-    mult: 1.34,
+    mult: 1.6,
     effects: [skillEffect("bleed", 2, 0.2, 0.4)],
     reqRealm: 3,
     reqTier: 0,
