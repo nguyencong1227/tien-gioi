@@ -57,7 +57,6 @@ import {
   DEFAULT_ORIGIN,
   ORIGIN_BUY_PREFIX,
   levelOf,
-  SKILL_MAX_LEVEL,
   type SkillSlot,
   keepSlotsOf,
   engraveSlotsOf,
@@ -3316,7 +3315,7 @@ function skillRowEl(row: SkillRow): HTMLElement {
   const pips = document.createElement("span");
   pips.className = "sk-row-pips";
   pips.textContent = ` ${row.pips}`;
-  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${SKILL_MAX_LEVEL}`);
+  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${row.maxLevel}`);
   kind.append(pips);
   detail.append(kind);
 
