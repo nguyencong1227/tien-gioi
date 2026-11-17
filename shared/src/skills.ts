@@ -27,6 +27,11 @@
 // ---------------------------------------------------------------------------------------------------------------
 
 import { STAT_CAPS } from "./stat-caps";
+import { TURN_MS, skillEffect, type SkillGrade, type SkillStyle } from "./skill-kit";
+import { SKILLS_KIM_THO } from "./skills-kim-tho";
+import { SKILLS_MOC_THUY } from "./skills-moc-thuy";
+import { SKILLS_HOA } from "./skills-hoa";
+import { SKILLS_KHAC } from "./skills-khac";
 
 /** Pha ngũ hành dùng để tính khắc: kim, mộc, thủy, hỏa, thổ; `none` = vô sắc (không khắc, không bị khắc). */
 export type Phase = "kim" | "moc" | "thuy" | "hoa" | "tho" | "none";
@@ -158,8 +163,8 @@ export interface StatusDef {
   maxRatio: number;
 }
 
-/** Một lượt của nguồn (trò chơi theo lượt) đổi sang thời gian thực. */
-export const TURN_MS = 1500;
+/** Một lượt của nguồn (trò chơi theo lượt) đổi sang thời gian thực (định nghĩa ở `skill-kit.ts`, lá của đồ thị import; xuất lại ở đây). */
+export { TURN_MS };
 /** Số trạng thái tối đa trên một mục tiêu; cùng loại thì LÀM MỚI (không cộng dồn). */
 export const MAX_STATUSES = 4;
 /** Choáng: tối đa 1,2 giây, trùm miễn, sau khi hết thì miễn choáng 3 giây (không choáng liền nhau). */
@@ -255,6 +260,17 @@ export type SkillFxId = (typeof SKILL_FX_IDS)[number];
 
 export type SkillShape = "cone" | "line" | "fan" | "nova" | "ground" | "dash" | "self";
 
+/** Mọi hình chiêu (cùng thứ tự với `SkillShape`): để luật kiểm dữ liệu / công cụ duyệt qua mà không chép danh sách. */
+export const SKILL_SHAPES: readonly SkillShape[] = [
+  "cone",
+  "line",
+  "fan",
+  "nova",
+  "ground",
+  "dash",
+  "self",
+];
+
 export interface SkillEffect {
   status: StatusId;
   /** Thời gian (ms) */
@@ -303,14 +319,13 @@ export interface SkillDef {
   price: number;
   /** Kiểu hiệu ứng client (`FxMsg` `cast`, `SKILL_FX_IDS`); ghép với hệ để chọn màu */
   fx: SkillFxId;
+  /** TUỲ CHỌN (mục 51): phong cách chiêu để client chọn hình biểu tượng (`SKILL_STYLES`, `skill-kit.ts`); thiếu thì client suy theo `shape`. */
+  style?: SkillStyle;
+  /** TUỲ CHỌN (mục 51): phẩm cấp Hoàng / Huyền / Địa / Thiên (`SKILL_GRADES`); thiếu thì suy theo `rarity`. */
+  grade?: SkillGrade;
 }
 
-const fx = (status: StatusId, turns: number, ratio: number, chance: number): SkillEffect => ({
-  status,
-  ms: Math.round(turns * TURN_MS),
-  ratio,
-  chance,
-});
+const fx = skillEffect;
 
 /**
  * 12 chiêu đợt 1 (kế hoạch mục 5.3), toàn bộ lấy từ công pháp CÓ chiêu của nguồn (phẩm cấp 1-3). Số là số khởi điểm.
@@ -670,8 +685,21 @@ export const SKILLS_M7: readonly SkillDef[] = [
   },
 ];
 
+/**
+ * MỌI chiêu HỌC ĐƯỢC của trò chơi (mục 51; tên `LEARNABLE_SKILLS` vì `SKILLS` đã là bảng hai chiêu cố định ô 1 ở `game.ts`): 18 chiêu `SKILLS_M7` + các tệp dữ liệu theo nhóm hệ để PR của D / E / G không xung đột (`skills-kim-tho.ts`, `skills-moc-thuy.ts`,
+ * `skills-hoa.ts`, `skills-khac.ts` = Phong / Lôi / Băng / Âm / vô sắc). Kinh quyển, tra cứu, sổ chiêu, luật kiểm `skillViolations` đều đọc `LEARNABLE_SKILLS` (không đọc `SKILLS_M7`,
+ * vẫn giữ để test ghim 18 chiêu gốc). Thứ tự = thứ tự hiện ở bảng Công pháp.
+ */
+export const LEARNABLE_SKILLS: readonly SkillDef[] = [
+  ...SKILLS_M7,
+  ...SKILLS_KIM_THO,
+  ...SKILLS_MOC_THUY,
+  ...SKILLS_HOA,
+  ...SKILLS_KHAC,
+];
+
 export const SKILL_BY_ID: Readonly<Record<string, SkillDef>> = Object.fromEntries(
-  SKILLS_M7.map((s) => [s.id, s]),
+  LEARNABLE_SKILLS.map((s) => [s.id, s]),
 );
 
 /** Tra chiêu theo id không tin được (tin nhắn client, file lưu): id lạ / độc -> `undefined`. */
@@ -760,7 +788,7 @@ export function sanitizeSkillBook(raw: unknown, realm: number): SkillBook {
   const r = raw as Record<string, unknown>;
   if (r.learned !== null && typeof r.learned === "object" && !Array.isArray(r.learned)) {
     const src = r.learned as Record<string, unknown>;
-    for (const def of SKILLS_M7) {
+    for (const def of LEARNABLE_SKILLS) {
       if (Object.prototype.hasOwnProperty.call(src, def.id))
         out.learned[def.id] = levelClamp(src[def.id]);
     }
