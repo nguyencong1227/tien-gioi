@@ -60,6 +60,7 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       "cao_thi",
       "thu_mon",
       "lao_dan", // Lò đan (nghề nhỏ lát 1, #763): NPC trạm alchemy ở Lạc Hà Trấn
+      "lao_phu", // Bàn phù (nghề nhỏ lát 2, #817): NPC trạm talisman ở Lạc Hà Trấn
     ]);
     expect(npcsOfMap(HAC_PHONG_ID).map((n) => n.id)).toEqual(["lai_buon"]);
     expect(npcsOfMap(AM_SUONG_ID).map((n) => n.id)).toEqual([

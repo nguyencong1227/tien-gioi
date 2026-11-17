@@ -19,9 +19,23 @@ import {
 
 describe("giá trị vật phẩm", () => {
   it("mọi vật phẩm đều có giá trị (số nguyên >= 0) và không có khóa lạ", () => {
-    // Đan hộ đạo (luyện ở Lò đan, #763) cố ý KHÔNG có giá: đồ tự chế chỉ tiêu hao khi dùng, KHÔNG bán được cho NPC.
-    // Guard riêng trong lo-dan-lat1.test.ts (không có trong ITEM_VALUE + sellPrice === 0); mọi vật phẩm khác phải có giá.
-    const khong_gia = new Set(["dot_pha_dan", "kinh_chi_dan", "duong_anh_dan"]);
+    // Đan hộ đạo (luyện ở Lò đan, #763) và phù (chế ở Bàn phù, #817) cố ý KHÔNG có giá: đồ tự chế chỉ tiêu hao khi dùng,
+    // KHÔNG bán được cho NPC. Guard riêng trong lo-dan-lat1.test.ts / ban-phu-lat2.test.ts (không có trong ITEM_VALUE +
+    // sellPrice === 0); mọi vật phẩm khác phải có giá.
+    const khong_gia = new Set([
+      "dot_pha_dan",
+      "kinh_chi_dan",
+      "duong_anh_dan",
+      "phu_hoa_dan",
+      "phu_hoa_cuonghuyet",
+      "phu_kim_phicham",
+      "phu_kim_toagia",
+      "phu_hoa_lieutiem",
+      "phu_loi_loino",
+      "phu_hoa_tammoi",
+      "phu_moc_kimlan",
+      "phu_tho_tocphong",
+    ]);
     for (const i of ITEMS) {
       if (khong_gia.has(i.id)) continue;
       expect(Object.prototype.hasOwnProperty.call(ITEM_VALUE, i.id), `thiếu giá trị: ${i.id}`).toBe(
