@@ -57,6 +57,7 @@ import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
 import type { PBolt } from "./systems/pbolt";
+import type { Windup } from "./systems/windup";
 import type { BossCtrl } from "./systems/boss-state";
 import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
@@ -105,6 +106,12 @@ export interface PlayerCtrl {
   skills: SkillBook;
   /** Thời điểm (ms, `w.now`) mỗi ô chiêu 2-5 dùng lại được */
   skillCd: [number, number, number, number];
+  /** Cửa sổ 60 giây tính điểm luyện chiêu đã cộng (`creditMastery`, CT5): `start` = `w.now` lúc mở cửa sổ, `n` = số điểm đã cộng trong cửa sổ (trần `MASTERY_PER_MIN_CAP`). Chỉ dữ liệu riêng, không lưu. */
+  masteryWin?: { start: number; n: number };
+  /** Đang vận khí chiêu `windupMs` (CT5, `systems/windup.ts`): dữ liệu riêng, không lưu; huỷ khi choáng / chết / hồn lìa xác / Hoàng Tuyền / thách đấu bắt đầu. */
+  windup?: Windup;
+  /** Lần cuối (`w.now`) gửi `SkillsMsg.mastery` cho chủ: tối đa 1 lần / `MASTERY_SEND_MS` (trừ lúc lên tầng / vào phòng). */
+  masterySentAt?: number;
   /** Trạng thái đang có (M7.2b, `systems/status.ts`): tạo khi gắn lần đầu; chỉ gửi cho chủ qua tin `status`, không vào state chung */
   st?: StatusBox;
   /**

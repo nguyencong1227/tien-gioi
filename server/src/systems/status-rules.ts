@@ -4,6 +4,7 @@
 // Số liệu từng trạng thái (trần thời gian / cường độ, loại tác dụng) ở `shared/src/skills.ts`; chuỗi / id lạ bị bỏ, không bao giờ ném lỗi.
 import {
   MAX_STATUSES,
+  STATUS_UNCOUNTED,
   STUN_IMMUNE_MS,
   markIndexOf,
   statusAmpMult,
@@ -74,9 +75,20 @@ function isControl(id: StatusId): boolean {
  * Vị trí buff CÓ LỢI hết hạn sớm nhất trong hộp (-1 nếu không có). `withBreakAid` = false thì bỏ qua đan hộ đạo (`breakAid`: đã tốn một viên
  * đan, chỉ mất khi là buff duy nhất).
  */
+/** Trạng thái KHÔNG tính vào `MAX_STATUSES` (`windup`, mục 51): không chiếm ô, không bao giờ là nạn nhân bị đẩy ra. */
+const UNCOUNTED: ReadonlySet<string> = new Set(STATUS_UNCOUNTED);
+
+/** Số trạng thái trong hộp TÍNH vào `MAX_STATUSES` (bỏ `windup`). */
+function countedLength(box: StatusBox): number {
+  let n = 0;
+  for (const s of box.list) if (!UNCOUNTED.has(s.id)) n++;
+  return n;
+}
+
 function earliestBuff(box: StatusBox, withBreakAid: boolean): number {
   let victim = -1;
   for (let i = 0; i < box.list.length; i++) {
+    if (UNCOUNTED.has(box.list[i].id)) continue;
     const d = statusOf(box.list[i].id);
     if (!d || d.harmful) continue;
     if (!withBreakAid && d.kind === "breakAid") continue;
@@ -161,7 +173,7 @@ export function addStatus(
     if (opts.src !== undefined) same.src = src;
     return "refreshed";
   }
-  if (box.list.length >= MAX_STATUSES) {
+  if (!UNCOUNTED.has(def.id) && countedLength(box) >= MAX_STATUSES) {
     if (def.harmful) {
       // Có hại luôn vào: nạn nhân là buff có lợi hết sớm nhất (đan hộ đạo chỉ bị đẩy khi không còn buff nào khác, và khi đó dùng luật cũ).
       let victim = earliestBuff(box, false);
@@ -170,7 +182,7 @@ export function addStatus(
         // trạng thái + một choáng" thành miễn choáng); nạn nhân là trạng thái KHÔNG phải khống chế hết sớm nhất; trạng thái thường chỉ vào
         // khi sống lâu hơn nạn nhân.
         for (let i = 0; i < box.list.length; i++) {
-          if (isControl(box.list[i].id)) continue;
+          if (isControl(box.list[i].id) || UNCOUNTED.has(box.list[i].id)) continue;
           if (victim < 0 || box.list[i].until < box.list[victim].until) victim = i;
         }
         if (victim < 0) return "full"; // toàn khống chế (không xảy ra: chỉ có hai loại khống chế nên tối đa hai mục)

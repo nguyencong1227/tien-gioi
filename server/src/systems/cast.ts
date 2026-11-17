@@ -27,8 +27,9 @@ import { rollDamage } from "./damage";
 import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
 import { fireBolts } from "./pbolt";
+import { beginWindup, windupMsOf } from "./windup";
 import { syncPublicPos } from "./movement";
-import { cdrNow, sendSkills } from "./skills";
+import { cdrNow, creditMastery, sendSkills } from "./skills";
 import {
   applyMonsterStatus,
   applyPlayerStatus,
@@ -325,6 +326,7 @@ export function cast(w: World, sid: string, raw: unknown) {
     });
     return;
   }
+  if (c.windup !== undefined) return; // đang vận khí: không dùng chiêu khác (im lặng như hồi chiêu)
   if (w.now < c.skillCd[idx]) return; // client tự hiện hồi chiêu (cdMax): im lặng, không tốn tin
   const cost = skillMpCost(def, p.maxMp);
   if (p.mp < cost) {
@@ -335,20 +337,34 @@ export function cast(w: World, sid: string, raw: unknown) {
   p.mp -= cost;
   p.meditating = false;
   p.angle = quantAngle(m.angle);
-  if (def.dodgeMs) c.dodgeUntil = w.now + def.dodgeMs; // né đòn của quái trong lúc dùng (bộ pháp)
-  const x0 = p.x;
-  const y0 = p.y;
   w.events.fx({
     kind: "cast",
     by: sid,
     skill: def.id,
-    x: x0,
-    y: y0,
+    x: p.x,
+    y: p.y,
     angle: m.angle,
     range: fxRange(def),
   });
+  // CHIÊU VẬN (CT5 lát 2): tiêu hao + hồi chiêu đã tính ở trên, `fx cast` đã báo cho người ở gần; hiệu ứng hình + sát thương chỉ tới LÚC ĐÁP (`tickWindup` gọi `release`)
+  const wind = windupMsOf(def);
+  if (wind > 0) beginWindup(w, sid, c, def, wind, () => release(w, sid, def, level, m.angle));
+  else release(w, sid, def, level, m.angle);
+  sendSkills(w, sid); // hồi chiêu mới (client đếm lùi từ đây)
+}
 
-  if (def.shape === "dash") dash(w, sid, def, m.angle);
+/**
+ * ĐÁP chiêu `def` (tầng `level`) theo `angle` từ chỗ người dùng đứng LÚC NÀY: né đòn (bộ pháp), lao, gom mục tiêu, sát thương, hiệu ứng, đạn, chia cho đồng đội. Chiêu tức thời gọi ngay trong `cast`;
+ * chiêu vận (`windupMs`) gọi sau khi vận xong. Người dùng đã rời phòng thì bỏ qua.
+ */
+function release(w: World, sid: string, def: SkillDef, level: number, angle: number) {
+  const r = w.ready(sid);
+  if (!r) return;
+  const { p, c } = r;
+  if (def.dodgeMs) c.dodgeUntil = w.now + def.dodgeMs; // né đòn của quái trong lúc dùng (bộ pháp)
+  const x0 = p.x;
+  const y0 = p.y;
+  if (def.shape === "dash") dash(w, sid, def, angle);
 
   // Cường Lực (`empower`, mục 51): sát thương gây ra của MỌI chiêu nhân `1 + ratio` (một lần mỗi lần dùng chiêu)
   const empower = c.st && c.st.list.length > 0 ? statusEmpowerMult(entriesOf(c.st, w.now)) : 1;
@@ -361,7 +377,7 @@ export function cast(w: World, sid: string, raw: unknown) {
     const hits: { id: string; n: number; scale: number }[] = [];
     if (def.shape === "chain") {
       // SÉT LAN: thứ tự trúng + hệ số giảm theo từng lần nảy; vẽ tia nối tiếp cho người ở gần
-      const ch = chainTargets(w, def, x0, y0, m.angle);
+      const ch = chainTargets(w, def, x0, y0, angle);
       hits.push(...ch.hits);
       if (ch.hits.length > 0)
         w.events.fx({ kind: "chain", by: sid, skill: def.id, x: x0, y: y0, pts: ch.pts });
@@ -376,15 +392,15 @@ export function cast(w: World, sid: string, raw: unknown) {
             ? segDist(mon.x, mon.y, x0, y0, p.x, p.y) <= DASH_HIT_RADIUS + mc.def.radius
               ? 1
               : 0
-            : shapeHits(def, x0, y0, m.angle, mon.x, mon.y, mc.def.radius);
+            : shapeHits(def, x0, y0, angle, mon.x, mon.y, mc.def.radius);
         if (n > 0) hits.push({ id, n, scale: 1 });
       });
     }
-    const sk: StrikeCtx = { atk, crit: st.crit, mult, amp };
+    const sk: StrikeCtx = { atk, crit: st.crit, mult, amp, credited: false };
     for (const h of hits) strikeMonster(w, sid, def, sk, h.id, h.n, h.scale, x0, y0);
     if (def.shape === "bolt") {
       // CT3: quy hoạch đường bay + hẹn giờ trúng từng quái / đối thủ; trúng đòn nào thì đi CÙNG `strikeMonster` / `opponentAftermath` với chiêu tức thời
-      fireBolts(w, sid, def, x0, y0, m.angle, {
+      fireBolts(w, sid, def, x0, y0, angle, {
         strike: (id, fx, fy) => strikeMonster(w, sid, def, sk, id, 1, 1, fx, fy),
         hitOpponent: (target, fx, fy) => {
           if (duelHit(w, sid, target, mult)) opponentAftermath(w, sid, def, target, fx, fy);
@@ -392,15 +408,13 @@ export function cast(w: World, sid: string, raw: unknown) {
       });
     }
     if (def.shape !== "dash" && def.shape !== "bolt" && w.duels.active)
-      castAtOpponent(w, sid, def, x0, y0, m.angle, mult);
+      castAtOpponent(w, sid, def, x0, y0, angle, mult);
   }
 
   // trạng thái CÓ LỢI của chiêu (hộ thể, tăng tốc, hồi phục) luôn lên chính mình; trạng thái có hại chỉ lên kẻ trúng đòn
   for (const eff of def.effects)
     if (statusOf(eff.status)?.harmful === false) applyPlayerStatus(w, sid, eff, 0, sid);
   if (def.ally) shareWithParty(w, sid, def, x0, y0); // đồng đội cùng đội trong tầm cũng được trạng thái CÓ LỢI
-
-  sendSkills(w, sid); // hồi chiêu mới (client đếm lùi từ đây)
 }
 
 /** Số liệu chốt LÚC DÙNG chiêu để mọi lần trúng (tức thời hay đạn bay tới sau) tính cùng một công thức. */
@@ -413,6 +427,8 @@ interface StrikeCtx {
   mult: number;
   /** Hệ số phù `amp_<hệ>` cùng hệ với chiêu (một lần mỗi lần dùng chiêu, không mỗi mục tiêu) */
   amp: number;
+  /** Đã cộng điểm luyện chiêu cho lần dùng này chưa (MỘT điểm mỗi lần dùng, dù trúng nhiều quái / nhiều viên đạn) */
+  credited: boolean;
 }
 
 /**
@@ -434,6 +450,10 @@ function strikeMonster(
   const mc = w.mctrl.get(id);
   const p = w.state.players.get(sid);
   if (!mon || !mc || !p) return;
+  if (!sk.credited) {
+    sk.credited = true;
+    creditMastery(w, sid, def); // trúng quái đầu tiên của lần dùng này: +1 điểm luyện (chỉ quái, không phải đối thủ thách đấu)
+  }
   const em =
     elementMult(def.element, mc.def.element ?? "none") *
     treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
