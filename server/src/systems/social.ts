@@ -4,8 +4,8 @@ import { dayKey, socialPkRecord } from "@tien-gioi/shared";
 import type { World } from "../world";
 
 /**
- * Ghi kết quả một trận PK ĐÃ PHÂN THẮNG THUA cho hai linh hồn: người thắng +1 thắng, người thua +1 thua, nhưng CHỈ khi cặp (thắng, thua) còn trong hạn mức `BOARD_PK_PAIR_DAY_CAP` trận thắng của
- * ngày (`Hub.pkPairs`, chống đổi thắng); vượt hạn mức thì KHÔNG tính cho cả hai bên. Hoà không gọi hàm này. Trả `true` nếu có ghi.
+ * Ghi kết quả một trận PK phân thắng thua bằng HẠ GỤC cho hai linh hồn: người thắng +1 thắng, người thua +1 thua, nhưng CHỈ khi còn trong CẢ HAI hạn mức của ngày (`Hub.pkPairs`: cặp không thứ tự
+ * `BOARD_PK_PAIR_DAY_CAP`, mỗi người thắng `PK_DAY_WIN_CAP`); vượt hạn mức thì KHÔNG tính cho cả hai bên. Hoà / đầu hàng / bỏ chạy không gọi hàm này (`endDuel`). Trả `true` nếu có ghi.
  */
 export function recordPkResult(w: World, winnerSid: string, loserSid: string): boolean {
   const wc = w.ctrl.get(winnerSid);

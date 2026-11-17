@@ -189,6 +189,9 @@ describe("thách đấu qua phòng thật", () => {
     expect(sa?.social?.counters).toMatchObject({ pk_won: 1 });
     expect(sbSoul?.social?.pk).toEqual({ won: 0, lost: 1 });
     expect(sbSoul?.social?.counters).toMatchObject({ pk_lost: 1 });
+    // `PlayerCtrl.soul` của người trực tuyến cũng được cập nhật (M9.5 sẽ đọc `c.soul.social` để cấp thành tựu): không để bản cũ
+    expect(worldOf(a.room).ctrl.get(sidOf(a)).soul.social.pk).toEqual({ won: 1, lost: 0 });
+    expect(worldOf(b.room).ctrl.get(sidOf(b)).soul.social.pk).toEqual({ won: 0, lost: 1 });
     // đứng dậy tại chỗ (rút thời gian gục phía server)
     worldOf(b.room).ctrl.get(sidOf(b)).reviveAt = Date.now();
     await waitFor(() => !sb.dead, 3000, "B đứng dậy");

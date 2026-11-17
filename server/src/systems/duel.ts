@@ -407,7 +407,9 @@ export function endDuel(w: World, d: Duel, winner: string | undefined, reason: D
     reason,
   });
   // M9: thống kê PK theo linh hồn (hoà không tính; vượt hạn mức đổi thắng của cặp thì không tính cho cả hai bên)
-  if (winner !== undefined) recordPkResult(w, winner, winner === d.a ? d.b : d.a);
+  // (chỉ tính hạ gục `ko`: đầu hàng / bỏ chạy cho phép tài khoản phụ "thua" miễn phí; xem `pk-ledger.ts`)
+  if (winner !== undefined && reason === "ko")
+    recordPkResult(w, winner, winner === d.a ? d.b : d.a);
   for (const sid of [d.a, d.b]) {
     const p = w.state.players.get(sid);
     const c = w.ctrl.get(sid);
