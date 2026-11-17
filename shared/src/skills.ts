@@ -40,6 +40,7 @@ import { SKILLS_KIM_THO } from "./skills-kim-tho";
 import { SKILLS_MOC_THUY } from "./skills-moc-thuy";
 import { SKILLS_HOA } from "./skills-hoa";
 import { SKILLS_KHAC } from "./skills-khac";
+import { SKILLS_DANG_MOI } from "./skills-dang-moi";
 
 /** Pha ngũ hành dùng để tính khắc: kim, mộc, thủy, hỏa, thổ; `none` = vô sắc (không khắc, không bị khắc). */
 export type Phase = "kim" | "moc" | "thuy" | "hoa" | "tho" | "none";
@@ -896,6 +897,7 @@ export const LEARNABLE_SKILLS: readonly SkillDef[] = [
   ...SKILLS_MOC_THUY,
   ...SKILLS_HOA,
   ...SKILLS_KHAC,
+  ...SKILLS_DANG_MOI,
 ];
 
 export const SKILL_BY_ID: Readonly<Record<string, SkillDef>> = Object.fromEntries(

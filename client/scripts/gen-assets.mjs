@@ -978,6 +978,13 @@ const BOOKS = {
   kinh_liet_dia_nhat_quyen: [0xa8803a, 0xf0d9a0],
   kinh_phan_nhac_tram: [0x8a6a2a, 0xffd34d, "kiem"],
   kinh_van_kiem_quy_tong: [0xc8ccd4, 0x5a626e, "kiem"],
+  // Chiêu dạng mới (CT9 lát 1, A): bìa theo hệ; Lôi vàng nhạt, Âm tím sẫm
+  kinh_doc_dang_phuc: [0x4f8a4e, 0xc4e6b0],
+  kinh_phi_kiem_tam_lien: [0xb8bcc8, 0xf2e6a0, "kiem"],
+  kinh_liet_diem_tran: [0xd9433b, 0xffd0a0, "tran"],
+  kinh_loi_lien_chau: [0xe0c850, 0xfff6b0],
+  kinh_hon_phien_tuong: [0x5a3a7a, 0xc9a8e6, "tran"],
+  kinh_pha_son_nhat_kich: [0x8f6a2e, 0xe6c98a],
 };
 
 /**

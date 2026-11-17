@@ -22,7 +22,7 @@
 
 ---
 
-## 2. Bảng thống kê chi tiết tài sản (112 tệp tĩnh = 6 ảnh AI (`login_bg.webp` và 5 thẻ bản đồ, #513) + 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763) + 9 icon phù (#817) + 6 icon kinh quyển Kim / Thổ (CT6 lát 1, #1051); các mô-đun vẽ bằng mã ở mục 2c)
+## 2. Bảng thống kê chi tiết tài sản (118 tệp tĩnh = 6 ảnh AI (`login_bg.webp` và 5 thẻ bản đồ, #513) + 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763) + 9 icon phù (#817) + 6 icon kinh quyển Kim / Thổ (CT6 lát 1, #1051) + 6 icon chiêu dạng mới (CT9 lát 1, #1054); các mô-đun vẽ bằng mã ở mục 2c)
 
 | STT | Đường dẫn tệp | Loại tài nguyên | Nguồn gốc / Tác giả | Giấy phép | Tình trạng |
 |:---:|---|---|---|:---:|:---:|
@@ -130,10 +130,16 @@
 | 102 | `client/public/assets/items/kinh_liet_dia_nhat_quyen.png` | Icon kinh quyển Liệt Địa Nhất Quyền (Thổ, Huyền phẩm, Kim Đan) (CT6 lát 1, #1051; bìa theo hệ, chiêu kiếm có dấu kiếm) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 103 | `client/public/assets/items/kinh_phan_nhac_tram.png` | Icon kinh quyển Phân Nhạc Trảm (Thổ, Huyền phẩm, Kim Đan) (CT6 lát 1, #1051; bìa theo hệ, chiêu kiếm có dấu kiếm) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 104 | `client/public/assets/items/kinh_van_kiem_quy_tong.png` | Icon kinh quyển Vạn Kiếm Quy Tông (Kim, Địa phẩm, Nguyên Anh) (CT6 lát 1, #1051; bìa theo hệ, chiêu kiếm có dấu kiếm) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 105 | `client/public/assets/items/kinh_doc_dang_phuc.png` | Icon kinh quyển Độc Đằng Phục (Mộc, bẫy, Trúc Cơ) (CT9 lát 1, #1054; bìa theo hệ) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 106 | `client/public/assets/items/kinh_phi_kiem_tam_lien.png` | Icon kinh quyển Phi Kiếm Tam Liên (Kim, đạn bay, Kim Đan) (CT9 lát 1, #1054; bìa theo hệ) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 107 | `client/public/assets/items/kinh_liet_diem_tran.png` | Icon kinh quyển Liệt Diễm Trận (Hỏa, vùng, Kim Đan) (CT9 lát 1, #1054; bìa theo hệ) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 108 | `client/public/assets/items/kinh_loi_lien_chau.png` | Icon kinh quyển Liên Châu Lôi (Lôi, sét lan, Kim Đan) (CT9 lát 1, #1054; bìa theo hệ) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 109 | `client/public/assets/items/kinh_hon_phien_tuong.png` | Icon kinh quyển Hồn Phiên Tượng (Âm, tượng, Nguyên Anh) (CT9 lát 1, #1054; bìa theo hệ) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 110 | `client/public/assets/items/kinh_pha_son_nhat_kich.png` | Icon kinh quyển Phá Sơn Nhất Kích (Thổ, chiêu vận, Nguyên Anh) (CT9 lát 1, #1054; bìa theo hệ) | Do nhóm Tiên Giới (Dev A) sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 
-> Hàng 2-3 (atlas) nay có **454 khung** (xem 2b). Hàng 4-19 và 28-104 cộng lại là **93 icon**: 69 khớp 69 mặt hàng trong `ITEMS` của `shared/` (gồm 3 đan hộ đạo hàng 87-89, #763, vẽ SAU dữ liệu của Dev D, và 9 phù hàng 90-98, #817, vẽ SAU dữ liệu của Dev G) (mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế) + 12 icon Hàn Vân Lĩnh (hàng 69-80, M7.5 #506) + 6 icon kinh quyển đợt 2 (hàng 81-86, #654, A) vẽ TRƯỚC vật phẩm trong `shared/` (id chưa có trong `ITEMS` thì vô hại; A / Dev D thêm dữ liệu sau).
+> Hàng 2-3 (atlas) nay có **460 khung** (xem 2b). Hàng 4-19 và 28-110 cộng lại là **99 icon**: 69 khớp 69 mặt hàng trong `ITEMS` của `shared/` (gồm 3 đan hộ đạo hàng 87-89, #763, vẽ SAU dữ liệu của Dev D, và 9 phù hàng 90-98, #817, vẽ SAU dữ liệu của Dev G) (mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế) + 12 icon Hàn Vân Lĩnh (hàng 69-80, M7.5 #506) + 6 icon kinh quyển đợt 2 (hàng 81-86, #654, A) vẽ TRƯỚC vật phẩm trong `shared/` (id chưa có trong `ITEMS` thì vô hại; A / Dev D thêm dữ liệu sau).
 
-### 2b. Khung atlas (tệp 2-3) sau 6 kinh quyển Kim / Thổ CT6 lát 1 #1051: 454 khung (448 sau chín phù #817 = 337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển + 50 khung năm quái Hàn Vân Lĩnh + 12 icon + 3 NPC Hàn Vân Trạm + 6 icon kinh quyển đợt 2 + 1 NPC Lò đan + 3 icon đan hộ đạo + 1 NPC Bàn phù + 9 icon phù, rồi + 6 icon kinh quyển Kim / Thổ), toàn bộ sinh bằng `gen-assets.mjs`
+### 2b. Khung atlas (tệp 2-3) sau 6 chiêu dạng mới CT9 lát 1 #1054: 460 khung (454 sau 6 kinh quyển Kim / Thổ CT6 #1051; 448 sau chín phù #817 = 337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển + 50 khung năm quái Hàn Vân Lĩnh + 12 icon + 3 NPC Hàn Vân Trạm + 6 icon kinh quyển đợt 2 + 1 NPC Lò đan + 3 icon đan hộ đạo + 1 NPC Bàn phù + 9 icon phù, rồi + 6 icon kinh quyển Kim / Thổ, rồi + 6 icon chiêu dạng mới), toàn bộ sinh bằng `gen-assets.mjs`
 
 | Nhóm khung | Số khung | Nội dung |
 |---|:---:|---|
@@ -141,7 +147,7 @@
 | `robe-*` | 123 | Ba bộ pháp bào `tho_nhung_bao`, `hac_ho_bao`, `xich_lan_bao` (3 x 41 khung như trên) |
 | `mon-*` | 140 | **9 yêu thú x 10 khung** (đứng, đi 0-1, đánh `atk-0..1`, bị đánh `hurt`, gục `die-0..3`): `tho`, `lang`, `ho`, `mang` và **M6 #407** `suong_ho`, `thach_quy`, `doc_thiem`, `hac_giao`, `yeu_vuong` và **M7.5b #506** (B, vẽ TRƯỚC khi loài vào `shared/`) `han_lang` (sói băng), `phong_nha` (chim nanh thép), `cot_tuong` (voi xương), `doc_tuoc` (sẻ độc), `thien_han_vuong` (trùm sư tử băng): **14 loài x 10 khung** (không còn "9 yêu thú x 10") |
 | `npc-*` | 14 | `truong_tran`, `duoc_su`, `tho_ren`, `cao_thi`, `lai_buon`, `thu_mon` và **M6** `tram_truong`, `lai_buon_suong`, `tho_ren_suong` và **#763** `lao_dan` (Mộc Diên, lão đan sư ôm lò đan) và **#817** `lao_phu` (Tô Linh Ấn, lão phù sư giơ dải phù) |
-| `item-*` | 93 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
+| `item-*` | 99 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |
 | `swordbeam`, `dot` | 1 + 1 | Kiếm khí, chấm nhỏ dùng chung |
 
 Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ khung đi / đứng bằng biến đổi + đổi màu NGAY trong script (không có ảnh ngoài).
@@ -217,7 +223,7 @@ Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id
 
 | Hạng mục | Kết quả |
 |---|---|
-| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **112 tệp** (3 trong `assets/` + 6 ảnh AI `assets/ai/` (`login_bg.webp` + 5 thẻ bản đồ) + 93 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
+| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **118 tệp** (3 trong `assets/` + 6 ảnh AI `assets/ai/` (`login_bg.webp` + 5 thẻ bản đồ) + 99 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |
 | Tài sản bên thứ ba có SHA-256 khớp `CREDITS.md` mục 6 | 5 / 5 (4 tệp `woff2` + `OFL.txt`) |
 | Giấy phép | CC0 1.0 (Tiên Giới tự tạo) cho 39 tệp; SIL OFL 1.1 cho 5 tệp phông (Noto Serif); không có CC-BY mới |
 | Mô-đun đồ hoạ / âm thanh vẽ bằng mã | 7 dòng (mô-đun hoặc nhóm mô-đun) ở 2c, không có tài sản ngoài |
