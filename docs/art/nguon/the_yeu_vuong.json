@@ -1,0 +1,64 @@
+{
+  "asset": "client/public/packs/art-trum/the_yeu_vuong.webp",
+  "finalSha256": "0ff7f3a7e8755f0ce219e10fe7c80cbbbb5b36d9cd5c6ad871f94a0db0b47ad8",
+  "rawSha256": "5eb90c492e34860474c78cd057b6203d8f5ea39376d885f274c6928877005d84",
+  "rawFile": "/mnt/data/comfyui/output/chosen/the_yeu_vuong_raw_1_00001_.png (ngoài repo; ảnh thô được chọn nằm ở thư mục chosen/ của /mnt/data, repo chỉ giữ băm)",
+  "model": {
+    "name": "sd_xl_base_1.0.safetensors",
+    "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+  },
+  "lora": [],
+  "comfyui": {
+    "comfyui": "0.43.2",
+    "python": "3.12.16",
+    "pytorch": "2.14.1+cu130",
+    "driver": "615.71.09",
+    "gpu": "NVIDIA GeForce RTX 5060 8 GB"
+  },
+  "workflow": {
+    "path": "scripts/art/gen-raw-batch.mjs",
+    "sha256": "ddb4093b293c136f51886cf4d454139f92649b22fe708c4f7b60bca70e3e856a",
+    "note": "Lô 2 do Dev C sinh ngày 17/11 18:02 bằng `node scripts/art/gen-raw-batch.mjs boss` từ main, đúng tệp đã merge ở #1009 (băm trên khớp tệp trong repo, không dựng lại); prompt dương và hạt giống lấy từ BOSS_CARD_BATCH, prompt âm NEGATIVE_PROMPT (client/scripts/art/prompt-rules.mjs). rawSha256 khớp bảng của C ở #513.",
+    "params": {
+      "sampler": "euler",
+      "scheduler": "normal",
+      "steps": 25,
+      "cfg": 7,
+      "denoise": 1,
+      "width": 1024,
+      "height": 1024
+    }
+  },
+  "prompt": "ancient spirit beast lord with huge branching luminous antlers and long fur drifting like mist, standing in a crystal cavern with glowing mushrooms, jade teal and cyan glow with deep violet accents against blue-black shadows, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text",
+  "negativePrompt": "text, letters, words, calligraphy, watermark, signature, logo, cjk, chinese characters, frame, border, blurry, lowres, distorted, modern, futuristic, photorealistic, human face, western fantasy, anime, 3d render",
+  "seed": 2026111831,
+  "postProcess": [
+    {
+      "script": "client/scripts/art/hau-ky-webp.py",
+      "params": {
+        "crop": [112, 16, 880, 880],
+        "size": [384, 384],
+        "quality": 86,
+        "method": 6
+      },
+      "result": {
+        "width": 384,
+        "height": 384,
+        "bytes": 21822,
+        "chunks": ["VP8 "],
+        "pillow": "10.2.0",
+        "libwebp": "1.3.2"
+      },
+      "note": "Cắt 112,16,880,880 (vuông, bỏ mép giấy / viền, giữ cả con vật) rồi đổi cỡ 384x384 (Lanczos) và mã hoá WebP sạch (không EXIF / XMP / ICC). Tất định: cùng ảnh thô + tham số + Pillow / libwebp cho cùng finalSha256."
+    }
+  ],
+  "reviewed": {
+    "by": "Dev B (Claude Code, chạy đêm)",
+    "date": "2026-11-17",
+    "noText": true,
+    "noOtherGameLikeness": true,
+    "note": "Xem cả 16 ảnh thô của lô 2 (bốn hạt giống mỗi trùm) trên bảng thu nhỏ, hai ứng viên cuối ở 640 px, ảnh cuối ở cỡ thật và thu nhỏ 64 px (cỡ ảnh đại diện thật): không chữ, không ký tự giả, không chữ ký, không logo, không người (không mặt người). ảnh 1 chọn vì gạc lớn đối xứng, thân nằm giữa khung, màu lam ngọc đúng bảng màu bí cảnh Linh Hư; loại số 2 (thân mờ khối, nền nhạt), số 3 (tối, gạc trắng hoà vào nền) và số 4 (mảnh, nhiều chi tiết nhỏ)."
+  },
+  "date": "2026-11-17",
+  "use": "Thẻ trùm `yeu_vuong` ở đầu thanh máu trùm (client/src/boss-card.ts, BOSS_CARDS; gói tải theo nhu cầu `art:trum`)"
+}

@@ -1,0 +1,31 @@
+{
+  "packs": [
+    {
+      "id": "art:trum",
+      "kind": "art",
+      "files": [
+        {
+          "path": "art-trum/the_hac_giao.webp",
+          "bytes": 20092,
+          "sha256": "03c24079de760d7b5c0fba24c0d338f30fda00f36bc92c8ba12fed97e00c8a0c"
+        },
+        {
+          "path": "art-trum/the_thien_han_vuong.webp",
+          "bytes": 15626,
+          "sha256": "0239a505c2890d6c3b53c2f44e9c89b7a6a0c132db2889557f7497c082086abc"
+        },
+        {
+          "path": "art-trum/the_xich_mang.webp",
+          "bytes": 26436,
+          "sha256": "7f20328bc6b5158efdb303d3dbac93a7fdc5b867fc3534097a76b217195f26c9"
+        },
+        {
+          "path": "art-trum/the_yeu_vuong.webp",
+          "bytes": 21822,
+          "sha256": "0ff7f3a7e8755f0ce219e10fe7c80cbbbb5b36d9cd5c6ad871f94a0db0b47ad8"
+        }
+      ],
+      "bytes": 83976
+    }
+  ]
+}
