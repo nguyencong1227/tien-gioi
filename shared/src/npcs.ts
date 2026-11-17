@@ -113,7 +113,7 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Thanh Lộ Trạm là cửa ngõ duy nhất xuyên Hắc Phong Cốc, ta giữ con đường này bao năm bằng máu và nanh thú.",
       "Gió đen thổi suốt ngày đêm, bầy Hôi Lang và Hắc Hổ càng nhiều, đạo hữu vào sâu phải cẩn trọng.",
-      "Yêu thú quấy phá đường vận chuyển, hạ chúng mang da răng về trạm, ta trả công bằng Linh thạch.",
+      "Yêu thú quấy phá đường vận chuyển, hạ chúng mang da răng về trạm, ta trả công bằng đan dược và tu vi.",
       "Lái buôn Mạc Thông bên kia trạm thu mua đồ, ngươi có gì cứ mang sang bán, hắn trả giá không tệ.",
       "Ta săn thú từ thuở còn non trẻ, nên biết rõ con đường nào an toàn và con thú nào nên tránh.",
     ],
