@@ -178,6 +178,29 @@ describe("showArtImage", () => {
     expect(img2.srcNow).toBe(packFileUrl(GIAO)); // KHÔNG phải ảnh trùm trước
   });
 
+  it("huỷ NGAY (trước khi gói kịp xong): gói về xong cũng không hiện thẻ", async () => {
+    const { ctl } = setup();
+    const img = fakeImg();
+    const cancel = show(img, ctl);
+    cancel();
+    await tick(10);
+    expect(img.srcNow).toBe("");
+    expect(img.hidden).toBe(true);
+  });
+
+  it("đổi sang tệp KHÔNG có trong gói: yêu cầu cũ về muộn KHÔNG được hiện ảnh cũ (thẻ phải ẩn)", async () => {
+    const { ctl, gate } = setup({ hold: true });
+    const img = fakeImg();
+    show(img, ctl, XICH.path, 5);
+    await new Promise((r) => setTimeout(r, 30)); // quá giờ, đang đợi gói về muộn
+    show(img, ctl, "art-trum/khong-co.webp", 5); // yêu cầu mới: tệp không có
+    gate.hold = false;
+    gate.release.splice(0).forEach((r) => r());
+    await tick(10);
+    expect(img.srcNow).toBe("");
+    expect(img.hidden).toBe(true);
+  });
+
   it("gói KHÁC về xong thì không đổi gì ở thẻ đang chờ gói này; gói của nó về thì hiện", async () => {
     const { ctl, gate } = setup({ hold: true });
     const img = fakeImg();

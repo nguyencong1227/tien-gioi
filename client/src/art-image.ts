@@ -53,13 +53,12 @@ export function showArtImage(img: CardImg, opt: ShowArtOptions): () => void {
   void ctl
     .ensure(opt.packId, { timeoutMs: opt.timeoutMs ?? ART_WAIT_MS })
     .then((res) => {
-      if (!current()) return;
       if (res === "loaded" || res === "cached") {
-        apply();
+        apply(); // `apply` tự bỏ nếu yêu cầu này đã cũ / bị huỷ
         return;
       }
       // `failed` (kể cả hết giờ): gói có thể về MUỘN, lúc đó áp dụng nếu yêu cầu này còn hiệu lực. `skipped` (không có gói) thì thôi.
-      if (res === "failed") {
+      if (res === "failed" && current()) {
         unsub = ctl.onReady((id) => {
           if (id !== opt.packId) return;
           if (apply()) {
