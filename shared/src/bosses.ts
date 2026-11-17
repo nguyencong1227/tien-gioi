@@ -171,7 +171,7 @@ export function bossPhaseMarks(def: BossDef): number[] {
  * sát thương mỗi đòn / khí huyết tối đa (<= 55%) và bot né hoàn hảo; `boss-data-dodge.test.ts` bắt bất kỳ đòn nào làm bot né (phản xạ 400 ms) bị trúng.
  *
  * Quy ước số: `dmgMult` nhân với `atk` của LOÀI (đòn thường), nên trùm đội có `atk` thấp so với bậc người chơi cần `dmgMult` lớn (đòn nặng ~20-30% khí huyết người đúng bậc,
- * Linh Hư Yêu Vương `atk` 16 là "bao máu" nên `dmgMult` 6-9). Báo trước luôn dư so với giới hạn nhanh của `bossViolations` (r <= 0,15 T - 63; w <= 0,3 T - 126) để bot
+ * Linh Hư Yêu Vương `atk` 16 là "bao máu" nên `dmgMult` 3,5-4,5: đòn nhẹ ~10% khí huyết người bậc 9, trận dài; mô phỏng #874: đội 4 người đứng yên vẫn hạ được, nặng hơn thì người bậc 9 chết hết). Báo trước luôn dư so với giới hạn nhanh của `bossViolations` (r <= 0,15 T - 63; w <= 0,3 T - 126) để bot
  * phản xạ 400 ms luôn thoát. `BOSS_MOVES=on` mới bật bộ chiêu ở bản chạy thật (`World.bossMoves`); không bật thì mọi trùm chạy như cũ.
  */
 export const BOSSES: readonly BossDef[] = [
@@ -428,7 +428,7 @@ export const BOSSES: readonly BossDef[] = [
         recoverMs: 800,
         cooldownMs: 9000,
         weight: 3,
-        dmgMult: 7,
+        dmgMult: 3.5,
         element: "am",
       },
       {
@@ -439,7 +439,7 @@ export const BOSSES: readonly BossDef[] = [
         recoverMs: 700,
         cooldownMs: 9000,
         weight: 2,
-        dmgMult: 9,
+        dmgMult: 4.5,
         element: "am",
       },
       {
@@ -450,7 +450,7 @@ export const BOSSES: readonly BossDef[] = [
         recoverMs: 900,
         cooldownMs: 12000,
         weight: 2,
-        dmgMult: 8,
+        dmgMult: 4,
         element: "am",
       },
       {
