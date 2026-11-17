@@ -190,6 +190,31 @@ describe("thành tựu qua phòng thật", () => {
     expect((await soulOf(again))!.social!.title).toBeNull();
   });
 
+  it("chat chung mang danh hiệu đang đeo của người nói (ChatOut.titleId, máy chủ điền lúc gửi); không đeo thì tin không có trường", async () => {
+    const a = await spawn();
+    const b = await spawn();
+    const heard: { from: string; text: string; titleId?: string }[] = [];
+    b.room.onMessage("chat", (m: { from: string; text: string; titleId?: string }) =>
+      heard.push(m),
+    );
+    me(a).title = "tr1";
+    a.room.send("chat", { text: "co danh hieu" });
+    await waitFor(() => heard.find((m) => m.text === "co danh hieu"), 3000, "nhận chat");
+    expect(heard.find((m) => m.text === "co danh hieu")).toEqual({
+      from: a.name,
+      text: "co danh hieu",
+      titleId: "tr1",
+    });
+    me(a).title = "";
+    await sleep(900); // hồi chiêu chat 800 ms
+    a.room.send("chat", { text: "het danh hieu" });
+    await waitFor(() => heard.find((m) => m.text === "het danh hieu"), 3000, "nhận chat 2");
+    expect(heard.find((m) => m.text === "het danh hieu")).toEqual({
+      from: a.name,
+      text: "het danh hieu",
+    });
+  });
+
   it("achievementsGet: trả sổ hiện tại cho chủ; chân linh cũ có kiếp >= 2 được cấp thành tựu ngay lần VÀO đầu tiên khi bật", async () => {
     WorldRoomCls.achievements = true;
     const name = `Kiep Cu ${++seq}`;

@@ -288,7 +288,8 @@ export class WorldRoom extends Room<WorldState> {
         sys: (text) =>
           this.broadcast("chat", { from: "Thiên Đạo", text, sys: true } satisfies ChatOut),
         // Chat người chơi là của CẢ SERVER (mọi bản đồ / phòng); thông báo hệ thống (`sys`) chỉ trong phòng
-        chat: (from, text) => this.hub.chat({ from, text } satisfies ChatOut),
+        chat: (from, text, titleId) =>
+          this.hub.chat({ from, text, ...(titleId ? { titleId } : {}) } satisfies ChatOut),
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),

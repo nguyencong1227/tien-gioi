@@ -67,6 +67,7 @@ import {
   type SectHallCtx,
   shopKnown,
 } from "../sect-service";
+import { titleField } from "./chat-title";
 import type { World } from "../world";
 import { exchangeItems, sendInv, takeFromSlot } from "./inventory";
 import { gainExp } from "./progression";
@@ -492,7 +493,12 @@ export function sectChat(w: World, sid: string, text: string) {
   const book = w.hub.sects;
   const sect = w.sectService ? book.cache.get(book.online.get(a.soulKey) ?? "") : undefined;
   if (!sect) return toastFail(w, sid, "not_in_sect");
-  const out: ChatOut = { from: a.name, text, channel: "sect" };
+  const out: ChatOut = {
+    from: a.name,
+    text,
+    channel: "sect",
+    ...titleField(w.state.players.get(sid)),
+  };
   for (const m of sect.members) {
     const loc = locateMember(w, m);
     if (loc) loc.w.events.chatTo(loc.sid, out);
