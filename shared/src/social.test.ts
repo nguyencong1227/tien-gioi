@@ -15,6 +15,7 @@ import {
   WORLD_BOSS_SUPPORT_CAP_PCT,
   WORLD_BOSS_TZ_OFFSET_MS,
   achievementProgress,
+  achievementOf,
   achievementViolations,
   achievementsDue,
   compareBoardRows,
@@ -27,11 +28,13 @@ import {
   sampleWorldBossEvent,
   sampleWorldBossSchedule,
   socialTrack,
+  titleOf,
   titleViolations,
   worldBossAnnouncements,
   worldBossDayStart,
   worldBossEligible,
   worldBossNext,
+  worldBossNoneMsg,
   worldBossOccurrence,
   worldBossPhaseAt,
   worldBossPoints,
@@ -96,6 +99,18 @@ describe("worldBossViolations: bắt dữ liệu sai", () => {
     expect(
       bad({ reward: { exp: 10, coin: 1, top: { itemId: "dai_hoi_huyet_dan", count: 0 } } }).join(),
     ).toContain("số vật phẩm");
+  });
+
+  it("khung giờ không được vắt qua nửa đêm (giờ + thời lượng <= 24:00); đúng 24:00 thì được", () => {
+    expect(bad({ hour: 23, minute: 50, durationMin: 30 }).join()).toContain("vắt qua nửa đêm");
+    expect(bad({ hour: 23, minute: 31, durationMin: 30 }).join()).toContain("vắt qua nửa đêm");
+    expect(bad({ hour: 23, minute: 30, durationMin: 30 })).toEqual([]); // kết thúc đúng 24:00
+    expect(bad({ hour: 0, minute: 0, durationMin: 120 })).toEqual([]);
+    // Hệ quả cho worldBossNext: khung hợp lệ luôn nằm gọn trong một ngày, nên lúc 00:10 khung 23:30 (hôm qua) đã kết thúc và "sắp tới" là khung hôm nay
+    const late = { ...base(), id: "khuya", hour: 23, minute: 30 };
+    const o = worldBossNext([late], at7(2026, 11, 18, 0, 10))!;
+    expect(o.startMs).toBe(at7(2026, 11, 18, 23, 30));
+    expect(worldBossPhaseAt(o, at7(2026, 11, 18, 0, 10))).toBe("soon");
   });
 
   it("id trùng và hai khung giờ chồng nhau bị bắt; hai khung cách nhau thì không", () => {
@@ -385,6 +400,62 @@ describe("hàm mẫu khớp kiểu thật", () => {
     for (const m of [soon, live, ended]) {
       expect(Object.keys(m)).not.toContain("atMs");
       expect(m.name.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("sampleBoards: đủ biến thể của `mine` (ngoài top, lý do không hạng) khớp BoardNoRank", () => {
+    for (const id of BOARD_IDS) {
+      const out = sampleBoards(id, 5, "outside");
+      expect(out.mine.rank).toBe(47);
+      expect(out.mine.row!.rank).toBe(47);
+      expect(out.rows.length).toBe(5); // hạng 47 KHÔNG nằm trong rows
+      for (const c of BOARD_COLUMNS[id]) expect(typeof out.mine.row![c.key]).toBe("number");
+      expect(sampleBoards(id, 5, "test").mine).toEqual({ rank: null, reason: "test" });
+      expect(sampleBoards(id, 5, "none").mine).toEqual({ rank: null, reason: "none" });
+      const mg = sampleBoards(id, 5, "min_games").mine;
+      expect(mg).toMatchObject({ rank: null, reason: "min_games" });
+      expect(mg.need).toBeGreaterThan(0);
+      expect(JSON.stringify(sampleBoards(id, 5, "outside"))).toBe(JSON.stringify(out));
+    }
+  });
+
+  it("sampleWorldBossEvent: none, fled / cancelled / below, live chưa đủ ngưỡng", () => {
+    expect(sampleWorldBossEvent("none")).toEqual(worldBossNoneMsg());
+    expect(worldBossNoneMsg()).toEqual({ phase: "none", id: "", name: "", mapId: "" });
+    expect(sampleWorldBossEvent("ended", "fled")).toMatchObject({
+      phase: "ended",
+      outcome: "fled",
+    });
+    expect(sampleWorldBossEvent("ended", "fled").reward).toBeUndefined();
+    expect(sampleWorldBossEvent("ended", "cancelled").outcome).toBe("cancelled");
+    const below = sampleWorldBossEvent("ended", "below");
+    expect(below.outcome).toBe("killed");
+    expect(below.reward).toBeUndefined(); // hạ được nhưng người xem chưa đủ ngưỡng: không thưởng
+    expect(sampleWorldBossEvent("live", "below").mine).toEqual({
+      pts: 900,
+      pct: 0.4,
+      eligible: false,
+    });
+    expect(sampleWorldBossEvent("live").mine!.eligible).toBe(true);
+  });
+
+  it("achievementOf / titleOf: tra thuộc tính RIÊNG (id lạ, tên của Object.prototype, kiểu sai đều undefined)", () => {
+    expect(achievementOf("kiep_2")).toBe(ACHIEVEMENT_BY_ID.kiep_2);
+    expect(titleOf("lh2")).toBe(TITLE_BY_ID.lh2);
+    for (const bad of [
+      "constructor",
+      "__proto__",
+      "toString",
+      "hasOwnProperty",
+      "",
+      "khong_co",
+      5,
+      null,
+      undefined,
+      {},
+    ]) {
+      expect(achievementOf(bad), String(bad)).toBeUndefined();
+      expect(titleOf(bad), String(bad)).toBeUndefined();
     }
   });
 
