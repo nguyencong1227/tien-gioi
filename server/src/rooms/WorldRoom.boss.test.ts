@@ -234,10 +234,44 @@ describe("Trùm nhiều chiêu trên máy chủ Colyseus thật (T6 #875)", () =
     await waitFor(() => boss!.mc.boss.cast != null, 2000, "trùm bắt đầu gồng");
     await waitFor(() => boss!.mc.boss.cast == null, 5000, "trùm hoàn tất đòn chiêu");
 
-    // 7. Đối chứng âm cùng lượt: Client xa KHÔNG nhận được bất kỳ warn hay bossCast nào
-    const farBossFx = far.fxList.filter(
-      (f) => f.kind === "warn" || (f.kind === "bossCast" && (f as any).by === boss!.id),
-    );
+    // 7. Đối chứng âm cùng lượt: Client xa KHÔNG nhận được warn/bossCast CỦA TRÙM.
+    //    warn KHÔNG có trường by (game.ts:493) → KHÔNG được lọc theo kind (sẽ bắt MỌI warn trong tầm nhìn Far,
+    //    kể cả từ nguồn khác) — lọc theo TOẠ ĐỘ: chỉ tính warn có gốc gần trùm (nón quat_duoi phát đúng chỗ trùm
+    //    đứng, boss.ts:261 default). bossCast có by → lọc theo by. In NGUỒN nếu red để debug (theo yêu cầu A).
+    const BOSS_WARN_ORIGIN_PX = 400; // nón warn phát đúng chỗ trùm đứng; dư biên cho trùm di chuyển vài bước lúc cast
+    const farBossFx = far.fxList.filter((f) => {
+      if (f.kind === "bossCast") return (f as any).by === boss!.id;
+      if (f.kind === "warn")
+        return Math.hypot(f.x - boss!.m.x, f.y - boss!.m.y) <= BOSS_WARN_ORIGIN_PX;
+      return false;
+    });
+    if (farBossFx.length > 0) {
+      // In nguồn: kind + toạ độ + khoảng cách tới trùm, giúp xác định fx nào đã rò rỉ tới Far và từ đâu
+      console.error(
+        "[#1018] Far NHẬN fx của trùm (rò rỉ sendNear?):",
+        farBossFx.map((f) => {
+          const dx = (f as any).x - boss!.m.x;
+          const dy = (f as any).y - boss!.m.y;
+          return f.kind === "warn"
+            ? {
+                kind: "warn",
+                shape: f.shape,
+                x: f.x,
+                y: f.y,
+                r: f.r,
+                distToBoss: Math.round(Math.hypot(dx, dy)),
+              }
+            : {
+                kind: f.kind,
+                by: (f as any).by,
+                x: (f as any).x,
+                y: (f as any).y,
+                distToBoss: Math.round(Math.hypot(dx, dy)),
+              };
+        }),
+        { boss: { x: boss!.m.x, y: boss!.m.y }, far: { x: pFar.x, y: pFar.y }, distToFar },
+      );
+    }
     expect(farBossFx.length).toBe(0);
   });
 

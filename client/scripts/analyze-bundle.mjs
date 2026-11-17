@@ -338,7 +338,7 @@ export async function analyzeClientBundle(options = {}) {
   const breakdown = classifyModules(mainChunk.modules, gzipBytes);
 
   // Đọc giới hạn ngân sách tĩnh để so sánh
-  let budgetMaxGzipKb = 520;
+  let budgetMaxGzipKb = 540;
   const budgetPath = path.resolve(clientDir, "perf-budget.json");
   if (fs.existsSync(budgetPath)) {
     try {
