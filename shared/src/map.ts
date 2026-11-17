@@ -28,6 +28,9 @@ export const TOWN: Readonly<{ cx: number; cy: number; r: number }> = {
   cy: MAP_H / 2,
   r: 7,
 };
+/** Số trùm (quái `boss: true`) SINH SẴN tối đa mỗi bản đồ (QUYET_DINH_M3 mục 55 / 56); `MapDef` kiểm lúc dựng (`checkMonsterCap`). Không tính trùm sự kiện thế giới, quái con trùm triệu hồi, đối thủ chặn đường. */
+export const MAX_BOSSES_PER_MAP = 6;
+
 export const TOWN_PX = { x: TOWN.cx * TILE, y: TOWN.cy * TILE, r: TOWN.r * TILE };
 
 function mulberry32(seed: number) {
@@ -303,12 +306,20 @@ export class GameMap {
   }
 
   private checkMonsterCap() {
+    let bosses = 0;
     for (const [id, n] of Object.entries(this.monsterCap)) {
       if (!Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, id))
         throw new Error(`MapDef ${this.def.id}: monsterCap có loại quái lạ "${id}"`);
       if (!Number.isInteger(n) || n < 0)
         throw new Error(`MapDef ${this.def.id}: monsterCap.${id} phải là số nguyên >= 0 (${n})`);
+      if (MONSTER_BY_ID[id]!.boss) bosses += n;
     }
+    // LUẬT CHUNG (QUYET_DINH_M3 mục 55 / 56): tối đa `MAX_BOSSES_PER_MAP` trùm sinh sẵn mỗi bản đồ (quái `boss: true` trong `monsterCap`). Không tính trùm sự kiện thế giới,
+    // quái con trùm triệu hồi, đối thủ chặn đường (phòng solo): ba thứ đó không nằm trong `monsterCap`.
+    if (bosses > MAX_BOSSES_PER_MAP)
+      throw new Error(
+        `MapDef ${this.def.id}: ${bosses} trùm sinh sẵn vượt giới hạn ${MAX_BOSSES_PER_MAP} mỗi bản đồ (monsterCap)`,
+      );
   }
 
   /** Số quái tối đa của loại `id` ở bản đồ này (loại không khai báo là 0). Id lạ cũng là 0. */
@@ -503,8 +514,8 @@ export const MAPS: readonly MapDef[] = [
         toPortal: "han_van_nam",
       },
     ],
-    // Tổng 62 (Hắc Phong Cốc 62; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
-    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 2 },
+    // Tổng 66 (Hắc Giao 6, mục 56; trần ~70 để tick < 10 ms): số liệu quái ở game.ts (#403), vùng sinh theo `minDanger` của từng loài
+    monsterCap: { suong_ho: 24, thach_quy: 18, doc_thiem: 18, hac_giao: 6 },
   },
   {
     id: HAN_VAN_ID,

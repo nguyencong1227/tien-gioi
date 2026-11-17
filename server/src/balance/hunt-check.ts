@@ -27,7 +27,7 @@ import { tickBolts } from "../systems/bolt";
 import { tickStatuses } from "../systems/status";
 import { applyStats } from "../systems/progression";
 import { addMonster, addPlayer, makeWorld } from "../systems/test-helpers";
-import { ASSUME, bestGear } from "./simulate";
+import { ASSUME, bestGear, huntRate } from "./simulate";
 import { ASSUME_DUNGEON } from "./dungeon";
 import { KIM_DAN_BOSS_ID, KIM_DAN_MONSTER_IDS } from "./kim-dan-sau";
 
@@ -175,16 +175,34 @@ export function huntCheck(realm: number, tier: number, monsterId: string, runs =
   };
 }
 
-/** Các cặp (bậc, quái) đối chiếu: mọi loài Kim Đan (kể cả Xích Mãng) x ba bậc, bốn loài thường Nguyên Anh x ba bậc (M7.9), cộng đại diện Luyện Khí / Trúc Cơ. */
+/**
+ * Các cặp (bậc, quái) đối chiếu: mọi loài Kim Đan (kể cả Xích Mãng) x ba bậc, bốn loài thường Nguyên Anh x ba bậc (M7.9), cộng đại diện Luyện Khí / Trúc Cơ; CHỈ những ca mà MÔ HÌNH coi
+ * là săn solo được (`huntRate` khác null, <= 50% khí huyết mỗi trận). Sau QUYET_DINH_M3 mục 30 (máu x1,5) một số ca (Độc Thiềm ở cả ba bậc Kim Đan, Phong Nha Sơ kỳ và Độc Tước ở cả ba bậc
+ * Nguyên Anh) không còn an toàn solo: người chơi thật mà đứng đánh một mình là chết, nên đối chiếu "hạ được quái" với mã thật không còn ý nghĩa cho ca đó (mô hình đã nói KHÔNG đi săn).
+ */
+export function huntCheckSkipped(): [number, number, string][] {
+  const out: [number, number, string][] = [];
+  for (let tier = 0; tier < REALMS[KD].tiers.length; tier++)
+    for (const id of ["mang", ...KIM_DAN_MONSTER_IDS])
+      if (huntRate(MONSTER_BY_ID[id], KD, tier) === null) out.push([KD, tier, id]);
+  for (let tier = 0; tier < REALMS[NA].tiers.length; tier++)
+    for (const id of NGUYEN_ANH_MONSTER_IDS)
+      if (huntRate(MONSTER_BY_ID[id], NA, tier) === null) out.push([NA, tier, id]);
+  return out;
+}
+
 export function huntCheckCases(): [number, number, string][] {
   const out: [number, number, string][] = [
     [1, 4, "lang"],
     [2, 2, "ho"],
   ];
+  const safe = (realm: number, tier: number, id: string) =>
+    huntRate(MONSTER_BY_ID[id], realm, tier) !== null;
   for (let tier = 0; tier < REALMS[KD].tiers.length; tier++)
-    for (const id of ["mang", ...KIM_DAN_MONSTER_IDS]) out.push([KD, tier, id]);
+    for (const id of ["mang", ...KIM_DAN_MONSTER_IDS])
+      if (safe(KD, tier, id)) out.push([KD, tier, id]);
   for (let tier = 0; tier < REALMS[NA].tiers.length; tier++)
-    for (const id of NGUYEN_ANH_MONSTER_IDS) out.push([NA, tier, id]);
+    for (const id of NGUYEN_ANH_MONSTER_IDS) if (safe(NA, tier, id)) out.push([NA, tier, id]);
   return out;
 }
 
@@ -415,11 +433,21 @@ export function renderHuntCheck(): string {
     (r) =>
       `| ${r.label} | ${MONSTER_BY_ID[r.monsterId].name} | ${n1(r.modelSeconds)} | ${n1(r.realSeconds)} | ${n2(r.timeRatio)}x | ${n0(r.modelLost)} | ${n0(r.realLost)} (${n0((r.realLost / r.maxHp) * 100)}%) | ${n2(r.lostRatioNoDodge)}x |`,
   );
+  const skipped = huntCheckSkipped().map(
+    ([realm, tier, id]) =>
+      `${MONSTER_BY_ID[id].name} (${REALMS[realm].name} ${REALMS[realm].tiers[tier]})`,
+  );
+  const skippedNote = skipped.length
+    ? `**Không đối chiếu ${skipped.length} ca** mà mô hình coi là KHÔNG an toàn solo (mất > 50% khí huyết mỗi trận; QUYET_DINH_M3 mục 30, máu x1,5): ${skipped.join(", ")} — người chơi thật đứng đánh một mình ở các ca này là chết, nên "hạ được quái" không còn là phép thử có nghĩa (cần đội).\n\n`
+    : "";
   const tMin = Math.min(...rows.map((r) => r.timeRatio));
   const tMax = Math.max(...rows.map((r) => r.timeRatio));
   const lMin = Math.min(...rows.map((r) => r.lostRatioNoDodge));
   const lMax = Math.max(...rows.map((r) => r.lostRatioNoDodge));
-  const hauRow = rows.find((r) => r.realm === KD && r.tier === 2 && r.monsterId === "doc_thiem")!;
+  // Ví dụ "gần ngưỡng nhất" ở Hậu kỳ Kim Đan: loài an toàn solo mất NHIỀU khí huyết nhất (trước mục 30 là Độc Thiềm; nay Độc Thiềm không an toàn solo nên không có dòng)
+  const hauRow = rows
+    .filter((r) => r.realm === KD && r.tier === 2)
+    .reduce((a, b) => (b.modelLost / b.maxHp > a.modelLost / a.maxHp ? b : a));
   const hauDoc = { ...hauRow, monsterName: MONSTER_BY_ID[hauRow.monsterId].name };
   const tiers = [0, 1, 2];
   const boss = tiers.flatMap((tier) =>
@@ -491,7 +519,7 @@ export function renderHuntCheck(): string {
 |---|---|---:|---:|---:|---:|---:|---:|
 ${rowLines.join("\n")}
 
-Thời gian hạ quái khớp mô hình trong **${n2(tMin)}x - ${n2(tMax)}x** (mục tiêu lệch <= ~25%): tốc độ tu vi / giờ và Linh thạch / giờ của mục 1 (phụ thuộc thời gian trận) đáng tin ở phần này. Khí huyết mất của mã thật bằng **${n2(lMin)}x - ${n2(lMax)}x** mô hình không né (mô hình giả định né ${n0((1 - ASSUME.hitTaken) * 100)}%, nên mã thật không né mất nhiều hơn mô hình ${n0((lMin / ASSUME.hitTaken - 1) * 100)}-${n0((lMax / ASSUME.hitTaken - 1) * 100)}%; phần dư ngoài hệ số né là làm tròn: quái đánh phát đầu ngay khi vào tầm nên số đòn là làm tròn LÊN, rõ nhất ở trận ngắn). Hệ quả: tiêu chí "an toàn" (mất <= 50% khí huyết mỗi trận) dựa trên giả định né; người KHÔNG né mất nhiều hơn số ở mục 1, vd ${hauDoc.label} ${hauDoc.monsterName}: **${n0((hauDoc.realLost / hauDoc.maxHp) * 100)}%** thay vì ${n0((hauDoc.modelLost / hauDoc.maxHp) * 100)}%; vẫn sống (đả tọa / đan hồi giữa các trận) nhưng sát ngưỡng khi gặp hai con cùng lúc.
+${skippedNote}Thời gian hạ quái khớp mô hình trong **${n2(tMin)}x - ${n2(tMax)}x** (mục tiêu lệch <= ~25%): tốc độ tu vi / giờ và Linh thạch / giờ của mục 1 (phụ thuộc thời gian trận) đáng tin ở phần này. Khí huyết mất của mã thật bằng **${n2(lMin)}x - ${n2(lMax)}x** mô hình không né (mô hình giả định né ${n0((1 - ASSUME.hitTaken) * 100)}%, nên mã thật không né mất nhiều hơn mô hình ${n0((lMin / ASSUME.hitTaken - 1) * 100)}-${n0((lMax / ASSUME.hitTaken - 1) * 100)}%; phần dư ngoài hệ số né là làm tròn: quái đánh phát đầu ngay khi vào tầm nên số đòn là làm tròn LÊN, rõ nhất ở trận ngắn). Hệ quả: tiêu chí "an toàn" (mất <= 50% khí huyết mỗi trận) dựa trên giả định né; người KHÔNG né mất nhiều hơn số ở mục 1, vd ${hauDoc.label} ${hauDoc.monsterName}: **${n0((hauDoc.realLost / hauDoc.maxHp) * 100)}%** thay vì ${n0((hauDoc.modelLost / hauDoc.maxHp) * 100)}%; vẫn sống (đả tọa / đan hồi giữa các trận) nhưng sát ngưỡng khi gặp hai con cùng lúc.
 
 **Trùm Hắc Giao theo đội, mã thật.** Mô hình mục 2 chia sát thương đều cho cả đội (\`/ n\`); mã thật thì trùm CHỈ đánh một mục tiêu (người nó đã nhắm), nên người bị nhắm chịu gần hết sát thương (cột "Không đan": có người chết ở đội 3 - 4); Đại Hồi Huyết Đan (hồi ${n0((ITEM_BY_ID.dai_hoi_huyet_dan.effect as { pct: number }).pct * 100)}%, hồi chiêu ${n0(ITEM_BY_ID.dai_hoi_huyet_dan.cooldown! / 1000)} giây, ${n0(buyPrice("dai_hoi_huyet_dan"))} Linh thạch) cứu được. Chính sách như \`dungeon.ts\` (\`ASSUME_DUNGEON\`): đứng đánh liên tục, uống đan khi khí huyết dưới ${n0(ASSUME_DUNGEON.potionBelow * 100)}%. Hai cột đan: mang ${ASSUME_DUNGEON.potions} viên (chính sách của bí cảnh) và đủ đan (${POTIONS_PLENTY} viên, không còn là giới hạn). ${BOSS_RUNS} trận mỗi ô.
 

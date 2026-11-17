@@ -20,6 +20,7 @@ import {
   DEFAULT_MAP_ID,
   GameMap,
   MAPS,
+  MAX_BOSSES_PER_MAP,
   MAP_BY_ID,
   WORLD_W,
   WORLD_H,
@@ -589,6 +590,35 @@ describe("nhiều bản đồ: danh sách, cổng, khu an toàn (M3 bước 1)",
       expect(() => new GameMap({ ...base, monsterCap: {} })).not.toThrow();
       expect(new GameMap({ ...base, monsterCap: {} }).monsterCapOf("ho")).toBe(0);
     });
+
+    it("LUẬT CHUNG (mục 55 / 56): tối đa MAX_BOSSES_PER_MAP (6) trùm sinh sẵn mỗi bản đồ: 6 hợp lệ, 7 bị từ chối; trùm tính theo MỌI loài `boss: true` cộng lại", () => {
+      expect(MAX_BOSSES_PER_MAP).toBe(6);
+      expect(() => new GameMap({ ...base, monsterCap: { mang: 6 } })).not.toThrow();
+      expect(() => new GameMap({ ...base, monsterCap: { mang: 7 } })).toThrow(/vượt giới hạn 6/);
+      // hai loài trùm khác nhau cộng chung (3 + 4 = 7)
+      expect(() => new GameMap({ ...base, monsterCap: { mang: 3, hac_giao: 4 } })).toThrow(
+        /vượt giới hạn/,
+      );
+      expect(() => new GameMap({ ...base, monsterCap: { mang: 3, hac_giao: 3 } })).not.toThrow();
+      // quái thường không tính: 36 con ho + 6 trùm vẫn hợp lệ
+      expect(
+        () => new GameMap({ ...base, monsterCap: { ho: 36, lang: 20, mang: 6 } }),
+      ).not.toThrow();
+    });
+  });
+
+  it("mọi bản đồ thật: tổng trùm sinh sẵn <= MAX_BOSSES_PER_MAP; Hắc Phong Xích Mãng 6 (giữ), Âm Sương Hắc Giao 6 (mục 56), Hàn Vân Thiên Hàn Vương 2, Lạc Hà Xích Mãng 2", () => {
+    for (const m of all) {
+      const bosses = Object.entries(m.monsterCap).reduce(
+        (n, [id, c]) => n + (MONSTERS.find((k) => k.id === id)?.boss ? c : 0),
+        0,
+      );
+      expect(bosses, m.def.id).toBeLessThanOrEqual(MAX_BOSSES_PER_MAP);
+    }
+    expect(getMap(HAC_PHONG_ID)!.monsterCapOf("mang")).toBe(6);
+    expect(getMap(AM_SUONG_ID)!.monsterCapOf("hac_giao")).toBe(6);
+    expect(getMap(HAN_VAN_ID)!.monsterCapOf("thien_han_vuong")).toBe(2);
+    expect(getMap(DEFAULT_MAP_ID)!.monsterCapOf("mang")).toBe(2);
   });
 });
 

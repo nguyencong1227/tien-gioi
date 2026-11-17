@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MONSTER_BY_ID } from "./game";
+import { MAPS, getMap } from "./map";
 import { ITEMS, ITEM_BY_ID } from "./items";
 import { NPC_BY_ID, TRADES } from "./npcs";
 import { RECIPES } from "./recipes";
@@ -124,11 +125,21 @@ describe("rơi Linh thạch", () => {
       const d = COIN_DROPS[k]!;
       return d.chance * ((d.min + d.max) / 2);
     };
-    const kinds = Object.keys(COIN_DROPS).sort(
-      (a, b) => MONSTER_BY_ID[a]!.exp - MONSTER_BY_ID[b]!.exp,
-    );
-    for (let i = 1; i < kinds.length; i++)
-      expect(avg(kinds[i]!)).toBeGreaterThan(avg(kinds[i - 1]!));
+    // So SÁNH TRONG CÙNG MỘT BẢN ĐỒ (bãi săn): tu vi và tiền rơi cùng tăng theo độ khó của loài. Không so xuyên bản đồ: QUYET_DINH_M3 mục 30 nhân đôi tu vi quái Âm Sương /
+    // Hàn Vân mà KHÔNG đổi Linh thạch rơi (người dùng chỉ chốt máu x1,5 và tu vi x2), nên tu vi của loài Nguyên Anh (Hàn Lang 1320) nay vượt tu vi của Xích Mãng (900, Lạc Hà)
+    // trong khi tiền rơi vẫn theo bậc. Trùm bí cảnh (không sinh ngoài hoang) tính chung nhóm riêng.
+    const home = (k: string) =>
+      MAPS.find((m) => getMap(m.id)!.monsterCapOf(k) > 0)?.id ?? "bi_canh";
+    const byMap = new Map<string, string[]>();
+    for (const k of Object.keys(COIN_DROPS)) {
+      const g = home(k);
+      byMap.set(g, [...(byMap.get(g) ?? []), k]);
+    }
+    for (const [, group] of byMap) {
+      const kinds = group.sort((a, b) => MONSTER_BY_ID[a]!.exp - MONSTER_BY_ID[b]!.exp);
+      for (let i = 1; i < kinds.length; i++)
+        expect(avg(kinds[i]!)).toBeGreaterThan(avg(kinds[i - 1]!));
+    }
   });
 });
 
