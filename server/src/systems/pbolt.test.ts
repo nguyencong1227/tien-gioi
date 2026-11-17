@@ -201,6 +201,9 @@ describe("planBolt: đường bay thuần", () => {
     expect(none.hits.map((h) => h.id)).toEqual(["a"]);
     const sub = plan({ bounce: 1, range: hitAt + 0.5, targets }); // còn dưới 1 px: cũng không nảy
     expect(sub.legs).toHaveLength(1);
+    const little = plan({ bounce: 1, range: hitAt + 20, targets }); // còn 20 px (>= 1): vẫn nảy (đoạn hai ngắn, chưa tới b)
+    expect(little.legs).toHaveLength(2);
+    expect(little.hits.map((h) => h.id)).toEqual(["a"]);
     const ok = plan({ bounce: 1, range: hitAt + 400, targets }); // còn dư: nảy bình thường
     expect(ok.legs).toHaveLength(2);
     expect(ok.hits.map((h) => h.id)).toEqual(["a", "b"]);
