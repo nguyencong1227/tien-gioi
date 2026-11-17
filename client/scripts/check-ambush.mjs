@@ -178,7 +178,7 @@ try {
         label: b.querySelector('.ab-label').textContent, h: Math.round(b.getBoundingClientRect().height), w: Math.round(b.getBoundingClientRect().width) }; };
       return { open: !m.hidden, inAmbush: document.body.classList.contains('in-ambush'), captured: window.__ui.isKeyboardCaptured(),
         focus: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : '', foe: q('ambush-foe').textContent,
-        scene: q('ambush-scene').textContent, count: q('ambush-countdown').textContent, note: q('ambush-note').textContent,
+        scene: q('ambush-scene').textContent, danger: !q('ambush-danger').hidden, dangerText: q('ambush-danger').textContent, count: q('ambush-countdown').textContent, note: q('ambush-note').textContent,
         fight: btn('ambush-fight'), coin: btn('ambush-flee-coin'), exp: btn('ambush-flee-exp') };
     })()`);
   const layout = () =>
@@ -207,6 +207,7 @@ try {
     `nút Chiến ghi 'Đấu một mình' kèm gợi ý Enter khi có chuột ('${s.fight.sub}')`,
   );
   check(s.foe === "Sói Hoang · Thường × 2", `tên kẻ chặn đường kèm mức và số lượng ('${s.foe}')`);
+  check(!s.danger, "mức Thường: KHÔNG có nhãn NGUY HIỂM");
   check(s.scene.startsWith("Đường đi bỗng vắng hẳn"), "văn mẫu hiện đúng");
   check(
     s.coin.sub === "30 Linh thạch" && s.exp.sub === "420 tu vi",
@@ -538,7 +539,7 @@ try {
       const btn = (id) => { const b = q(id); return { dis: b.getAttribute('aria-disabled'), sub: b.querySelector('.ab-sub').textContent }; };
       return { hud: !q('ambush-hud').hidden, inArena: document.body.classList.contains('in-arena'), clock: q('ahud-clock').textContent,
         urgent: q('ahud-clock').classList.contains('urgent'), fleeDis: q('ahud-flee').getAttribute('aria-disabled'), note: q('ahud-note').textContent,
-        sheet: !q('ambush-flee-modal').hidden, captured: window.__ui.isKeyboardCaptured(), focus: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : '',
+        fleeBar: !q('ahud-flee-bar').hidden, fleeFill: q('ahud-flee-fill').style.width, sheet: !q('ambush-flee-modal').hidden, captured: window.__ui.isKeyboardCaptured(), focus: document.activeElement ? (document.activeElement.id || document.activeElement.tagName) : '',
         coin: btn('aflee-coin'), exp: btn('aflee-exp'), text: q('aflee-text').textContent, anote: q('aflee-note').textContent,
         result: !q('ambush-result').hidden, rTitle: q('ar-title').textContent, rLines: [...q('ar-lines').children].map((li) => li.textContent), rCls: q('ambush-result').className };
     })()`);
@@ -678,6 +679,78 @@ try {
   await evalJs("window.__ui.hideAmbush(); 1");
   a = await arena();
   check(!a.result && !a.hud, "hideAmbush (đổi phòng bởi travelTo) gỡ cả thẻ kết quả và HUD");
+  // MỤC 53: VẬN bỏ chạy 1 giây (ambushState.fleeMs): bảng xác nhận đóng để thấy trận, thanh vận đầy dần, nút Bỏ chạy mờ (không bấm lại), chữ 'Đang thoát…'
+  await evalJs(
+    `window.__ui.onAmbushState(${AST()}); document.getElementById('ahud-flee').click(); 1`,
+  );
+  await sleep(120);
+  a = await arena();
+  check(a.sheet && !a.fleeBar, "(mồi) bảng xác nhận đang mở, chưa có thanh vận");
+  await evalJs(`window.__ui.onAmbushState(${AST({ fleeMs: 1000 })}); 1`);
+  await sleep(250);
+  a = await arena();
+  check(
+    !a.sheet && a.hud && a.fleeBar && /^Đang thoát…/.test(a.note) && a.fleeDis === "true",
+    `có fleeMs: bảng xác nhận đóng, HUD còn, thanh vận hiện, nút Bỏ chạy mờ ('${a.note}')`,
+  );
+  const w1 = parseFloat(a.fleeFill);
+  await shot("chan-duong-dang-thoat");
+  await sleep(500);
+  a = await arena();
+  check(parseFloat(a.fleeFill) > w1, `thanh vận ĐẦY DẦN theo thời gian (${w1}% -> ${a.fleeFill})`);
+  await clearSent();
+  await evalJs("document.getElementById('ahud-flee').click(); 1");
+  m = await sent();
+  a = await arena();
+  check(!a.sheet && m.length === 0, "đang vận: bấm lại Bỏ chạy không mở xác nhận, không gửi gì");
+  await evalJs(`window.__ui.onAmbushState(${AST()}); 1`);
+  a = await arena();
+  check(
+    !a.fleeBar && a.fleeDis === "false" && a.note === "",
+    "tin kế tiếp vắng fleeMs (vận huỷ): thanh vận ẩn, nút Bỏ chạy mở lại",
+  );
+  // MỤC 53: CHẾT THẬT: thẻ 'Ngươi đã gục', KHÔNG dòng 'Mất ...', KHÔNG câu 'không mất kiếp', không thêm toast
+  const toastsDie = await evalJs("document.querySelectorAll('#toast p').length");
+  await evalJs(
+    `window.__ui.onAmbushState(${AST()}); window.__ui.onAmbushEnd(${JSON.stringify({ result: "lost", died: true })}); 1`,
+  );
+  await sleep(150);
+  a = await arena();
+  check(
+    a.result &&
+      !a.hud &&
+      a.rTitle === "Ngươi đã gục" &&
+      a.rLines.join("|") === "Hoàng Tuyền đang chờ ngươi." &&
+      a.rCls.includes("bad"),
+    `chết thật: thẻ 'Ngươi đã gục' + 'Hoàng Tuyền đang chờ ngươi.' ('${a.rTitle}' / '${a.rLines.join("|")}')`,
+  );
+  check(
+    !/Mất |không mất kiếp/i.test(a.rTitle + " " + a.rLines.join(" ")),
+    "chết thật: KHÔNG in giá và KHÔNG còn câu 'không mất kiếp'",
+  );
+  check(
+    (await evalJs("document.querySelectorAll('#toast p').length")) === toastsDie,
+    "chết thật ở đấu trường: dùng thẻ, không thêm toast trùng",
+  );
+  await evalJs("window.__ui.hideAmbush(); 1");
+  // MỤC 53: nhãn NGUY HIỂM ở hộp thoại: tinh anh + cầm đầu có, thường không; chữ >= 14 px và không chỉ bằng màu
+  for (const [tier, want] of [
+    ["normal", false],
+    ["elite", true],
+    ["leader", true],
+  ]) {
+    await evalJs(
+      `window.__ui.hideAmbush(); window.__ui.onAmbushOffer(${sample({ foe: { name: "Sói Hoang", tier, count: 1 } })}); 1`,
+    );
+    await sleep(150);
+    s = await state();
+    check(
+      s.danger === want && (!want || s.dangerText === "NGUY HIỂM"),
+      `mức ${tier}: nhãn NGUY HIỂM ${want ? "HIỆN" : "ẨN"} ('${s.danger ? s.dangerText : ""}')`,
+    );
+    if (tier === "leader") await shot("chan-duong-nguy-hiem");
+  }
+  await evalJs("window.__ui.hideAmbush(); 1");
   // không đủ / thanh tu vi trống / hết giờ cục bộ
   await evalJs(
     `window.__ui.onAmbushState(${AST({ price: { exp: 0, coin: { price: 90, enough: false } } })}); document.getElementById('ahud-flee').click(); 1`,
@@ -854,13 +927,23 @@ try {
   );
   await clearSent();
   await evalJs("document.getElementById('aflee-coin').click(); 1");
-  await sleep(700);
+  await sleep(300);
   m = await sent();
   check(
     m.filter((x) => x.t === "ambushFlee").length === 1 &&
       m.find((x) => x.t === "ambushFlee").d.choice === "flee_coin",
     "chọn Linh thạch: gửi ambushFlee { flee_coin } qua sendAmbush",
   );
+  mockState = await arena();
+  check(
+    mockState.hud &&
+      !mockState.result &&
+      !mockState.sheet &&
+      mockState.fleeBar &&
+      /^Đang thoát…/.test(mockState.note),
+    `MỤC 53: máy chủ giả VẬN 1 giây (ambushState.fleeMs qua reg): HUD còn, chưa kết thúc, thanh vận hiện ('${mockState.note}')`,
+  );
+  await sleep(1100);
   mockState = await arena();
   check(
     !mockState.hud &&
@@ -873,6 +956,46 @@ try {
   await sleep(6500);
   s = await state();
   check(s.open, "sau kết cục máy chủ giả đề nghị LẠI: hộp thoại mới tự mở (luồng lặp được)");
+  await evalJs("window.__ambushMock.stop(); window.__ui.hideAmbush(); 1");
+
+  console.log(
+    "--- ĐƯỜNG DÂY THẬT, CHẾT THẬT (mục 53): ?ambush=mock&die=1 (hết trận = bị hạ: ambushEnd lost + died, rồi màn Hoàng Tuyền) ---",
+  );
+  await send("Page.navigate", { url: `${BASE_URL}/?ambush=mock&die=1&debug=1` });
+  for (let k = 0; k < 60; k++) {
+    await sleep(300);
+    if (
+      await evalJs(
+        "Boolean(window.__scene && window.__scene.me && window.__scene.me() && window.__ambushMock)",
+      )
+    )
+      break;
+  }
+  for (let k = 0; k < 40 && !(await state()).open; k++) await sleep(250);
+  s = await state();
+  check(s.open, "lời đề nghị đến (máy chủ giả, chế độ chết thật)");
+  await sleep(ARM_WAIT);
+  await evalJs("document.getElementById('ambush-fight').click(); 1");
+  await sleep(1500);
+  mockState = await arena();
+  check(mockState.hud && !mockState.result, "đã vào đấu trường: HUD hiện, chưa có kết cục");
+  // AMBUSH_MOCK_FIGHT_MS = 25 s: chờ tới lúc máy chủ giả cho bị hạ
+  for (let k = 0; k < 40 && !(await arena()).result; k++) await sleep(1000);
+  mockState = await arena();
+  check(
+    !mockState.hud &&
+      mockState.result &&
+      mockState.rTitle === "Ngươi đã gục" &&
+      mockState.rCls.includes("bad") &&
+      !/Mất |không mất kiếp/i.test(mockState.rTitle + " " + mockState.rLines.join(" ")),
+    `bị hạ: thẻ 'Ngươi đã gục' qua reg, không in giá, không 'không mất kiếp' ('${mockState.rTitle}')`,
+  );
+  check(
+    await evalJs("window.__ui.isLimboOpen()"),
+    "ngay sau ambushEnd died: MÀN HOÀNG TUYỀN hiện (tin limbo của máy chủ giả)",
+  );
+  await sleep(600);
+  await shot("chan-duong-chet-that");
   await evalJs("window.__ambushMock.stop(); window.__ui.hideAmbush(); 1");
 
   console.log("--- cảm ứng: cần điều khiển đang giữ lúc hộp thoại hiện, kiểu dính đáy ---");

@@ -5,10 +5,13 @@
  * Luồng (theo `docs/THIET_KE_CHAN_DUONG.md`, CÙNG hằng số với máy chủ thật): hộp thoại `ambushOffer` (giá CHỐT) -> không `ambushSeen` trong `AMBUSH_SEEN_MS` thì
  * `ambushEnd canceled`; lựa chọn đến sớm hơn `AMBUSH_ARM_MS` bị bỏ qua; `fight` -> "đổi phòng" (`onTravel`) rồi `ambushState` mỗi giây (giá giữa trận), tự thắng sau
  * `AMBUSH_MOCK_FIGHT_MS` nếu không bỏ chạy; `flee_coin` / `flee_exp` / `ambushFlee` -> `ambushEnd fled` kèm giá đã chốt; hết `AMBUSH_OFFER_MS` không chọn = `fight`.
+ * Mục 53: bỏ chạy giữa trận VẬN `AMBUSH_FLEE_CHANNEL_MS` (1 giây; `ambushState.fleeMs`) rồi mới `ambushEnd fled`; `?ambush=mock&die=1` thì trận KẾT THÚC bằng chết thật
+ * (`ambushEnd { lost, died }` rồi màn Hoàng Tuyền qua `onDied`) thay vì thắng. Mức kẻ địch luân phiên thường / tinh anh / cầm đầu (hai mức sau hiện nhãn NGUY HIỂM).
  * Sau mỗi kết cục có lời đề nghị MỚI sau `AMBUSH_MOCK_REOFFER_MS` để xem lại. KHÔNG có quái, không trừ tiền thật: chỉ đủ để thấy giao diện và kiểm đường dây.
  */
 import {
   AMBUSH_ARM_MS,
+  AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_MSG,
   AMBUSH_OFFER_MS,
   AMBUSH_SEEN_MS,
@@ -31,6 +34,15 @@ export const AMBUSH_MOCK_REOFFER_MS = 6_000;
 export const MOCK_OFFER_PRICE: AmbushPrice = { exp: 420, coin: { price: 60, enough: true } };
 export const MOCK_MID_PRICE: AmbushPrice = { exp: 840, coin: { price: 120, enough: true } };
 
+/** Kết cục của trận trong máy chủ giả: `won` (mặc định) hoặc `died` (`?ambush=mock&die=1`: bị hạ = chết thật, mục 53). */
+export type MockAmbushOutcome = "won" | "died";
+
+export function mockAmbushOutcome(
+  search: string = typeof location !== "undefined" ? location.search : "",
+): MockAmbushOutcome {
+  return new URLSearchParams(search).get("die") === "1" ? "died" : "won";
+}
+
 /** `?ambush=mock`: chỉ bật ở môi trường DEV hoặc URL có `?debug` (như `?skills=mock`, `?duel=mock`). */
 export function isMockAmbushEnabled(
   search: string = typeof location !== "undefined" ? location.search : "",
@@ -48,6 +60,10 @@ export interface MockAmbushRoom {
 }
 
 export interface MockAmbushOptions {
+  /** Kết cục cuối trận (mặc định `won`). */
+  outcome?: MockAmbushOutcome;
+  /** Chết thật: máy chủ thật gửi tin `limbo` ngay sau `ambushEnd`; ở đây gọi hàm hiện màn Hoàng Tuyền mẫu. */
+  onDied?: () => void;
   /** Gọi khi "đổi phòng" sang đấu trường (máy chủ thật gửi `travelTo`; client thật đóng hộp thoại ở đó). */
   onTravel?: () => void;
   /** Đồng hồ và hẹn giờ tiêm vào để test tất định (mặc định `performance.now` / `setTimeout` thật). */
@@ -117,7 +133,10 @@ export function installMockAmbush(room: MockAmbushRoom, opts: MockAmbushOptions 
       const left = Math.max(0, arena.endsAt - now());
       room.emit(AMBUSH_MSG.state, { msLeft: left, price: MOCK_MID_PRICE });
       if (now() - startedAt >= AMBUSH_MOCK_FIGHT_MS) {
-        end({ result: "won", rewards: { exp: 360, coin: 48, items: [] } });
+        if (opts.outcome === "died") {
+          end({ result: "lost", died: true }); // chết thật: KHÔNG `paid` (cái chết thay giá)
+          opts.onDied?.(); // máy chủ thật: tin `limbo` ngay sau `ambushEnd`, rồi `travelTo` về phòng gốc
+        } else end({ result: "won", rewards: { exp: 360, coin: 48, items: [] } });
         return;
       }
       if (left <= 0) {
@@ -176,7 +195,13 @@ export function installMockAmbush(room: MockAmbushRoom, opts: MockAmbushOptions 
       const m = parseAmbushFlee(data);
       if (m === null || arena === null || settling) return;
       settling = true;
-      later(() => fled(m.choice, MOCK_MID_PRICE), 300);
+      // mục 53: VẬN 1 giây (báo `fleeMs` ngay), rồi mới trừ giá + thoát
+      room.emit(AMBUSH_MSG.state, {
+        msLeft: Math.max(0, arena.endsAt - now()),
+        price: MOCK_MID_PRICE,
+        fleeMs: AMBUSH_FLEE_CHANNEL_MS,
+      });
+      later(() => fled(m.choice, MOCK_MID_PRICE), AMBUSH_FLEE_CHANNEL_MS);
     }
   };
 
