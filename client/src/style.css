@@ -2235,6 +2235,15 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   font-size: var(--fs-12);
   color: #ffd27a;
 }
+/* ô số lượng vứt (mục 47): chỉ hiện khi có từ 2 cái; ghi chú kẹp / sai nằm ngay dưới ô */
+.inv-drop-qty {
+  margin: 4px 0 6px;
+  text-align: left;
+}
+/* vùng ghi chú trống không chừa khoảng hở (hộp vứt thế chỗ hàng nút, càng thấp càng tốt ở điện thoại ngang) */
+.inv-drop-qty .qty-note {
+  min-height: 0;
+}
 .inv-drop-btns {
   display: flex;
   gap: 8px;
@@ -2290,6 +2299,9 @@ html[data-form="phone"][data-orient="portrait"] .inv-slot .slot-icon {
   flex-direction: column;
   gap: 10px;
   min-height: 110px;
+  /* KHÔNG co: tấm có chiều cao cố định (điện thoại) nên chân trang bị flex co về `min-height` còn nội dung (chi tiết món, hộp xác nhận vứt có ô số lượng) tràn ra ngoài,
+     đệm đáy của tấm tính theo chân trang đã co nên nút Đóng nổi đè lên nút "Vứt" */
+  flex-shrink: 0;
   justify-content: space-between;
 }
 .inv-title-row {

@@ -529,6 +529,257 @@ async function main() {
       await sleep(150);
       kb = await state();
       check(!kb.invOpen, "Esc lần nữa (không còn hộp): đóng túi đồ");
+
+      // ================= Ô SỐ LƯỢNG trong hộp xác nhận vứt (QUYET_DINH_M3 mục 47) =================
+      console.log("  [ô số lượng] hộp xác nhận vứt: chỉnh số trước khi vứt");
+      const tap = (x, y) => (vp.mobile ? tapAt(x, y) : clickAt(x, y));
+      const huyet = await nameOf("hoi_huyet_dan");
+      const resetBag = async () => {
+        await evalJs(`(() => {
+          window.__sent = [];
+          window.__ui.onInv({ slots: [
+            { itemId: "hoi_huyet_dan", qty: 5 }, { itemId: "hoi_linh_dan", qty: 3 }, { itemId: "long_tho", qty: 7 },
+            { itemId: "lang_nha_kiem", qty: 1 }, null, { itemId: "long_tho", qty: 2 },
+          ], cd: {} });
+          window.__ui.toggleInventory(false);
+          window.__ui.toggleInventory(true);
+          return 1;
+        })()`);
+        await sleep(300);
+      };
+      const qty = () =>
+        evalJs(`(() => {
+          const box = document.getElementById("inv-drop-qty");
+          const i = document.getElementById("inv-drop-qty-input");
+          const note = box.querySelector(".qty-note");
+          const r = box.getBoundingClientRect();
+          return {
+            shown: !box.hidden && r.height > 0, value: i ? i.value : null, invalid: i?.getAttribute("aria-invalid") === "true",
+            note: note ? note.textContent : "", focused: document.activeElement === i, right: Math.round(r.right), left: Math.round(r.left),
+            vw: window.innerWidth,
+          };
+        })()`);
+      const typeQty = async (text) => {
+        await evalJs(
+          `(() => { const i = document.getElementById("inv-drop-qty-input"); i.focus(); i.select(); return 1; })()`,
+        );
+        await send("Input.insertText", { text });
+        await sleep(80);
+      };
+      const selectSlot = async (i) => {
+        const c = await center("#inv-grid .inv-slot", i);
+        await tap(c.x, c.y);
+        await sleep(200);
+      };
+      const openDrop = async (all) => {
+        const b = await center(all ? "#inv-btn-dropall" : "#inv-btn-drop1");
+        await tap(b.x, b.y);
+        await sleep(200);
+      };
+      const clickYes = async () => {
+        await pastGuard();
+        const y = await center("#inv-drop-yes");
+        await tap(y.x, y.y);
+        await sleep(250);
+      };
+
+      // món chỉ có 1 cái (ô 3): không có gì để chọn, KHÔNG có ô số lượng
+      await resetBag();
+      await selectSlot(3);
+      await openDrop(true);
+      let q = await qty();
+      check(!q.shown, "món chỉ có 1 cái: hộp vứt KHÔNG hiện ô số lượng");
+      await pastGuard();
+      await press("Escape");
+      await sleep(150);
+
+      // stack 5 (ô 0): "Vứt 1" mở hộp với số 1, hiện ô số lượng, focus vẫn ở "Giữ lại"
+      await resetBag();
+      await selectSlot(0);
+      await openDrop(false);
+      let st2 = await state();
+      q = await qty();
+      check(
+        q.shown && q.value === "1" && st2.confirmText === `Vứt 1 ${huyet}? (còn lại 4)`,
+        `Vứt 1 (stack 5): ô số lượng hiện, = 1, lời "${st2.confirmText}"`,
+      );
+      check(
+        st2.active === "inv-drop-no",
+        `focus vẫn ở "Giữ lại" (${st2.active}): Enter nhầm không vứt`,
+      );
+      check(
+        q.left >= 0 && q.right <= q.vw,
+        `ô số lượng không tràn ngang khung (${q.left}..${q.right} / ${q.vw})`,
+      );
+      // vừa mở (chưa cuộn tay): hai nút xác nhận nằm trọn trong khung nhìn và KHÔNG bị nút Đóng nổi của điện thoại che
+      const cover = await evalJs(`(() => {
+        const close = document.getElementById("inv-close").getBoundingClientRect();
+        const out = {};
+        for (const id of ["inv-drop-no", "inv-drop-yes"]) {
+          const r = document.getElementById(id).getBoundingClientRect();
+          out[id] = {
+            inView: r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth,
+            covered: !(r.right <= close.left || r.left >= close.right || r.bottom <= close.top || r.top >= close.bottom),
+          };
+        }
+        return out;
+      })()`);
+      check(
+        Object.values(cover).every((c) => c.inView && !c.covered),
+        `vừa mở hộp (chưa cuộn tay): "Giữ lại" / "Vứt" trọn trong khung nhìn, không bị nút Đóng che ${JSON.stringify(cover)}`,
+      );
+      await shot("vut-o-so-luong"); // ảnh đúng trạng thái người chơi thấy ngay sau khi mở hộp
+      for (let i = 0; i < 5; i++) {
+        const b = await center("#inv-drop-qty button", i);
+        check(
+          b.hit && (!vp.mobile || (b.h >= MIN_TAP_PX - 0.5 && b.w >= MIN_TAP_PX - 0.5)),
+          `nút ${i} của ô số lượng bấm được, không bị che${vp.mobile ? `, >= ${MIN_TAP_PX} px` : ""} (${b.w.toFixed(0)}x${b.h.toFixed(0)}, che bởi "${b.hit ? "" : b.topId}")`,
+        );
+      }
+
+      // gõ số: lời đổi theo, chưa gửi gì
+      await typeQty("3");
+      st2 = await state();
+      check(
+        st2.confirmText === `Vứt 3 ${huyet}? (còn lại 2)` && st2.drops.length === 0,
+        `gõ 3: lời đổi thành "${st2.confirmText}", chưa gửi gì`,
+      );
+      // 9999: kẹp về toàn bộ, lời thành "Vứt hết", ghi chú nêu giới hạn
+      await typeQty("9999");
+      st2 = await state();
+      q = await qty();
+      check(
+        q.value === "5" &&
+          st2.confirmText === `Vứt hết ${huyet} ×5?` &&
+          /Chỉ có tối đa 5/.test(q.note),
+        `gõ 9999: kẹp về 5, lời "${st2.confirmText}", ghi chú "${q.note}"`,
+      );
+      // chữ / 0 / số lẻ rồi Enter: KHÔNG vứt, hộp vẫn mở
+      await pastGuard();
+      for (const bad of ["abc", "0", "2.5", ""]) {
+        await typeQty(bad);
+        if (bad === "")
+          await evalJs(
+            `document.getElementById("inv-drop-qty-input").value = ""; document.getElementById("inv-drop-qty-input").dispatchEvent(new Event("input", { bubbles: true })); 1`,
+          );
+        await press("Enter");
+        await sleep(150);
+        st2 = await state();
+        check(
+          st2.confirmOpen && st2.drops.length === 0,
+          `gõ "${bad}" rồi Enter: KHÔNG vứt, hộp vẫn mở (gửi ${st2.drops.length} tin)`,
+        );
+      }
+      // chữ / 0 / trống rồi bấm nút "Vứt" (chuột / chạm, không qua Enter của ô): cũng KHÔNG vứt, hộp vẫn mở, focus về ô để sửa (nếu không, nút sẽ vứt lại số hợp lệ cũ)
+      for (const bad of ["abc", "0", ""]) {
+        await typeQty(bad);
+        if (bad === "")
+          await evalJs(
+            `document.getElementById("inv-drop-qty-input").value = ""; document.getElementById("inv-drop-qty-input").dispatchEvent(new Event("input", { bubbles: true })); 1`,
+          );
+        await evalJs(`document.getElementById("inv-drop-no").focus(); 1`); // focus rời ô: để thấy focus được ĐƯA VỀ ô (không phải còn nguyên từ lúc gõ)
+        const yesBtn = await center("#inv-drop-yes");
+        await tap(yesBtn.x, yesBtn.y);
+        await sleep(200);
+        st2 = await state();
+        check(
+          st2.confirmOpen && st2.drops.length === 0 && st2.active === "inv-drop-qty-input",
+          `gõ "${bad}" rồi bấm nút Vứt: KHÔNG vứt, hộp vẫn mở, focus về ô (${st2.drops.length} tin, focus "${st2.active}")`,
+        );
+      }
+      // số hợp lệ rồi Enter trong ô: đúng MỘT dropItem với qty đã gõ
+      await typeQty("3");
+      await press("Enter");
+      await sleep(250);
+      st2 = await state();
+      check(
+        !st2.confirmOpen &&
+          st2.drops.length === 1 &&
+          st2.drops[0].slot === 0 &&
+          st2.drops[0].qty === 3,
+        `gõ 3 rồi Enter: đúng MỘT dropItem {slot: 0, qty: 3} ${JSON.stringify(st2.drops)}`,
+      );
+
+      // "Vứt hết": mở với toàn bộ; chỉnh xuống thì gửi qty cụ thể bằng nút Vứt; không chỉnh thì vẫn KHÔNG kèm qty
+      await resetBag();
+      await selectSlot(0);
+      await openDrop(true);
+      q = await qty();
+      st2 = await state();
+      check(
+        q.shown && q.value === "5" && st2.confirmText === `Vứt hết ${huyet} ×5?`,
+        `Vứt hết (stack 5): ô số lượng = 5, lời "${st2.confirmText}"`,
+      );
+      await typeQty("2");
+      st2 = await state();
+      check(
+        st2.confirmText === `Vứt 2 ${huyet}? (còn lại 3)`,
+        `chỉnh xuống 2: lời "${st2.confirmText}"`,
+      );
+      await clickYes();
+      st2 = await state();
+      check(
+        !st2.confirmOpen &&
+          st2.drops.length === 1 &&
+          st2.drops[0].slot === 0 &&
+          st2.drops[0].qty === 2,
+        `bấm Vứt sau khi chỉnh: đúng MỘT dropItem {slot: 0, qty: 2} ${JSON.stringify(st2.drops)}`,
+      );
+      await resetBag();
+      await selectSlot(0);
+      await openDrop(true);
+      await clickYes();
+      st2 = await state();
+      check(
+        st2.drops.length === 1 && st2.drops[0].slot === 0 && !("qty" in st2.drops[0]),
+        `Vứt hết không chỉnh: dropItem KHÔNG kèm qty ${JSON.stringify(st2.drops)}`,
+      );
+
+      // nút Tối đa / − bằng chuột hoặc chạm thật
+      await resetBag();
+      await selectSlot(0);
+      await openDrop(false);
+      const maxBtn = await center("#inv-drop-qty button", 4);
+      await tap(maxBtn.x, maxBtn.y);
+      await sleep(150);
+      q = await qty();
+      st2 = await state();
+      check(
+        q.value === "5" && st2.confirmText === `Vứt hết ${huyet} ×5?`,
+        `bấm Tối đa: ô = ${q.value}, lời "${st2.confirmText}"`,
+      );
+      const minusBtn = await center("#inv-drop-qty button", 0);
+      await tap(minusBtn.x, minusBtn.y);
+      await sleep(150);
+      q = await qty();
+      check(q.value === "4", `bấm −: 5 -> ${q.value}`);
+
+      // Esc trong ô: Giữ lại (hộp đóng, túi còn mở, không gửi gì)
+      await typeQty("2");
+      await press("Escape");
+      await sleep(200);
+      st2 = await state();
+      check(
+        !st2.confirmOpen && st2.invOpen && st2.drops.length === 0,
+        `Esc trong ô số lượng: hộp đóng, túi vẫn mở, không gửi gì (hộp ${st2.confirmOpen ? "còn" : "đóng"}, túi ${st2.invOpen ? "mở" : "đóng"})`,
+      );
+
+      // túi đổi lúc hộp mở và không còn đủ số định vứt: hộp đóng, không vứt
+      await selectSlot(0);
+      await openDrop(false);
+      await typeQty("4");
+      await evalJs(
+        `window.__ui.onInv({ slots: [{ itemId: "hoi_huyet_dan", qty: 2 }, { itemId: "hoi_linh_dan", qty: 3 }], cd: {} }); 1`,
+      );
+      await sleep(150);
+      st2 = await state();
+      check(
+        !st2.confirmOpen && st2.drops.length === 0,
+        "túi chỉ còn 2 mà đang định vứt 4: hộp đóng, không gửi gì",
+      );
+      await resetBag();
+      await press("Escape");
+      await sleep(150);
     }
   } finally {
     try {

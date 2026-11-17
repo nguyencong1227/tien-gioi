@@ -214,7 +214,14 @@ import {
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
-import { dropConfirmText, dropStillValid, dropWarnText, planDrop, type DropPlan } from "./inv-drop";
+import {
+  dropConfirmText,
+  dropStillValid,
+  dropWarnText,
+  planDrop,
+  withDropQty,
+  type DropPlan,
+} from "./inv-drop";
 import {
   inConfirmGuard,
   rebirthPlan,
@@ -853,6 +860,10 @@ function closeActConfirm(refocus = true): boolean {
 
 /** Kế hoạch vứt đang chờ xác nhận (chụp lúc bấm "Vứt 1" / "Vứt hết"); `null` = không có hộp. */
 let dropPlanPending: DropPlan | null = null;
+/** Kế hoạch GỐC lúc bấm nút ("Vứt 1" / "Vứt hết"); ô số lượng đổi số thì kế hoạch đang chờ được dựng lại từ đây (`withDropQty`) */
+let dropPlanInit: DropPlan | null = null;
+/** Ô số lượng dùng chung trong hộp xác nhận vứt (mục 47); chỉ hiện khi ô túi có từ 2 cái */
+let dropStepper: QtyStepper | null = null;
 /** Nút đã mở hộp (trả focus về đó khi đóng hộp bằng Esc / "Giữ lại") */
 let dropConfirmOpener: HTMLElement | null = null;
 /**
@@ -861,6 +872,11 @@ let dropConfirmOpener: HTMLElement | null = null;
  */
 const DROP_CONFIRM_GUARD_MS = 450;
 let dropConfirmOpenedAt = -Infinity;
+/**
+ * Lúc hộp xác nhận vừa ĐÓNG: hộp biến mất thì hàng nút "Vứt 1" / "Vứt hết" hiện lại, có khi đúng chỗ ngón vừa chạm "Vứt" / "Giữ lại", và `click` do trình duyệt tạo sau khi nhả ngón rơi
+ * vào nút đó (`bindTap` nhớ lần chạm theo TỪNG nút nên không nhận ra) và mở hộp lần nữa ngay sau khi vừa vứt. Hai nút này bỏ qua click chuột / chạm trong cửa sổ chống click ma sau khi hộp đóng.
+ */
+let dropConfirmClosedAt = -Infinity;
 
 /** Mở hộp xác nhận vứt cho ô được chọn: ghi rõ TÊN + SỐ LƯỢNG (+ dòng nhắc đồ quý). `all` = "Vứt hết", ngược lại vứt 1. */
 function askDropConfirm(all: boolean, opener: HTMLElement | null) {
@@ -868,9 +884,17 @@ function askDropConfirm(all: boolean, opener: HTMLElement | null) {
   const def = plan ? ITEM_BY_ID[plan.itemId] : undefined;
   if (!plan || !def) return;
   dropPlanPending = plan;
+  dropPlanInit = plan;
   dropConfirmOpener = opener;
   dropConfirmOpenedAt = performance.now();
   $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+  // ô số lượng: chỉ khi có từ 2 cái (1 cái thì không có gì để chọn); "Vứt 1" mở với số 1, "Vứt hết" mở với toàn bộ, chỉnh được trước khi xác nhận
+  const stepper = dropStepper;
+  $("inv-drop-qty").hidden = !(plan.have >= 2 && stepper);
+  if (stepper && plan.have >= 2) {
+    stepper.setMax(plan.have);
+    stepper.setQty(plan.qty);
+  }
   const warn = dropWarnText(def.rarity, rarityStyle(def.rarity).name);
   const warnEl = $("inv-drop-warn");
   warnEl.textContent = warn ?? "";
@@ -885,18 +909,43 @@ function closeDropConfirm(refocus = true): boolean {
   const box = document.getElementById("inv-drop-confirm");
   if (!box || box.hidden) return false;
   box.hidden = true;
+  dropConfirmClosedAt = performance.now();
   $("inv-detail").classList.remove("dropping");
   dropPlanPending = null;
+  dropPlanInit = null;
   const back = dropConfirmOpener;
   dropConfirmOpener = null;
   if (refocus && back && !back.hidden) back.focus();
   return true;
 }
 
-/** "Vứt" trong hộp: kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng như lúc bấm rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo. */
+/** Ô số lượng đổi số: dựng lại kế hoạch từ kế hoạch gốc và cập nhật lời trong hộp. Ô đang trống / sai (người chơi đang gõ lại) thì giữ kế hoạch cũ. */
+function onDropQtyChange(q: number | null) {
+  const init = dropPlanInit;
+  const def = init ? ITEM_BY_ID[init.itemId] : undefined;
+  if (!init || !def || q === null) return;
+  const plan = withDropQty(init, q);
+  dropPlanPending = plan;
+  $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
+}
+
+/**
+ * "Vứt" trong hộp: đọc lại số trong ô (nếu có), kiểm lại túi vẫn còn ĐÚNG món + đủ số lượng rồi mới gửi `dropItem`; đã đổi thì huỷ kèm thông báo.
+ * Số trong ô trống / sai thì KHÔNG vứt và hộp vẫn mở (không gửi gì, không đoán số).
+ */
 function confirmDrop() {
   if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return; // click ma ngay sau khi hộp mở: bỏ qua
-  const plan = dropPlanPending;
+  let plan = dropPlanPending;
+  const init = dropPlanInit;
+  if (plan && init && !$("inv-drop-qty").hidden && dropStepper) {
+    const q = dropStepper.read();
+    if (q === null) {
+      ui.toast({ text: "Nhập số lượng vứt từ 1 trở lên.", tone: "bad" });
+      dropStepper.focus();
+      return;
+    }
+    plan = withDropQty(init, q);
+  }
   closeDropConfirm(true);
   if (!plan) return;
   if (!dropStillValid(invSlots, plan)) {
@@ -3677,8 +3726,30 @@ export const ui = {
       }
     });
     // Vứt có HỘP XÁC NHẬN ghi tên + số lượng (QUYET_DINH_M3 mục 24); gửi `dropItem` chỉ khi bấm "Vứt" trong hộp
+    // chặn click ma ngay sau khi hộp đóng (đăng ký TRƯỚC `bindTap`, pha bắt): chỉ click chuột / chạm (`detail` > 0), Enter / Space bằng bàn phím (`detail` 0) vẫn mở lại được ngay
+    for (const id of ["inv-btn-drop1", "inv-btn-dropall"]) {
+      $(id).addEventListener(
+        "click",
+        (e) => {
+          if (e.detail > 0 && performance.now() - dropConfirmClosedAt < DROP_CONFIRM_GUARD_MS)
+            e.stopImmediatePropagation();
+        },
+        true,
+      );
+    }
     bindTap("inv-btn-drop1", () => askDropConfirm(false, $("inv-btn-drop1")));
     bindTap("inv-btn-dropall", () => askDropConfirm(true, $("inv-btn-dropall")));
+    // Ô số lượng dùng chung trong hộp vứt (mục 47): Enter = Vứt (qua cửa sổ chống click ma của `confirmDrop`), Esc = Giữ lại
+    dropStepper = createQtyStepper({
+      label: "Số lượng vứt",
+      max: 1,
+      initial: 1,
+      ids: { input: "inv-drop-qty-input" },
+      onChange: (q) => onDropQtyChange(q),
+      onConfirm: () => confirmDrop(),
+      onCancel: () => void closeDropConfirm(true),
+    });
+    $("inv-drop-qty").append(dropStepper.el);
     bindTap("inv-drop-yes", () => confirmDrop());
     // Hộp xác nhận dùng chung: bỏ qua bấm trong cửa sổ chống click ma; "Chưa / Giữ lại" cũng vậy (hộp không được chớp tắt dưới ngón tay)
     bindTap("act-btn-yes", () => {
