@@ -44,6 +44,7 @@ import {
   type TitleDef,
   type WorldBossSlot,
 } from "./social";
+import { realmOfStep } from "./realms";
 
 /** Hai chữ Hán dựng bằng mã (repo cấm viết chữ Hán trực tiếp trong mã, `no-cjk.test.ts`). */
 const HAN = String.fromCharCode(0x5929, 0x9053);
@@ -416,6 +417,14 @@ describe("hàm mẫu khớp kiểu thật", () => {
       expect(mg).toMatchObject({ rank: null, reason: "min_games" });
       expect(mg.need).toBeGreaterThan(0);
       expect(JSON.stringify(sampleBoards(id, 5, "outside"))).toBe(JSON.stringify(out));
+    }
+  });
+
+  it("sampleBoards('linhhon'): mọi bậc nằm TRONG thang (realmOfStep không null) kể cả ở số dòng tối đa và dòng ngoài top", () => {
+    for (const variant of ["top", "outside"] as const) {
+      const m = sampleBoards("linhhon", BOARD_SIZE, variant);
+      const all = [...m.rows, ...(m.mine.row ? [m.mine.row] : [])];
+      for (const r of all) expect(realmOfStep(r.step!), `bậc ${r.step}`).not.toBeNull();
     }
   });
 
