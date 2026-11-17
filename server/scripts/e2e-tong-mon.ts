@@ -454,7 +454,10 @@ async function main() {
       "số lượng góp = 3",
     );
     await clickAct(tb);
-    await waitServer(() => vaultCount() === 3, "kho có 3 Hồi Huyết Đan trên đĩa");
+    await waitServer(
+      () => vaultCount() === 3 && bagCount(B.name) === GIVEN - 3,
+      "kho có 3 Hồi Huyết Đan trên đĩa",
+    );
     if (bagCount(B.name) !== GIVEN - 3)
       throw new Error(`Túi B phải còn ${GIVEN - 3}, thực tế ${bagCount(B.name)}`);
     await tb.waitFor(
@@ -486,7 +489,10 @@ async function main() {
       "số lượng rút = 3",
     );
     await clickAct(ta);
-    await waitServer(() => vaultCount() === 0, "kho rỗng sau khi A rút");
+    await waitServer(
+      () => vaultCount() === 0 && bagCount(A.name) === 3,
+      "kho rỗng và túi A nhận 3 viên sau khi A rút",
+    );
     if (bagCount(A.name) !== 3)
       throw new Error(`Túi A phải có 3 Hồi Huyết Đan, thực tế ${bagCount(A.name)}`);
     // B (Đệ tử): góp 1 rồi rút 1 CÓ HỘP XÁC NHẬN nêu hạn mức, trừ đúng MỘT lượt
@@ -726,28 +732,50 @@ async function main() {
       if ((await rowBtn(quest.title, "Nhận")) === "ok")
         throw new Error("Nhiệm vụ đã trả cùng ngày không được có nút Nhận bấm được");
 
-      // --- Đua lệnh nhận cùng một mẫu nhiệm vụ: chỉ MỘT thành công, không nhân đôi vào sổ ---
+      // --- Đua lệnh nhận cùng một mẫu nhiệm vụ + thử nhận lại tuần tự: chỉ MỘT thành công, không nhân đôi vào sổ ---
+      // (a) Nhiệm vụ đã trả hôm nay (done): gửi sectQuestAccept trực tiếp lên máy chủ phải bị từ chối quest_done
+      await tb.ev(
+        `(() => { const t = document.getElementById('toast'); if (t) t.textContent = ''; window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(quest.questId)} }); return 1; })()`,
+      );
+      await tb.waitFor(
+        `document.getElementById('toast')?.textContent?.includes(${JSON.stringify(sectFailMessage("quest_done"))})`,
+        "máy chủ từ chối nhận lại nhiệm vụ đã trả hôm nay (quest_done)",
+      );
+      if (ctrlOf(B.name).quests.active.some((a: any) => a.id === quest.questId))
+        throw new Error("Nhiệm vụ đã trả hôm nay không được vào lại sổ active");
+
+      // (b) Nhiệm vụ mới (offer): hai tin đua nhau chỉ 1 vào sổ; tin gửi tuần tự tiếp theo phải bị máy chủ từ chối quest_active
       const nextOffer = hAfterLimbo.quests.find(
         (q: any) => q.questId !== quest.questId && q.state === "offer",
       );
-      if (nextOffer) {
-        await Promise.all([
-          tb.ev(
-            `window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); 1`,
-          ),
-          tb.ev(
-            `window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); 1`,
-          ),
-        ]);
-        await sleep(300);
-        const activeMatches = ctrlOf(B.name).quests.active.filter(
-          (a: any) => a.id === nextOffer.questId,
+      if (!nextOffer) throw new Error("Phải còn ít nhất 1 nhiệm vụ 'offer' để thử đua nhận");
+      await Promise.all([
+        tb.ev(
+          `window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); 1`,
+        ),
+        tb.ev(
+          `window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); 1`,
+        ),
+      ]);
+      await waitServer(
+        () =>
+          ctrlOf(B.name).quests.active.filter((a: any) => a.id === nextOffer.questId).length === 1,
+        "nhận nhiệm vụ mới vào sổ active",
+      );
+      await tb.ev(
+        `(() => { const t = document.getElementById('toast'); if (t) t.textContent = ''; window.__scene.room.send("sectQuestAccept", { questId: ${JSON.stringify(nextOffer.questId)} }); return 1; })()`,
+      );
+      await tb.waitFor(
+        `document.getElementById('toast')?.textContent?.includes(${JSON.stringify(sectFailMessage("quest_active"))})`,
+        "máy chủ từ chối nhận trùng nhiệm vụ đang làm (quest_active)",
+      );
+      const activeMatches = ctrlOf(B.name).quests.active.filter(
+        (a: any) => a.id === nextOffer.questId,
+      );
+      if (activeMatches.length !== 1)
+        throw new Error(
+          `Đua + tuần tự nhận nhiệm vụ: chỉ được nhận đúng 1 lần, thực tế ${activeMatches.length}`,
         );
-        if (activeMatches.length !== 1)
-          throw new Error(
-            `Đua lệnh nhận nhiệm vụ: chỉ được nhận đúng 1 lần, thực tế ${activeMatches.length}`,
-          );
-      }
 
       // --- cửa hàng: đổi một món qua giao diện (trừ cống hiến, thêm đồ, ghi số đã mua, lưu hồ sơ) ---
       await (store as any).update(sectId, (sc: any) => ({
@@ -782,7 +810,7 @@ async function main() {
       if (!JSON.stringify(saveOf(B.name)).includes(item.itemId))
         throw new Error("Hồ sơ của B phải được lưu sau khi đổi (đồ mới nằm trong tệp)");
 
-      // --- Đua lệnh mua món hạn mức 1 (limitDay: 1): chỉ MỘT thành công, không nhân đôi đồ / trừ đúp cống hiến ---
+      // --- Đua lệnh mua món hạn mức 1 (limitDay: 1) + thử mua tuần tự lần hai: chỉ MỘT thành công ---
       const l1Item = (await hall()).shop.find((e: any) => e.limitDay === 1 && e.locked === null);
       if (!l1Item) throw new Error("Phải có món limitDay: 1 mua được để thử đua lệnh");
       const l1CountBefore = countItem(ctrlOf(B.name).inv, l1Item.itemId);
@@ -795,22 +823,36 @@ async function main() {
           `window.__scene.room.send("sectShopBuy", { itemId: ${JSON.stringify(l1Item.itemId)}, qty: 1 }); 1`,
         ),
       ]);
-      await sleep(400);
+      await waitServer(
+        () => (memberB().today.buys?.[l1Item.itemId] ?? 0) >= 1 && world.hub.sects.busy.size === 0,
+        "lần mua limitDay: 1 đầu tiên hoàn tất và nhả khoá busy",
+      );
+      // Gửi TUẦN TỰ thêm một tin sectShopBuy nữa sau khi khoá busy đã nhả: bắt buộc đi qua kiểm tra shop_limit trong sect-service
+      await tb.ev(
+        `(() => { const t = document.getElementById('toast'); if (t) t.textContent = ''; window.__scene.room.send("sectShopBuy", { itemId: ${JSON.stringify(l1Item.itemId)}, qty: 1 }); return 1; })()`,
+      );
+      await tb.waitFor(
+        `document.getElementById('toast')?.textContent?.includes(${JSON.stringify(sectFailMessage("shop_limit"))})`,
+        "máy chủ từ chối mua lần 2 vượt limitDay: 1 (shop_limit)",
+      );
       const buysL1 = memberB().today.buys?.[l1Item.itemId] ?? 0;
       if (buysL1 !== 1)
-        throw new Error(`Đua mua limitDay: 1: chỉ được mua đúng 1 lần hôm nay, thực tế ${buysL1}`);
+        throw new Error(
+          `Mua limitDay: 1 (đua + tuần tự): chỉ được mua đúng 1 lần hôm nay, thực tế ${buysL1}`,
+        );
       const l1CountAfter = countItem(ctrlOf(B.name).inv, l1Item.itemId);
       if (l1CountAfter !== l1CountBefore + 1)
         throw new Error(
-          `Đua mua limitDay: 1: túi chỉ được thêm đúng 1 món, thực tế tăng ${l1CountAfter - l1CountBefore}`,
+          `Mua limitDay: 1 (đua + tuần tự): túi chỉ được thêm đúng 1 món, thực tế tăng ${l1CountAfter - l1CountBefore}`,
         );
       const contribAfterL1 = memberB().contrib ?? 0;
       if (contribAfterL1 !== contribBeforeL1 - l1Item.cost)
         throw new Error(
-          `Đua mua limitDay: 1: cống hiến chỉ trừ đúng 1 lần cost (${l1Item.cost}), thực tế trừ ${contribBeforeL1 - contribAfterL1}`,
+          `Mua limitDay: 1 (đua + tuần tự): cống hiến chỉ trừ đúng 1 lần cost (${l1Item.cost}), thực tế trừ ${contribBeforeL1 - contribAfterL1}`,
         );
 
-      // --- Ảnh 5 khung nhìn (360x640, 390x844, 640x360, 844x390, 1280x720) vào docs/screenshots/ ---
+      // --- Ảnh 5 khung nhìn (360x640, 390x844, 640x360, 844x390, 1280x720) định dạng WebP ---
+      // Mặc định ghi ra thư mục tạm trong dataDir để không làm bẩn git khi chạy thường lệ; truyền `--shots <thư mục>` (hoặc E2E_SHOTS) để xuất ra ngoài
       const viewports = [
         { name: "360x640", w: 360, h: 640, mobile: true },
         { name: "390x844", w: 390, h: 844, mobile: true },
@@ -818,7 +860,13 @@ async function main() {
         { name: "844x390", w: 844, h: 390, mobile: true },
         { name: "1280x720", w: 1280, h: 720, mobile: false },
       ];
-      const screenshotsDir = path.join(repoRoot, "docs/screenshots");
+      const shotsIdx = process.argv.indexOf("--shots");
+      const screenshotsDir =
+        shotsIdx >= 0 && process.argv[shotsIdx + 1]
+          ? path.resolve(process.argv[shotsIdx + 1]!)
+          : process.env.E2E_SHOTS
+            ? path.resolve(process.env.E2E_SHOTS)
+            : path.join(dataDir, "shots");
       mkdirSync(screenshotsDir, { recursive: true });
       for (const vp of viewports) {
         await tb.send("Emulation.setDeviceMetricsOverride", {
@@ -828,13 +876,13 @@ async function main() {
           mobile: vp.mobile,
         });
         await sleep(150);
-        const scr = await tb.send("Page.captureScreenshot", { format: "png" });
-        if (scr.result?.data) {
-          writeFileSync(
-            path.join(screenshotsDir, `sect-hall-${vp.name}.png`),
-            Buffer.from(scr.result.data, "base64"),
-          );
-        }
+        const scr = await tb.send("Page.captureScreenshot", { format: "webp", quality: 82 });
+        const data = scr.result?.data;
+        if (!data) throw new Error(`Không chụp được khung nhìn ${vp.name}`);
+        const buf = Buffer.from(data, "base64");
+        if (buf.byteLength < 1000)
+          throw new Error(`Ảnh khung nhìn ${vp.name} quá nhỏ (${buf.byteLength} B)`);
+        writeFileSync(path.join(screenshotsDir, `sect-hall-${vp.name}.webp`), buf);
       }
       await tb.send("Emulation.setDeviceMetricsOverride", {
         width: 1280,
@@ -910,20 +958,33 @@ async function main() {
         throw new Error("Túi đầy: cống hiến và số đã mua KHÔNG được đổi");
       for (let i = 0; i < inv.length; i++) inv[i] = saved[i];
       out(
-        `  ✓ [7b] NỘI VỤ với máy chủ thật: tab hiện ${h0.quests.length} nhiệm vụ + ${SECT_SHOP.length} món; nhận + trả "${quest.title}" (+${ch} cống hiến + công tích); ca GỤC bảo toàn cống hiến/sổ ngày/kho; đua lệnh nhận nhiệm vụ & mua limitDay 1 (chỉ 1 thành công); ảnh 5 khung nhìn; đổi "${itemName}"; hết hạn mức & túi đầy chuẩn`,
+        `  ✓ [7b] NỘI VỤ với máy chủ thật: tab hiện ${h0.quests.length} nhiệm vụ + ${SECT_SHOP.length} món; nhận + trả "${quest.title}" (+${ch} cống hiến + công tích); ca GỤC bảo toàn cống hiến/sổ ngày/kho; đua + tuần tự nhận nhiệm vụ & mua limitDay 1 (chỉ 1 thành công); ảnh 5 khung nhìn WebP; đổi "${itemName}"; hết hạn mức & túi đầy chuẩn`,
       );
       await press(tb, "sect-tab-btn-treasury"); // trở lại các bước sau như cũ
     }
 
-    // 8. B rời tông môn: hộp xác nhận phải nêu rõ cống hiến và công tích sẽ MẤT
+    // 8. B rời tông môn: hộp xác nhận phải nêu rõ SỐ cống hiến và công tích sẽ MẤT
+    const mbLeave = sectOnDisk().members.find((m: any) => m.name === B.name);
+    const expectContribLeave = mbLeave?.contrib ?? 0;
+    const expectMeritLeave = mbLeave?.merit ?? 0;
+    if (expectContribLeave <= 0 || expectMeritLeave <= 0)
+      throw new Error(
+        `Trước khi rời tông, B phải đang có cống hiến + công tích > 0, thực tế ${expectContribLeave} / ${expectMeritLeave}`,
+      );
     await press(tb, "sect-tab-btn-overview");
     await press(tb, "sect-btn-leave");
     // Hộp xác nhận trong game (#246) thay confirm() gốc
     await tb.waitFor(visible("sect-action-confirm"), "hộp xác nhận rời tông môn");
     const leaveConfirmText = await text(tb, "sect-action-confirm-text");
-    if (!/MẤT/i.test(leaveConfirmText) || !/cống hiến/i.test(leaveConfirmText)) {
+    const expectContribStr = `${expectContribLeave.toLocaleString("vi-VN")} cống hiến`;
+    const expectMeritStr = `${expectMeritLeave.toLocaleString("vi-VN")} công tích`;
+    if (
+      !leaveConfirmText.includes("MẤT") ||
+      !leaveConfirmText.includes(expectContribStr) ||
+      !leaveConfirmText.includes(expectMeritStr)
+    ) {
       throw new Error(
-        `Hộp xác nhận rời tông phải cảnh báo MẤT cống hiến, thực tế "${leaveConfirmText}"`,
+        `Hộp xác nhận rời tông phải cảnh báo MẤT đúng số "${expectContribStr}" và "${expectMeritStr}", thực tế "${leaveConfirmText}"`,
       );
     }
     await press(tb, "sect-action-confirm-ok");
