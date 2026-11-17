@@ -106,6 +106,16 @@ describe("chainTargets: chọn mục tiêu sét lan", () => {
     expect(far.m.hp).toBeGreaterThan(0);
   });
 
+  it("chainReach 0 (hoặc thiếu): KHÔNG nảy dù có quái đứng chồng lên mục tiêu", () => {
+    const t = setup();
+    mon(t, 1060, 1000);
+    mon(t, 1062, 1000); // chồng lên mục tiêu đầu: nếu nảy với tầm 0 thì còn dính
+    expect(
+      chainTargets(t.w, { range: 200, bounces: 3, chainReach: 0 }, 1000, 1000, 0).hits,
+    ).toHaveLength(1);
+    expect(chainTargets(t.w, { range: 200, bounces: 3 }, 1000, 1000, 0).hits).toHaveLength(1);
+  });
+
   it("quái đã chết (hp 0) bị bỏ qua; tham số ngoài trần bị kẹp (bounces <= chainBouncesMax, falloff >= chainFalloffMin, chainReach <= chainReachMax, số lạ -> mặc định)", () => {
     const t = setup();
     const dead = mon(t, 1050, 1000);
