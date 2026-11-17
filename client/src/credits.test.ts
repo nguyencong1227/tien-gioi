@@ -23,6 +23,7 @@ import {
   validateAiSource,
   webpChunks,
 } from "../scripts/check-credits.mjs";
+import { NEGATIVE_PROMPT } from "../scripts/art/prompt-rules.mjs";
 
 describe("Rà soát tài sản và giấy phép (check-credits)", () => {
   const rootDir = path.resolve(__dirname, "../..");
@@ -729,8 +730,9 @@ const validSource = (asset: string, finalSha: string, over: Record<string, unkno
   lora: [],
   comfyui: { comfyui: "0.3.0", pytorch: "2.5.0", driver: "560.35" },
   workflow: { path: "docs/art/workflow/sdxl-base.json", sha256: HEX },
-  prompt: "misty mountain pass at dawn, ink wash, muted palette",
-  negativePrompt: "text, watermark, letters",
+  prompt:
+    "misty mountain pass at dawn, painterly ink wash landscape, muted palette, no people, no text",
+  negativePrompt: NEGATIVE_PROMPT,
   seed: 12345,
   postProcess: [{ script: "client/scripts/art/to-webp.mjs", params: { maxWidth: 512 } }],
   reviewed: { by: "dev-b", date: "2026-11-15", noText: true, noOtherGameLikeness: true },

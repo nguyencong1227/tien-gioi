@@ -18,6 +18,7 @@ import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promptViolations } from "./art/prompt-rules.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -672,6 +673,8 @@ export function validateAiSource(j) {
   )
     bad.push("`workflow` phải có `path` và `sha256` (64 hex)");
   if (!str(j.prompt)) bad.push("thiếu `prompt`");
+  // Luật prompt của phong cách minh hoạ (docs/art/PHONG_CACH_MINH_HOA.md): từ cấm / bắt buộc, prompt âm đủ chữ-chữ ký-logo-CJK
+  else bad.push(...promptViolations(j.prompt, j.negativePrompt));
   if (typeof j.negativePrompt !== "string")
     bad.push("`negativePrompt` phải là chuỗi (có thể rỗng)");
   if (!(Number.isInteger(j.seed) || (typeof j.seed === "string" && /^-?\d+$/.test(j.seed))))
