@@ -8,6 +8,8 @@ import {
   TOWN_PX,
   getMap,
   MAX_BOLTS,
+  SKILL_BY_ID,
+  type SkillDef,
 } from "@tien-gioi/shared";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
@@ -16,6 +18,7 @@ import { tickWorld } from "./tick";
 import { ambushOf, createAmbushRuntime } from "./ambush";
 import { slash, tickRespawn } from "./combat";
 import { cast } from "./cast";
+import { MAX_PLAYER_BOLTS } from "./pbolt";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
 import {
@@ -1027,6 +1030,84 @@ describe("benchmark bốn bản đồ chạy đồng thời (M7.10 #511)", () =>
     expect(res.p95TotalMs).toBeLessThan(10);
     for (const r of res.rooms) {
       expect(r.patchBytes).toBeLessThan(600);
+    }
+  });
+});
+
+describe("đạn của người chơi (mục 51, CT3 #1048)", () => {
+  it("100 người bắn đạn nhiều viên (xuyên + nảy) liên tục vào đám quái đông: tick < 10 ms, đạn đang bay không vượt trần phòng, fx pbolt chỉ theo đoạn (không mỗi tick)", () => {
+    const { w, fx, dmgs } = makeWorld();
+    const id = "dan_perf";
+    const def = {
+      ...SKILL_BY_ID["bon_thach_quyen"]!,
+      id,
+      shape: "bolt",
+      mult: 0.05,
+      range: 560,
+      arc: Math.PI / 3,
+      count: 5,
+      speed: 700,
+      pierce: 3,
+      bounce: 2,
+      element: "none",
+      effects: [],
+    } as SkillDef;
+    (SKILL_BY_ID as Record<string, SkillDef>)[id] = def;
+    try {
+      w.now = 1_000_000;
+      const heroes: { sid: string; c: ReturnType<typeof addPlayer>["c"] }[] = [];
+      for (let i = 0; i < 100; i++) {
+        const sid = `bp_${i}`;
+        const { p, c } = addPlayer(w, sid, 4, 0);
+        p.x = w.map.townPx.x + 260 + (i % 10) * 24;
+        p.y = w.map.townPx.y + 260 + Math.floor(i / 10) * 24;
+        p.hp = p.maxHp = 1e9; // sống suốt phép đo
+        p.mp = p.maxMp = 1e9;
+        syncPublicPos(p);
+        c.skills = { learned: { [id]: 1 }, slots: [id, "", "", ""] };
+        heroes.push({ sid, c });
+      }
+      // đám quái đông trước mặt (hướng +x), máu cực lớn để không chết giữa phép đo
+      for (let k = 0; k < 80; k++) {
+        const m = addMonster(
+          w,
+          "tho",
+          w.map.townPx.x + 560 + (k % 10) * 30,
+          w.map.townPx.y + 250 + Math.floor(k / 10) * 40,
+        );
+        m.m.hp = m.m.maxHp = 1e12;
+        m.mc.homeX = m.m.x;
+        m.mc.homeY = m.m.y;
+      }
+      const ticks = 80;
+      const durations: number[] = [];
+      let peak = 0;
+      let maxFxPerTick = 0;
+      for (let t = 0; t < ticks; t++) {
+        w.now += TICK_MS;
+        const fx0 = fx.filter((f) => f.kind === "pbolt").length;
+        // bắn mỗi tick: ca xấu nhất (thật chỉ bắn theo hồi chiêu); 100 lần quy hoạch 5 viên + tick đo CHUNG một nhịp
+        durations.push(
+          measureSyncStepMs(() => {
+            for (const h of heroes) {
+              h.c.skillCd[0] = 0;
+              cast(w, h.sid, { slot: 2, angle: 0 });
+            }
+            tickWorld(w, TICK_MS);
+          }),
+        );
+        peak = Math.max(peak, w.pbolts.length);
+        maxFxPerTick = Math.max(maxFxPerTick, fx.filter((f) => f.kind === "pbolt").length - fx0);
+      }
+      const s = summarizeTickMs(durations);
+      expect(s.avgMs).toBeLessThan(10); // trung bình (CI chậm 2-3 lần máy dev; khởi động JIT làm tick đầu lâu): đo cả 100 lần quy hoạch 5 viên + tick
+      expect(peak).toBeGreaterThan(0);
+      expect(peak).toBeLessThanOrEqual(MAX_PLAYER_BOLTS);
+      expect(dmgs.length).toBeGreaterThan(0); // đạn thật sự trúng
+      expect(maxFxPerTick).toBeLessThanOrEqual(MAX_PLAYER_BOLTS * 3); // mỗi tick: tối đa trần viên mới (đoạn đầu) + các đoạn nảy tới hạn; không tăng theo số người bắn
+      expect(w.pbolts.length).toBeLessThanOrEqual(MAX_PLAYER_BOLTS);
+    } finally {
+      delete (SKILL_BY_ID as Record<string, SkillDef>)[id];
     }
   });
 });
