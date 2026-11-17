@@ -452,8 +452,13 @@ async function main() {
     );
     await clickAct(tb);
     await waitServer(() => vaultCount() === 3, "kho có 3 Hồi Huyết Đan trên đĩa");
-    if (bagCount(B.name) !== GIVEN - 3)
+    // tệp kho (đĩa) và túi (bộ nhớ) cập nhật ở hai thời điểm: CHỜ theo điều kiện thay vì đọc túi ngay (trước đây thi thoảng đọc trước khi túi kịp đổi)
+    await waitServer(
+      () => bagCount(B.name) === GIVEN - 3,
+      `túi B còn ${GIVEN - 3} sau khi góp`,
+    ).catch(() => {
       throw new Error(`Túi B phải còn ${GIVEN - 3}, thực tế ${bagCount(B.name)}`);
+    });
     await tb.waitFor(
       `[...document.querySelectorAll('#sect-vault-grid .slot-name')].some(e => e.textContent === ${JSON.stringify(POTION_NAME)})`,
       "ảnh chụp kho mới của B có đan (nút mở khoá)",
@@ -484,8 +489,13 @@ async function main() {
     );
     await clickAct(ta);
     await waitServer(() => vaultCount() === 0, "kho rỗng sau khi A rút");
-    if (bagCount(A.name) !== 3)
+    // rút: máy chủ ghi kho trước rồi mới đưa đồ vào túi, nên tệp kho rỗng chưa có nghĩa túi A đã nhận: CHỜ theo điều kiện (race chập chờn thi thoảng đỏ "thực tế 0")
+    await waitServer(
+      () => bagCount(A.name) === 3,
+      "túi A nhận đủ 3 Hồi Huyết Đan sau khi rút",
+    ).catch(() => {
       throw new Error(`Túi A phải có 3 Hồi Huyết Đan, thực tế ${bagCount(A.name)}`);
+    });
     // B (Đệ tử): góp 1 rồi rút 1 CÓ HỘP XÁC NHẬN nêu hạn mức, trừ đúng MỘT lượt
     await pickSlot(tb, "sect-vault-bag");
     await tb.waitFor(
