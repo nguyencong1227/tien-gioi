@@ -1,5 +1,5 @@
-// Cờ bật bộ chiêu trùm (mục 42, `systems/boss.ts`) từ biến môi trường `BOSS_MOVES`. Mặc định TẮT: số liệu trong `BOSSES` mới là khung mẫu (T1), dữ liệu thật của E (T3)
-// và cân bằng của D (T5) chưa xong, nên bản chạy thật chưa đổi hành vi trùm. Bật bằng `BOSS_MOVES=on` (hoặc `1`, `true`, `yes`) để thử trên máy dev / thử nghiệm.
+// Cờ bật bộ chiêu trùm (mục 42, `systems/boss.ts`) từ biến môi trường `BOSS_MOVES`. Mặc định TẮT (không đặt biến thì trùm chạy như cũ): dữ liệu thật của bốn trùm đã vào ở T3 #872 (v0.4.0) và
+// bản chạy thật bật bằng `BOSS_MOVES=on` (hoặc `1`, `true`, `yes`) trong `.env`; máy dev / test không đặt thì giữ hành vi cũ.
 // Thuần hàm (test được); `WorldRoom` đọc MỘT lần lúc dựng phòng.
 
 /** `BOSS_MOVES` -> bật / tắt. Giá trị lạ (gõ nhầm) coi là TẮT: không bao giờ bật ngầm. */

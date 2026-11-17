@@ -211,7 +211,7 @@ export interface Result {
  * `opts.roam`: sau mỗi đòn bot được chuyển tới chỗ NGẪU NHIÊN (30-450 px quanh trùm, ngoài vũng cũ) để trùm chọn chiêu theo mọi khoảng cách (`cond` `minDist` / `maxDist`: chiêu
  * cận chiến như nón chỉ được dùng khi người ở gần, chiêu lao khi ở xa); bắt buộc khi kiểm dữ liệu thật có `cond`. Trả số đòn đã đáp / trúng bot theo hình và danh sách lần bot mất khí huyết (bot né phải rỗng).
  */
-export function runDodgeBot(
+function runDodgeBotInner(
   defSeed: number,
   def: BossDef,
   mode: "dodge" | "stand",
@@ -267,7 +267,12 @@ export function runDodgeBot(
   while (w.now < t0 + simMs) {
     w.now += TICK_MS;
     tickMonsters(w, TICK_MS / 1000);
-    for (const q of w.mctrl.values()) q.nextAttack = Number.MAX_SAFE_INTEGER; // kể cả quái con trùm gọi ra: không đánh thường
+    for (const q of w.mctrl.values()) {
+      q.nextAttack = Number.MAX_SAFE_INTEGER; // kể cả quái con trùm gọi ra: không đánh thường
+    }
+    // Trùm lao / dịch chuyển (`charge`, `blink`) rời chỗ xuất hiện; quá `LEASH_DIST` thì máy chủ BỎ MỤC TIÊU và reset (hồi đầy, giai đoạn 0): đó là luật bám của quái, không phải thứ bài này kiểm
+    mon.mc.homeX = mon.m.x;
+    mon.mc.homeY = mon.m.y;
     // khí huyết bot giảm trong tick này? Gán cho đòn chưa xử lý có mốc đáp gần nhất (đáp có thể sớm hơn mốc ước tính tới 2 tick: warn của mưa phát muộn tới một tick)
     if (p.hp < lastHp) {
       if (mode === "dodge") out.hurt.push({ at: w.now, ability: cur?.id ?? "?", x: p.x, y: p.y });
@@ -379,4 +384,31 @@ export function runDodgeBot(
   }
   out.phase = mon.mc.boss!.phase;
   return out;
+}
+
+/** Mọi loài quái con mà bộ chiêu / giai đoạn của `def` có thể gọi (chiêu `summon` và `onEnter`). */
+function addKindsOf(def: BossDef): Set<string> {
+  const kinds = new Set<string>();
+  for (const a of def.abilities) if (a.shape.t === "summon") kinds.add(a.shape.kind);
+  for (const ph of def.phases)
+    for (const act of ph.onEnter ?? []) if (act.t === "summon") kinds.add(act.kind);
+  return kinds;
+}
+
+export function runDodgeBot(
+  defSeed: number,
+  def: BossDef,
+  mode: "dodge" | "stand",
+  simMs: number,
+  opts: { phase?: number; roam?: boolean } = {},
+): Result {
+  // Quái con của trùm (rắn con, Hàn Lang, phân thân) có thể đánh NGAY trong tick sinh ra, bằng hành vi riêng (lao / bắn / `nextAttack` ban đầu 0): bài này chỉ kiểm bộ chiêu của TRÙM,
+  // nên cho công của các loài đó về 0 trong lúc chạy (khôi phục sau, như `balance/dungeon.ts` làm với trùm)
+  const saved = [...addKindsOf(def)].map((k) => [k, MONSTER_BY_ID[k]!.atk] as const);
+  for (const [k] of saved) MONSTER_BY_ID[k]!.atk = 0;
+  try {
+    return runDodgeBotInner(defSeed, def, mode, simMs, opts);
+  } finally {
+    for (const [k, atk] of saved) MONSTER_BY_ID[k]!.atk = atk;
+  }
 }
