@@ -44,6 +44,24 @@ interface Snapshot {
   byName: Record<BoardId, Map<string, BoardRow>>;
   /** đạo hiệu chuẩn hoá -> số trận PK (để tính `need` khi chưa đủ). */
   pkGames: Map<string, number>;
+  /** khoá chân linh của thành viên -> TÊN tông đang ở (để `view` tra hạng tông của người xem; `tongmon` xếp theo tên tông, không theo đạo hiệu). */
+  sectOfSoul: Map<string, string>;
+}
+
+/** Hệ số `TEST_EXP_MULT` có làm tài khoản thành "thử nghiệm" không: chỉ khi > 1 (hệ số 1 không nhân gì; khớp `WorldRoom` chỉ gắn `testExpMult` khi > 1). `undefined` = không có trong cấu hình. */
+const isTestMult = (mult: number | undefined): boolean => (mult ?? 1) > 1;
+
+/** Làm mới chậm hơn chừng này (ms) thì ghi cảnh báo vào log (quy mô lớn dần: mỗi lần đọc toàn bộ chân linh + hồ sơ từng tệp). */
+export const BOARD_SLOW_REFRESH_MS = 2_000;
+
+/** Số đo lần làm mới gần nhất (để vận hành / test xem; chưa đưa vào `/metrics`: thêm khi đông). */
+export interface LeaderboardStats {
+  /** Lần làm mới gần nhất thành công (mili giây, đồng hồ của dịch vụ); `null` nếu chưa lần nào. */
+  lastRefreshMs: number | null;
+  /** Số chân linh / hồ sơ / tông đã đọc ở lần đó. */
+  souls: number;
+  profiles: number;
+  sects: number;
 }
 
 const emptyBoards = <T>(make: () => T): Record<BoardId, T> => ({
@@ -81,6 +99,13 @@ export class LeaderboardService {
     return this.snap !== null;
   }
 
+  private lastStats: LeaderboardStats = { lastRefreshMs: null, souls: 0, profiles: 0, sects: 0 };
+
+  /** Số đo lần làm mới gần nhất (bản sao). */
+  get stats(): LeaderboardStats {
+    return { ...this.lastStats };
+  }
+
   /** Làm mới bản chụp từ kho. Gọi chồng thì dùng chung MỘT lần chạy. Lỗi chỉ ghi log và GIỮ bản chụp cũ (không ném). */
   refresh(): Promise<void> {
     this.running ??= this.build()
@@ -92,6 +117,7 @@ export class LeaderboardService {
   }
 
   private async build(): Promise<void> {
+    const t0 = this.now();
     const d = this.d;
     const [souls, profiles, sects, accounts] = await Promise.all([
       d.souls.all?.(BOARD_SCAN_MAX) ?? Promise.resolve([]),
@@ -100,7 +126,8 @@ export class LeaderboardService {
       d.accounts?.all() ?? Promise.resolve([]),
     ]);
     const testExp = d.testExp();
-    const isTest = (name: string) => testExp.has(soulIdOf(name));
+    // Hệ số 1 (`TEST_EXP_MULT=Han:1`: KHÔNG nhân gì) không phải tài khoản thử nghiệm: cùng luật với `WorldRoom` (chỉ gắn `testExpMult` khi > 1)
+    const isTest = (name: string) => isTestMult(testExp.get(soulIdOf(name)));
 
     // đạo hiệu <-> khoá chân linh: chế độ tài khoản khoá theo id tài khoản, chế độ cũ theo đạo hiệu chuẩn hoá
     const keyOfName = new Map<string, string>();
@@ -143,8 +170,10 @@ export class LeaderboardService {
       if (won + lost >= BOARD_PK_MIN_GAMES) rows.pk.push(mark({ ...base, won, lost }, name));
     }
     // tongmon: tông còn thành viên
+    const sectOfSoul = new Map<string, string>();
     for (const t of sects) {
       if (t.members.length === 0) continue;
+      for (const m of t.members) sectOfSoul.set(m.soulKey, t.name);
       const points = t.points ?? 0;
       rows.tongmon.push({
         rank: 0,
@@ -161,24 +190,42 @@ export class LeaderboardService {
       ranked[id] = rankBoard(id, rows[id], rows[id].length);
       for (const r of ranked[id]) byName[id].set(soulIdOf(r.name), r);
     }
-    this.snap = { at: this.now(), ranked, byName, pkGames };
+    this.snap = { at: this.now(), ranked, byName, pkGames, sectOfSoul };
+    const ms = Math.max(0, this.now() - t0);
+    this.lastStats = {
+      lastRefreshMs: ms,
+      souls: souls.length,
+      profiles: profiles.length,
+      sects: sects.length,
+    };
+    if (ms > BOARD_SLOW_REFRESH_MS)
+      console.warn(
+        `[xếp hạng] làm mới chậm: ${ms} ms (${souls.length} chân linh, ${profiles.length} hồ sơ, ${sects.length} tông)`,
+      );
   }
 
   /**
    * Bảng `board` cho người xem `viewerName` (đạo hiệu; `null` = không biết): `BOARD_SIZE` dòng đầu + `mine`. Chưa có bản chụp thì bảng trống với lý do `none`.
+   * `viewerSoul` (khoá chân linh của người xem, tuỳ chọn): bảng `tongmon` xếp theo TÊN TÔNG nên `mine` là hạng tông người xem đang ở (tra từ bản chụp, tối đa cũ `BOARD_REFRESH_MS`);
+   * không ở tông nào (hoặc không truyền) thì `none` (client tự biết có tông hay không qua `Player.sect`).
    * `mine.rank` null kèm lý do: `test` (tài khoản thử nghiệm xem bảng `tuvi`), `min_games` (PK chưa đủ trận, `need` = số trận còn thiếu), `none` (chưa có dữ liệu).
    */
-  view(board: BoardId, viewerName: string | null): BoardsMsg {
+  view(board: BoardId, viewerName: string | null, viewerSoul: string | null = null): BoardsMsg {
     const s = this.snap;
     if (!s) return { board, rows: [], mine: { rank: null, reason: "none" }, ageMs: 0 };
     const rows = s.ranked[board].slice(0, BOARD_SIZE);
     const key = viewerName === null ? null : soulIdOf(viewerName);
     let mine: BoardMine = { rank: null, reason: "none" };
-    // `tongmon` xếp theo TÊN TÔNG nên không tra theo đạo hiệu người xem (không có hạng riêng của người, tránh trùng tên tông với đạo hiệu)
-    if (key !== null && viewerName !== null && board !== "tongmon") {
+    // `tongmon` xếp theo TÊN TÔNG nên không tra theo đạo hiệu người xem (tránh trùng tên tông với đạo hiệu): tra theo tông người xem đang ở (qua khoá chân linh)
+    if (board === "tongmon") {
+      const sectName = viewerSoul === null ? undefined : s.sectOfSoul.get(viewerSoul);
+      const row = sectName === undefined ? undefined : s.byName.tongmon.get(soulIdOf(sectName));
+      if (row) mine = { rank: row.rank, row };
+    } else if (key !== null && viewerName !== null) {
       const row = s.byName[board].get(key);
       if (row) mine = { rank: row.rank, row };
-      else if (board === "tuvi" && this.d.testExp().has(key)) mine = { rank: null, reason: "test" };
+      else if (board === "tuvi" && isTestMult(this.d.testExp().get(key)))
+        mine = { rank: null, reason: "test" };
       else if (board === "pk") {
         const games = s.pkGames.get(key) ?? 0;
         mine =
