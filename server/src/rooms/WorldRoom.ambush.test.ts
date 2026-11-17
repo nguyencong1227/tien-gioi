@@ -202,6 +202,20 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     expect(c.ambush.cooldownUntil).toBeGreaterThan(w.now);
   }, 15_000);
 
+  it("có ambushSeen thì quá AMBUSH_SEEN_MS hộp thoại VẪN mở (không bị huỷ); còn chọn được sau đó", async () => {
+    const h = await spawn("Da Thay");
+    const { w, sid, p, c } = prime(h);
+    expect(rollAmbush(w, sid, p, c)).toBe(true);
+    const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
+    h.room.send(AMBUSH_MSG.seen, { id: offer.id });
+    await sleep(AMBUSH_SEEN_MS + 700);
+    expect(c.ambush.offer?.id).toBe(offer.id);
+    expect(h.ends).toHaveLength(0);
+    h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "flee_coin" });
+    const end = await waitFor(() => h.ends[0], 3000, "nhận ambushEnd");
+    expect(end.result).toBe("fled");
+  }, 15_000);
+
   it("client cũ (v < AMBUSH_MIN_PROTOCOL) KHÔNG bao giờ bị chặn (không có hộp thoại để trả lời)", async () => {
     const h = await spawn("Client Cu", AMBUSH_MIN_PROTOCOL - 1);
     const { w, sid, p, c } = prime(h);
