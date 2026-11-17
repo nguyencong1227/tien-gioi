@@ -45,7 +45,7 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 |---|---|---|---|---|---|---|
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
 | **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 (mục 5)** |
-| thẻ trùm | bảng / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2, vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
+| thẻ trùm | bảng / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2 (mục 5b), vào GÓI `art:trum` (tải theo nhu cầu, mục 4b) |
 | chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3, vào GÓI `art:npc` (tải theo nhu cầu, mục 4b) |
 
 **Ngân sách gói tải NGAY** (`client/perf-budget.json` `static.aiAssets`: mỗi ảnh <= 150 KB, tổng <= 300 KB; ảnh ở `client/public/assets/ai/` vào `dist/` nên vào cả APK lẫn bộ nhớ đệm PWA của mọi người chơi web): `login_bg` 72 KB + 5 thẻ bản đồ (23-34 KB mỗi ảnh, thực đo 146,5 KB) = **218,7 KB <= 300 KB**. **A giữ trần 300 KB** (quyết định ở #998): lô 2 và lô 3 KHÔNG vào đây mà vào gói tải theo nhu cầu `art` (mục 4b).
@@ -86,6 +86,29 @@ foggy swamp of dead trees and still black water, faint wisps of pale lantern lig
 ### `the_han_van` (bản đồ `han_van`; hạt giống `2026111751`, `2026111752`, `2026111753`)
 ```text
 icy highland with drifting snow, frozen lake and sheer ice cliffs under a pale dawn, thin clouds on the ridges, pale ice blue and white haze, cold silver light, painterly soft ink wash and gouache landscape, muted colors, misty depth, wide panoramic composition, eastern mountain cultivation fantasy, no people, no text
+```
+
+## 5b. LÔ 2: bốn thẻ trùm (việc của C, CHỈ KHI #1005 gói `art` đã được A duyệt)
+Mỗi trùm một thẻ vuông, **bốn hạt giống** mỗi thẻ để B chọn một (16 ảnh thô; lô 1 cho thấy 4 / 15 ảnh có chữ ký giả ở góc nên dư một ảnh). Cỡ thô 1024x1024, ảnh cuối 384x384 WebP <= 30 KB, vào gói `art:trum` (`client/public/packs/art-trum/`, mục 4b). Cùng cài đặt KSampler của lô 1 (`euler`, `normal`, 25 bước, CFG 7.0, denoise 1.0), cùng prompt âm ở mục 3, chỉ SDXL base. Tên tệp thô `<id>_raw_<n>_00001_.png` (n = 1..4 theo thứ tự hạt giống) vào `/mnt/data/comfyui/output/`. Màu và ánh sáng theo bản đồ của từng trùm (bảng màu mục 2); trùm là thú / khối băng, KHÔNG mặt người (để khỏi giống nhân vật của game khác). Prompt dương (đã qua `promptViolations`, KHÔNG sửa tay: cần đổi thì sửa `BOSS_CARD_BATCH` trong `prompt-rules.mjs` rồi cập nhật trang này):
+
+### `the_xich_mang` (trùm `mang`; hạt giống `2026111801`, `2026111802`, `2026111803`, `2026111804`)
+```text
+colossal crimson python coiled around mossy boulders beneath blossoming peach branches, glossy blood-red scales, warm amber evening light, soft rose and cream haze, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+### `the_hac_giao` (trùm `hac_giao`; hạt giống `2026111811`, `2026111812`, `2026111813`, `2026111814`)
+```text
+enormous black river dragon-serpent rising from dark swamp water, wet obsidian scales with a pale green sheen, dead trees around it, moss green and grey-green mist, faint wisps of pale lantern light, heavy fog, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+### `the_thien_han_vuong` (trùm `thien_han_vuong`; hạt giống `2026111821`, `2026111822`, `2026111823`, `2026111824`)
+```text
+towering colossus of living glacier ice standing on a frozen lake, armor-like plates of blue ice, a jagged crown of icicles, no face, pale ice blue and white haze, cold silver light, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
+```
+
+### `the_yeu_vuong` (trùm `yeu_vuong`; hạt giống `2026111831`, `2026111832`, `2026111833`, `2026111834`)
+```text
+ancient spirit beast lord with huge branching luminous antlers and long fur drifting like mist, standing in a crystal cavern with glowing mushrooms, jade teal and cyan glow with deep violet accents against blue-black shadows, painterly soft ink wash and gouache creature illustration, single creature centered, full body visible, muted colors, misty depth, eastern mountain cultivation fantasy, no people, no text
 ```
 
 ## 6. Quy trình sau khi C sinh xong
