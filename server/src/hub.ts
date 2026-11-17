@@ -7,6 +7,7 @@ import { Parties } from "./systems/party";
 import { Runs } from "./systems/dungeon";
 import { SectBook } from "./systems/sect";
 import { WriteGauge } from "./metrics";
+import { PkLedger } from "./systems/pk-ledger";
 
 /** Nơi nhận chat toàn server của một phòng (thường là `room.broadcast("chat", msg)`). */
 export type ChatSink = (msg: ChatOut) => void;
@@ -31,6 +32,8 @@ export class Hub {
   readonly runs = new Runs();
   /** Lời mời tông môn đang chờ, thành viên trực tuyến và bản ghi nhớ của cả tiến trình (systems/sect.ts). */
   readonly sects = new SectBook();
+  /** Sổ chống đổi thắng PK của cả tiến trình (M9, `systems/pk-ledger.ts`): mỗi cặp (thắng, thua) tối đa `BOARD_PK_PAIR_DAY_CAP` trận thắng tính mỗi ngày. */
+  readonly pkPairs = new PkLedger();
   /** Hàng đợi ghi hồ sơ nhân vật của cả tiến trình (đo ở `WorldRoom.persist`, đọc ở `/metrics`: M4 3.3). */
   readonly writes = new WriteGauge();
 
