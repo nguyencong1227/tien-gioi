@@ -1,0 +1,74 @@
+{
+  "asset": "client/public/assets/ai/the_lac_ha.webp",
+  "finalSha256": "ec7afda86e9fe210873b93415ceb86539005f35023f50680b0de416aa396a502",
+  "rawSha256": "70717b01def5ac93a628bcde123320c83178611ef9c4b40ba9e1e63b4b2bae23",
+  "rawFile": "/mnt/data/comfyui/output/chosen/the_lac_ha_raw_1_00001_.png (ngoài repo; ảnh thô được chọn nằm ở thư mục chosen/ của /mnt/data, repo chỉ giữ băm)",
+  "model": {
+    "name": "sd_xl_base_1.0.safetensors",
+    "sha256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
+  },
+  "lora": [],
+  "comfyui": {
+    "comfyui": "0.43.2",
+    "python": "3.12.16",
+    "pytorch": "2.14.1+cu130",
+    "driver": "615.71.09",
+    "gpu": "NVIDIA GeForce RTX 5060 8 GB"
+  },
+  "workflow": {
+    "path": "scripts/art/gen-raw-pilot.mjs",
+    "sha256": "9236af12ee5c67e6e34ffdf055ef2449781744b901ab4c1178b71f79d757a2c9",
+    "note": "TẠM (chờ C đưa script riêng của lô 1 vào repo): băm và đường dẫn này là của script PILOT (cỡ 1024x1024); lô 1 sinh bằng script khác cùng KSampler euler / normal, 25 bước, cfg 7, denoise 1 nhưng cỡ 1216x832 và prompt của MAP_CARD_BATCH (client/scripts/art/prompt-rules.mjs). SỬA dòng này khi có script lô 1.",
+    "params": {
+      "sampler": "euler",
+      "scheduler": "normal",
+      "steps": 25,
+      "cfg": 7,
+      "denoise": 1,
+      "width": 1216,
+      "height": 832
+    }
+  },
+  "prompt": "small mountain town of timber houses below a sacred misty peak, a river winding past peach blossom trees, falling pink petals, warm peach and amber light, soft rose and cream haze, painterly soft ink wash and gouache landscape, muted colors, misty depth, wide panoramic composition, eastern mountain cultivation fantasy, no people, no text",
+  "negativePrompt": "text, letters, words, calligraphy, watermark, signature, logo, cjk, chinese characters, frame, border, blurry, lowres, distorted, modern, futuristic, photorealistic, human face, western fantasy, anime, 3d render",
+  "seed": 2026111711,
+  "postProcess": [
+    {
+      "script": "client/scripts/art/hau-ky-webp.py",
+      "params": {
+        "crop": [
+          38,
+          18,
+          1140,
+          760
+        ],
+        "size": [
+          624,
+          416
+        ],
+        "quality": 86,
+        "method": 6
+      },
+      "result": {
+        "width": 624,
+        "height": 416,
+        "bytes": 34234,
+        "chunks": [
+          "VP8 "
+        ],
+        "pillow": "10.2.0",
+        "libwebp": "1.3.2"
+      },
+      "note": "Cắt 38,18,1140,760 (bỏ viền giấy và mép ảnh, đúng 3:2) rồi đổi cỡ 624x416 (Lanczos) và mã hoá WebP sạch (không EXIF / XMP / ICC). Tất định: cùng ảnh thô + tham số + Pillow / libwebp cho cùng finalSha256."
+    }
+  ],
+  "reviewed": {
+    "by": "Dev B (Claude Code, chạy đêm)",
+    "date": "2026-11-17",
+    "noText": true,
+    "noOtherGameLikeness": true,
+    "note": "Xem cả 15 ảnh thô của lô 1 (ba hạt giống mỗi bản đồ), ảnh cuối ở cỡ thật và bốn góc phóng 200 %: không chữ, không ký tự giả, không chữ ký, không logo, không người. thị trấn gỗ bên sông dưới núi, hoa đào hồng; ảnh số 1 chọn vì thấy cả CỤM nhà (hợp 'trấn'), màu ấm đúng ambient Lạc Hà; loại số 2 (viền giấy trắng rộng ở mép) và số 3 (chỉ một căn nhà)."
+  },
+  "date": "2026-11-17",
+  "use": "Thẻ minh hoạ bản đồ `lac_ha` ở màn chuyển cảnh qua cổng (client/src/map-card.ts, MAP_CARDS)"
+}

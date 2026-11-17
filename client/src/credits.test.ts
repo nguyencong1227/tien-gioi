@@ -175,7 +175,7 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
     // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 81 tệp tài sản thường + số ảnh AI
     const ai = under("assets/ai");
-    expect(ai).toHaveLength(1); // login_bg.webp (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
+    expect(ai).toHaveLength(6); // login_bg.webp + 5 thẻ bản đồ (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
     expect(under("assets")).toHaveLength(81 + ai.length);
     expect(under("icons")).toHaveLength(5);
     expect(under("fonts")).toHaveLength(5);
@@ -776,7 +776,14 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
 
   it("kho thật của repo: sạch và thư mục ảnh AI chỉ có đúng ảnh đã khai báo (thêm ảnh AI thì thêm vào danh sách này CÙNG LÚC với JSON nguồn)", () => {
     expect(auditAiImages().errors).toEqual([]);
-    expect(scanFiles(AI_ASSET_DIR)).toEqual(["client/public/assets/ai/login_bg.webp"]);
+    expect(scanFiles(AI_ASSET_DIR)).toEqual([
+      "client/public/assets/ai/login_bg.webp",
+      "client/public/assets/ai/the_am_suong.webp",
+      "client/public/assets/ai/the_hac_phong.webp",
+      "client/public/assets/ai/the_han_van.webp",
+      "client/public/assets/ai/the_lac_ha.webp",
+      "client/public/assets/ai/the_linh_hu.webp",
+    ]);
   });
 
   it("một ảnh WebP hợp lệ (JSON cùng tên, băm khớp, có dòng CREDITS, không siêu dữ liệu) thì qua", () => {

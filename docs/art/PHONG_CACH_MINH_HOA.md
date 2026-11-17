@@ -44,7 +44,7 @@ Lý do từng nhóm: tên game / truyện / nghệ sĩ khác vi phạm quy tắc
 | lớp | dùng ở | tỉ lệ | thô (SDXL) | cuối (WebP) | trần mỗi ảnh | trạng thái |
 |---|---|---|---|---|---|---|
 | nền đăng nhập | `section#login` | 1:1 | 1024x1024 | 1024x1024 | 150 KB | ĐÃ VÀO (`login_bg.webp`, 72 KB) |
-| **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 (mục 5)** |
+| **thẻ bản đồ** | màn chuyển cảnh qua cổng (ĐÃ nối: `client/src/map-card.ts`, danh sách `MAP_CARDS`; chưa có ảnh thì chỉ hiện tên) và đầu bảng Sơn Hà Đồ (`M`, dự kiến) | 3:2 (thô ≈ 3:2, B cắt nhẹ về đúng 3:2) | 1216x832 | 624x416 | 40 KB | **LÔ 1 ĐÃ VÀO GAME (17/11/2026, mục 5)** |
 | thẻ trùm | thanh máu trùm / báo trùm (dự kiến) | 1:1 | 1024x1024 | 384x384 | 30 KB | lô 2, SAU khi B xem lô 1 |
 | chân dung NPC | khung hội thoại (dự kiến) | 1:1 | 1024x1024 | 256x256 | 20 KB | lô 3 |
 
