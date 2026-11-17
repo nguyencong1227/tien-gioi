@@ -95,7 +95,7 @@ function hitList(w: World, z: BossZone): string[] {
 }
 
 /** Sát thương một đòn của chiêu `ab`: `round(atk x hệ số hiện hành x dmgMult)`, ít nhất 1. Cố định, không ngẫu nhiên. */
-function damageOf(w: World, mc: MonsterCtrl, bs: BossCtrl, ab: BossAbility): number {
+export function damageOf(w: World, mc: MonsterCtrl, bs: BossCtrl, ab: BossAbility): number {
   return weakened(mc, w.now, Math.max(1, Math.round(mc.def.atk * bs.atk * ab.dmgMult))); // `weaken` (mục 51): trùm chỉ chịu nửa
 }
 

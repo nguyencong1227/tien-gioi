@@ -23,6 +23,8 @@ import {
 import { tickMonsters } from "./monsters";
 import { fireBolt } from "./bolt";
 import { placeMonster } from "./monster-place";
+import { damageOf } from "./boss";
+import { bossDefOf } from "@tien-gioi/shared";
 import { MONSTER_BY_ID } from "@tien-gioi/shared";
 import { dealtMult } from "./status-rules";
 import { applyMonsterStatus, applyPlayerStatus, monsterHasStatus, tickStatuses } from "./status";
@@ -670,6 +672,22 @@ describe("weaken: các đường gây sát thương khác của quái (đạn, �
       expect(base, kind).toBeGreaterThan(0);
       expect(weak / base, kind).toBeCloseTo(ratio, 1);
     }
+  });
+});
+
+describe("weaken: sát thương chiêu của TRÙM (damageOf)", () => {
+  it("giảm 20% khi trùm bị suy yếu 40% (trùm chỉ chịu nửa); không suy yếu thì y hệt", () => {
+    const t = setup();
+    t.w.bossMoves = true;
+    t.w.now = 100_000;
+    const id = placeMonster(t.w, MONSTER_BY_ID["mang"]!, 1500, 1000);
+    const mc = t.w.mctrl.get(id)!;
+    const ab = bossDefOf("mang")!.abilities[0]!;
+    const base = damageOf(t.w, mc, mc.boss!, ab);
+    applyMonsterStatus(t.w, id, { status: "weaken", ms: 60_000, ratio: 0.4, chance: 1 }, 0, "a");
+    expect(damageOf(t.w, mc, mc.boss!, ab) / base).toBeCloseTo(0.8, 1);
+    t.w.now += 61_000; // hết hạn
+    expect(damageOf(t.w, mc, mc.boss!, ab)).toBe(base);
   });
 });
 
