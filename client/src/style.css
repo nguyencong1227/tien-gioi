@@ -568,6 +568,36 @@ body.reduced-motion .st-badge.urgent {
     display: flex;
   }
 }
+/* Hàng nút khi mở ở màn hẹp: nếu quá rộng thì XUỐNG DÒNG thay vì tràn khỏi mép trái (7 nút rộng 338 px vừa khung 360 px nên không đổi gì; 8 nút khi bật nút Xã hội
+   rộng ~386 px, trước đây nút đầu bị cắt khỏi màn hình). */
+@media (max-width: 669px) {
+  .hud-menu-items {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    width: max-content; /* hộp định vị tuyệt đối co theo nút ☰ (44 px): thiếu dòng này thì 8 nút xếp thành MỘT CỘT */
+    max-width: calc(100vw - 20px);
+  }
+}
+/* Cờ ?social=1 bật nút Xã hội: hàng thành 8 nút (~386 px) nên mốc chuyển sang ☰ nâng từ 620 lên 670 (cần >= 12 + 240 + 8 + 386 + 12 = 658 px mới đứng cạnh bảng Tổ đội). */
+@media (min-width: 620px) and (max-width: 669px) {
+  body.social-on .menu-toggle {
+    display: inline-flex;
+  }
+  body.social-on .hud-menu-items {
+    display: none;
+    position: absolute;
+    width: max-content;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 12;
+    border: 1px solid var(--gold);
+    background: rgba(24, 21, 18, 0.97);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  }
+  body.social-on .hud-menu.open .hud-menu-items {
+    display: flex;
+  }
+}
 
 /* Cột trái HUD: chứa HUD, tổ đội, nhiệm vụ dạng flex không đè nhau (#91) */
 #hud-col-left {
@@ -7435,7 +7465,9 @@ body.ui-hidden
 /* ---------- Thanh máu TRÙM (mục 42, T4 #873; `boss-bar-ui.ts`) ---------- */
 .boss-bar {
   position: fixed;
-  top: max(8px, env(safe-area-inset-top));
+  top: calc(
+    max(8px, env(safe-area-inset-top)) + var(--wb-h, 0px)
+  ); /* banner trùm thế giới (M9.7) nằm trên, đo vào --wb-h */
   left: 50%;
   transform: translateX(-50%);
   width: min(440px, calc(100vw - 24px));
@@ -7602,7 +7634,7 @@ body.ui-hidden
 /* Điện thoại / máy tính bảng ĐỨNG: khung thông tin của mình (khí huyết / linh lực), bản đồ nhỏ và nút menu chiếm phần trên cùng: thanh trùm nằm dưới chúng, không che số liệu của chính mình hay nút bấm */
 @media (orientation: portrait) {
   .boss-bar {
-    top: calc(max(8px, env(safe-area-inset-top)) + 186px);
+    top: calc(max(8px, env(safe-area-inset-top)) + 186px + var(--wb-h, 0px));
   }
 }
 
@@ -7831,4 +7863,144 @@ body.ui-hidden
   color: #ffe08a;
   font-size: var(--fs-13);
   cursor: pointer;
+}
+
+/* Banner TRÙM THẾ GIỚI (M9.7, #1026): nằm TRÊN thanh trùm (thanh trùm tự xuống theo --wb-h); không chặn chạm / nhấp vào thế giới, chỉ nút "Xem đóng góp" nhận chạm. */
+.wb-banner {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 6px 10px 8px;
+  border: 1px solid rgba(255, 190, 90, 0.6);
+  border-radius: 8px;
+  background: rgba(24, 16, 8, 0.86);
+  color: #ffe9c8;
+  z-index: 19;
+  pointer-events: none;
+  font-size: var(--fs-13);
+}
+.wb-banner[hidden] {
+  display: none;
+}
+.wb-banner[data-tone="good"] {
+  border-color: rgba(120, 220, 140, 0.7);
+}
+.wb-banner[data-tone="bad"] {
+  border-color: rgba(255, 120, 90, 0.7);
+}
+.wb-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+.wb-head[hidden] {
+  display: none;
+}
+.wb-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wb-hp {
+  color: #ffb4a8;
+  white-space: nowrap;
+}
+.wb-timer {
+  white-space: nowrap;
+}
+.wb-timer[hidden] {
+  display: none;
+}
+.wb-time {
+  font-variant-numeric: tabular-nums;
+  color: #ffe08a;
+}
+.wb-mine {
+  margin: 4px 0 0;
+}
+.wb-mine.low {
+  color: #ffd2a8;
+}
+.wb-toggle {
+  pointer-events: auto;
+  margin-top: 4px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: rgba(255, 190, 90, 0.14);
+  border: 1px solid rgba(255, 190, 90, 0.45);
+  border-radius: 6px;
+  color: #ffe08a;
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+.wb-top {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.wb-top li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.wb-top .n {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wb-top .t {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgba(212, 175, 55, 0.18);
+  color: #ffe08a;
+  font-size: var(--fs-12, 12px);
+  white-space: nowrap;
+}
+.wb-top .pct {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wb-result {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.wb-result[hidden],
+.wb-top[hidden],
+.wb-mine[hidden],
+.wb-toggle[hidden] {
+  display: none;
+}
+/* Điện thoại / máy tính bảng ĐỨNG: cùng chỗ với thanh trùm (dưới khung thông tin của mình / bản đồ nhỏ / nút menu). Nằm DƯỚI cột HUD (z-index 10) để hàng nút của
+   menu ☰ khi mở (rơi đúng chỗ banner) vẫn nằm trên và bấm được. */
+@media (orientation: portrait) {
+  .wb-banner {
+    top: calc(max(8px, env(safe-area-inset-top)) + 186px);
+    z-index: 9;
+  }
+}
+/* Điện thoại NGANG (khung thấp): banner thu thành MỘT dòng (tên · máu · đồng hồ) để không che khung thông tin của mình; phần đóng góp xem ở tab Sự kiện. */
+@media (orientation: landscape) and (max-height: 420px) {
+  .wb-banner {
+    padding: 3px 8px;
+    width: min(400px, calc(100vw - 24px));
+  }
+  .wb-banner .wb-mine,
+  .wb-banner .wb-toggle,
+  .wb-banner .wb-top {
+    display: none;
+  }
+}
+.wbt-h {
+  margin: 14px 0 6px;
+  font-size: var(--fs-13);
+  color: #ffe08a;
+}
+.social-table .c-time {
+  width: 1%;
+  white-space: nowrap;
 }
