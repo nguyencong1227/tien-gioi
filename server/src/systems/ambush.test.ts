@@ -738,6 +738,10 @@ describe("ambushChoose: bỏ chạy = trừ ĐÚNG giá chốt -> LƯU -> đóng
     expect(s.c.ambush!.offer).toBeDefined();
     expect(s.ambushEnds).toHaveLength(0);
     expect(s.c.coin).toBe(before - price);
+    // Lưu hỏng KHÔNG im lặng (review B ở #1083): báo toast + gửi LẠI hộp thoại (cùng id) để client biết mà thử lại
+    expect(s.toasts).toHaveLength(1);
+    expect(s.ambushOffers.at(-1)!.msg.id).toBe(s.o.id);
+    expect(s.ambushOffers.length).toBeGreaterThan(1);
     ok = true;
     await onAmbushChoose(s.w, s.sid, { id: s.o.id, choice: "flee_coin" });
     expect(saves).toBe(2);

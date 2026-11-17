@@ -559,7 +559,12 @@ async function settleFlee(
   const ok = (await w.onSaveNow?.(sid)) ?? true;
   // Trong lúc chờ lưu người chơi có thể đã rời phòng (ctrl mất) hoặc hộp thoại đã bị đóng bởi nhánh khác
   if (w.ctrl.get(sid)?.ambush?.offer !== o) return;
-  if (!ok) return; // giữ hộp thoại + `settling`: lần bấm sau (hoặc nhịp thử lại) chỉ lưu lại, không trừ thêm
+  if (!ok) {
+    // Giữ hộp thoại + `settling`: lần bấm sau (client mở lại nút sau vài giây) chỉ lưu lại, không trừ thêm. Báo cho người chơi (review B ở #1083): không im lặng.
+    w.events.toast(sid, { text: "Chưa lưu được, hãy bấm lại sau giây lát", tone: "bad" });
+    ambushResend(w, sid);
+    return;
+  }
   w.audit?.("ambush.flee", { name: p.name, choice, paid: o.settling.paid, stage: "offer" });
   closeOffer(w, sid, c, o, { result: "fled", paid: o.settling.paid });
 }
