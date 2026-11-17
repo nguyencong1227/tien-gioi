@@ -278,10 +278,11 @@ describe("trap: bẫy", () => {
   it("hết `durationMs` mà chưa nổ thì tan lặng lẽ (không `fxEnd`); `armMs` dưới sàn bị kẹp lên trapArmMin", () => {
     const t = setup();
     def(t, { shape: "trap", reach: 0, range: 60, armMs: 10, durationMs: 1000 });
+    const m = mon(t, 1030, 1000); // quái đã đứng sẵn trong bán kính
     use(t);
-    advance(t, 300);
-    const m = mon(t, 1030, 1000);
-    advance(t, 100); // 400 ms: vừa tới trapArmMin
+    advance(t, SKILL_LIMITS.trapArmMin - 100);
+    expect(dmgTo(t, m.id)).toEqual([]); // armMs 10 bị kẹp lên trapArmMin: chưa hoạt động
+    advance(t, 100); // vừa tới trapArmMin
     expect(dmgTo(t, m.id)).toHaveLength(1);
     const u = setup();
     def(u, { shape: "trap", reach: 0, range: 60, armMs: 400, durationMs: 1000 });
