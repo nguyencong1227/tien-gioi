@@ -561,6 +561,13 @@ async function main() {
           (await panels()).length === 0 && !(await moreRows()).includes(idA),
           "món hết lượt khi ảnh chụp mới về: khung đóng, không còn nút 'Nhiều…' ở món đó",
         );
+        // sang ngày mới (món có lượt lại): khung đã đóng KHÔNG tự bật lên lại với số cũ
+        await many();
+        await sleep(120);
+        check(
+          (await panels()).length === 0 && (await moreRows()).includes(idA),
+          "món có lượt lại sau đó: nút 'Nhiều…' về, nhưng khung KHÔNG tự bật lại",
+        );
         // đã gục: mọi nút mờ, không còn nút 'Nhiều…'
         await evalJs(`window.__scene.me().dead = true; 1`);
         await many();
