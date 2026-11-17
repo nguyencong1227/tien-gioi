@@ -13,7 +13,10 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - mũi tên Phải / Trái / Home / End đổi tab VÀ đưa focus theo (không nhảy qua tab `tabindex=-1`), vòng hai đầu, chỉ MỘT thân tab hiện;
  *   - bấm chuột / chạm vào tab đổi tab; mỗi tab cao >= 44 px;
  *   - Esc đóng bảng, trả focus về nút HUD, `aria-expanded=false`; Shift+G lần nữa đóng / mở lại được.
- * `--shots`: lưu ảnh bảng đang mở mỗi khung nhìn.
+ *   - tab Xếp hạng (M9.6): trạng thái đang tải + nút Tải lại (>= 44 px), bốn bảng bằng tin MẪU `window.__sample.boards` (20 dòng, đủ cột, dòng của mình, thử nghiệm,
+ *     không ô trống / NaN, không cắt chữ, không tràn), mình ngoài top / không hạng (3 lý do) / bảng rỗng, đạo hiệu có thẻ HTML không thành phần tử, tin sai kiểu bị bỏ,
+ *     tab phụ >= 44 px + mũi tên / Home / End đổi bảng và đưa focus theo.
+ * `--shots`: lưu ảnh bảng đang mở mỗi khung nhìn (và bảng Tu vi / Tông môn đầy dòng).
  */
 import http from "node:http";
 import fs from "node:fs";
@@ -331,6 +334,210 @@ async function main() {
         s.tabs[1].sel === "true" && s.visiblePanes.join() === "ach",
         "bấm tab Thành tựu: đổi tab",
       );
+
+      // ---- 4b. tab Xếp hạng (M9.6, #1025) ----
+      await evalJs(`document.getElementById("social-tab-btn-rank").click(); 1`);
+      await sleep(200);
+      const rank = () =>
+        evalJs(`(() => {
+          const q = (id) => document.getElementById(id);
+          const r = (el) => { const b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, h: b.height }; };
+          const wrap = q("social-board-wrap"), table = q("social-board-table");
+          const cells = [...table.querySelectorAll("th, td")];
+          return {
+            status: q("social-board-status").textContent, statusHidden: q("social-board-status").hidden,
+            wrapHidden: wrap.hidden, retryHidden: q("social-board-retry").hidden, retryH: r(q("social-board-retry")).h,
+            mine: q("social-board-mine").textContent, age: q("social-board-age").textContent,
+            head: [...q("social-board-head").children].map((e) => e.textContent),
+            rows: [...q("social-board-body").querySelectorAll("tr")].map((tr) => ({ cls: tr.className, cells: [...tr.children].map((c) => c.textContent) })),
+            wrapOverflow: wrap.scrollWidth - wrap.clientWidth,
+            clipped: cells.filter((c) => c.scrollWidth > c.clientWidth + 1).length,
+            pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+            modal: r(q("social-modal")), vw: window.innerWidth, vh: window.innerHeight,
+            injected: q("social-board-body").querySelectorAll("b, img, script").length,
+            sub: ["tuvi", "linhhon", "tongmon", "pk"].map((id) => { const b = q("social-board-btn-" + id); return { id, sel: b.getAttribute("aria-selected"), ti: b.tabIndex, h: r(b).h }; }),
+            focusId: document.activeElement ? document.activeElement.id : "",
+          };
+        })()`);
+      /** Bảng mẫu của shared; bảng Linh hồn đổi bậc về trong thang (mẫu của shared cho bậc 40, ngoài thang). */
+      const setBoard = (board, n, patch = "") =>
+        evalJs(`(() => {
+          const m = window.__sample.boards(${JSON.stringify(board)}, ${n});
+          if (m.board === "linhhon") m.rows = m.rows.map((r, i) => ({ ...r, step: 30 - i }));
+          ${patch}
+          window.__ui.setBoards(m);
+          window.__ui.switchSocialBoard(${JSON.stringify(board)});
+          return 1;
+        })()`);
+
+      // chưa có bản nào của bảng 'pk' (chưa nhận được tin): "Đang tải…", rồi sau ~6 s hiện nút "Tải lại" cao >= 44 px
+      await evalJs(`window.__ui.switchSocialBoard("pk"); 1`);
+      let k = await rank();
+      check(
+        k.status === "Đang tải bảng Thách đấu…" && !k.statusHidden && k.wrapHidden && k.retryHidden,
+        `chưa có bảng: "${k.status}", bảng ẩn, chưa có nút Tải lại`,
+      );
+      await sleep(6300);
+      k = await rank();
+      check(
+        !k.retryHidden && k.retryH >= 44 - 0.5 && k.status.startsWith("Chưa nhận được bảng"),
+        `máy chủ im quá 6 s: nút "Tải lại bảng" hiện (${Math.round(k.retryH)} px), chữ "${k.status}"`,
+      );
+
+      const WANT_HEAD = { tuvi: 4, linhhon: 4, tongmon: 5, pk: 4 };
+      for (const board of ["tuvi", "linhhon", "tongmon", "pk"]) {
+        await setBoard(board, 20);
+        await sleep(150);
+        k = await rank();
+        const tag = `bảng ${board}`;
+        check(!k.wrapHidden && k.rows.length === 20, `${tag}: 20 dòng (${k.rows.length})`);
+        check(
+          k.head.length === WANT_HEAD[board],
+          `${tag}: ${WANT_HEAD[board]} cột (${k.head.join(" | ")})`,
+        );
+        check(k.retryHidden && k.statusHidden, `${tag}: hết trạng thái tải, không còn nút Tải lại`);
+        check(k.mine === "Hạng của bạn: 3", `${tag}: "${k.mine}"`);
+        check(
+          k.rows.filter((x) => x.cls.includes("mine")).length === 1 &&
+            k.rows[2].cls.includes("mine"),
+          `${tag}: đúng MỘT dòng được đánh dấu (hạng 3)`,
+        );
+        check(
+          /^Cập nhật 1 phút trước\. Bảng làm mới mỗi 5 phút\.$/.test(k.age),
+          `${tag}: "${k.age}"`,
+        );
+        check(
+          k.rows.every((x) => x.cells.every((c) => c !== "" && !/NaN|undefined|null/.test(c))),
+          `${tag}: không ô trống / NaN / undefined`,
+        );
+        if (board === "linhhon")
+          check(
+            k.rows[0].cells[2] !== "—",
+            `${tag}: cột cảnh giới đảo từ bậc ("${k.rows[0].cells[2]}")`,
+          );
+        if (board === "tongmon") check(k.head[1] === "Tông môn", `${tag}: cột tên ghi "Tông môn"`);
+        check(
+          board === "tuvi"
+            ? k.rows.every((x) => !x.cells[1].includes("thử nghiệm"))
+            : k.rows[1].cells[1].includes("thử nghiệm"),
+          board === "tuvi"
+            ? `${tag}: KHÔNG có dòng thử nghiệm`
+            : `${tag}: dòng thử nghiệm được đánh dấu`,
+        );
+        check(k.clipped === 0, `${tag}: không ô nào bị cắt chữ (${k.clipped})`);
+        check(
+          k.wrapOverflow <= 1 && k.pageOverflow <= 1,
+          `${tag}: không tràn ngang (bảng ${k.wrapOverflow}, trang ${k.pageOverflow})`,
+        );
+        check(
+          k.modal.l >= -0.5 &&
+            k.modal.t >= -0.5 &&
+            k.modal.r <= k.vw + 0.5 &&
+            k.modal.b <= k.vh + 0.5,
+          `${tag}: bảng vẫn nằm trọn khung`,
+        );
+        if (shotsDir && (board === "tuvi" || board === "tongmon")) {
+          const shot = await send("Page.captureScreenshot", { format: "png" });
+          fs.writeFileSync(
+            path.join(shotsDir, `xa-hoi-xep-hang-${board}-${vp.name}.png`),
+            Buffer.from(shot.result.data, "base64"),
+          );
+        }
+      }
+
+      // các trạng thái của "Hạng của bạn" + bảng rỗng + chống chèn HTML (trên bảng tu vi)
+      await setBoard(
+        "tuvi",
+        5,
+        `m.mine = { rank: 47, row: { rank: 47, name: "Tô Vân Hạc", realm: 1, tier: 4, exp: 1234 } };`,
+      );
+      k = await rank();
+      check(
+        k.mine === "Hạng của bạn: 47" &&
+          k.rows.length === 7 &&
+          k.rows[5].cls.includes("gap") &&
+          k.rows[6].cls.includes("outside") &&
+          k.rows[6].cls.includes("mine") &&
+          k.rows[6].cells[0] === "47",
+        `mình ngoài top: dòng "…" rồi dòng của mình (hạng 47) có số liệu (${k.rows.length} hàng)`,
+      );
+      for (const [patch, want, name] of [
+        [
+          `m.mine = { rank: null, reason: "test" };`,
+          "Tài khoản thử nghiệm không vào bảng này.",
+          "thử nghiệm",
+        ],
+        [
+          `m.mine = { rank: null, reason: "min_games", need: 4 };`,
+          "Cần thêm 4 trận để lên bảng.",
+          "thiếu trận",
+        ],
+        [`m.mine = { rank: null, reason: "none" };`, "Chưa có hạng.", "chưa có"],
+      ]) {
+        await setBoard("tuvi", 5, patch);
+        k = await rank();
+        check(
+          k.mine === want && !k.rows.some((x) => x.cls.includes("mine")),
+          `không hạng (${name}): "${k.mine}"`,
+        );
+      }
+      await setBoard("tuvi", 5, `m.rows = [];`);
+      k = await rank();
+      check(
+        k.wrapHidden && !k.statusHidden && k.status === "Chưa có ai trên bảng này.",
+        `bảng rỗng: "${k.status}", không hiện khung bảng`,
+      );
+      await setBoard("tuvi", 5, `m.rows[0].name = "<b>x</b><img src=x onerror=alert(1)>";`);
+      k = await rank();
+      check(
+        k.injected === 0 && k.rows[0].cells[1].startsWith("<b>x</b>"),
+        `đạo hiệu có thẻ HTML hiện NGUYÊN chữ, không thành phần tử (${k.injected})`,
+      );
+      await evalJs(
+        `window.__ui.setBoards({ board: "zzz", rows: 5 }); window.__ui.setBoards(null); window.__ui.setBoards("x"); 1`,
+      );
+      k = await rank();
+      check(k.rows.length === 5 || k.wrapHidden, "tin sai kiểu bị bỏ, giao diện vẫn nguyên");
+
+      // tab phụ: cao >= 44, mũi tên / Home / End đổi bảng VÀ đưa focus theo
+      k = await rank();
+      check(
+        k.sub.every((b) => b.h >= 44 - 0.5),
+        `mỗi tab phụ cao >= 44 px (${k.sub.map((b) => Math.round(b.h)).join(" / ")})`,
+      );
+      await evalJs(
+        `window.__ui.switchSocialBoard("tuvi"); document.getElementById("social-board-btn-tuvi").focus(); 1`,
+      );
+      await press("ArrowRight", "ArrowRight", 39);
+      k = await rank();
+      check(
+        k.sub[1].sel === "true" && k.focusId === "social-board-btn-linhhon",
+        `tab phụ: Phải -> Linh hồn, focus theo ("${k.focusId}")`,
+      );
+      check(
+        k.sub.filter((b) => b.sel === "true").length === 1 &&
+          k.sub.filter((b) => b.ti === 0).length === 1,
+        "tab phụ: chỉ MỘT tab chọn / tabindex 0",
+      );
+      await press("End", "End", 35);
+      k = await rank();
+      check(
+        k.sub[3].sel === "true" && k.focusId === "social-board-btn-pk",
+        "tab phụ: End -> Thách đấu",
+      );
+      await press("ArrowRight", "ArrowRight", 39);
+      k = await rank();
+      check(k.sub[0].sel === "true", "tab phụ: Phải ở tab cuối vòng về Tu vi");
+      await press("ArrowLeft", "ArrowLeft", 37);
+      k = await rank();
+      check(k.sub[3].sel === "true", "tab phụ: Trái ở tab đầu vòng về Thách đấu");
+      await press("Home", "Home", 36);
+      k = await rank();
+      check(
+        k.sub[0].sel === "true" && k.focusId === "social-board-btn-tuvi",
+        "tab phụ: Home -> Tu vi",
+      );
+      check(!(await state()).modalHidden, "mũi tên ở tab phụ không đóng bảng");
 
       // ---- 5. Esc đóng, trả focus; Shift+G đóng / mở lại ----
       await press("Escape", "Escape", 27);

@@ -94,7 +94,11 @@ import {
   cleanSectName,
   cleanSectTag,
   cleanMotd,
+  BOARD_IDS,
+  BOARD_LABELS,
+  type BoardId,
 } from "@tien-gioi/shared";
+import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
 import {
   dungeonEndReasonText,
   dungeonFallenToastText,
@@ -184,6 +188,7 @@ import {
   asSocialTab,
   socialEnabled,
   socialTabByKey,
+  tabByKey,
   type SocialTabId,
 } from "./social-tabs";
 import {
@@ -360,6 +365,8 @@ export interface UiCallbacks {
   onSectVaultPolicy?: (drawPerDay: number) => void;
   /** Tab Nội vụ (M8.6): xin ảnh chụp mới (lúc mở tab, khi qua mốc đặt lại trong ngày), nhận / trả nhiệm vụ tông, mua ở cửa hàng tông */
   onSectHallGet?: () => void;
+  /** Bảng Xã hội (M9.6): xin một bảng xếp hạng (máy chủ trả tin `boards`) */
+  onBoardsGet?: (board: BoardId) => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
   onSectShopBuy?: (itemId: string, qty?: number) => void;
@@ -489,6 +496,142 @@ function renderSocialTabs() {
     $(`social-tab-${t.id}`).hidden = !on;
   }
 }
+// Tab Xếp hạng (M9.6, #1025): bốn bảng, mỗi bảng giữ bản MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (chỉ để đo khoảng trôi của "tuổi bản chụp")
+let socialBoard: BoardId = BOARD_IDS[0];
+const socialBoards = new Map<
+  BoardId,
+  { msg: NonNullable<ReturnType<typeof sanitizeBoardsMsg>>; at: number }
+>();
+/** Lần xin gần nhất của từng bảng (đồng hồ máy khách): không xin lại trong `BOARD_ASK_GAP_MS`; quá `BOARD_WAIT_MS` chưa thấy trả lời thì hiện nút "Tải lại". */
+const socialBoardAsked = new Map<BoardId, number>();
+const BOARD_ASK_GAP_MS = 20_000;
+const BOARD_WAIT_MS = 6_000;
+let socialBoardTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSocialBoardTimer() {
+  if (socialBoardTimer !== null) {
+    clearTimeout(socialBoardTimer);
+    socialBoardTimer = null;
+  }
+}
+
+/** Xin bảng `board` từ máy chủ (bỏ qua nếu vừa xin chưa lâu và đã có bản; `force` = bấm "Tải lại"). Có hẹn giờ để hiện nút thử lại nếu máy chủ im. */
+function requestSocialBoard(board: BoardId, force = false) {
+  const now = performance.now();
+  const last = socialBoardAsked.get(board);
+  if (!force && last !== undefined && now - last < BOARD_ASK_GAP_MS && socialBoards.has(board))
+    return;
+  socialBoardAsked.set(board, now);
+  callbacks?.onBoardsGet?.(board);
+  clearSocialBoardTimer();
+  if (!socialBoards.has(board)) {
+    socialBoardTimer = setTimeout(() => {
+      socialBoardTimer = null;
+      if (socialModalOpen && socialTab === "rank") renderSocialRank();
+    }, BOARD_WAIT_MS + 50);
+  }
+}
+
+/** Vẽ tab Xếp hạng: thanh tab phụ, câu "Hạng của bạn", bảng (đạo hiệu / danh hiệu / cột theo `BOARD_COLUMNS`), tuổi bản chụp, trạng thái tải / trống. Đổ chữ bằng `textContent`. */
+function renderSocialRank() {
+  for (const id of BOARD_IDS) {
+    const on = id === socialBoard;
+    const btn = $(`social-board-btn-${id}`);
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.tabIndex = on ? 0 : -1;
+  }
+  $("social-board-panel").setAttribute("aria-labelledby", `social-board-btn-${socialBoard}`);
+  const entry = socialBoards.get(socialBoard);
+  const status = $("social-board-status");
+  const wrap = $("social-board-wrap");
+  const retry = $("social-board-retry");
+  const mine = $("social-board-mine");
+  const age = $("social-board-age");
+  if (!entry) {
+    const asked = socialBoardAsked.get(socialBoard);
+    const stale = asked !== undefined && performance.now() - asked >= BOARD_WAIT_MS;
+    status.hidden = false;
+    status.textContent = stale
+      ? "Chưa nhận được bảng. Thử tải lại nhé."
+      : `Đang tải bảng ${BOARD_LABELS[socialBoard]}…`;
+    wrap.hidden = true;
+    retry.hidden = !stale;
+    mine.textContent = "";
+    age.textContent = "";
+    return;
+  }
+  const v = boardView(entry.msg, performance.now() - entry.at);
+  retry.hidden = true;
+  mine.textContent = v.mineText;
+  const ageLine = v.ageText ? v.ageText.charAt(0).toUpperCase() + v.ageText.slice(1) + ". " : "";
+  age.textContent = v.empty ? "" : `${ageLine}${REFRESH_NOTE}`;
+  status.hidden = !v.empty;
+  status.textContent = v.empty ? "Chưa có ai trên bảng này." : "";
+  wrap.hidden = v.empty;
+  const head = $("social-board-head");
+  head.textContent = "";
+  const th = (t: string, cls: string) => {
+    const e = document.createElement("th");
+    e.scope = "col";
+    e.textContent = t;
+    e.className = cls;
+    head.appendChild(e);
+  };
+  th("Hạng", "c-rank");
+  th(v.board === "tongmon" ? "Tông môn" : "Đạo hiệu", "c-name");
+  for (const c of v.columns) th(c, "c-num");
+  $("social-board-caption").textContent = `${v.label}: ${v.rows.length} dòng đầu bảng`;
+  const body = $("social-board-body");
+  body.textContent = "";
+  const addRow = (r: (typeof v.rows)[number], extra = "") => {
+    const tr = document.createElement("tr");
+    tr.className = `${r.mine ? "mine" : ""} ${extra}`.trim();
+    const rank = document.createElement("td");
+    rank.className = "c-rank";
+    rank.textContent = String(r.rank);
+    const name = document.createElement("td");
+    name.className = "c-name";
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = r.name;
+    name.appendChild(n);
+    if (r.title) {
+      const t = document.createElement("span");
+      t.className = "t";
+      t.textContent = r.title;
+      name.appendChild(t);
+    }
+    if (r.test) {
+      const t = document.createElement("span");
+      t.className = "test";
+      t.textContent = "thử nghiệm";
+      name.appendChild(t);
+    }
+    tr.append(rank, name);
+    for (const c of r.cells) {
+      const td = document.createElement("td");
+      // ô SỐ ("40.000", "—") không xuống dòng; ô CHỮ nhiều từ (tên cảnh giới) xuống dòng ở khoảng trắng
+      td.className = /\s/.test(c) ? "c-num" : "c-num nw";
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  };
+  for (const r of v.rows) addRow(r);
+  if (v.mineRow) {
+    const gap = document.createElement("tr");
+    gap.className = "gap";
+    const td = document.createElement("td");
+    td.colSpan = 2 + v.columns.length;
+    td.textContent = "…";
+    td.setAttribute("aria-hidden", "true");
+    gap.appendChild(td);
+    body.appendChild(gap);
+    addRow(v.mineRow, "outside");
+  }
+}
+
 // ---- Nội vụ tông môn (M8.6, #843) ----
 /** Ảnh chụp "Nội vụ" MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (để đếm ngược theo giờ máy chủ); `null` = chưa có. */
 let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: number } | null = null;
@@ -3856,6 +3999,15 @@ export const ui = {
     bindTap("social-close", () => this.toggleSocialModal(false));
     for (const t of SOCIAL_TABS)
       bindTap(`social-tab-btn-${t.id}`, () => this.switchSocialTab(t.id));
+    for (const id of BOARD_IDS) bindTap(`social-board-btn-${id}`, () => this.switchSocialBoard(id));
+    bindTap("social-board-retry", () => requestSocialBoard(socialBoard, true));
+    $("social-board-tabs").addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const next = tabByKey(BOARD_IDS, socialBoard, e.code);
+      if (next === null) return;
+      e.preventDefault();
+      this.switchSocialBoard(next, true);
+    });
     // Mũi tên / Home / End trên thanh tab (WAI-ARIA tablist): đổi tab VÀ chuyển focus theo; `preventDefault` để bộ nghe phím ở `window`
     // (`handlePanelKey`, chuyển focus theo hình học) bỏ qua, nếu không tab có `tabindex=-1` bị nhảy qua.
     $("social-tabs").addEventListener("keydown", (e) => {
@@ -6374,12 +6526,15 @@ export const ui = {
       $("btn-social").setAttribute("aria-expanded", "true");
       modalStack.push("social-modal", $("btn-social"));
       renderSocialTabs();
+      renderSocialRank();
+      if (socialTab === "rank") requestSocialBoard(socialBoard);
       focusModal($("social-modal"));
     } else {
       $("social-modal").hidden = true;
       $("btn-social").classList.remove("active");
       $("btn-social").setAttribute("aria-expanded", "false");
       modalStack.remove("social-modal");
+      clearSocialBoardTimer();
       returnFocus($("btn-social"));
     }
   },
@@ -6392,7 +6547,34 @@ export const ui = {
   switchSocialTab(tab: string, focus = false) {
     socialTab = asSocialTab(tab);
     renderSocialTabs();
+    if (socialTab === "rank" && socialModalOpen) {
+      renderSocialRank();
+      requestSocialBoard(socialBoard);
+    }
     if (focus) $(`social-tab-btn-${socialTab}`).focus();
+  },
+
+  /** Đổi bảng xếp hạng (tab phụ). Id lạ bị bỏ qua. `focus` = đưa focus về nút tab (đổi bằng mũi tên). */
+  switchSocialBoard(board: string, focus = false) {
+    const id = asBoardId(board);
+    if (id === null) return;
+    socialBoard = id;
+    renderSocialRank();
+    if (socialModalOpen && socialTab === "rank") requestSocialBoard(id);
+    if (focus) $(`social-board-btn-${id}`).focus();
+  },
+
+  getSocialBoard(): BoardId {
+    return socialBoard;
+  },
+
+  /** Nhận tin `boards` từ máy chủ (M9.6): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Xếp hạng. Tin sai kiểu bị bỏ, không sập. */
+  setBoards(raw: unknown) {
+    const msg = sanitizeBoardsMsg(raw);
+    if (msg === null) return;
+    socialBoards.set(msg.board, { msg, at: performance.now() });
+    if (msg.board === socialBoard) clearSocialBoardTimer();
+    if (socialModalOpen && socialTab === "rank") renderSocialRank();
   },
 
   getSocialTab(): SocialTabId {
