@@ -30,6 +30,8 @@ import type {
   NetShieldMsg,
   SectMsg,
   SectPresenceMsg,
+  AmbushOfferMsg,
+  AmbushEndMsg,
 } from "@tien-gioi/shared";
 import type { WorldState, Player } from "./schema";
 import type { SavedPlayer, QuestSave, LifeCounters, LimboRecord } from "./store";
@@ -56,6 +58,7 @@ import type { Bolt } from "./systems/bolt";
 import type { BossCtrl } from "./systems/boss-state";
 import type { NavCtrl } from "./systems/nav-chase";
 import type { TreasureRt } from "./systems/treasure";
+import type { AmbushCtrl, AmbushRuntime } from "./systems/ambush";
 
 /** Dữ liệu riêng của server cho mỗi người chơi (không gửi xuống client). */
 export interface PlayerCtrl {
@@ -150,6 +153,12 @@ export interface PlayerCtrl {
   sectBuff?: SectBuff;
   /** Dữ liệu chạy của pháp bảo đang mặc (M7.4, `systems/treasure.ts`): đồng hồ khiên, chỗ đứng yên. Chỉ có khi đang có pháp bảo tác dụng. */
   treasure?: TreasureRt;
+  /** Phiên bản giao thức client khai lúc vào phòng (`JoinOptions.v`); `undefined` = client chưa khai (coi là 0). Chặn đường chỉ kích hoạt khi `>= AMBUSH_MIN_PROTOCOL`. */
+  proto?: number;
+  /** Lần gần nhất người này GÂY sát thương cho quái (`w.now`, `dealMonsterDamage`): chặn đường coi "đang đánh" trong `AMBUSH_CALM_MS`. */
+  lastDealtAt?: number;
+  /** Chặn đường (mục 52, `systems/ambush.ts`): quãng đi, hồi, hộp thoại đang mở. Dựng lười khi `World.ambush` bật; tính năng tắt thì không có. */
+  ambush?: AmbushCtrl;
 }
 
 /** Dữ liệu riêng của server cho mỗi món đồ rơi. */
@@ -268,6 +277,10 @@ export interface WorldEvents {
   sectHall(sessionId: string, msg: SectHallMsg): void;
   /** Hộ thể sau nối lại / có tin lại sau im lặng / được tha chết do mạng (mục 33; chỉ chủ nhân vật nhận). */
   netShield(sessionId: string, msg: NetShieldMsg): void;
+  /** Hộp thoại gặp chặn đường (mục 52; chỉ người bị chặn nhận). Gửi lại cùng `id` sau khi nối lại mạng là bản cập nhật. */
+  ambushOffer(sessionId: string, msg: AmbushOfferMsg): void;
+  /** Kết cục chặn đường (mục 52; chỉ người bị chặn nhận). */
+  ambushEnd(sessionId: string, msg: AmbushEndMsg): void;
 }
 
 export class World {
@@ -374,6 +387,11 @@ export class World {
    * Không có hook: coi như đã lưu (bench, test đơn vị không có đĩa).
    */
   onSaveNow: ((sid: string) => Promise<boolean>) | null = null;
+  /**
+   * Gặp chặn đường (mục 52, `systems/ambush.ts`): cấu hình chạy của phòng. `null` = TẮT (MẶC ĐỊNH: bản chạy thật không đổi cho tới nghiệm thu CD10; mọi hàm của system thoát ngay,
+   * đường nóng không tốn gì). `WorldRoom` đặt từ `AMBUSH` (`server/src/systems/ambush-config.ts`); test đơn vị dựng bằng `createAmbushRuntime`.
+   */
+  ambush: AmbushRuntime | null = null;
   /** Nhật ký kiểm toán (`server/src/audit.ts`): `WorldRoom` đặt; null (test, bench) = không ghi. Chỉ gọi khi có sự kiện nhạy cảm, không trong tick nóng. */
   audit: AuditFn | null = null;
   /** Đổi ví từ ngần này trở lên (cộng hoặc trừ) thì ghi `wallet.big`. Infinity = không ghi. */
@@ -396,11 +414,14 @@ export class World {
     this.hub.worlds.delete(this);
   }
 
-  /** Người chơi còn sống và đang trong phòng; null nếu không. */
+  /**
+   * Người chơi còn sống và đang trong phòng; null nếu không. Đang mở hộp thoại chặn đường (mục 52) cũng là `null`: nhân vật bị KHOÁ (không đánh, dùng chiêu / đan, nhặt, qua cổng,
+   * mở bí cảnh... trong tối đa `AMBUSH_OFFER_MS`); `systems/ambush.ts` tự tra `state` / `ctrl` nên vẫn nhận được lựa chọn.
+   */
   ready(sessionId: string): { p: Player; c: PlayerCtrl } | null {
     const p = this.state.players.get(sessionId);
     const c = this.ctrl.get(sessionId);
-    if (!p || !c || p.dead) return null;
+    if (!p || !c || p.dead || c.ambush?.offer !== undefined) return null;
     return { p, c };
   }
 }

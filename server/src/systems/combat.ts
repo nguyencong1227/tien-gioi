@@ -112,6 +112,10 @@ export function dealMonsterDamage(
   if (mc.boss) dmg = Math.max(1, Math.round(dmg * bossArmorMult(mc, w.now))); // giáp của trùm (`buff`, mục 42)
   mon.hp = Math.max(0, mon.hp - dmg);
   if (by) mc.damageBy.set(by, (mc.damageBy.get(by) ?? 0) + dmg);
+  if (aggro && by) {
+    const bc = w.ctrl.get(by);
+    if (bc) bc.lastDealtAt = w.now; // chặn đường (mục 52): vừa đánh thì chưa bị chặn
+  }
   if (aggro && by && !isEvading(w, mc)) mc.target = by; // đang rút về chỗ sinh (mục 48): không bị đòn đánh kéo lại
   w.events.dmg({ target: id, amount: dmg, x: mon.x, y: mon.y - 18, crit });
   if (mon.hp <= 0) killMonster(w, id, mc);
