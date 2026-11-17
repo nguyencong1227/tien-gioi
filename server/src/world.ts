@@ -57,6 +57,7 @@ import { Duels } from "./systems/duel";
 import { TickStats } from "./metrics";
 import type { Bolt } from "./systems/bolt";
 import type { PBolt } from "./systems/pbolt";
+import type { PObj } from "./systems/objects";
 import type { Windup } from "./systems/windup";
 import type { BossCtrl } from "./systems/boss-state";
 import type { NavCtrl } from "./systems/nav-chase";
@@ -333,6 +334,10 @@ export class World {
   readonly bolts: Bolt[] = [];
   /** Đạn của NGƯỜI CHƠI đang bay (mục 51, CT3, `systems/pbolt.ts`): KHÔNG là state; tối đa `MAX_PLAYER_BOLTS` mỗi phòng, `MAX_PLAYER_BOLTS_PER_PLAYER` mỗi người; client chỉ nhận `fx` `pbolt` từng đoạn. */
   readonly pbolts: PBolt[] = [];
+  /** Vật thể BỀN của người chơi (mục 51, CT4, `systems/objects.ts`): vùng / bẫy / hào quang / tượng; KHÔNG là state; theo thứ tự dựng (cũ nhất trước); trần `persistPerPlayerMax` mỗi người, `persistPerRoomMax` mỗi phòng. */
+  readonly objs: PObj[] = [];
+  /** Bộ đếm `id` vật thể bền, tăng dần THEO PHÒNG (client ghép `fxEnd` với `fx` dựng bằng id này). */
+  objSeq = 0;
   monsterSeq = 0;
   lootSeq = 0;
   /** Số tick đã chạy (dùng chia nhịp ghi px, py) */

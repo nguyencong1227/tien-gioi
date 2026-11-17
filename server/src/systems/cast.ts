@@ -27,6 +27,7 @@ import { rollDamage } from "./damage";
 import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
 import { fireBolts } from "./pbolt";
+import { isPersistShape, placeObject } from "./objects";
 import { beginWindup, windupMsOf } from "./windup";
 import { syncPublicPos } from "./movement";
 import { cdrNow, creditMastery, sendSkills } from "./skills";
@@ -381,8 +382,8 @@ function release(w: World, sid: string, def: SkillDef, level: number, angle: num
       hits.push(...ch.hits);
       if (ch.hits.length > 0)
         w.events.fx({ kind: "chain", by: sid, skill: def.id, x: x0, y: y0, pts: ch.pts });
-    } else if (def.shape === "bolt") {
-      // ĐẠN BAY (CT3): không có mục tiêu tức thời, sát thương tới đúng lúc đạn chạm (`tickPBolts`)
+    } else if (def.shape === "bolt" || isPersistShape(def.shape)) {
+      // ĐẠN BAY (CT3) / VẬT THỂ BỀN (CT4): không có mục tiêu tức thời, sát thương tới sau (`tickPBolts` / `tickObjects`)
     } else {
       w.state.monsters.forEach((mon, id) => {
         const mc = w.mctrl.get(id);
@@ -398,6 +399,12 @@ function release(w: World, sid: string, def: SkillDef, level: number, angle: num
     }
     const sk: StrikeCtx = { atk, crit: st.crit, mult, amp, credited: false };
     for (const h of hits) strikeMonster(w, sid, def, sk, h.id, h.n, h.scale, x0, y0);
+    if (isPersistShape(def.shape)) {
+      // CT4: dựng vùng / bẫy / hào quang / tượng; mỗi lần tác dụng đi CÙNG `strikeMonster` với chiêu tức thời (chỉ đánh quái, PK không)
+      placeObject(w, sid, def, x0, y0, angle, (id, fx, fy) =>
+        strikeMonster(w, sid, def, sk, id, 1, 1, fx, fy),
+      );
+    }
     if (def.shape === "bolt") {
       // CT3: quy hoạch đường bay + hẹn giờ trúng từng quái / đối thủ; trúng đòn nào thì đi CÙNG `strikeMonster` / `opponentAftermath` với chiêu tức thời
       fireBolts(w, sid, def, x0, y0, angle, {
@@ -407,7 +414,12 @@ function release(w: World, sid: string, def: SkillDef, level: number, angle: num
         },
       });
     }
-    if (def.shape !== "dash" && def.shape !== "bolt" && w.duels.active)
+    if (
+      def.shape !== "dash" &&
+      def.shape !== "bolt" &&
+      !isPersistShape(def.shape) &&
+      w.duels.active
+    )
       castAtOpponent(w, sid, def, x0, y0, angle, mult);
   }
 
