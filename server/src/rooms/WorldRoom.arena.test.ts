@@ -389,6 +389,7 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     const sid = h.room.sessionId;
     await waitFor(() => h.states[0], 3000, "nhận ambushState");
     const deadline0 = w.arena.deadline;
+    w.arena.nextStateAt = w.now + 600_000; // state định kỳ không tới trong lúc đo: chỉ tin GỬI LẠI khi nối lại mới đưa state tới ngay
     w.arena.ticket.expiresAt = 0; // hạn VÀO phòng đã qua từ lâu: phòng đã có người nên KHÔNG được đóng chỉ vì hạn đó khi người chơi rớt mạng
     (h.room.connection.transport as any).ws.close();
     await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
