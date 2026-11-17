@@ -120,6 +120,33 @@ describe("mỗi luật ĐỎ khi dữ liệu bị phá (trùm giả)", () => {
     expect(bossBalanceViolations([fakeBoss({ dmgMult: 0.5 })])).toEqual([]);
   });
 
+  it("ranh giới 55%: ~49% sạch, ~56% vi phạm (khí huyết đúng bậc của Xích Mãng 1.147, công 140)", () => {
+    // 140 x 4,0 = 560 = 48,8%; 140 x 4,6 = 644 = 56,1%
+    expect(
+      bossBalanceViolations([fakeBoss({ dmgMult: 4.0 })]).some((x) => x.includes("vong")),
+    ).toBe(false);
+    expect(
+      bossBalanceViolations([fakeBoss({ dmgMult: 4.6 })]).some((x) => x.includes("vong")),
+    ).toBe(true);
+  });
+
+  it("hệ số công LỚN NHẤT của các giai đoạn dùng chiêu được tính (giai đoạn sau nặng hơn thì chiêu bị bắt)", () => {
+    const d = fakeBoss({ dmgMult: 3.5, atkMult: 1 }); // giai đoạn đầu 140 x 3,5 = 490 (43%): sạch
+    d.phases.push({
+      id: "p1",
+      fromHp: 0.5,
+      speedMult: 1,
+      atkMult: 1.4, // giai đoạn sau 140 x 1,4 x 3,5 = 686 (60%): vi phạm
+      cdMult: 1,
+      castGapMs: 800,
+      abilities: ["vong"],
+    });
+    const h = hitFractions(d)[0]!;
+    expect(h.phase).toBe("p1");
+    expect(h.dmg).toBe(Math.round(140 * 1.4 * 3.5));
+    expect(bossBalanceViolations([d]).some((x) => x.includes("giai đoạn p1"))).toBe(true);
+  });
+
   it("vùng quá rộng so với báo trước (bot né hoàn hảo KHÔNG thoát kịp) bị bắt, dù đòn nhẹ", () => {
     // r 400 px / 150 px/giây = 2,7 s > báo trước 0,9 s - phản xạ 0,4 s: né hoàn hảo cũng trúng
     const v = bossBalanceViolations([fakeBoss({ r: 400, telegraphMs: 900, dmgMult: 0.3 })]);
