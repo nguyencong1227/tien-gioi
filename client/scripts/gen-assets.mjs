@@ -1006,6 +1006,12 @@ const BOOKS = {
   kinh_bach_thu_khieu_phong: [0x5fb89a, 0xe6fff6],
   kinh_minh_vu_lac_hon: [0x3f2a5e, 0xc9a8e6],
   kinh_phuong_minh_cau_hoang: [0xd9433b, 0xffe0a8],
+  // Vô sắc (CT8 lát 3, A): bìa xám trắng, không dấu
+  kinh_huyet_anh_xuyen_tam: [0x8a8f98, 0xe8ecf2],
+  kinh_su_tu_hong: [0x9a9288, 0xf0e8d8],
+  kinh_cam_long_khau: [0x7d8590, 0xdde4ec],
+  kinh_hoa_huyet_phe_nguyen: [0x8c7f88, 0xeadde6],
+  kinh_long_tuong_ho_the: [0xa89c78, 0xf4ecd0],
 };
 
 /**
