@@ -1973,3 +1973,21 @@ Cách chạy:
 npm run build -w client
 npm run e2e:chieu-dau -w server
 ```
+
+## 36. E2E thật chiêu vận tia / kéo / hộ thể (CT8 lát 3, #1053; `npm run e2e:chieu-vo-sac -w server`)
+
+Năm chiêu VÔ SẮC của CT8 lát 3 dùng LẦN ĐẦU ba cơ chế: chiêu vận trên hình `line` (Huyết Ảnh Xuyên Tâm), kéo `displace pull` (Cầm Long Khấu) và hộ thể `shield` (Long Tượng Hộ Thể). Máy chủ Colyseus thật + Chrome + phím thật (L U I), nhân vật Nguyên Anh hậu kỳ, quái Linh Thố choáng làm bao cát cách 100 px.
+
+| Ca | Quan sát |
+|---|---|
+| chiêu vận tia | `fx cast` có vòng tụ khí (WindupLayer) ngay khi nhận, tiến độ TĂNG, CHƯA sát thương lúc vận (khẳng định chỉ khi đồng hồ thật < 1100 ms kể từ lúc gửi phím), hết vận đòn đáp (quái mất máu), vòng tắt |
+| kéo | quái bị kéo lại gần 60 px (cách 82 -> 23 px: dừng sát người); client vẽ quái ở chỗ mới (khớp máy chủ trong 30 px) |
+| hộ thể | máy chủ có `shield`; client hiện huy hiệu `[data-status="shield"]`; khiên `round(0,3 x maxHp)` (944) hấp thụ đòn 300 (không mất máu), tổng 2300 chỉ mất phần vượt khiên (1356); đối chứng: chưa khiên thì 300 trừ đúng 300 |
+
+Kết quả: cả ba cơ chế đúng, không phát hiện lỗi; 5 / 5 lần chạy liền đạt. Đột biến (cây thật, `git checkout --` sau mỗi lần): bỏ `windupMs` của Huyết Ảnh ĐỎ ca vận ('đang vận: CHƯA có sát thương'); kéo -> đẩy ĐỎ ca kéo; khiên không hấp thụ (`take = 0`) ĐỎ ca hộ thể; client không vẽ vòng vận khí (`windups.begin` bỏ) ĐỎ 'vòng tụ khí hiện NGAY'. Sát thương của khiên đo bằng `hurtPlayerDot` (hàm thật của máy chủ, không giết người) để tất định, không cần quái đánh. Bậc đồ hoạ ghim `tg_quality=high` (`E2E_QUALITY`).
+
+Cách chạy:
+```bash
+npm run build -w client
+npm run e2e:chieu-vo-sac -w server
+```
