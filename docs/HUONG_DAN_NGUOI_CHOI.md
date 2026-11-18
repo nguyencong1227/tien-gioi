@@ -124,6 +124,8 @@ Mỗi chiêu có **phẩm cấp**: **Hoàng, Huyền, Địa, Thiên** (từ th�
 |---|---|---|---|---|
 | Tầng tối đa | 3 | 4 | 5 | 6 |
 
+**18 chiêu cũ** (có từ trước đợt chiêu mới) chưa khai phẩm riêng nên **luôn tối đa tầng 3**, dù bảng Công pháp có thể hiện phẩm suy từ độ hiếm của kinh quyển; tầng 4-6 chỉ dành cho chiêu mới có phẩm Huyền, Địa hoặc Thiên.
+
 Có hai cách lên tầng:
 
 - **Đọc thêm kinh quyển trùng** (nhặt được khi hạ quái, bán và mua được): mỗi quyển trùng nâng một tầng, tới tầng tối đa.
