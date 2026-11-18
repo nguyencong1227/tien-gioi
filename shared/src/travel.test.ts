@@ -51,7 +51,7 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
     expect(TRAVEL_JOIN_TIMEOUT_MS).toBeGreaterThan(TRAVEL_COOLDOWN_MS);
   });
 
-  it("npcsOfMap: NPC không ghi mapId thuộc Lạc Hà; Hắc Phong Cốc có đúng lái buôn Thanh Lộ; Âm Sương Trạch có ba NPC Vọng Sương; Hàn Vân Lĩnh có ba NPC Hàn Vân; id lạ rỗng", () => {
+  it("npcsOfMap: NPC không ghi mapId thuộc Lạc Hà; Hắc Phong Cốc có lái buôn + trạm úy Thanh Lộ (D7 #755); Âm Sương Trạch có ba NPC Vọng Sương; Hàn Vân Lĩnh có ba NPC Hàn Vân; id lạ rỗng", () => {
     expect(npcsOfMap(DEFAULT_MAP_ID)).toEqual(NPCS.filter((n) => n.mapId === undefined));
     expect(npcsOfMap(DEFAULT_MAP_ID).map((n) => n.id)).toEqual([
       "truong_tran",
@@ -62,7 +62,7 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       "lao_dan", // Lò đan (nghề nhỏ lát 1, #763): NPC trạm alchemy ở Lạc Hà Trấn
       "lao_phu", // Bàn phù (nghề nhỏ lát 2, #817): NPC trạm talisman ở Lạc Hà Trấn
     ]);
-    expect(npcsOfMap(HAC_PHONG_ID).map((n) => n.id)).toEqual(["lai_buon"]);
+    expect(npcsOfMap(HAC_PHONG_ID).map((n) => n.id)).toEqual(["lai_buon", "tran_uy"]); // D7 #755: thêm trạm úy giao việc hằng ngày
     expect(npcsOfMap(AM_SUONG_ID).map((n) => n.id)).toEqual([
       "tram_truong",
       "lai_buon_suong",
