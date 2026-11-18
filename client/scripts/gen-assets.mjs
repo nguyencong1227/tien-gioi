@@ -993,6 +993,13 @@ const BOOKS = {
   kinh_thiem_to_cong: [0x6fae5a, 0xd8ecc0],
   kinh_doan_truong_chi_phap: [0x3f7a44, 0xb4dca0],
   kinh_kho_moc_phung_xuan_quyet: [0x7ab866, 0xe0f0cc],
+  // Hỏa / Băng / Âm / Lôi / Phong (CT8 lát 1, A): bìa theo hệ, không dấu để tránh chữ
+  kinh_liet_diem_chuong: [0xd9433b, 0xffd0a0],
+  kinh_xich_tuoc_phu: [0xc8352c, 0xffe0a8],
+  kinh_han_bang_nhat_chuong: [0x6fb8e8, 0xe6f6ff],
+  kinh_minh_anh_phuc_chuong: [0x4a2f6a, 0xc9a8e6],
+  kinh_loi_dinh_nhat_miet: [0xe0c850, 0xfff6b0],
+  kinh_hoi_phong_lien_chuong: [0x6fc0a8, 0xe6fff6],
 };
 
 /**
