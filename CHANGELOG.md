@@ -2,9 +2,20 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
-## [Chưa phát hành] — sau v0.5.1
+## [0.5.2] — 18/11/2026: sửa lỗi gấp "nhân vật mới không đầu thai được"
+
+Bản vá nhỏ sau v0.5.1 (QUYET_DINH_M3 mục 58); không đổi giao thức (`PROTOCOL_VERSION` giữ 6) hay định dạng lưu.
+
+- **Sửa lỗi gấp (người dùng báo trên bản thật): nhân vật MỚI (`hanh`, `hanh1`: kiếp 1, Phàm Nhân) chết xong bấm Đầu thai chỉ thấy một thông báo hiện rồi tắt, không đầu thai được.** Khảo sát CSDL bản thật (chỉ đọc): kẹt đúng 2 người, cả hai ở Hoàng Tuyền với Duyên đã cộng, kiếp không tính (chưa chơi phút nào), chân linh trắng; log có `soul.limbo` nhưng không có `soul.rebirth` và không lỗi nào. **NGUYÊN NHÂN CHÍNH XÁC CHƯA TÁI HIỆN ĐƯỢC:** test tích hợp mới (nhân vật mới chết ngay, `ACHIEVEMENTS` bật, thoát rồi vào lại giữa Hoàng Tuyền) và `e2e` client THẬT trong Chrome với hồ sơ gieo giống `hanh` đều đầu thai được với tin chuẩn của client; nghi ngờ mạng chập chờn làm tin lạc (cả hai tài khoản có nhiều `net.drop` ngắn), nên bản này làm cho mọi đường đi tới đầu thai bền hơn và để lại dấu vết chẩn đoán:
+  - **Máy chủ khoan dung** (`server/src/systems/rebirth-choice.ts`): lựa chọn đầu thai sai / vượt ô (giữ quá số ô Ký vật, món không có, xuất thân chưa mở, chiêu khắc sai) KHÔNG còn bị từ chối cả yêu cầu: chỉ bỏ phần sai rồi vẫn đầu thai, kèm toast "Đầu thai: ..." báo phần đã bỏ. Chiêu khắc sai thì bỏ CẢ phần khắc và giữ nguyên chân linh (không xoá nhầm chiêu đã khắc). Kết quả luôn qua được luật `validateRebirth`.
+  - **Client chỉ gửi phần hợp lệ** (`client/src/limbo-choice.ts`): giữ đồ / chiêu khắc / xuất thân được kẹp theo chân linh và danh sách máy chủ gửi.
+  - **Màn Hoàng Tuyền không tự đóng khi chưa đầu thai được và nói rõ lý do:** lời trả lời của máy chủ (toast 3 giây rồi tắt) nay hiện BỀN thành một dòng ngay trong màn; máy chủ im lặng quá 4 giây (mạng chập chờn, tin lạc) thì hiện "Chưa nhận được phản hồi của máy chủ ... bấm lại để đầu thai" và mở khoá nút.
+  - **Nhật ký kiểm toán để biết lần sau vì sao kẹt:** `soul.rebirth_trim` (phần bị bỏ) và `soul.rebirth_fail` (`no_limbo`, `not_credited`, `engrave_write_failed`; mỗi lý do một lần mỗi người).
+  - Test: `rebirth-choice.test.ts` (12 ca; đột biến bỏ kẹp ô giữ / nhận xuất thân chưa mở / bỏ qua chiêu sai đều làm đỏ), ca tích hợp nhân vật mới tinh + ca khoan dung (`WorldRoom.test.ts`), `limbo-choice.test.ts` (7 ca), `e2e` kịch bản `E2E_LIMBO_MOI=1` (Chrome thật), `check-limbo-confirm` bước 8 (dòng lý do, 5 khung nhìn).
+- **Triển khai:** giữ nguyên mọi cờ `.env.production`. Rollback về v0.5.1 an toàn (dữ liệu lưu không đổi). Hai người đang kẹt (`hanh`, `hanh1`) cần tải lại trang (Ctrl+F5) để nhận bản mới rồi bấm Đầu thai.
 
 ### Công cụ và tài liệu
+- **`WorldRoom.world-boss.test.ts` hết đỏ mãi từ 11:00 ngày 18/11 (A):** hai ca của tệp dùng giờ giả CỐ ĐỊNH 18/11/2026 11:00; từ lúc giờ thật qua mốc đó, giờ giả nằm trong QUÁ KHỨ nên bộ lập lịch coi là "đồng hồ đi lùi" và hai ca đỏ mãi (kể cả `release.yml`, sẽ chặn phát hành). Nay ngày giả luôn là đầu ngày thứ ba kể từ lúc chạy test (luôn ở tương lai).
 - **`e2e:nhip-tim` ngưỡng RTT theo NỀN đo được (nightly thủ công `e2e.yml` trên main 18/11: đỏ cả hai lần thử; chỉ test, KHÔNG đổi mã trò chơi) (B):** #1160 hạ kỳ vọng nền từ 40 xuống 120 ms vì runner CI đo 42 ms, nhưng nền DAO ĐỘNG theo lần chạy: lần này đo **116 ms** (sát trần 120) nên ca 7 hết giờ ở 'RTT về nhỏ sau khi bỏ độ trễ', và lần thử kế đỏ ở ca 6 (dải 'Mất kết nối' hiện chậm hơn 4 s). Nay: (a) trần nền 400 ms; (b) trần RTT sau khi đặt trễ 80 ms = `max(320, nền + 260)`; (c) 650-1400; (d) quay về `max(120, nền x 1,6 + 40)`, sàn vùng báo 750 (bù kẹp 250 ms) thay vì 800; ca 6 chờ dải 5,5 s thay vì 4 s (socket chỉ chết sau 8 s im lặng, kiểm ngay sau). Tái hiện bằng núm `E2E_NEN_MS`: bản CŨ + 60 (nền ~125 ms) đỏ đúng 'RTT đo được trên đường cục bộ'; bản mới đạt ở 0, 60 và 100 (nền ~210 ms).
 
 ## [0.5.1] — 18/11/2026: 53 chiêu thức (23 chiêu mới, phủ đủ ngũ hành + vô sắc)
