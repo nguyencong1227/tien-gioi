@@ -2,6 +2,11 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — sau v0.5.1
+
+### Công cụ và tài liệu
+- **`e2e:nhip-tim` ngưỡng RTT theo NỀN đo được (nightly thủ công `e2e.yml` trên main 18/11: đỏ cả hai lần thử; chỉ test, KHÔNG đổi mã trò chơi) (B):** #1160 hạ kỳ vọng nền từ 40 xuống 120 ms vì runner CI đo 42 ms, nhưng nền DAO ĐỘNG theo lần chạy: lần này đo **116 ms** (sát trần 120) nên ca 7 hết giờ ở 'RTT về nhỏ sau khi bỏ độ trễ', và lần thử kế đỏ ở ca 6 (dải 'Mất kết nối' hiện chậm hơn 4 s). Nay: (a) trần nền 400 ms; (b) trần RTT sau khi đặt trễ 80 ms = `max(320, nền + 260)`; (c) 650-1400; (d) quay về `max(120, nền x 1,6 + 40)`, sàn vùng báo 750 (bù kẹp 250 ms) thay vì 800; ca 6 chờ dải 5,5 s thay vì 4 s (socket chỉ chết sau 8 s im lặng, kiểm ngay sau). Tái hiện bằng núm `E2E_NEN_MS`: bản CŨ + 60 (nền ~125 ms) đỏ đúng 'RTT đo được trên đường cục bộ'; bản mới đạt ở 0, 60 và 100 (nền ~210 ms).
+
 ## [0.5.1] — 18/11/2026: 53 chiêu thức (23 chiêu mới, phủ đủ ngũ hành + vô sắc)
 
 Bản nhỏ sau v0.5.0, chỉ thêm **nội dung chiêu thức** và kiểm tra; không đổi giao thức hay định dạng lưu. Phần dưới là TÓM TẮT cho người quyết định; chi tiết từng PR nằm ở các mục bên dưới.
