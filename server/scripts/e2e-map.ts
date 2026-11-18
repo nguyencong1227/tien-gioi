@@ -600,7 +600,14 @@ async function main() {
             const px = (i / 4) % W, py = Math.floor(i / 4 / W), tx = Math.floor((wv.x + (px * wv.width) / W) / 32), ty = Math.floor((wv.y + (py * wv.width) / W) / 32);
             if (tx >= 0 && ty >= 0 && tx < m.def.w && ty < m.def.h && m.tiles[ty * m.def.w + tx] === 3) n++; }
           resolve(n); })); })`) as Promise<number>;
-    const wCtl = Number(await waterDiff(true, true));
+    // Đối chứng phải đo LÚC CẢNH ĐÃ YÊN: sau khi đổi bậc / đặt camera, cảnh còn nhiễu thoáng qua rồi lắng dần (đo thật: cả khung hàng nghìn điểm ảnh, trong ô nước
+    // 500-1200 rồi giảm về < 100; dưới tải mất 6-7 giây, lần chạy xấu nhất đo 12 lần) nên MỘT lần đo đôi khi vọt qua 400 (nightly 17/11: 703 ở lần thử 1; máy nhà dưới tải ~3 / 22 lần).
+    // Chờ theo điều kiện: đo lại (cách 300 ms, tối đa 30 lần) tới khi < 400. Phép đo CHÍNH (bật / tắt nước) vẫn đòi > 400 và gấp 3 lần đối chứng, không nới tiêu chuẩn.
+    let wCtl = Number.POSITIVE_INFINITY;
+    for (let k = 0; k < 30 && !(wCtl < 400); k++) {
+      if (k > 0) await sleep(300);
+      wCtl = Number(await waterDiff(true, true));
+    }
     const wOnOff = Number(await waterDiff(false, true));
     await ev(`window.__scene.waterLayer.setVisible(true); 1`);
     must(
