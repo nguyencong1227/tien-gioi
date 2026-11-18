@@ -363,6 +363,10 @@ async function main() {
 
     // ---------- 3. HỘ THỂ: Long Tượng Hộ Thể ----------
     await reset();
+    // Cất quái ra xa: quái đã bị đánh ở hai ca trước, trên runner CI chậm nó kịp đánh người vài khí huyết (4 một đòn) giữa lúc vận khiên và lúc đo, khiên hấp thụ trước nên
+    // số 'mất' lệch 4 so với kỳ vọng (nightly thủ công 18/11: 1360 thay vì 1356). Đo khiên không cần quái.
+    mon.x = world.map.worldW - 150;
+    mon.y = world.map.worldH - 150;
     // đối chứng: chưa có khiên thì sát thương trừ thẳng khí huyết
     hurtPlayerDot(world, sid, me, 300);
     must(
