@@ -1000,6 +1000,12 @@ const BOOKS = {
   kinh_minh_anh_phuc_chuong: [0x4a2f6a, 0xc9a8e6],
   kinh_loi_dinh_nhat_miet: [0xe0c850, 0xfff6b0],
   kinh_hoi_phong_lien_chuong: [0x6fc0a8, 0xe6fff6],
+  // Nguyên Anh, Địa phẩm (CT8 lát 2, A): Lôi x2, Phong, Âm, Hỏa; cùng quy ước màu theo hệ, không dấu
+  kinh_thien_la_loi_cam: [0xe0c850, 0xfff6b0, "tran"],
+  kinh_chuong_tam_loi_bao: [0xd8b83c, 0xfffbc0],
+  kinh_bach_thu_khieu_phong: [0x5fb89a, 0xe6fff6],
+  kinh_minh_vu_lac_hon: [0x3f2a5e, 0xc9a8e6],
+  kinh_phuong_minh_cau_hoang: [0xd9433b, 0xffe0a8],
 };
 
 /**

@@ -965,6 +965,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("han_quang_tien"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("hon_phien_tuong"), chance: 0.006, min: 1, max: 1 }, // tượng Âm (CT9 lát 1)
+    { itemId: bookIdOf("minh_vu_lac_hon"), chance: 0.006, min: 1, max: 1 }, // quạt Âm Nguyên Anh (CT8 lát 2)
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },
@@ -974,6 +975,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("bang_hoa_loan"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("han_quang_tien"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("van_kiem_quy_tong"), chance: 0.008, min: 1, max: 1 }, // Kim, Địa phẩm (CT6 lát 1)
+    { itemId: bookIdOf("thien_la_loi_cam"), chance: 0.006, min: 1, max: 1 }, // Lôi gắn dấu, Địa phẩm (CT8 lát 2)
+    { itemId: bookIdOf("chuong_tam_loi_bao"), chance: 0.006, min: 1, max: 1 }, // Lôi kích dấu (CT8 lát 2)
+    { itemId: bookIdOf("bach_thu_khieu_phong"), chance: 0.006, min: 1, max: 1 }, // Phong tăng tốc đồng đội (CT8 lát 2)
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
@@ -996,6 +1000,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thiem_to_cong"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("phuong_minh_cau_hoang"), chance: 0.006, min: 1, max: 1 }, // Hỏa khống chế Nguyên Anh (CT8 lát 2)
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [
