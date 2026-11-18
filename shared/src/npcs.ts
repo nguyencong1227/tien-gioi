@@ -101,6 +101,24 @@ export const NPCS: NpcDef[] = [
     ],
     color: 0x6b4f8a,
   },
+  {
+    // Trạm trưởng canh cổng (D7 #755): đội trưởng thợ săn giữ Thanh Lộ Trạm, giao việc hằng ngày săn quái Hắc Phong.
+    // Đứng đối xứng lái buôn qua tâm trấn (2048, 2688): lai_buon phía bắc (2048, 2618), tran_uy phía đông-nam (2143, 2713); cách 134 px > 64, trong trấn, chỗ đi lại được (test giữ)
+    id: "tran_uy",
+    mapId: HAC_PHONG_ID,
+    name: "Lôi Báo",
+    title: "Trạm úy Thanh Lộ",
+    x: 2143,
+    y: 2713,
+    dialog: [
+      "Thanh Lộ Trạm là cửa ngõ duy nhất xuyên Hắc Phong Cốc, ta giữ con đường này bao năm bằng máu và nanh thú.",
+      "Gió đen thổi suốt ngày đêm, bầy Hôi Lang và Hắc Hổ càng nhiều, đạo hữu vào sâu phải cẩn trọng.",
+      "Yêu thú quấy phá đường vận chuyển, hạ chúng mang da răng về trạm, ta trả công bằng đan dược và tu vi.",
+      "Lái buôn Mạc Thông bên kia trạm thu mua đồ, ngươi có gì cứ mang sang bán, hắn trả giá không tệ.",
+      "Ta săn thú từ thuở còn non trẻ, nên biết rõ con đường nào an toàn và con thú nào nên tránh.",
+    ],
+    color: 0x4a6b3a,
+  },
   // Vọng Sương Trạm (Âm Sương Trạch, M6 #404): tâm trấn (2048, 3136); ba NPC quanh tâm, cách nhau > 64 px, đứng trên nền đá của trạm
   {
     id: "tram_truong",
