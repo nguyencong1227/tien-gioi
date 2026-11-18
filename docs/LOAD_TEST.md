@@ -955,7 +955,11 @@ Cách chạy:
 ```bash
 npm run build -w client
 npm run e2e:nhip-tim -w server
+# mô phỏng runner CI chậm (nightly đo RTT nền ~45 ms): độ trễ MỖI CHIỀU làm nền của ca 7 (mặc định 0)
+E2E_NEN_MS=22 npm run e2e:nhip-tim -w server
 ```
+
+Ca 7 không giả định RTT cục bộ nhỏ: trần RTT nền 120 ms và vùng báo kiểm theo `1000 - clamp(RTT + 10, 0, 250)` với RTT đọc cùng lúc phát. Lý do: trên runner CI hai lõi (Chrome WebGL mềm) pong chờ luồng chính nên RTT loopback ~40-50 ms; kỳ vọng cũ "RTT < 40 ms" làm nightly 17/11 đỏ (hết giờ 20 s ở cả hai lần thử). Chỉ tải CPU thuần (một lõi + vòng đốt) KHÔNG tái hiện được, nên dùng `E2E_NEN_MS`.
 
 ## 22. Đo thực nghiệm bot săn Kim Đan, qua hai cổng và đội hạ trùm (M6.9, Issue #410)
 
