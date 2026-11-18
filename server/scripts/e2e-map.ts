@@ -608,15 +608,20 @@ async function main() {
       ev(`(() => { const s = window.__scene;
         if (${hide}) { window.__hiddenAbove = []; for (const o of s.children.list) { if (o !== s.waterLayer && o.depth > s.waterLayer.depth && o.visible) { window.__hiddenAbove.push(o); o.setVisible(false); } } }
         else { for (const o of window.__hiddenAbove || []) o.setVisible(true); window.__hiddenAbove = []; } })(); 1`);
+    // `try / finally`: lỗi giữa chừng (hết giờ CDP, ...) vẫn TRẢ LẠI các đối tượng đã ẩn, không để ca sau chạy trên cảnh trống
     await hideAboveWater(true);
-    // Vẫn chờ theo điều kiện (đo lại cách 300 ms, tối đa 30 lần, tới khi < 400) phòng nhiễu còn lại (dựng lại sau đổi bậc)
     let wCtl = Number.POSITIVE_INFINITY;
-    for (let k = 0; k < 30 && !(wCtl < 400); k++) {
-      if (k > 0) await sleep(300);
-      wCtl = Number(await waterDiff(true, true));
+    let wOnOff = 0;
+    try {
+      // Vẫn chờ theo điều kiện (đo lại cách 300 ms, tối đa 30 lần, tới khi < 400) phòng nhiễu còn lại (dựng lại sau đổi bậc)
+      for (let k = 0; k < 30 && !(wCtl < 400); k++) {
+        if (k > 0) await sleep(300);
+        wCtl = Number(await waterDiff(true, true));
+      }
+      wOnOff = Number(await waterDiff(false, true));
+    } finally {
+      await hideAboveWater(false);
     }
-    const wOnOff = Number(await waterDiff(false, true));
-    await hideAboveWater(false);
     await ev(`window.__scene.waterLayer.setVisible(true); 1`);
     must(
       wCtl < 400,
