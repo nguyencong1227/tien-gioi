@@ -305,24 +305,29 @@ async function main() {
         await sleep(TRAVEL_DELAY_MS);
         return Object.getPrototypeOf(this).travel.apply(this, a);
       };
-      await ev(`(() => {
-        window.__portalLog.t0 = performance.now();
-        window.__scene.travelPortal(${JSON.stringify(id)});
-      })()`);
+      // `finally`: hết giờ / lỗi giữa chừng cũng gỡ bản vá trễ (nit của A ở #1171), không để lại `travel` bị trễ cho ca sau
+      let swapped!: number;
+      try {
+        await ev(`(() => {
+          window.__portalLog.t0 = performance.now();
+          window.__scene.travelPortal(${JSON.stringify(id)});
+        })()`);
 
-      await T.waitFor(
-        `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
-        "màn chuyển cảnh hiện",
-        5000,
-      );
-      await T.waitFor(
-        `window.__scene.map.def.id === ${JSON.stringify(destMapId)}`,
-        `sang bản đồ ${destMapId}`,
-        timeout,
-      );
-      const swapped = Date.now();
-      await T.waitFor(overlayHidden, "màn chuyển cảnh ẩn lại", timeout);
-      delete serverRoom.travel; // trả lại `travel` của lớp (gỡ bản vá trễ)
+        await T.waitFor(
+          `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
+          "màn chuyển cảnh hiện",
+          5000,
+        );
+        await T.waitFor(
+          `window.__scene.map.def.id === ${JSON.stringify(destMapId)}`,
+          `sang bản đồ ${destMapId}`,
+          timeout,
+        );
+        swapped = Date.now();
+        await T.waitFor(overlayHidden, "màn chuyển cảnh ẩn lại", timeout);
+      } finally {
+        delete serverRoom.travel; // trả lại `travel` của lớp (gỡ bản vá trễ)
+      }
 
       const m = (await ev(`(() => {
         const p = window.__portalLog;
