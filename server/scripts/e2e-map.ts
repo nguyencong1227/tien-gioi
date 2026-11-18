@@ -600,15 +600,28 @@ async function main() {
             const px = (i / 4) % W, py = Math.floor(i / 4 / W), tx = Math.floor((wv.x + (px * wv.width) / W) / 32), ty = Math.floor((wv.y + (py * wv.width) / W) / 32);
             if (tx >= 0 && ty >= 0 && tx < m.def.w && ty < m.def.h && m.tiles[ty * m.def.w + tx] === 3) n++; }
           resolve(n); })); })`) as Promise<number>;
-    // Đối chứng phải đo LÚC CẢNH ĐÃ YÊN: sau khi đổi bậc / đặt camera, cảnh còn nhiễu thoáng qua rồi lắng dần (đo thật: cả khung hàng nghìn điểm ảnh, trong ô nước
-    // 500-1200 rồi giảm về < 100; dưới tải mất 6-7 giây, lần chạy xấu nhất đo 12 lần) nên MỘT lần đo đôi khi vọt qua 400 (nightly 17/11: 703 ở lần thử 1; máy nhà dưới tải ~3 / 22 lần).
-    // Chờ theo điều kiện: đo lại (cách 300 ms, tối đa 30 lần) tới khi < 400. Phép đo CHÍNH (bật / tắt nước) vẫn đòi > 400 và gấp 3 lần đối chứng, không nới tiêu chuẩn.
+    // NGUỒN nhiễu của ảnh đối chứng (đo thật bằng lấy mẫu 14 x 400 ms): MỖI 400 ms có ~50 đối tượng đổi trạng thái (quái đi lại kèm bóng / vòng `Arc` ở độ sâu 0, nhãn,
+    // thanh máu), quái đứng sát bờ có bóng đè lên ô nước: đối chứng 0-1200 điểm ảnh tuỳ quái đang ở đâu (nightly 17/11: 703 > 400 ở lần thử 1; máy nhà dưới tải ~3 / 22 lần).
+    // Đo CHỈ lớp nước nên ẨN mọi đối tượng nằm TRÊN lớp nước (độ sâu > độ sâu lớp nước: thực thể, bóng, nhãn, lớp phủ) suốt phép đo rồi trả lại ĐÚNG trạng thái cũ
+    // (lần ẩn trước chỉ ẩn `root` của thực thể nên bóng còn nhiễu). Phép đo CHÍNH (bật / tắt nước) vẫn đòi > 400 và gấp 3 lần đối chứng, không nới tiêu chuẩn.
+    const hideAboveWater = (hide: boolean) =>
+      ev(`(() => { const s = window.__scene;
+        if (${hide}) { window.__hiddenAbove = []; for (const o of s.children.list) { if (o !== s.waterLayer && o.depth > s.waterLayer.depth && o.visible) { window.__hiddenAbove.push(o); o.setVisible(false); } } }
+        else { for (const o of window.__hiddenAbove || []) o.setVisible(true); window.__hiddenAbove = []; } })(); 1`);
+    // `try / finally`: lỗi giữa chừng (hết giờ CDP, ...) vẫn TRẢ LẠI các đối tượng đã ẩn, không để ca sau chạy trên cảnh trống
+    await hideAboveWater(true);
     let wCtl = Number.POSITIVE_INFINITY;
-    for (let k = 0; k < 30 && !(wCtl < 400); k++) {
-      if (k > 0) await sleep(300);
-      wCtl = Number(await waterDiff(true, true));
+    let wOnOff = 0;
+    try {
+      // Vẫn chờ theo điều kiện (đo lại cách 300 ms, tối đa 30 lần, tới khi < 400) phòng nhiễu còn lại (dựng lại sau đổi bậc)
+      for (let k = 0; k < 30 && !(wCtl < 400); k++) {
+        if (k > 0) await sleep(300);
+        wCtl = Number(await waterDiff(true, true));
+      }
+      wOnOff = Number(await waterDiff(false, true));
+    } finally {
+      await hideAboveWater(false);
     }
-    const wOnOff = Number(await waterDiff(false, true));
     await ev(`window.__scene.waterLayer.setVisible(true); 1`);
     must(
       wCtl < 400,

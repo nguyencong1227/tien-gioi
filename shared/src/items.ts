@@ -918,6 +918,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Trùm Trúc Cơ rơi kinh quyển chiêu cao cấp (M7.4): phần thưởng của việc hạ trùm
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.25, min: 1, max: 1 },
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.25, min: 1, max: 1 },
+    // Vô sắc Trúc Cơ, Huyền phẩm (CT8 lát 3, A): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ vì bí cảnh đòi thưởng >= 15 phút săn quái tốt nhất cùng bậc (`balance/dungeon.test.ts` đỏ ở 14,86 khi thêm 0,3 % x 2 vào Hắc Hổ)
+    { itemId: bookIdOf("su_tu_hong"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("cam_long_khau"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -947,6 +950,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("liet_diem_tran"), chance: 0.008, min: 1, max: 1 }, // vùng cháy Hỏa (CT9 lát 1)
     { itemId: bookIdOf("xich_tuoc_phu"), chance: 0.005, min: 1, max: 1 }, // phù Hỏa Kim Đan (CT8 lát 1)
+    { itemId: bookIdOf("hoa_huyet_phe_nguyen"), chance: 0.005, min: 1, max: 1 }, // vô sắc Kim Đan (CT8 lát 3)
   ],
   // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
   hac_giao: [
@@ -965,6 +969,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("han_quang_tien"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("hon_phien_tuong"), chance: 0.006, min: 1, max: 1 }, // tượng Âm (CT9 lát 1)
+    { itemId: bookIdOf("minh_vu_lac_hon"), chance: 0.006, min: 1, max: 1 }, // quạt Âm Nguyên Anh (CT8 lát 2)
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },
@@ -974,6 +979,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("bang_hoa_loan"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("han_quang_tien"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("van_kiem_quy_tong"), chance: 0.008, min: 1, max: 1 }, // Kim, Địa phẩm (CT6 lát 1)
+    { itemId: bookIdOf("thien_la_loi_cam"), chance: 0.006, min: 1, max: 1 }, // Lôi gắn dấu, Địa phẩm (CT8 lát 2)
+    { itemId: bookIdOf("chuong_tam_loi_bao"), chance: 0.006, min: 1, max: 1 }, // Lôi kích dấu (CT8 lát 2)
+    { itemId: bookIdOf("bach_thu_khieu_phong"), chance: 0.006, min: 1, max: 1 }, // Phong tăng tốc đồng đội (CT8 lát 2)
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
@@ -983,6 +991,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("van_thach_tran"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("pha_son_nhat_kich"), chance: 0.006, min: 1, max: 1 }, // chiêu vận Thổ (CT9 lát 1)
+    { itemId: bookIdOf("long_tuong_ho_the"), chance: 0.006, min: 1, max: 1 }, // vô sắc hộ thể Nguyên Anh (CT8 lát 3)
   ],
   doc_tuoc: [
     { itemId: "doc_tuoc_nang", chance: 0.45, min: 1, max: 2 },
@@ -996,6 +1005,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thiem_to_cong"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("phuong_minh_cau_hoang"), chance: 0.006, min: 1, max: 1 }, // Hỏa khống chế Nguyên Anh (CT8 lát 2)
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [

@@ -114,6 +114,12 @@ async function main() {
     if (!cond) throw new Error(msg);
   };
   const SECRET = "e2e_secret_chieu_moi_1111111";
+  /**
+   * Bậc chất lượng đồ hoạ GHIM cho kịch bản (mặc định "high"; `E2E_QUALITY=low` để tái hiện lỗi CI). Bậc "Tự động" chọn theo phần cứng: máy nhà có GPU thật -> high, còn runner CI
+   * (Chrome headless, SwiftShader phần mềm) -> low, mà bậc Thấp giảm số điểm hạt của tia sét (`planChainFx`: `emitterBudget` nhỏ) nên ca "chain vẽ >= n - 1 điểm hạt" đỏ
+   * trên CI (nightly thủ công trên main 18/11, cả hai lần thử) dù xanh trên máy nhà.
+   */
+  const QUALITY = process.env.E2E_QUALITY ?? "high";
   const NAME = "Chieu Moi Mot";
 
   try {
@@ -174,7 +180,7 @@ async function main() {
 
     // Đăng nhập bằng form thật
     await T.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
+      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tg_quality", ${JSON.stringify(QUALITY)}); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
     });
     await T.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug=1` });
     await T.waitFor(
@@ -501,6 +507,7 @@ async function main() {
     }
     mon.hp = BIG_HP;
     await cast(3);
+    const tCast = Date.now(); // mốc đồng hồ THẬT sau khi gửi phím: máy chủ bắt đầu vận SAU mốc này, nên thời gian máy chủ đã vận <= (bây giờ - tCast)
     await waitLog("cast", WINDUP, 1, "client nhận `fx cast` của Phá Sơn Nhất Kích");
     const w0 = (await fxLog("cast", WINDUP))[0]!;
     must(
@@ -516,6 +523,10 @@ async function main() {
     const p2 = (await ev(
       `JSON.stringify(window.__scene.windups.snapshot(window.__scene.time.now))`,
     ).then((v) => JSON.parse(v as string))) as Array<{ progress: number }>;
+    // ĐỌC máu quái NGAY sau lần đo thứ hai (máy chủ ở cùng tiến trình): chụp ảnh ở runner CI phần mềm mất hàng trăm ms nên KHÔNG được nằm giữa phép đo và
+    // phép kiểm (cửa sổ chỉ 1,2 s: nightly thủ công 18/11 đòn đáp đã xuống trước khi kiểm). Máy quá chậm (đã >= 1100 ms đồng hồ thật) thì không còn khẳng định được.
+    const dropAtP2 = hpDrop();
+    const sinceCast = Date.now() - tCast;
     await T.shot("chieu-moi-6-van");
     must(
       p1.length === 1 &&
@@ -524,7 +535,12 @@ async function main() {
         p2[0]!.progress > p1[0]!.progress,
       `vòng tụ khí TIẾN DẦN (${p1[0]?.progress.toFixed(2)} -> ${p2[0]?.progress.toFixed(2)})`,
     );
-    must(hpDrop() === 0, "vận được ~0,7 s trên 1,2 s: vẫn CHƯA có sát thương");
+    if (sinceCast < 1100)
+      must(dropAtP2 === 0, `vận được ${sinceCast} ms trên 1200 ms: vẫn CHƯA có sát thương`);
+    else
+      out(
+        `  (máy chậm: đo xong sau ${sinceCast} ms >= 1100 ms nên bỏ qua kiểm 'chưa có sát thương lúc vận')`,
+      );
     await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 3000);
     const t6 = Date.now();
     while (hpDrop() === 0 && Date.now() - t6 < 3000) await sleep(100);

@@ -56,6 +56,10 @@ async function main() {
   const FILE_BYTES = 1000;
   const SHA = "ab".repeat(32);
   const delays: Record<string, number> = { am_suong: 2000, hac_phong: 12000 };
+  /** Độ trễ `travelTo` do kịch bản chèn ở máy chủ (ms), xem `crossPortal`. */
+  const TRAVEL_DELAY_MS = 800;
+  /** `E2E_CACHE_DELAY_MS`: làm chậm `caches.match` trong trang để tái hiện runner CI chậm (mặc định 0). */
+  const CACHE_DELAY_MS = Math.max(0, Number(process.env.E2E_CACHE_DELAY_MS ?? "0") || 0);
   const reqs: PackReq[] = [];
   const manifest = {
     packs: ["am_suong", "hac_phong"].map((id) => ({
@@ -254,6 +258,13 @@ async function main() {
           hidden: 0,
         };
 
+        // Mô phỏng runner CI chậm (nightly thủ công 18/11): tra CacheStorage (caches.match, bước đầu của việc tải tệp gói) mất E2E_CACHE_DELAY_MS ms
+        const CACHE_DELAY = ${CACHE_DELAY_MS};
+        if (CACHE_DELAY > 0 && window.caches && !window.__cacheWrapped) {
+          window.__cacheWrapped = true;
+          const om = window.caches.match.bind(window.caches);
+          window.caches.match = (...a) => new Promise((r) => setTimeout(r, CACHE_DELAY)).then(() => om(...a));
+        }
         // Bắt yêu cầu tải gói trong trang (cả manifest nếu chưa có và tệp gói bản đồ đích)
         if (!window.__origFetch) {
           window.__origFetch = window.fetch;
@@ -286,23 +297,37 @@ async function main() {
         mo.observe(overlay, { attributes: true, attributeFilter: ["hidden", "class"] });
       })()`);
 
-      await ev(`(() => {
-        window.__portalLog.t0 = performance.now();
-        window.__scene.travelPortal(${JSON.stringify(id)});
-      })()`);
+      // Trễ `travelTo` của MÁY CHỦ `TRAVEL_DELAY_MS` ms (vá `travel` của phòng đang ở, tất định): nếu gói chỉ bắt đầu tải SAU `travelTo` thì mốc `packStart` rơi
+      // SAU màn chuyển cảnh (`active`) ít nhất chừng đó; gói bắt đầu lúc GỬI `travel` thì dù máy chậm (tra CacheStorage vài chục ms) vẫn TRƯỚC `active`
+      const roomId = (await ev(`window.__scene.room.roomId`)) as string;
+      const serverRoom = matchMaker.getLocalRoomById(roomId) as any;
+      serverRoom.travel = async function (...a: unknown[]) {
+        await sleep(TRAVEL_DELAY_MS);
+        return Object.getPrototypeOf(this).travel.apply(this, a);
+      };
+      // `finally`: hết giờ / lỗi giữa chừng cũng gỡ bản vá trễ (nit của A ở #1171), không để lại `travel` bị trễ cho ca sau
+      let swapped!: number;
+      try {
+        await ev(`(() => {
+          window.__portalLog.t0 = performance.now();
+          window.__scene.travelPortal(${JSON.stringify(id)});
+        })()`);
 
-      await T.waitFor(
-        `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
-        "màn chuyển cảnh hiện",
-        5000,
-      );
-      await T.waitFor(
-        `window.__scene.map.def.id === ${JSON.stringify(destMapId)}`,
-        `sang bản đồ ${destMapId}`,
-        timeout,
-      );
-      const swapped = Date.now();
-      await T.waitFor(overlayHidden, "màn chuyển cảnh ẩn lại", timeout);
+        await T.waitFor(
+          `document.getElementById('transition-overlay').classList.contains('active') && !document.getElementById('transition-overlay').hidden`,
+          "màn chuyển cảnh hiện",
+          5000,
+        );
+        await T.waitFor(
+          `window.__scene.map.def.id === ${JSON.stringify(destMapId)}`,
+          `sang bản đồ ${destMapId}`,
+          timeout,
+        );
+        swapped = Date.now();
+        await T.waitFor(overlayHidden, "màn chuyển cảnh ẩn lại", timeout);
+      } finally {
+        delete serverRoom.travel; // trả lại `travel` của lớp (gỡ bản vá trễ)
+      }
 
       const m = (await ev(`(() => {
         const p = window.__portalLog;
