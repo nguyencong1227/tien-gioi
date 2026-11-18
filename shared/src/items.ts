@@ -423,6 +423,116 @@ export const ITEMS: ItemDef[] = [
     cooldown: 5_000,
     color: 0x9a4a8c,
   },
+  // ---------- Phù (nghề nhỏ lát 2, #514/#817): Bàn phù chế ----------
+  // Dùng gắn trạng thái `amp_<hệ>` tăng sát thương chiêu cùng hệ trong 60 giây (chiêu hệ khác / đòn thường / đòn thách
+  // đấu KHÔNG nhân), hoặc `cdr_phu` giảm hồi chiêu. Nguồn: bảng #764 (docs/NGHE_NHO_NGUON.md) — phù tấn công / buff sát
+  // thương của Vạn Kiếp Tu Tiên dịch thành `amp_<hệ>`; `cdr_phu` không có phù nguồn nên viết GỐC (tên Tiên Giới).
+  // `ratio` theo bậc trong khung (A chốt khi review): LK 0,08-0,10 / TC 0,12-0,15 / KD 0,18-0,22 / NA 0,25-0,30 / cdr <= 0,15.
+  // KHÔNG vào ITEM_VALUE (sellPrice = 0): chốt chặn chống sinh Linh thạch. EV: docs/NGHE_NHO_KINH_TE.md mục Phù.
+  // Luyện Khí (rarity 1):
+  {
+    id: "phu_hoa_dan",
+    name: "Hỏa Đạn Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 1,
+    desc: "Tăng 8% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.08, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xd9532a,
+  },
+  {
+    id: "phu_hoa_cuonghuyet",
+    name: "Cuồng Huyết Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 1,
+    desc: "Tăng 10% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.1, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xc94030,
+  },
+  // Trúc Cơ (rarity 2):
+  {
+    id: "phu_kim_phicham",
+    name: "Phi Châm Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Tăng 12% sát thương chiêu hệ Kim trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_kim", ratio: 0.12, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xb8b8c8,
+  },
+  {
+    id: "phu_kim_toagia",
+    name: "Toái Giáp Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Tăng 13% sát thương chiêu hệ Kim trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_kim", ratio: 0.13, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x9a9aa8,
+  },
+  {
+    id: "phu_hoa_lieutiem",
+    name: "Liệt Diễm Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Tăng 15% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.15, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xc0392b,
+  },
+  // Kim Đan (rarity 3):
+  {
+    id: "phu_loi_loino",
+    name: "Lôi Nộ Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Tăng 20% sát thương chiêu hệ Lôi trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_loi", ratio: 0.2, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x8a6a2a,
+  },
+  // Nguyên Anh (rarity 3):
+  {
+    id: "phu_hoa_tammoi",
+    name: "Tam Muội Hỏa Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Tăng 25% sát thương chiêu hệ Hỏa trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_hoa", ratio: 0.25, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0xe05a1a,
+  },
+  {
+    id: "phu_moc_kimlan",
+    name: "Kim Lân Độc Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 3,
+    desc: "Tăng 28% sát thương chiêu hệ Mộc trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "amp_moc", ratio: 0.28, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x3a8a4a,
+  },
+  // cdr_phu (giảm hồi chiêu): phù GỐC của Tiên Giới, giữa Trúc Cơ - Kim Đan
+  {
+    id: "phu_tho_tocphong",
+    name: "Tốc Phong Phù",
+    type: "consumable",
+    stack: 9,
+    rarity: 2,
+    desc: "Giảm tối đa 15% hồi chiêu của các chiêu thức trong 60 giây; không tác dụng khi thách đấu; mất khi thoát hay qua cổng.",
+    effect: { kind: "status", id: "cdr_phu", ratio: 0.15, ms: 60_000 },
+    cooldown: 5_000,
+    color: 0x5a8ab0,
+  },
   // ---------- Trang bị (rèn ở Thợ rèn, xem recipes.ts) ----------
   {
     id: "lang_nha_kiem",
@@ -790,6 +900,15 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Kinh quyển chiêu cơ bản (M7.4): rơi rất hiếm (ngoài việc mua ở cửa hàng)
     { itemId: bookIdOf("hoa_van_kiem"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("bon_thach_quyen"), chance: 0.012, min: 1, max: 1 },
+    // Kinh quyển Kim / Thổ Trúc Cơ, Huyền phẩm (CT6 lát 1, A): rơi hiếm từ quái Trúc Cơ (không từ trùm: giữ nguyên số Linh thạch / giờ của mục 30)
+    { itemId: bookIdOf("thanh_van_kiem_khi"), chance: 0.01, min: 1, max: 1 },
+    { itemId: bookIdOf("ban_thach_ho_the"), chance: 0.01, min: 1, max: 1 },
+    { itemId: bookIdOf("doc_dang_phuc"), chance: 0.008, min: 1, max: 1 }, // bẫy Mộc (CT9 lát 1)
+    // Chiêu Thủy Trúc Cơ (CT7 #1052, E; A chuyển từ trùm Nguyên Anh Thiên Hàn Vương sang quái Trúc Cơ: chiêu rr 2 không thể chỉ rơi từ trùm cao hơn cấp chiêu)
+    { itemId: bookIdOf("thi_doc_am_chuong"), chance: 0.005, min: 1, max: 1 },
+    // Băng + Âm Trúc Cơ, Huyền phẩm (CT8 lát 1, A): rơi hiếm từ quái Trúc Cơ
+    { itemId: bookIdOf("han_bang_nhat_chuong"), chance: 0.0035, min: 1, max: 1 },
+    { itemId: bookIdOf("minh_anh_phuc_chuong"), chance: 0.0035, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
@@ -806,12 +925,19 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "dai_hoi_huyet_dan", chance: 0.04, min: 1, max: 1 },
     { itemId: bookIdOf("lac_tuyet_phan_phi"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
+    { itemId: bookIdOf("thu_thuy_kiem_anh"), chance: 0.012, min: 1, max: 1 }, // Kim + Thủy (CT6 lát 1)
+    { itemId: bookIdOf("phi_kiem_tam_lien"), chance: 0.008, min: 1, max: 1 }, // đạn bay Kim (CT9 lát 1)
+    { itemId: bookIdOf("hoi_phong_lien_chuong"), chance: 0.005, min: 1, max: 1 }, // Phong Kim Đan (CT8 lát 1)
   ],
   thach_quy: [
     { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
     { itemId: "hoi_linh_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "dai_hoi_linh_dan", chance: 0.04, min: 1, max: 1 },
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
+    { itemId: bookIdOf("liet_dia_nhat_quyen"), chance: 0.012, min: 1, max: 1 }, // Thổ (CT6 lát 1)
+    { itemId: bookIdOf("phan_nhac_tram"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("loi_lien_chau"), chance: 0.008, min: 1, max: 1 }, // sét lan Lôi (CT9 lát 1)
+    { itemId: bookIdOf("loi_dinh_nhat_miet"), chance: 0.005, min: 1, max: 1 }, // Lôi Kim Đan (CT8 lát 1)
   ],
   doc_thiem: [
     { itemId: "doc_nang", chance: 0.45, min: 1, max: 2 },
@@ -819,6 +945,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "dai_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
     { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 }, // kinh quyển hiếm (M7.4)
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
+    { itemId: bookIdOf("liet_diem_tran"), chance: 0.008, min: 1, max: 1 }, // vùng cháy Hỏa (CT9 lát 1)
+    { itemId: bookIdOf("xich_tuoc_phu"), chance: 0.005, min: 1, max: 1 }, // phù Hỏa Kim Đan (CT8 lát 1)
   ],
   // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
   hac_giao: [
@@ -836,6 +964,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Kinh quyển 6 chiêu Nguyên Anh đợt 2 (M7.9, #654): rơi hiếm
     { itemId: bookIdOf("han_quang_tien"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
+    { itemId: bookIdOf("hon_phien_tuong"), chance: 0.006, min: 1, max: 1 }, // tượng Âm (CT9 lát 1)
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },
@@ -844,6 +973,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("bang_hoa_loan"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("han_quang_tien"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("van_kiem_quy_tong"), chance: 0.008, min: 1, max: 1 }, // Kim, Địa phẩm (CT6 lát 1)
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
@@ -852,6 +982,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("van_thach_tran"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.015, min: 1, max: 1 },
+    { itemId: bookIdOf("pha_son_nhat_kich"), chance: 0.006, min: 1, max: 1 }, // chiêu vận Thổ (CT9 lát 1)
   ],
   doc_tuoc: [
     { itemId: "doc_tuoc_nang", chance: 0.45, min: 1, max: 2 },
@@ -860,6 +991,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.018, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.012, min: 1, max: 1 },
+    // Kinh quyển 4 chiêu hệ Mộc cao cấp (CT7 #1052, Dev E; A hạ 2 % -> 1,2 % theo mức 0,6-1,2 % của AGENTS.md): rơi hiếm từ Độc Tước (quái Mộc)
+    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("thiem_to_cong"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.012, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [

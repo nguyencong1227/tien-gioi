@@ -25,6 +25,7 @@ import type { WorldState } from "../schema";
 import { listenWithRetry } from "../test-port";
 import { bossCanTarget } from "../systems/boss";
 import { hurtPlayer } from "../systems/combat";
+import { VIEW_ENTER } from "../systems/interest";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-boss-room-"));
 
@@ -144,11 +145,24 @@ function getBoss(w: any, kind = "mang") {
   return null;
 }
 
-/** Khóa đòn thường của mọi quái trong phòng và ép trùm vận chiêu nón quat_duoi (r: 150 px, arc: 120 độ) nhắm vào targetSid */
+/**
+ * Ép trùm được chọn vận chiêu nón quat_duoi (r: 150 px, arc: 120 độ) nhắm vào targetSid, và KHÓA MỌI nguồn `warn` / `bossCast`
+ * khác trong phòng. Cần khoá chặt để đối chứng âm (client xa KHÔNG nhận) tất định: ngoài trùm được chọn, không ai được phát
+ * `warn` (trùm khác vận chiêu, charger `lang`/`ho` lao, slam) lọt tới client đặt ngoài vùng nhìn.
+ */
 function forceQuatDuoi(w: any, boss: NonNullable<ReturnType<typeof getBoss>>, targetSid: string) {
-  // Khử nhiễu: không quái nào trong phòng (trùm và quái thường xung quanh) được đánh thường
   for (const mc of w.mctrl.values()) {
+    // Khử nhiễu đòn thường của mọi quái (trùm và quái thường xung quanh)
     mc.nextAttack = Number.MAX_SAFE_INTEGER;
+    // Huỷ gồng đang dở: charger phát `warn` khi bắt lao, slam phát `warn` khi bắt đập
+    mc.ai = undefined;
+    mc.slam = undefined;
+    // Trùm KHÁC ngoài trùm được chọn: huỷ chiêu đang gồng, khoá vận chiêu mới, bỏ mục tiêu (không phát warn/bossCast)
+    if (mc.boss && mc !== boss.mc) {
+      mc.boss.cast = null;
+      mc.boss.nextCastAt = Number.MAX_SAFE_INTEGER;
+      mc.target = null;
+    }
   }
   boss.mc.target = targetSid;
   boss.mc.boss.engaged = true;
@@ -177,12 +191,19 @@ describe("Trùm nhiều chiêu trên máy chủ Colyseus thật (T6 #875)", () =
     pNear.x = boss!.m.x + 80;
     pNear.y = boss!.m.y;
 
-    // 3. Client Far (xa): tạo ở trấn Hắc Phong Cốc (cách trùm > 1000 px, ngoài vùng nhìn)
+    // 3. Client Far (xa): nối vào phòng rồi đặt RA NGOÀI tầm với của warn trùm.
+    //    Vì sao không đặt ở trấn như trước: trùm Xích Mãng sinh NGẪU NHIÊN từ ~1235 px ra khỏi trấn (minDanger 0.78),
+    //    còn warn của quat_duoi vươn VIEW_ENTER(1100) + r(150) = 1250 px — trấn KHÔNG đảm bảo ngoài tầm warn
+    //    (đo 4000 thế giới: ~0.6% ca trùm ĐẦU TIÊN lọt vào, ~3.5% ca có trùm nào đó lọt; #1018 đỏ chập chờn trên CI).
+    //    Đặt Far đối diện Near qua trùm, cách trùm > tầm warn, là tất định bất kể trùm sinh đâu.
     const nameFar = `Far ${++seq}`;
     const far = await spawnInHacPhong(nameFar, w.map.townPx.x, w.map.townPx.y);
     const pFar = serverState(far.room).players.get(far.room.sessionId)!;
+    const OUT_OF_REACH_PX = VIEW_ENTER + 500; // > tầm warn 1250 (VIEW_ENTER 1100 + r 150), dư biên cho trùm nhích bước
+    pFar.x = boss!.m.x - OUT_OF_REACH_PX; // đối diện Near (Near ở +x) qua trùm
+    pFar.y = boss!.m.y;
     const distToFar = Math.hypot(pFar.x - boss!.m.x, pFar.y - boss!.m.y);
-    expect(distToFar).toBeGreaterThan(600); // Ngoài vùng nhìn
+    expect(distToFar).toBeGreaterThan(VIEW_ENTER + 150); // chắc chắn ngoài tầm warn của quat_duoi
 
     // Xóa mọi fx nhận được trong quá trình kết nối ban đầu để đo chính xác đòn ép
     near.fxList.length = 0;
@@ -213,10 +234,44 @@ describe("Trùm nhiều chiêu trên máy chủ Colyseus thật (T6 #875)", () =
     await waitFor(() => boss!.mc.boss.cast != null, 2000, "trùm bắt đầu gồng");
     await waitFor(() => boss!.mc.boss.cast == null, 5000, "trùm hoàn tất đòn chiêu");
 
-    // 7. Đối chứng âm cùng lượt: Client xa KHÔNG nhận được bất kỳ warn hay bossCast nào
-    const farBossFx = far.fxList.filter(
-      (f) => f.kind === "warn" || (f.kind === "bossCast" && (f as any).by === boss!.id),
-    );
+    // 7. Đối chứng âm cùng lượt: Client xa KHÔNG nhận được warn/bossCast CỦA TRÙM.
+    //    warn KHÔNG có trường by (game.ts:493) → KHÔNG được lọc theo kind (sẽ bắt MỌI warn trong tầm nhìn Far,
+    //    kể cả từ nguồn khác) — lọc theo TOẠ ĐỘ: chỉ tính warn có gốc gần trùm (nón quat_duoi phát đúng chỗ trùm
+    //    đứng, boss.ts:261 default). bossCast có by → lọc theo by. In NGUỒN nếu red để debug (theo yêu cầu A).
+    const BOSS_WARN_ORIGIN_PX = 400; // nón warn phát đúng chỗ trùm đứng; dư biên cho trùm di chuyển vài bước lúc cast
+    const farBossFx = far.fxList.filter((f) => {
+      if (f.kind === "bossCast") return (f as any).by === boss!.id;
+      if (f.kind === "warn")
+        return Math.hypot(f.x - boss!.m.x, f.y - boss!.m.y) <= BOSS_WARN_ORIGIN_PX;
+      return false;
+    });
+    if (farBossFx.length > 0) {
+      // In nguồn: kind + toạ độ + khoảng cách tới trùm, giúp xác định fx nào đã rò rỉ tới Far và từ đâu
+      console.error(
+        "[#1018] Far NHẬN fx của trùm (rò rỉ sendNear?):",
+        farBossFx.map((f) => {
+          const dx = (f as any).x - boss!.m.x;
+          const dy = (f as any).y - boss!.m.y;
+          return f.kind === "warn"
+            ? {
+                kind: "warn",
+                shape: f.shape,
+                x: f.x,
+                y: f.y,
+                r: f.r,
+                distToBoss: Math.round(Math.hypot(dx, dy)),
+              }
+            : {
+                kind: f.kind,
+                by: (f as any).by,
+                x: (f as any).x,
+                y: (f as any).y,
+                distToBoss: Math.round(Math.hypot(dx, dy)),
+              };
+        }),
+        { boss: { x: boss!.m.x, y: boss!.m.y }, far: { x: pFar.x, y: pFar.y }, distToFar },
+      );
+    }
     expect(farBossFx.length).toBe(0);
   });
 

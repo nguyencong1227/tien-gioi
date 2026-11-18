@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MONSTER_BY_ID } from "./game";
+import { MAPS, getMap } from "./map";
 import { ITEMS, ITEM_BY_ID } from "./items";
 import { NPC_BY_ID, TRADES } from "./npcs";
 import { RECIPES } from "./recipes";
@@ -19,9 +20,23 @@ import {
 
 describe("giá trị vật phẩm", () => {
   it("mọi vật phẩm đều có giá trị (số nguyên >= 0) và không có khóa lạ", () => {
-    // Đan hộ đạo (luyện ở Lò đan, #763) cố ý KHÔNG có giá: đồ tự chế chỉ tiêu hao khi dùng, KHÔNG bán được cho NPC.
-    // Guard riêng trong lo-dan-lat1.test.ts (không có trong ITEM_VALUE + sellPrice === 0); mọi vật phẩm khác phải có giá.
-    const khong_gia = new Set(["dot_pha_dan", "kinh_chi_dan", "duong_anh_dan"]);
+    // Đan hộ đạo (luyện ở Lò đan, #763) và phù (chế ở Bàn phù, #817) cố ý KHÔNG có giá: đồ tự chế chỉ tiêu hao khi dùng,
+    // KHÔNG bán được cho NPC. Guard riêng trong lo-dan-lat1.test.ts / ban-phu-lat2.test.ts (không có trong ITEM_VALUE +
+    // sellPrice === 0); mọi vật phẩm khác phải có giá.
+    const khong_gia = new Set([
+      "dot_pha_dan",
+      "kinh_chi_dan",
+      "duong_anh_dan",
+      "phu_hoa_dan",
+      "phu_hoa_cuonghuyet",
+      "phu_kim_phicham",
+      "phu_kim_toagia",
+      "phu_hoa_lieutiem",
+      "phu_loi_loino",
+      "phu_hoa_tammoi",
+      "phu_moc_kimlan",
+      "phu_tho_tocphong",
+    ]);
     for (const i of ITEMS) {
       if (khong_gia.has(i.id)) continue;
       expect(Object.prototype.hasOwnProperty.call(ITEM_VALUE, i.id), `thiếu giá trị: ${i.id}`).toBe(
@@ -110,11 +125,21 @@ describe("rơi Linh thạch", () => {
       const d = COIN_DROPS[k]!;
       return d.chance * ((d.min + d.max) / 2);
     };
-    const kinds = Object.keys(COIN_DROPS).sort(
-      (a, b) => MONSTER_BY_ID[a]!.exp - MONSTER_BY_ID[b]!.exp,
-    );
-    for (let i = 1; i < kinds.length; i++)
-      expect(avg(kinds[i]!)).toBeGreaterThan(avg(kinds[i - 1]!));
+    // So SÁNH TRONG CÙNG MỘT BẢN ĐỒ (bãi săn): tu vi và tiền rơi cùng tăng theo độ khó của loài. Không so xuyên bản đồ: QUYET_DINH_M3 mục 30 nhân đôi tu vi quái Âm Sương /
+    // Hàn Vân mà KHÔNG đổi Linh thạch rơi (người dùng chỉ chốt máu x1,5 và tu vi x2), nên tu vi của loài Nguyên Anh (Hàn Lang 1320) nay vượt tu vi của Xích Mãng (900, Lạc Hà)
+    // trong khi tiền rơi vẫn theo bậc. Trùm bí cảnh (không sinh ngoài hoang) tính chung nhóm riêng.
+    const home = (k: string) =>
+      MAPS.find((m) => getMap(m.id)!.monsterCapOf(k) > 0)?.id ?? "bi_canh";
+    const byMap = new Map<string, string[]>();
+    for (const k of Object.keys(COIN_DROPS)) {
+      const g = home(k);
+      byMap.set(g, [...(byMap.get(g) ?? []), k]);
+    }
+    for (const [, group] of byMap) {
+      const kinds = group.sort((a, b) => MONSTER_BY_ID[a]!.exp - MONSTER_BY_ID[b]!.exp);
+      for (let i = 1; i < kinds.length; i++)
+        expect(avg(kinds[i]!)).toBeGreaterThan(avg(kinds[i - 1]!));
+    }
   });
 });
 

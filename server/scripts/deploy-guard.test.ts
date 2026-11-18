@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { PROTOCOL_VERSION } from "@tien-gioi/shared";
 import { assertNotProd, PROD_DOMAIN, PROD_DIR_NAME } from "./assert-not-prod.js";
 
 const repoRoot = path.resolve(__dirname, "../..");
@@ -579,7 +580,7 @@ else
   if [[ -n "\${STUB_HEALTH_OUT:-}" ]]; then
     echo "$STUB_HEALTH_OUT"
   else
-    echo '{"ok":true,"authMode":"account","protocol":4,"minProtocol":0}'
+    echo '{"ok":true,"authMode":"account","protocol":${PROTOCOL_VERSION},"minProtocol":0}'
   fi
 fi
 `;

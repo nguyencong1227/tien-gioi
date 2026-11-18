@@ -175,14 +175,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "suong_ho",
     name: "Sương Hồ",
     minDanger: 0.25,
-    hp: 1600,
+    hp: 2400,
     atk: 150,
     speed: 150,
     radius: 13,
     aggro: 280,
     attackRange: 34,
     attackCd: 1000,
-    exp: 110,
+    exp: 220,
     level: 13,
     color: 0xbfd7e0,
     // M7.3 (#504): hồ tuyết đứng xa bắn đạn băng (đứng bắn cách 0,3-0,85 tầm, lùi khi bị áp sát). Số khởi đầu, M7.9 hiệu chỉnh.
@@ -195,14 +195,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "thach_quy",
     name: "Thạch Quy",
     minDanger: 0.45,
-    hp: 6500,
+    hp: 9750,
     atk: 70,
     speed: 70,
     radius: 20,
     aggro: 150,
     attackRange: 40,
     attackCd: 1800,
-    exp: 215,
+    exp: 430,
     level: 14,
     color: 0x6f7f5e,
   },
@@ -210,14 +210,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "doc_thiem",
     name: "Độc Thiềm",
     minDanger: 0.65,
-    hp: 2600,
+    hp: 3900,
     atk: 290,
     speed: 110,
     radius: 15,
     aggro: 220,
     attackRange: 42,
     attackCd: 1500,
-    exp: 230,
+    exp: 460,
     level: 15,
     color: 0x7a5fa0,
     // M7.3 (#504): cóc độc nhổ đạn độc (chậm, dễ né): đạn TRÚNG thì gắn độc (`POISON_EFFECT`, không giết người). Số khởi đầu, M7.9 hiệu chỉnh.
@@ -231,14 +231,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "hac_giao",
     name: "Hắc Giao",
     minDanger: 0.85,
-    hp: 50000,
+    hp: 75000,
     atk: 150,
     speed: 105,
     radius: 28,
     aggro: 300,
     attackRange: 56,
     attackCd: 1600,
-    exp: 3200,
+    exp: 6400,
     level: 18,
     color: 0x1d2a3a,
     boss: true,
@@ -250,14 +250,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "han_lang",
     name: "Hàn Lang",
     minDanger: 0.2,
-    hp: 2900,
+    hp: 4350,
     atk: 264,
     speed: 160,
     radius: 14,
     aggro: 280,
     attackRange: 36,
     attackCd: 1000,
-    exp: 660,
+    exp: 1320,
     level: 16,
     color: 0x9fc3e8,
     element: "thuy",
@@ -269,14 +269,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "phong_nha",
     name: "Phong Nha",
     minDanger: 0.4,
-    hp: 2800,
+    hp: 4200,
     atk: 309,
     speed: 150,
     radius: 13,
     aggro: 300,
     attackRange: 34,
     attackCd: 1000,
-    exp: 760,
+    exp: 1520,
     level: 17,
     color: 0xb8bcc8,
     element: "kim",
@@ -289,14 +289,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "cot_tuong",
     name: "Cốt Tượng",
     minDanger: 0.55,
-    hp: 11800,
+    hp: 17700,
     atk: 123,
     speed: 70,
     radius: 22,
     aggro: 150,
     attackRange: 44,
     attackCd: 1800,
-    exp: 1290,
+    exp: 2580,
     level: 17,
     color: 0xd8cdb4,
     element: "tho",
@@ -307,14 +307,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "doc_tuoc",
     name: "Độc Tước",
     minDanger: 0.7,
-    hp: 4700,
+    hp: 7050,
     atk: 512,
     speed: 115,
     radius: 13,
     aggro: 240,
     attackRange: 42,
     attackCd: 1500,
-    exp: 1380,
+    exp: 2760,
     level: 18,
     color: 0x4e8a46,
     element: "moc",
@@ -329,14 +329,14 @@ export const MONSTERS: MonsterKind[] = [
     id: "thien_han_vuong",
     name: "Thiên Hàn Vương",
     minDanger: 0.85,
-    hp: 82000,
+    hp: 123000,
     atk: 240,
     speed: 110,
     radius: 30,
     aggro: 320,
     attackRange: 60,
     attackCd: 1600,
-    exp: 19200,
+    exp: 38400,
     level: 21,
     color: 0x5aa0d8,
     boss: true,
@@ -532,7 +532,44 @@ export type FxMsg =
       speed: number;
       range: number;
       element?: Element;
-    };
+    }
+  /**
+   * ĐẠN của người chơi, theo TỪNG ĐOẠN (mục 51, CT1b): bay thẳng từ (x, y) theo `angle` với `speed` (px/giây) trong `ms` (thời gian tới chỗ dừng do MÁY CHỦ tính: ô chặn, trúng,
+   * hết tầm). Mỗi lần nảy / xuyên đổi hướng máy chủ gửi `pbolt` MỚI từ điểm đó (client KHÔNG tự mô phỏng nảy). `skill` = id `SkillDef` (tra `fx` + hệ để vẽ). Phần trúng đã có `dmg`.
+   */
+  | {
+      kind: "pbolt";
+      by: string;
+      skill: string;
+      x: number;
+      y: number;
+      angle: number;
+      speed: number;
+      ms: number;
+    }
+  /** SÉT LAN: đường nảy theo thứ tự, `pts` = toạ độ phẳng [x0, y0, x1, y1, ...] (2 tới `CHAIN_FX_POINTS_MAX` điểm nguyên, điểm đầu là người dùng); (x, y) = chỗ người dùng đứng (để `sendNear` chỉ gửi cho người ở gần). Client vẽ tia nối tiếp; phần trúng có `dmg`. */
+  | { kind: "chain"; by: string; skill: string; x: number; y: number; pts: number[] }
+  /**
+   * VẬT THỂ BỀN (`zone` / `trap` / `totem` / `aura`) vừa dựng: `id` (số nguyên tăng dần THEO PHÒNG) để `fxEnd` gỡ đúng cái; (x, y) tâm, `r` bán kính, `ms` thời gian tồn tại tối đa. `zone` / `trap` /
+   * `totem` ĐỨNG YÊN ở (x, y); `aura` BÁM THEO người dùng `by` (client vẽ theo vị trí của thực thể `by`, (x, y) chỉ là chỗ lúc dựng). Gửi MỘT lần (`sendNear`); người đi VÀO vùng nhìn sau lúc dựng KHÔNG thấy nó (sát thương vẫn tính), nối lại mạng thì hình mất: chấp nhận vì vật thể ngắn.
+   */
+  | {
+      kind: "zone" | "trap" | "totem" | "aura";
+      by: string;
+      skill: string;
+      id: number;
+      x: number;
+      y: number;
+      r: number;
+      ms: number;
+    }
+  /** Vật thể bền `id` kết thúc SỚM hơn `ms`: `pop` (bẫy nổ) hoặc `gone` (chủ chết / rời / qua cổng, bị thay, vùng cũ nhất bị đẩy). (x, y) = chỗ vật thể đứng (để `sendNear` chỉ gửi cho người ở gần). */
+  | { kind: "fxEnd"; id: number; x: number; y: number; why: "pop" | "gone" };
+// CHIÊU VẬN (`SkillDef.windupMs`, mục 51): trạng thái `windup` chỉ nằm trong danh sách RIÊNG của người vận (`StatusMsg` gửi chủ), người đứng cạnh KHÔNG nhận nó. Người khác biết ai đang vận nhờ tin
+// `fx` `cast` máy chủ gửi lúc BẮT ĐẦU vận (client tra `windupMs` từ `skill` để vẽ vòng tụ khí trong chừng đó); hiệu ứng của hình (`pbolt` / `chain` / `zone`...) gửi lúc ĐÁP, sau `windupMs`.
+// Vận bị ngắt (choáng, chết, hồn lìa xác, qua cổng) thì máy chủ KHÔNG gửi thêm tin nào: client tự tắt vòng tụ khí khi thấy người vận choáng / chết hoặc quá `windupMs` (hở tối đa `WINDUP_MAX_MS`).
+/** Số điểm tối đa của `FxMsg` `chain` (người dùng + `SKILL_LIMITS.chainBouncesMax` lần nảy + 1 mục tiêu đầu). */
+export const CHAIN_FX_POINTS_MAX = 6;
 export interface DmgMsg {
   target: string;
   amount: number;
@@ -540,6 +577,11 @@ export interface DmgMsg {
   y: number;
   crit?: boolean;
   toPlayer?: boolean;
+  /**
+   * Đòn này ĂN COMBO (mục 51, CT1b: chiêu có `combo` gỡ DẤU `mark_<hệ>` trên mục tiêu và nhân sát thương): client vẽ vụ nổ dấu theo hệ ngay chỗ trúng (x, y). TUỲ CHỌN: client cũ bỏ qua
+   * trường lạ nên chỉ thấy con số to hơn (review B ở #1084). Máy chủ chỉ đặt `true` khi thật sự gỡ dấu.
+   */
+  combo?: boolean;
 }
 export interface ChatOut {
   from: string;
@@ -550,6 +592,12 @@ export interface ChatOut {
    * kể cả thành viên ở bản đồ khác; bỏ trống là chat chung **cả server** (mọi bản đồ / phòng, đi qua kênh chung giữa các phòng, M3 bước 1)
    */
   channel?: "party" | "sect";
+  /**
+   * Danh hiệu của người nói (M9, `docs/PHAN_CONG_M9.md`): ID NGẮN (`TITLE_ID_RE`, cùng `Player.title`), client tra `TITLES` ra chữ; thiếu / rỗng = không đeo danh hiệu.
+   * Máy chủ điền từ `Player.title` LÚC GỬI (không bao giờ tin client). Tin hệ thống (`sys`) và chat không có người nói thì bỏ trống. Client KHÔNG hiện id lạ ra màn hình
+   * (máy chủ mới hơn client). Chỉ hiện khi cờ `?social=1` bật (đến khi M9 phát hành).
+   */
+  titleId?: string;
 }
 export interface ToastMsg {
   text: string;

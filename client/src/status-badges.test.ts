@@ -109,7 +109,8 @@ describe("status-badges: badgeViews", () => {
       STATUSES.map((s) => [s.id, 3000, 0.1]),
       0,
     );
-    expect(badgeViews(t.active(0)).length).toBe(MAX_STATUSES);
+    // `windup` (vận khí) NGOÀI trần MAX_STATUSES (mục 51): MAX_STATUSES ô đếm được + ô vận khí
+    expect(badgeViews(t.active(0)).length).toBe(MAX_STATUSES + 1);
   });
 
   it("effectText: mọi loại trạng thái trong bảng đều có câu (không để trống)", () => {

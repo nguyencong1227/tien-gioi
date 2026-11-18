@@ -251,6 +251,24 @@ export const NPCS: NpcDef[] = [
     ],
     color: 0xb07a3a,
   },
+  {
+    // Bàn phù (nghề nhỏ lát 2, #514/#817): trạm talisman ở Lạc Hà Trấn. Đứng lệch phải trên của tâm trấn, cách mọi NPC
+    // khác > 64 px (test giữ); phù tăng sát thương chiêu cùng hệ trong 60 giây hoặc giảm hồi chiêu, chế từ đồ quái rơi.
+    id: "lao_phu",
+    name: "Tô Linh Ấn",
+    title: "Lão phù sư",
+    station: "talisman",
+    x: TOWN_PX.x + 40,
+    y: TOWN_PX.y - 40,
+    dialog: [
+      "Bàn phù ta nhóm hương trầm cả ngày, vẽ phù trấn yêu cho kẻ qua lại. Mang nguyên liệu yêu thú tới, ta chế phù cho đạo hữu.",
+      "Phù tăng sát thương hệ nào thì chỉ mạnh với chiêu cùng hệ, dùng đúng lúc mới đáng đồng tiền bát gạo.",
+      "Chế phù tốn Linh thạch và nguyên liệu quý, nhưng vào trận một lá phù đúng hệ, quái to cũng nhanh xuống ngựa.",
+      "Phù chỉ có hạn sáu mươi giây, qua cổng hay thoát là mất; dùng sát khi vào đánh mới khỏi phí.",
+      "Đừng vọng tưởng phù thay được công phu tu luyện, nó chỉ là chút trợ lực nhất thời cho kẻ đang gấp.",
+    ],
+    color: 0x7a5aa0,
+  },
 ];
 
 export const NPC_BY_ID: Record<string, NpcDef> = Object.fromEntries(NPCS.map((n) => [n.id, n]));

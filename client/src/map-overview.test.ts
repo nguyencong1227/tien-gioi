@@ -131,7 +131,7 @@ describe("map-overview: dữ liệu tổng quan", () => {
     expect(ov.zones[2].kindIds).toEqual(["lang", "ho"]);
   });
 
-  it("Âm Sương: ba khu Kim Đan theo cấp tăng dần và trùm Hắc Giao 2 con; không có Hôi Lang / Hắc Hổ", () => {
+  it("Âm Sương: ba khu Kim Đan theo cấp tăng dần và trùm Hắc Giao 6 con; không có Hôi Lang / Hắc Hổ", () => {
     const ov = getMapOverview("am_suong")!;
     expect(ov.zones.map((z) => z.kindId)).toEqual(["suong_ho", "thach_quy", "doc_thiem"]);
     expect(ov.zones.map((z) => z.levelLabel)).toEqual([
@@ -139,7 +139,7 @@ describe("map-overview: dữ liệu tổng quan", () => {
       "Kim Đan trung kỳ",
       "Kim Đan hậu kỳ",
     ]);
-    expect(ov.bosses).toEqual([expect.objectContaining({ kindId: "hac_giao", cap: 2 })]);
+    expect(ov.bosses).toEqual([expect.objectContaining({ kindId: "hac_giao", cap: 6 })]);
     expect(ov.zones.flatMap((z) => z.kindIds)).not.toContain("lang");
   });
 

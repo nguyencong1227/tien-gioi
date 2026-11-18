@@ -292,8 +292,9 @@ async function main() {
           small.length === 0,
           `mọi nút >= ${MIN_TAP_PX} px (nhỏ nhất ${Math.min(...bs.map((b) => b.h))} px)`,
         );
+        // chỉ năm nút của bảng Tông môn: `.sect-tab` còn là lớp của ba tab bảng Xã hội (M9, `#social-tabs`), đang ẩn nên đo ra 0 px
         const tabBtns = await evalJs(
-          `[...document.querySelectorAll(".sect-tab")].map((b) => Math.round(b.getBoundingClientRect().height))`,
+          `[...document.querySelectorAll("#sect-tab-btn-overview, #sect-tab-btn-members, #sect-tab-btn-treasury, #sect-tab-btn-vault, #sect-tab-btn-hall")].map((b) => Math.round(b.getBoundingClientRect().height))`,
         );
         check(
           tabBtns.every((h) => h >= MIN_TAP_PX),

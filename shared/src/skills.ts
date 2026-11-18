@@ -27,6 +27,20 @@
 // ---------------------------------------------------------------------------------------------------------------
 
 import { STAT_CAPS } from "./stat-caps";
+import {
+  MASTERY_NEED,
+  SKILL_TIER_MAX,
+  TURN_MS,
+  skillEffect,
+  skillMaxLevelOf,
+  type SkillGrade,
+  type SkillStyle,
+} from "./skill-kit";
+import { SKILLS_KIM_THO } from "./skills-kim-tho";
+import { SKILLS_MOC_THUY } from "./skills-moc-thuy";
+import { SKILLS_HOA } from "./skills-hoa";
+import { SKILLS_KHAC } from "./skills-khac";
+import { SKILLS_DANG_MOI } from "./skills-dang-moi";
 
 /** Pha ngũ hành dùng để tính khắc: kim, mộc, thủy, hỏa, thổ; `none` = vô sắc (không khắc, không bị khắc). */
 export type Phase = "kim" | "moc" | "thuy" | "hoa" | "tho" | "none";
@@ -130,7 +144,12 @@ export type StatusId =
   | "dao_ho"
   // Nghề nhỏ lát 2 (#514, phù): tăng sát thương chiêu của một hệ, giảm hồi chiêu
   | `amp_${AmpElement}`
-  | "cdr_phu";
+  | "cdr_phu"
+  // Đợt thêm chiêu (mục 51, CT1b): tự tăng sát thương, "suy" (quái yếu đi), DẤU hệ (combo), vận khí (chiêu vận)
+  | "empower"
+  | "weaken"
+  | `mark_${AmpElement}`
+  | "windup";
 
 /**
  * Loại tác dụng của trạng thái và ý nghĩa của `ratio` ở `SkillEffect`:
@@ -142,9 +161,27 @@ export type StatusId =
  *    gỡ ngay sau lần đó dù thành công hay thất bại; hết hạn mà chưa dùng thì mất;
  *  - `amp` (#514 lát 2, phù `amp_<hệ>`): sát thương GÂY RA của chiêu cùng hệ nhân `1 + ratio` (`statusAmpMult`); không áp cho đòn thường và chiêu hệ khác;
  *  - `cdr` (#514 lát 2, `cdr_phu`): cộng `ratio` vào giảm hồi chiêu của trang bị (`statusCdr`), tổng vẫn kẹp `CDR_CAP`.
+ *  - `empower` (mục 51, TỰ buff): sát thương GÂY RA của MỌI chiêu nhân `1 + ratio` (`statusEmpowerMult`), tối đa +50%, không áp cho đòn thường;
+ *  - `weaken` (mục 51, "suy", có hại): mục tiêu GÂY ít sát thương hơn `ratio` (tối đa 40%; trùm chỉ chịu nửa); lên đầu quái bằng bit `STATUS_BIT.weaken`;
+ *  - `mark` (mục 51, DẤU hệ `mark_<hệ>`, có hại, không sát thương, không `ratio`): chiêu có `combo.needs` = dấu đó và CÙNG hệ thì được thưởng (nhân sát thương, gỡ dấu).
+ *    Máy chủ giữ nhiều dấu trong `status`; lên đầu quái chỉ MỘT dấu mới nhất qua `Monster.mark` (1-9 = hệ theo `markIndexOf`, 0 = không dấu).
+ * `windup` (vận khí, mục 51) mang kind `slow` (ratio `WINDUP_SLOW`) để `moveSpeedMul` dự đoán tốc độ đúng miễn phí; KHÔNG tính vào `MAX_STATUSES` (`STATUS_UNCOUNTED`)
+ * và không bao giờ bị từ chối; vật phẩm không gắn được (`STATUS_SKILL_ONLY`).
  */
 export type StatusKind =
-  "dot" | "slow" | "vuln" | "stun" | "shield" | "haste" | "regen" | "breakAid" | "amp" | "cdr";
+  | "dot"
+  | "slow"
+  | "vuln"
+  | "stun"
+  | "shield"
+  | "haste"
+  | "regen"
+  | "breakAid"
+  | "amp"
+  | "cdr"
+  | "empower"
+  | "weaken"
+  | "mark";
 
 export interface StatusDef {
   id: StatusId;
@@ -158,8 +195,8 @@ export interface StatusDef {
   maxRatio: number;
 }
 
-/** Một lượt của nguồn (trò chơi theo lượt) đổi sang thời gian thực. */
-export const TURN_MS = 1500;
+/** Một lượt của nguồn (trò chơi theo lượt) đổi sang thời gian thực (định nghĩa ở `skill-kit.ts`, lá của đồ thị import; xuất lại ở đây). */
+export { TURN_MS };
 /** Số trạng thái tối đa trên một mục tiêu; cùng loại thì LÀM MỚI (không cộng dồn). */
 export const MAX_STATUSES = 4;
 /** Choáng: tối đa 1,2 giây, trùm miễn, sau khi hết thì miễn choáng 3 giây (không choáng liền nhau). */
@@ -169,6 +206,18 @@ export const STUN_IMMUNE_MS = 3000;
 /** Phù (#514 lát 2): hiệu lực tối đa 60 giây; phù tăng sát thương tối đa +30% (ratio 0,3). `cdr_phu` tối đa 0,15 (tổng với trang bị vẫn kẹp `CDR_CAP` = 0,3). */
 export const AMP_MAX_MS = 60_000;
 export const AMP_MAX_RATIO = 0.3;
+
+/** Chiêu vận (mục 51): thời gian vận tối đa (ms), và mức làm chậm di chuyển của người đang vận (trạng thái `windup`, kind `slow`). */
+export const WINDUP_MAX_MS = 2500;
+export const WINDUP_SLOW = 0.5;
+/** `empower` tối đa +50% sát thương chiêu, 8 giây; `weaken` tối đa -40% sát thương gây ra, 8 giây; DẤU hệ 8 giây. */
+export const EMPOWER_MAX_RATIO = 0.5;
+export const WEAKEN_MAX_RATIO = 0.4;
+export const MARK_MAX_MS = 8000;
+/** Trạng thái KHÔNG tính vào `MAX_STATUSES` (luôn nhận được, không đẩy buff khác ra). */
+export const STATUS_UNCOUNTED: readonly StatusId[] = ["windup"];
+/** Trạng thái CHỈ chiêu gắn được; vật phẩm (`ItemEffect` kind `status`) không gắn được (`clampStatusEffect` từ chối). */
+export const STATUS_SKILL_ONLY: readonly StatusId[] = ["windup"];
 
 export const STATUSES: readonly StatusDef[] = [
   { id: "burn", name: "Bỏng", kind: "dot", harmful: true, maxMs: 8000, maxRatio: 0.5 },
@@ -199,6 +248,39 @@ export const STATUSES: readonly StatusDef[] = [
     maxMs: AMP_MAX_MS,
     maxRatio: 0.15,
   },
+  // Đợt thêm chiêu (mục 51, CT1b): id mới luôn thêm CUỐI để thứ tự cũ không đổi
+  {
+    id: "empower",
+    name: "Cường Lực",
+    kind: "empower",
+    harmful: false,
+    maxMs: 8000,
+    maxRatio: EMPOWER_MAX_RATIO,
+  },
+  {
+    id: "weaken",
+    name: "Suy Yếu",
+    kind: "weaken",
+    harmful: true,
+    maxMs: 8000,
+    maxRatio: WEAKEN_MAX_RATIO,
+  },
+  ...AMP_ELEMENTS.map((el): StatusDef => ({
+    id: `mark_${el}`,
+    name: `Dấu ${ELEMENT_BY_ID[el].name}`,
+    kind: "mark",
+    harmful: true,
+    maxMs: MARK_MAX_MS,
+    maxRatio: 0,
+  })),
+  {
+    id: "windup",
+    name: "Vận Khí",
+    kind: "slow",
+    harmful: false,
+    maxMs: WINDUP_MAX_MS,
+    maxRatio: WINDUP_SLOW,
+  },
 ];
 
 export const STATUS_BY_ID: Readonly<Record<string, StatusDef>> = Object.fromEntries(
@@ -223,6 +305,32 @@ export function ampElementOf(id: unknown): AmpElement | undefined {
   const def = statusOf(id);
   if (!def || def.kind !== "amp") return undefined;
   return AMP_ELEMENTS.find((el) => `amp_${el}` === def.id);
+}
+
+/** Id trạng thái DẤU của hệ `element` (`mark_<hệ>`); `undefined` cho `none` / giá trị lạ. */
+export function markStatusIdOf(element: unknown): StatusId | undefined {
+  return typeof element === "string" && (AMP_ELEMENTS as readonly string[]).includes(element)
+    ? (`mark_${element}` as StatusId)
+    : undefined;
+}
+
+/**
+ * Chỉ số 1..9 của hệ trong `Monster.mark` (`AMP_ELEMENTS` theo thứ tự: kim 1, moc 2, thuy 3, hoa 4, tho 5, bang 6, phong 7, loi 8, am 9; 0 = không dấu). Hằng của hợp đồng:
+ * hai phía không tự đánh số. `none` / giá trị lạ -> 0.
+ */
+export function markIndexOf(element: unknown): number {
+  const i = (AMP_ELEMENTS as readonly unknown[]).indexOf(element);
+  return i < 0 ? 0 : i + 1;
+}
+
+/** Ngược lại: hệ ứng với chỉ số `index` của `Monster.mark`; ngoài 1..9 / không nguyên -> `undefined`. */
+export function markElementOf(index: unknown): AmpElement | undefined {
+  return typeof index === "number" &&
+    Number.isInteger(index) &&
+    index >= 1 &&
+    index <= AMP_ELEMENTS.length
+    ? AMP_ELEMENTS[index - 1]
+    : undefined;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -250,10 +358,90 @@ export const SKILL_FX_IDS = [
   "fan_ice",
   "ground_earth",
   "aura_wind",
+  // Đợt thêm chiêu (mục 51, CT1b): id CHUNG theo hình / hành vi (màu theo hệ), KHÔNG một id mỗi chiêu
+  "bolt",
+  "chain",
+  "zone",
+  "trap",
+  "aura",
+  "totem",
+  "pull",
+  "push",
+  "windup",
 ] as const;
 export type SkillFxId = (typeof SKILL_FX_IDS)[number];
 
-export type SkillShape = "cone" | "line" | "fan" | "nova" | "ground" | "dash" | "self";
+export type SkillShape =
+  | "cone"
+  | "line"
+  | "fan"
+  | "nova"
+  | "ground"
+  | "dash"
+  | "self"
+  // Đợt thêm chiêu (mục 51, CT1b, docs/PHAN_CONG_CHIEU_THUC.md mục 3): xem `SkillDef` và `SKILL_LIMITS`
+  | "chain"
+  | "bolt"
+  | "zone"
+  | "trap"
+  | "aura"
+  | "totem";
+
+/** Mọi hình chiêu (cùng thứ tự với `SkillShape`): để luật kiểm dữ liệu / công cụ duyệt qua mà không chép danh sách. */
+export const SKILL_SHAPES: readonly SkillShape[] = [
+  "cone",
+  "line",
+  "fan",
+  "nova",
+  "ground",
+  "dash",
+  "self",
+  "chain",
+  "bolt",
+  "zone",
+  "trap",
+  "aura",
+  "totem",
+];
+
+/**
+ * Trần của dữ liệu chiêu mới (mục 51; `skillViolations` kiểm). `chain`: SÉT LAN trúng mục tiêu gần nhất rồi nảy sang quái gần nhất CHƯA trúng trong `chainReach`, mỗi lần nảy sát thương
+ * nhân `falloff`; `bolt`: ĐẠN BAY (`count` viên toả `arc`, `speed` px/giây, xuyên `pierce` quái, nảy `bounce` lần sang quái gần nhất trong 160 px, dừng ở ô chặn / hết `range`); `zone`: VÙNG đặt
+ * như `ground` tồn tại `durationMs`, mỗi `tickMs` gây `mult` + hiệu ứng; `trap`: BẪY đặt như `ground`, sau `armMs` mới hoạt động, nổ MỘT lần khi quái bước vào, hết `durationMs` thì tan;
+ * `aura`: HÀO QUANG quanh thân bám theo người trong `durationMs`, mỗi `tickMs` tác dụng quái trong `range`; `totem`: TƯỢNG triệu hồi ngắn đứng yên `durationMs`, mỗi `tickMs` đánh quái gần
+ * nhất trong `range` (`taunt`: thu hút quái nhắm). Mọi vật thể bền chỉ đánh QUÁI (PK đợt 1: chỉ chiêu tức thời + đạn qua `duelHit`), có trần theo người và theo phòng ở máy chủ (CT3 / CT4).
+ */
+export const SKILL_LIMITS = {
+  chainBouncesMax: 4,
+  chainReachMax: 220,
+  chainFalloffMin: 0.5,
+  boltCountMax: 5,
+  boltSpeedMin: 300,
+  boltSpeedMax: 700,
+  boltRangeMax: 560,
+  boltPierceMax: 3,
+  boltBounceMax: 2,
+  zoneDurationMax: 8000,
+  zoneTickMin: 400,
+  trapArmMin: 400,
+  trapDurationMax: 20_000,
+  auraDurationMax: 12_000,
+  auraTickMin: 500,
+  totemDurationMax: 8000,
+  totemTickMin: 800,
+  windupMin: 300,
+  /** `windupMs` tối đa = `WINDUP_MAX_MS` (đặt sau; giữ một nguồn). */
+  displaceMin: 20,
+  displaceMax: 200,
+  comboMultMax: 2,
+  allyRangeMax: 600,
+  /**
+   * Trần VẬT THỂ BỀN (`zone` / `trap` / `totem` / `aura`) cùng tồn tại: theo MỖI NGƯỜI và theo CẢ PHÒNG. Máy chủ giữ (CT3 / CT4: vượt thì vật thể cũ nhất của người đó / của phòng bị đẩy, `fxEnd`
+   * `gone`); client dùng ĐÚNG số này để cấp bể hạt (vẽ tối đa chừng đó, gần người chơi nhất trước). TẠM: CT3 / CT4 chốt bằng đo; đổi thì đổi ở đây, hai bên đọc cùng một nguồn.
+   */
+  persistPerPlayerMax: 4,
+  persistPerRoomMax: 60,
+} as const;
 
 export interface SkillEffect {
   status: StatusId;
@@ -303,14 +491,42 @@ export interface SkillDef {
   price: number;
   /** Kiểu hiệu ứng client (`FxMsg` `cast`, `SKILL_FX_IDS`); ghép với hệ để chọn màu */
   fx: SkillFxId;
+  /** TUỲ CHỌN (mục 51): phong cách chiêu để client chọn hình biểu tượng (`SKILL_STYLES`, `skill-kit.ts`); thiếu thì client suy theo `shape`. */
+  style?: SkillStyle;
+  /** TUỲ CHỌN (mục 51): phẩm cấp Hoàng / Huyền / Địa / Thiên (`SKILL_GRADES`); thiếu thì suy theo `rarity`. */
+  grade?: SkillGrade;
+  // ----- Đợt thêm chiêu (mục 51, CT1b): mọi trường dưới đây TUỲ CHỌN, 18 chiêu cũ không có -----
+  /** `chain`: số lần nảy thêm (0..`SKILL_LIMITS.chainBouncesMax`). */
+  bounces?: number;
+  /** `chain`: tầm nhảy giữa hai mục tiêu (px, <= `chainReachMax`). */
+  chainReach?: number;
+  /** `chain`: hệ số sát thương mỗi lần nảy (`chainFalloffMin`..1; thiếu = 0,85). */
+  falloff?: number;
+  /** `bolt`: tốc độ bay (px/giây). */
+  speed?: number;
+  /** `bolt`: xuyên thêm bao nhiêu quái (0..3). */
+  pierce?: number;
+  /** `bolt`: số lần nảy sang quái gần nhất (0..2). */
+  bounce?: number;
+  /** `zone` / `trap` / `aura` / `totem`: thời gian tồn tại (ms). */
+  durationMs?: number;
+  /** `zone` / `aura` / `totem`: nhịp tác dụng (ms). */
+  tickMs?: number;
+  /** `trap`: thời gian chờ kích hoạt sau khi đặt (ms). */
+  armMs?: number;
+  /** `totem`: thu hút quái nhắm vào tượng. */
+  taunt?: boolean;
+  /** CHIÊU VẬN: vận khí chừng này (ms, `windupMin`..`WINDUP_MAX_MS`) rồi mới đáp; tiêu hao + hồi chiêu tính lúc BẮT ĐẦU; choáng / chết / hồn lìa xác huỷ; người vận chậm `WINDUP_SLOW`. */
+  windupMs?: number;
+  /** KÉO / ĐẨY mục tiêu trúng `px` (qua va chạm); trùm miễn, tinh anh nửa quãng. */
+  displace?: { dir: "pull" | "push"; px: number };
+  /** COMBO: đánh vào mục tiêu ĐANG mang trạng thái `needs` thì nhân sát thương `mult` (1..`comboMultMax`, thiếu = 1,4), gắn thêm `apply`, và gỡ `needs` nếu `consume`. */
+  combo?: { needs: StatusId; mult?: number; consume?: boolean; apply?: SkillEffect };
+  /** Trạng thái CÓ LỢI của chiêu (hộ thể / tăng tốc / hồi phục) cũng lên đồng đội CÙNG ĐỘI trong `range` px. */
+  ally?: { range: number };
 }
 
-const fx = (status: StatusId, turns: number, ratio: number, chance: number): SkillEffect => ({
-  status,
-  ms: Math.round(turns * TURN_MS),
-  ratio,
-  chance,
-});
+const fx = skillEffect;
 
 /**
  * 12 chiêu đợt 1 (kế hoạch mục 5.3), toàn bộ lấy từ công pháp CÓ chiêu của nguồn (phẩm cấp 1-3). Số là số khởi điểm.
@@ -670,8 +886,22 @@ export const SKILLS_M7: readonly SkillDef[] = [
   },
 ];
 
+/**
+ * MỌI chiêu HỌC ĐƯỢC của trò chơi (mục 51; tên `LEARNABLE_SKILLS` vì `SKILLS` đã là bảng hai chiêu cố định ô 1 ở `game.ts`): 18 chiêu `SKILLS_M7` + các tệp dữ liệu theo nhóm hệ để PR của D / E / G không xung đột (`skills-kim-tho.ts`, `skills-moc-thuy.ts`,
+ * `skills-hoa.ts`, `skills-khac.ts` = Phong / Lôi / Băng / Âm / vô sắc). Kinh quyển, tra cứu, sổ chiêu, luật kiểm `skillViolations` đều đọc `LEARNABLE_SKILLS` (không đọc `SKILLS_M7`,
+ * vẫn giữ để test ghim 18 chiêu gốc). Thứ tự = thứ tự hiện ở bảng Công pháp.
+ */
+export const LEARNABLE_SKILLS: readonly SkillDef[] = [
+  ...SKILLS_M7,
+  ...SKILLS_KIM_THO,
+  ...SKILLS_MOC_THUY,
+  ...SKILLS_HOA,
+  ...SKILLS_KHAC,
+  ...SKILLS_DANG_MOI,
+];
+
 export const SKILL_BY_ID: Readonly<Record<string, SkillDef>> = Object.fromEntries(
-  SKILLS_M7.map((s) => [s.id, s]),
+  LEARNABLE_SKILLS.map((s) => [s.id, s]),
 );
 
 /** Tra chiêu theo id không tin được (tin nhắn client, file lưu): id lạ / độc -> `undefined`. */
@@ -703,20 +933,26 @@ export function skillCooldownMs(def: Pick<SkillDef, "cooldown">, level: number, 
 // Tầng, ô chiêu, sổ chiêu của nhân vật
 // ---------------------------------------------------------------------------------------------------------------
 
-/** Tầng học tối đa của một chiêu (học thêm kinh quyển trùng thì +1 tầng). */
+/** Tầng học tối đa của chiêu KHÔNG khai phẩm (18 chiêu cũ): 3 (học thêm kinh quyển trùng thì +1 tầng). Chiêu có phẩm: `skillMaxLevelOf` (Hoàng 3 / Huyền 4 / Địa 5 / Thiên 6). */
 export const SKILL_MAX_LEVEL = 3;
-/** Mỗi tầng trên tầng 1: +15% sát thương và -8% hồi chiêu (đề xuất, M7.9 chỉnh). */
+/** Mỗi tầng trên tầng 1 (tầng 1-3): +15% sát thương và -8% hồi chiêu (đề xuất, M7.9 chỉnh). Tầng 4-6 theo bảng dưới (tăng chậm dần). */
 export const SKILL_LEVEL_DAMAGE = 0.15;
 export const SKILL_LEVEL_COOLDOWN = 0.08;
+/** Hệ số sát thương / hồi chiêu theo tầng 1..6 (tầng 1-3 TRÙNG công thức tuyến tính cũ: `1 + 0,15 (l - 1)`, `1 - 0,08 (l - 1)`). */
+export const SKILL_LEVEL_DAMAGE_TABLE: readonly number[] = [1, 1.15, 1.3, 1.4, 1.5, 1.6];
+export const SKILL_LEVEL_COOLDOWN_TABLE: readonly number[] = [1, 0.92, 0.84, 0.8, 0.76, 0.72];
+
+/** Tầng kẹp [1, `SKILL_TIER_MAX`] (số lạ -> 1). */
+function tierClamp(level: number): number {
+  return Math.min(SKILL_TIER_MAX, Math.max(1, Math.floor(Number.isFinite(level) ? level : 1)));
+}
 
 export function skillDamageMult(level: number): number {
-  const l = Math.min(SKILL_MAX_LEVEL, Math.max(1, Math.floor(Number.isFinite(level) ? level : 1)));
-  return 1 + SKILL_LEVEL_DAMAGE * (l - 1);
+  return SKILL_LEVEL_DAMAGE_TABLE[tierClamp(level) - 1]!;
 }
 
 export function skillCooldownMult(level: number): number {
-  const l = Math.min(SKILL_MAX_LEVEL, Math.max(1, Math.floor(Number.isFinite(level) ? level : 1)));
-  return 1 - SKILL_LEVEL_COOLDOWN * (l - 1);
+  return SKILL_LEVEL_COOLDOWN_TABLE[tierClamp(level) - 1]!;
 }
 
 /** Các ô chiêu học được: L U I O = ô 2-5 (ô 1 là Kiếm chém, Kiếm khí đứng riêng). */
@@ -738,16 +974,69 @@ export function slotOpen(slot: unknown, realm: number): boolean {
 export interface SkillBook {
   learned: Record<string, number>;
   slots: [string, string, string, string];
+  /**
+   * ĐIỂM LUYỆN dở dang của từng chiêu (CT5; id chiêu -> điểm, số nguyên >= 0, `< MASTERY_NEED` của tầng hiện tại). TUỲ CHỌN: file lưu cũ không có = chưa luyện gì. Chỉ có mục cho chiêu đã học
+   * còn luyện được (`masteryNeedOf` khác `null`); `sanitizeSkillBook` kẹp. Khắc chân linh KHÔNG mang (luyện lại ở kiếp mới).
+   */
+  mastery?: Record<string, number>;
 }
 
 export function emptySkillBook(): SkillBook {
   return { learned: {}, slots: ["", "", "", ""] };
 }
 
-function levelClamp(v: unknown): number {
+function levelClamp(v: unknown, max: number = SKILL_MAX_LEVEL): number {
   return typeof v === "number" && Number.isFinite(v)
-    ? Math.min(SKILL_MAX_LEVEL, Math.max(1, Math.floor(v)))
+    ? Math.min(max, Math.max(1, Math.floor(v)))
     : 1;
+}
+
+/**
+ * Điểm luyện cần để lên tầng kế của chiêu `def` đang ở tầng `level`; `null` = KHÔNG luyện được nữa (đã tới tầng tối đa - 1: tầng cuối chỉ bằng kinh quyển trùng; hoặc tầng không hợp lệ).
+ * Chiêu cũ (tối đa tầng 3) luyện được từ tầng 1 lên 2; tầng 3 chỉ bằng quyển.
+ */
+export function masteryNeedOf(def: { grade?: unknown }, level: number): number | null {
+  if (typeof level !== "number" || !Number.isInteger(level) || level < 1) return null;
+  return level < skillMaxLevelOf(def) - 1 && level <= MASTERY_NEED.length
+    ? MASTERY_NEED[level - 1]!
+    : null;
+}
+
+/**
+ * Cộng `points` điểm luyện cho chiêu `def` trong `book` (trả sổ MỚI, không sửa sổ cũ). Đủ `masteryNeedOf` thì lên tầng kế và chuyển phần dư sang tầng sau (lên liền nhiều tầng nếu đủ điểm),
+ * dừng ở tầng tối đa - 1. Chiêu chưa học / không luyện được / `points` không dương: trả nguyên sổ. `leveledTo` = tầng mới nếu có lên tầng.
+ */
+export function addMastery(
+  book: SkillBook,
+  def: { id: string; grade?: unknown },
+  points: number,
+): { book: SkillBook; leveledTo?: number } {
+  const has = Object.prototype.hasOwnProperty;
+  if (!has.call(book.learned, def.id) || !(points > 0) || !Number.isFinite(points)) return { book };
+  let level = book.learned[def.id]!;
+  let have =
+    (book.mastery && has.call(book.mastery, def.id) ? book.mastery[def.id]! : 0) +
+    Math.floor(points);
+  const start = level;
+  for (;;) {
+    const need = masteryNeedOf(def, level);
+    if (need === null) {
+      have = 0;
+      break;
+    }
+    if (have < need) break;
+    have -= need;
+    level += 1;
+  }
+  const mastery = { ...(book.mastery ?? {}) };
+  if (have > 0) mastery[def.id] = have;
+  else delete mastery[def.id];
+  const next: SkillBook = {
+    learned: level === start ? book.learned : { ...book.learned, [def.id]: level },
+    slots: book.slots,
+    ...(Object.keys(mastery).length > 0 ? { mastery } : {}), // không còn điểm nào thì không có trường (như `sanitizeSkillBook`)
+  };
+  return level === start ? { book: next } : { book: next, leveledTo: level };
 }
 
 /**
@@ -760,10 +1049,25 @@ export function sanitizeSkillBook(raw: unknown, realm: number): SkillBook {
   const r = raw as Record<string, unknown>;
   if (r.learned !== null && typeof r.learned === "object" && !Array.isArray(r.learned)) {
     const src = r.learned as Record<string, unknown>;
-    for (const def of SKILLS_M7) {
+    for (const def of LEARNABLE_SKILLS) {
       if (Object.prototype.hasOwnProperty.call(src, def.id))
-        out.learned[def.id] = levelClamp(src[def.id]);
+        out.learned[def.id] = levelClamp(src[def.id], skillMaxLevelOf(def));
     }
+  }
+  // Điểm luyện dở dang (CT5): chỉ cho chiêu ĐÃ HỌC còn luyện được, số nguyên 0 <= điểm < cần để lên tầng kế; không có / rác thì bỏ
+  if (r.mastery !== null && typeof r.mastery === "object" && !Array.isArray(r.mastery)) {
+    const src = r.mastery as Record<string, unknown>;
+    const mastery: Record<string, number> = {};
+    for (const def of LEARNABLE_SKILLS) {
+      if (!Object.prototype.hasOwnProperty.call(src, def.id)) continue;
+      const level = out.learned[def.id];
+      const need = level === undefined ? null : masteryNeedOf(def, level);
+      const v = src[def.id];
+      if (need === null || typeof v !== "number" || !Number.isFinite(v)) continue;
+      const pts = Math.min(need - 1, Math.max(0, Math.floor(v)));
+      if (pts > 0) mastery[def.id] = pts;
+    }
+    if (Object.keys(mastery).length > 0) out.mastery = mastery;
   }
   if (Array.isArray(r.slots)) {
     const used = new Set<string>();
@@ -777,6 +1081,17 @@ export function sanitizeSkillBook(raw: unknown, realm: number): SkillBook {
     }
   }
   return out;
+}
+
+/** `{ mastery }` của sổ cũ (bản sao) nếu có, để hàm tạo sổ mới không làm rơi điểm luyện. */
+function keepMastery(book: SkillBook): { mastery?: Record<string, number> } {
+  return book.mastery ? { mastery: { ...book.mastery } } : {};
+}
+
+function omitKey(o: Record<string, number>, k: string): Record<string, number> {
+  const { [k]: _drop, ...rest } = o;
+  void _drop;
+  return rest;
 }
 
 export type LearnResult =
@@ -811,10 +1126,12 @@ export function learnSkill(
   if (!def) return { ok: false, reason: "unknown" };
   if (!skillReqMet(def, realm, tier)) return { ok: false, reason: "realm" };
   const cur = Object.prototype.hasOwnProperty.call(book.learned, def.id) ? book.learned[def.id] : 0;
-  if (cur >= SKILL_MAX_LEVEL) return { ok: false, reason: "maxed" };
+  if (cur >= skillMaxLevelOf(def)) return { ok: false, reason: "maxed" };
   const next: SkillBook = {
     learned: { ...book.learned, [def.id]: cur + 1 },
     slots: [...book.slots] as SkillBook["slots"],
+    // quyển trùng lên tầng thì điểm luyện dở dang của tầng cũ KHÔNG còn nghĩa: bỏ (luyện lại từ 0 ở tầng mới)
+    ...(book.mastery ? { mastery: omitKey(book.mastery, def.id) } : {}),
   };
   return { ok: true, level: cur + 1, book: next };
 }
@@ -839,7 +1156,7 @@ export function assignSlot(
   const idx = LEARNABLE_SLOTS.indexOf(slot);
   if (skillId === "") {
     slots[idx] = "";
-    return { ok: true, book: { learned: { ...book.learned }, slots } };
+    return { ok: true, book: { learned: { ...book.learned }, slots, ...keepMastery(book) } };
   }
   const def = skillOf(skillId);
   if (!def) return { ok: false, reason: "unknown" };
@@ -847,7 +1164,7 @@ export function assignSlot(
     return { ok: false, reason: "notLearned" };
   for (let i = 0; i < slots.length; i++) if (slots[i] === def.id) slots[i] = "";
   slots[idx] = def.id;
-  return { ok: true, book: { learned: { ...book.learned }, slots } };
+  return { ok: true, book: { learned: { ...book.learned }, slots, ...keepMastery(book) } };
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -892,6 +1209,11 @@ export interface SkillsMsg {
    * để vẽ vòng hồi chiêu mà không cần biết `cdr`.
    */
   cdMax: [number, number, number, number];
+  /**
+   * ĐIỂM LUYỆN dở dang của chiêu đã học (TUỲ CHỌN, CT5; id -> điểm, như `SkillBook.mastery`): gửi khi mở sổ chiêu, khi lên tầng, tối đa 1 lần / 30 giây; client tự cộng giữa hai lần gửi CHỈ để
+   * hiện thanh tiến độ (`masteryNeedOf` cho mẫu số). Client cũ bỏ qua trường lạ.
+   */
+  mastery?: Record<string, number>;
 }
 
 /**
@@ -913,7 +1235,8 @@ export function statusCarriesRatio(id: unknown): boolean {
       def.kind === "slow" ||
       def.kind === "breakAid" ||
       def.kind === "amp" ||
-      def.kind === "cdr")
+      def.kind === "cdr" ||
+      def.kind === "empower")
   );
 }
 
@@ -928,7 +1251,7 @@ export function clampStatusEffect(e: {
   ms: unknown;
 }): { id: StatusId; ratio: number; ms: number } | null {
   const def = statusOf(e.id);
-  if (!def || def.harmful) return null;
+  if (!def || def.harmful || (STATUS_SKILL_ONLY as readonly string[]).includes(def.id)) return null;
   if (typeof e.ms !== "number" || !Number.isFinite(e.ms) || e.ms < 1) return null;
   if (typeof e.ratio !== "number" || !Number.isFinite(e.ratio) || e.ratio < 0) return null;
   return {
@@ -991,6 +1314,14 @@ export function statusCdr(list: readonly StatusEntry[]): number {
 }
 
 /**
+ * Hệ số nhân sát thương GÂY RA của MỌI chiêu (không phân hệ, không áp cho đòn thường) từ `empower` còn hiệu lực trong `list` (danh sách của CHÍNH MÌNH): `1 + ratio`
+ * (ratio kẹp [0, `EMPOWER_MAX_RATIO`]). 1 khi không có. Nhân CÙNG `statusAmpMult` (hai hệ số nhân với nhau).
+ */
+export function statusEmpowerMult(list: readonly StatusEntry[]): number {
+  return 1 + activeRatio(list, "empower");
+}
+
+/**
  * Làm sạch danh sách trạng thái nhận từ server (client không tin tin nhắn, như mọi tin khác): chỉ giữ mục có id trong bảng và `msLeft` hữu hạn > 0
  * (kẹp `maxMs`), `ratio` chỉ giữ cho loại mang ratio (`statusCarriesRatio`: tăng tốc / tê cóng / hộ đạo / phù; kẹp [0, `maxRatio`], thiếu thì 0); mỗi id một lần; tối đa `MAX_STATUSES` mục.
  * Không phải mảng thì rỗng.
@@ -999,10 +1330,17 @@ export function sanitizeStatusList(raw: unknown): StatusEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: StatusEntry[] = [];
   for (const e of raw) {
-    if (out.length >= MAX_STATUSES) break;
     if (!Array.isArray(e)) continue;
     const def = statusOf(e[0]);
     if (!def || out.some((x) => x[0] === def.id)) continue;
+    // `windup` (vận khí) KHÔNG tính vào trần `MAX_STATUSES`: luôn nhận được, không đẩy buff khác ra
+    const counted = !(STATUS_UNCOUNTED as readonly string[]).includes(def.id);
+    if (
+      counted &&
+      out.filter((x) => !(STATUS_UNCOUNTED as readonly string[]).includes(x[0])).length >=
+        MAX_STATUSES
+    )
+      continue;
     if (typeof e[1] !== "number" || !Number.isFinite(e[1]) || e[1] <= 0) continue;
     const ms = Math.min(def.maxMs, e[1]);
     if (statusCarriesRatio(def.id)) {
@@ -1027,7 +1365,8 @@ export interface StatusMsg {
 
 /**
  * Bit của các trạng thái CÓ HẠI trong byte công khai `Monster.fx` (M7.3; client vẽ biểu tượng lên đầu quái). Thứ tự bit là hằng của hợp đồng
- * để hai phía không tự đánh số; buff (`shield`, `haste`, `regen`) không lên quái nên không có bit (6 bit: vừa một byte).
+ * để hai phía không tự đánh số; buff (`shield`, `haste`, `regen`) không lên quái nên không có bit. Mục 51 thêm `weaken` = 64 (7 / 8 bit: còn đúng bit 128 cho `root` của đợt 2);
+ * DẤU hệ (`mark_<hệ>`, 9 loại) KHÔNG có bit ở đây vì không đủ chỗ: lên đầu quái qua trường riêng `Monster.mark` (`markIndexOf`).
  */
 export const STATUS_BIT: Readonly<Partial<Record<StatusId, number>>> = {
   burn: 1,
@@ -1036,9 +1375,10 @@ export const STATUS_BIT: Readonly<Partial<Record<StatusId, number>>> = {
   chill: 8,
   sunder: 16,
   stun: 32,
+  weaken: 64,
 };
 
-/** Mặt nạ bit (số nguyên 0..63) của các trạng thái có hại trong `ids`; id lạ và buff bị bỏ. */
+/** Mặt nạ bit (số nguyên 0..127) của các trạng thái có hại trong `ids`; id lạ, buff và DẤU hệ (xem `markIndexOf`) bị bỏ. */
 export function statusMask(ids: Iterable<unknown>): number {
   let m = 0;
   for (const id of ids) {

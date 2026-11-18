@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { getMap } from "@tien-gioi/shared";
+import { MAP_STYLES } from "./gfx/map-style";
 import {
   applyMapCard,
   MAP_CARD_DIR,
@@ -71,6 +72,36 @@ describe("MAP_CARDS: mỗi ảnh đã khai là ảnh CÓ THẬT, có nguồn, c�
         true,
       );
     }
+  });
+});
+
+describe("MAP_CARDS phủ MỌI bản đồ có kiểu riêng (bản đồ mới phải có thẻ, hoặc được miễn kèm lý do)", () => {
+  /** Bản đồ KHÔNG có thẻ minh hoạ, kèm lý do. Rỗng: cả năm bản đồ của lô 1 đều có. */
+  const EXEMPT: Record<string, string> = {};
+
+  it("mỗi mapId trong MAP_STYLES có dòng ở MAP_CARDS (trừ danh sách miễn)", () => {
+    for (const id of Object.keys(MAP_STYLES)) {
+      if (id in EXEMPT) {
+        expect(EXEMPT[id], `${id}: miễn thì phải có lý do`).not.toBe("");
+        continue;
+      }
+      expect(Object.keys(MAP_CARDS), `thiếu thẻ cho bản đồ ${id}`).toContain(id);
+    }
+  });
+
+  it("hai bản đồ không dùng chung một ảnh; ảnh nằm trong ngân sách mỗi ảnh (perf-budget.json)", () => {
+    const files = Object.values(MAP_CARDS);
+    expect(new Set(files).size).toBe(files.length);
+    const budget = JSON.parse(read("client/perf-budget.json")) as {
+      static: { aiAssets: { maxFileKb: number; totalKb: number } };
+    };
+    let total = fs.statSync(path.join(root, "client/public/assets/ai/login_bg.webp")).size;
+    for (const f of files) {
+      const size = fs.statSync(path.join(root, "client/public/assets/ai", f)).size;
+      expect(size / 1024, f).toBeLessThanOrEqual(budget.static.aiAssets.maxFileKb);
+      total += size;
+    }
+    expect(total / 1024).toBeLessThanOrEqual(budget.static.aiAssets.totalKb);
   });
 });
 
@@ -176,5 +207,38 @@ describe("canh nối mã: màn chuyển cảnh nhận mapId đích", () => {
     expect(i).toBeGreaterThan(0);
     const before = main.slice(Math.max(0, i - 700), i);
     expect(before).toMatch(/import\.meta\.env\.DEV[^]*has\("debug"\)/);
+  });
+});
+
+describe("canh nối mã: thẻ ở đầu bảng Sơn Hà Đồ theo bản đồ ĐANG XEM", () => {
+  it("setMapView gọi ui.setMapPanelCard với bản đồ đang xem (không phải bản đồ mình đứng khi đang xem bản đồ khác); ui tra bằng mapCardUrl", () => {
+    const scene = read("client/src/scenes/WorldScene.ts");
+    expect(scene).toMatch(/ui\.setMapPanelCard\(viewId \?\? this\.map\.def\.id\)/);
+    const ui = read("client/src/ui.ts");
+    expect(ui).toMatch(/setMapPanelCard\(mapId: string\)/);
+    // CHỈ trong thân hàm `setMapPanelCard` (`[^}]*`: không lấn sang `showTransition` có dòng giống hệt phía sau)
+    expect(ui).toMatch(
+      /setMapPanelCard\(mapId: string\) \{[^}]*getElementById\("map-card"\)[^}]*applyMapCard\(cardEl,\s*mapCardUrl\(mapId\)\)/,
+    );
+  });
+
+  it("HTML: thẻ nằm TRONG đầu bảng bản đồ, TRƯỚC tiêu đề, là ảnh trang trí ẩn sẵn; CSS: [hidden] thắng display, 3:2, không bắt chuột, bỏ ở màn thấp", () => {
+    const html = read("client/index.html");
+    const m = /<img\s[^>]*id="map-card"[^>]*>/.exec(html);
+    expect(m).not.toBeNull();
+    expect(m![0]).toMatch(/\salt=""/);
+    expect(m![0]).toMatch(/aria-hidden="true"/);
+    expect(m![0]).toMatch(/\shidden(\s|\/|>)/);
+    const modal = html.indexOf('id="map-modal"');
+    expect(html.indexOf('id="map-card"')).toBeGreaterThan(modal);
+    expect(html.indexOf('id="map-card"')).toBeLessThan(html.indexOf('id="map-title"'));
+    const css = read("client/src/style.css");
+    expect(css).toMatch(/\.map-panel-card\[hidden\]\s*\{\s*display:\s*none;?\s*\}/);
+    const card = /\.map-panel-card\s*\{([^}]*)\}/.exec(css)![1]!;
+    expect(card).toMatch(/aspect-ratio:\s*3\s*\/\s*2/);
+    expect(card).toMatch(/pointer-events:\s*none/);
+    expect(css).toMatch(
+      /@media \(max-height: 480px\)\s*\{\s*\.map-panel-card\s*\{\s*display:\s*none;/,
+    );
   });
 });

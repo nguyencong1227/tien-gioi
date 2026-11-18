@@ -46,15 +46,17 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
     );
   });
 
-  it("bộ I trả được trong Sơ kỳ, bộ I + II trong Trung kỳ (không bị chặn ở bộ đầu)", () => {
+  it("bộ I trả được trong Sơ kỳ (không bị chặn ở bộ đầu); bộ I + II hụt dưới ~10.000 Linh thạch tới hết Trung kỳ (mục 30: Linh thạch / giờ giảm ~một nửa, trước đó trả đủ)", () => {
     expect(eco.tiers[0].surplus).toBeGreaterThanOrEqual(0);
-    expect(eco.tiers[1].surplus).toBeGreaterThanOrEqual(0);
+    // Trước mục 30 (QUYET_DINH_M3 16/11) surplus Trung kỳ >= 0; nay ~ -5.800 (máu quái x1,5, tiền rơi giữ nguyên). Khoá bằng cận để biết nếu xấu thêm.
+    expect(eco.tiers[1].surplus).toBeLessThan(0);
+    expect(eco.tiers[1].surplus).toBeGreaterThan(-10_000);
   });
 
-  it("KHÔNG dư hàng vạn Linh thạch cuối Kim Đan (dư < 10.000) và KHÔNG bị chặn quá lâu (thiếu <= 3 giờ săn Hậu kỳ)", () => {
+  it("KHÔNG dư hàng vạn Linh thạch cuối Kim Đan (dư < 10.000) và không bị chặn QUÁ lâu (mục 30: thiếu ~6,5 giờ săn Hậu kỳ, trước đó <= 3 giờ; cận mới <= 7 giờ)", () => {
     const last = eco.tiers.at(-1)!;
     expect(last.surplus).toBeLessThan(10_000);
-    expect(shortfallHours(eco)).toBeLessThanOrEqual(3);
+    expect(shortfallHours(eco)).toBeLessThanOrEqual(7);
     // cộng dồn đúng: Linh thạch mang vào từ Luyện Khí / Trúc Cơ + tổng kiếm từng bậc Kim Đan
     expect(last.cumulative).toBeCloseTo(
       eco.preKimDan + eco.tiers.reduce((n, t) => n + t.earned, 0),
@@ -71,8 +73,9 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
     expect(eco.tiers[0].cumulative).toBeCloseTo(eco.preKimDan + eco.tiers[0].earned, 6);
   });
 
-  it("cày nguyên liệu không phải nút cổ chai: chiếm <= 60% thời gian của bậc", () => {
-    for (const t of eco.tiers) expect(materialShare(eco, t.tier), t.label).toBeLessThanOrEqual(0.6);
+  it("cày nguyên liệu không chiếm quá ~3/4 thời gian của bậc (mục 30: nguyên liệu rơi theo con mà con chết chậm 1,5 lần nên 55 / 66 / 73 %, trước đó <= 60%)", () => {
+    for (const t of eco.tiers)
+      expect(materialShare(eco, t.tier), t.label).toBeLessThanOrEqual(0.75);
   });
 
   it("săn trùm theo đội kiếm ít Linh thạch mỗi người hơn săn solo (tiền rơi chia đội, đồ một chủ); bộ III mới cần trùm", () => {
@@ -100,6 +103,7 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
 
   it("thu nhập khả dụng: không tính nguyên liệu giữ lại, thấp hơn tổng tiền theo mô hình cũ; quái không an toàn thì null", () => {
     expect(spendableCoinPerHour("doc_thiem", 0)).toBeNull(); // Độc Thiềm chưa an toàn solo ở Sơ kỳ
+    expect(spendableCoinPerHour("doc_thiem", 1)).toBeNull(); // mục 30: cả Trung kỳ (trước đó an toàn)
     for (const t of eco.tiers) expect(t.coinPerHour).toBeGreaterThan(0);
     // Thạch Quy rơi Quy giáp (nguyên liệu giữ lại): khả dụng = tiền rơi + bán đồ KHÁC, nằm giữa chỉ-tiền-rơi và tổng tiền cũ
     const e = monsterEconomy(MONSTER_BY_ID.thach_quy, 3, 1)!;
@@ -130,7 +134,7 @@ describe("kinh tế QUA KIẾP (câu hỏi của B ở #439): tu nhanh thì Linh
 
   it("khoá hiện trạng: không kiếp nào trả đủ cả ba bộ; kiếp cuối chỉ bộ I (ghi chủ ý cho người dùng, Ký vật giữ đồ qua kiếp)", () => {
     expect(lives.every((l) => l.affordableBo < 3)).toBe(true);
-    expect(lives[1].affordableBo).toBe(2); // kiếp 2 còn dư ~7.000 so với phí bộ I + II
+    expect(lives[1].affordableBo).toBe(1); // mục 30: kiếp 2 chỉ còn trả đủ bộ I (trước đó dư ~7.000 so với phí bộ I + II)
     expect(lives.at(-1)!.affordableBo).toBe(1);
     // đường giữ đồ có thật và rẻ: Ký vật nấc cuối giữ 3 món, tổng Duyên <= 2 kiếp Kim Đan
     const duyen = kimDanReincarnation().progression[0].duyenEarned;
@@ -170,8 +174,18 @@ describe("trang bị Kim Đan: ba bộ tăng đều, không bộ nào bắt bu�
     }
   });
 
-  it("không bộ nào bắt buộc: không có bộ nào vẫn đạt >= 70% tu vi / giờ so với đủ bộ (mọi bậc, cả hai cách săn)", () => {
-    expect(minGearRatio(gear)).toBeGreaterThanOrEqual(0.7);
+  it("bộ I gần như BẮT BUỘC ở Sơ kỳ sau mục 30 (không đồ chỉ đạt ~18,5% tu vi / giờ so với đủ bộ; trước đó >= 70%), các bộ sau vẫn không bắt buộc: khoá hiện trạng + ghi chủ ý", () => {
+    // Trước mục 30 (QUYET_DINH_M3 16/11) không bộ nào bắt buộc (>= 0,7). Máu quái x1,5 làm Sương Hồ / Thạch Quy lúc không đồ gần ngưỡng 50% khí huyết nên Sơ kỳ không đồ chỉ cày được
+    // loài cũ: 6.500 so với 35.100 tu vi / giờ có bộ I. Đã nêu với người dùng ở questions.md (A / B / C); người dùng giữ số (mục 54).
+    const worst = minGearRatio(gear);
+    expect(worst).toBeGreaterThanOrEqual(0.15);
+    expect(worst).toBeLessThan(0.25);
+    // từ bộ II trở đi không bộ nào bắt buộc (mọi bậc, cả hai cách săn): hàng `upTo >= 2` / các bậc sau đạt >= 70% so với đủ bộ
+    const full = (t: number) =>
+      Math.max(...gear.filter((g) => g.tier === t).map((g) => g.expPerHour));
+    for (const t of [1, 2])
+      for (const g of gear.filter((x) => x.tier === t && x.expPerHour > 0))
+        expect(g.expPerHour / full(t), `bậc ${t}`).toBeGreaterThanOrEqual(0.7);
   });
 
   it("sức mạnh gốc tăng đều giữa các bộ: công và khí huyết mỗi bước +10..25%, hai bước lệch nhau <= 5 điểm phần trăm", () => {

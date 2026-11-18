@@ -432,13 +432,13 @@ describe("M5.1 #400: parseFxDriverReport (hàm thuần)", () => {
   });
 });
 
-describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chiêu của 18 chiêu qua đường onFx thật)", () => {
+describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chiêu của 43 chiêu qua đường onFx thật)", () => {
   const CAST_PLANS = ["burst-cast", "boss-cast"] as const;
 
   it("FX_CAST_SKILLS TRÙNG đúng các chiêu trong `SKILLS` của shared (thêm / bớt chiêu mà quên ở đây thì đỏ), không trùng id", () => {
     expect([...FX_CAST_SKILLS].sort()).toEqual(Object.keys(SKILL_BY_ID).sort());
     expect(new Set(FX_CAST_SKILLS).size).toBe(FX_CAST_SKILLS.length);
-    expect(FX_CAST_SKILLS).toHaveLength(18);
+    expect(FX_CAST_SKILLS).toHaveLength(43);
     // sáu chiêu Nguyên Anh đợt 2 (#722) nằm trong danh sách
     for (const id of [
       "han_quang_tien",
@@ -447,6 +447,17 @@ describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chi�
       "bang_hoa_loan",
       "liet_hoa_kiem",
       "van_hanh_bo",
+    ])
+      expect(FX_CAST_SKILLS, id).toContain(id);
+    // bảy chiêu hệ Mộc / Thủy (CT7 #1052) nằm trong danh sách
+    for (const id of [
+      "hu_thuy_chuong",
+      "trien_xa_thu",
+      "hac_sa_doc_chuong",
+      "thi_doc_am_chuong",
+      "thiem_to_cong",
+      "doan_truong_chi_phap",
+      "kho_moc_phung_xuan_quyet",
     ])
       expect(FX_CAST_SKILLS, id).toContain(id);
   });
@@ -491,7 +502,7 @@ describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chi�
         expect(e.msg.range).toBe(150);
         expect(Number.isFinite(e.msg.angle)).toBe(true);
       });
-      // đủ cả 18 chiêu sau 18 lần
+      // 18 lần đầu là 18 chiêu KHÁC NHAU (xoay vòng danh sách; kế hoạch chỉ bắn ~20 lần nên không phủ hết danh sách dài hơn)
       expect(new Set(casts.slice(0, 18).map((e) => e.msg.skill)).size).toBe(18);
     }
   });

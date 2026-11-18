@@ -36,6 +36,7 @@ export type ActionId =
   | "panel.char"
   | "panel.quest"
   | "panel.sect"
+  | "panel.social"
   | "panel.skills"
   | "panel.map"
   | "panel.minimap"
@@ -202,6 +203,15 @@ export const ACTIONS: readonly ActionDef[] = [
     world: false,
   },
   { id: "panel.sect", label: "Tông môn", group: "panel", defaults: ["KeyG"], world: false },
+  // Bảng Xã hội (M9, #1025): xếp hạng / thành tựu / sự kiện. 26 chữ cái đã hết chỗ nên dùng Shift+G (cạnh G = Tông môn);
+  // mặc định BẬT; `?social=0` tắt (`social-tabs.ts` `socialEnabled`)
+  {
+    id: "panel.social",
+    label: "Xã hội (xếp hạng, thành tựu, sự kiện)",
+    group: "panel",
+    defaults: ["Shift+KeyG"],
+    world: false,
+  },
   // Bảng Công pháp (M7.6, #507): gắn / gỡ chiêu vào ô 2-5. Shift+K (K là Kiếm khí; A xác nhận không đụng phím M7 nào ở #536)
   {
     id: "panel.skills",

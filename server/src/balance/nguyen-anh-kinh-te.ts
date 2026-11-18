@@ -151,7 +151,11 @@ export function nguyenAnhBo(): BoGear[] {
           if (h) bossHours += (((BOSS_PARTY * qty) / avgDrop(drop)) * h.secPerKill) / 3600;
         } else {
           // Quái chưa an toàn solo ở bậc này: coi là cày ở bậc kế (số đo gần đúng)
-          const h = huntRate(m, NA, tier) ?? huntRate(m, NA, Math.min(2, tier + 1))!;
+          // Chưa an toàn solo ở MỌI bậc Nguyên Anh (mục 30: máu x1,5): coi là cày theo ĐỘI 2 người ở bậc cao nhất
+          const h =
+            huntRate(m, NA, tier) ??
+            huntRate(m, NA, Math.min(2, tier + 1)) ??
+            huntRate(m, NA, 2, 2)!;
           soloHours += (qty / avgDrop(drop)) * (h.secPerKill / 3600);
         }
         return { itemId, qty, source };
@@ -293,7 +297,7 @@ ${bossRows.join("\n")}
 
 ### 3. Nhịp cả cảnh giới Nguyên Anh (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
 
-Tổng: **${n1(eco.hours)} giờ** solo; mục tiêu 6-9 giờ (\`docs/PHAN_CONG_M7.md\` mục 10). Mô hình bỏ qua nhiệm vụ lặp và thời gian đi lại ngoài \`ASSUME.questOverheadSec\`.
+Tổng: **${n1(eco.hours)} giờ** solo; mục tiêu 6-9 giờ (\`docs/PHAN_CONG_M7.md\` mục 10; QUYET_DINH_M3 mục 30 chủ ý rút còn ~4 giờ: tu vi x2, máu x1,5). Mô hình bỏ qua nhiệm vụ lặp và thời gian đi lại ngoài \`ASSUME.questOverheadSec\`.
 
 | Bậc | Thanh | Nguồn tốt nhất | Phút |
 |---|---:|---|---:|

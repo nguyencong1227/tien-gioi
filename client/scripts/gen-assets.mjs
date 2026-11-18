@@ -971,6 +971,35 @@ const BOOKS = {
   kinh_bang_hoa_loan: [0xa8dcf0, 0xffffff, "hoa"],
   kinh_liet_hoa_kiem: [0xd9433b, 0xffd0a0, "kiem"],
   kinh_van_hanh_bo: [0x9ad0b8, 0xe6fff4, "bo"],
+  // Kim + Thổ (CT6 lát 1, A): màu bìa theo hệ; chiêu kiếm có dấu "kiem" như đợt 2
+  kinh_thanh_van_kiem_khi: [0xb8bcc8, 0xf2e6a0, "kiem"],
+  kinh_ban_thach_ho_the: [0x8f6a2e, 0xe6c98a],
+  kinh_thu_thuy_kiem_anh: [0xa8c4d8, 0xe6f6ff, "kiem"],
+  kinh_liet_dia_nhat_quyen: [0xa8803a, 0xf0d9a0],
+  kinh_phan_nhac_tram: [0x8a6a2a, 0xffd34d, "kiem"],
+  kinh_van_kiem_quy_tong: [0xc8ccd4, 0x5a626e, "kiem"],
+  // Chiêu dạng mới (CT9 lát 1, A): bìa theo hệ; Lôi vàng nhạt, Âm tím sẫm
+  kinh_doc_dang_phuc: [0x4f8a4e, 0xc4e6b0],
+  kinh_phi_kiem_tam_lien: [0xb8bcc8, 0xf2e6a0, "kiem"],
+  kinh_liet_diem_tran: [0xd9433b, 0xffd0a0, "tran"],
+  kinh_loi_lien_chau: [0xe0c850, 0xfff6b0],
+  kinh_hon_phien_tuong: [0x5a3a7a, 0xc9a8e6, "tran"],
+  kinh_pha_son_nhat_kich: [0x8f6a2e, 0xe6c98a],
+  // Mộc + Thủy (CT7 #1052): màu bìa theo hệ, dấu tròn (không mark để tránh chữ). Dev E thêm chiêu + quyển, atlas.test.ts đòi icon cho mọi vật phẩm.
+  kinh_hu_thuy_chuong: [0x3b7bd9, 0xbfe0ff],
+  kinh_trien_xa_thu: [0x5e9a4a, 0xd0f0b8],
+  kinh_hac_sa_doc_chuong: [0x4f8a4e, 0xc4e6b0],
+  kinh_thi_doc_am_chuong: [0x2f6ab8, 0xa8d4f0],
+  kinh_thiem_to_cong: [0x6fae5a, 0xd8ecc0],
+  kinh_doan_truong_chi_phap: [0x3f7a44, 0xb4dca0],
+  kinh_kho_moc_phung_xuan_quyet: [0x7ab866, 0xe0f0cc],
+  // Hỏa / Băng / Âm / Lôi / Phong (CT8 lát 1, A): bìa theo hệ, không dấu để tránh chữ
+  kinh_liet_diem_chuong: [0xd9433b, 0xffd0a0],
+  kinh_xich_tuoc_phu: [0xc8352c, 0xffe0a8],
+  kinh_han_bang_nhat_chuong: [0x6fb8e8, 0xe6f6ff],
+  kinh_minh_anh_phuc_chuong: [0x4a2f6a, 0xc9a8e6],
+  kinh_loi_dinh_nhat_miet: [0xe0c850, 0xfff6b0],
+  kinh_hoi_phong_lien_chuong: [0x6fc0a8, 0xe6fff6],
 };
 
 /**
@@ -1118,6 +1147,57 @@ function drawItemIcon(id) {
       s.line(9.6, y + 1.2, 12, y - 1.2, 0xfff3b0, 1.4);
       s.line(14.4, y + 1.2, 12, y - 1.2, 0xfff3b0, 1.4);
     }
+  } else if (id.startsWith("phu_")) {
+    // Phù (nghề nhỏ lát 2, #817): dải giấy vàng có chu sa. Hệ đọc được bằng HÌNH ở giữa (lửa / lưỡi kiếm / lá / tia sét / gió) VÀ màu dải trên + tua; bậc cảnh giới
+    // đọc bằng SỐ chấm vàng ở chân (1 Luyện Khí, 2 Trúc Cơ, 3 Kim Đan, 4 Nguyên Anh), không chỉ bằng màu. Khác đan (viên tròn) và nguyên liệu (vật thể đơn lẻ).
+    const look = {
+      phu_hoa_dan: ["hoa", 1],
+      phu_hoa_cuonghuyet: ["hoa", 1],
+      phu_kim_phicham: ["kim", 2],
+      phu_kim_toagia: ["kim", 2],
+      phu_hoa_lieutiem: ["hoa", 2],
+      phu_loi_loino: ["loi", 3],
+      phu_hoa_tammoi: ["hoa", 4],
+      phu_moc_kimlan: ["moc", 4],
+      phu_tho_tocphong: ["phong", 2],
+    }[id] ?? ["hoa", 1];
+    const [el, tier] = look;
+    const band = { hoa: 0xd9532a, kim: 0x9aa0b4, moc: 0x3a8a4a, loi: 0xe0b020, phong: 0x4a9ad0 }[
+      el
+    ];
+    // Giấy phù + viền, dải màu hệ trên đầu, hai tua dưới chân
+    s.rect(4, 1, 16, 22, 0xb8923f);
+    s.rect(5, 2, 14, 20, 0xf0dfa0);
+    s.rect(5, 2, 14, 3, band);
+    s.rect(7, 22, 2, 2, band);
+    s.rect(15, 22, 2, 2, band);
+    // Hình hệ ở giữa (nét chu sa / màu hệ)
+    if (el === "hoa") {
+      s.ellipse(12, 12.4, 3.4, 4.2, band);
+      s.tri(9.2, 11, 14.8, 11, 12, 5.6, band);
+      s.ellipse(12, 13.4, 1.7, 2.3, 0xffe27a);
+    } else if (el === "kim") {
+      s.tri(12, 6, 8.2, 12, 15.8, 12, band);
+      s.tri(12, 18, 8.2, 12, 15.8, 12, 0x6c7284);
+      s.line(12, 7.6, 12, 16.4, 0xe8ecf4, 1);
+    } else if (el === "moc") {
+      s.line(12, 18, 12, 9.4, 0x2a6a38, 1.4);
+      s.ellipse(9.4, 11.4, 2.3, 3.6, band);
+      s.ellipse(14.6, 9.8, 2.3, 3.6, 0x56ad66);
+      s.line(12, 15, 9.6, 12.6, 0x2a6a38, 1);
+    } else if (el === "loi") {
+      s.tri(13.8, 5.6, 8.6, 12.6, 12.4, 12.6, band);
+      s.tri(10.2, 18.4, 15.4, 11.4, 11.6, 11.4, band);
+    } else {
+      s.line(8.4, 8.6, 15, 8.6, band, 1.4);
+      s.line(8.4, 12, 13.6, 12, band, 1.4);
+      s.line(8.4, 15.4, 15, 15.4, band, 1.4);
+      s.ring(15.6, 8.6, 1.5, 1, band);
+      s.ring(14.4, 12, 1.5, 1, band);
+    }
+    // Chấm vàng = bậc: ô 2x2 cách nhau 3 px (có khe hở rõ để ĐẾM được cả ở cỡ thật 24 px), căn giữa
+    const dx = Math.round(12 - (tier * 3 - 1) / 2);
+    for (let k = 0; k < tier; k++) s.rect(dx + 3 * k, 18, 2, 2, 0xb8780a);
   } else if (id === "long_tho") {
     // Chùm lông thỏ trắng mềm
     s.ellipse(11, 13, 6, 4, 0xe0d8c8);
@@ -1625,6 +1705,8 @@ function drawNpcSprite(id) {
     tho_ren: { robe: 0x8c3b2a, trim: 0x473933, hair: 0x241c18, beard: false, prop: "hammer" },
     // Lò đan Lạc Hà Trấn (nghề nhỏ lát 1, #763): lão đan sư áo vàng đất, tóc bạc, ôm lò đan nhỏ đang cháy
     lao_dan: { robe: 0xb07a3a, trim: 0xf2e0b0, hair: 0xe8e4da, beard: true, prop: "cauldron" },
+    // Bàn phù Lạc Hà Trấn (nghề nhỏ lát 2, #817): lão phù sư áo tím, tóc bạc, một tay giơ dải phù vàng, tay kia cầm bút lông
+    lao_phu: { robe: 0x7a5aa0, trim: 0xe9dcf5, hair: 0xe8e4da, beard: true, prop: "talisman" },
     // Hắc Phong Cốc và bí cảnh (trước M6 dùng ảnh dự phòng)
     lai_buon: { robe: 0x6b4f8a, trim: 0xe6c365, hair: 0x241c18, beard: false, prop: "pack" },
     // Trạm úy Thanh Lộ (D7 #755): đội trưởng thợ săn trấn thủ cửa ải, áo xanh ô-liu, tay cầm giáo dài
@@ -1711,6 +1793,16 @@ function drawNpcSprite(id) {
     s.rect(27, 22.5, 2, 2, 0xc9a24a);
     s.rect(24, 31, 2, 3, 0x2f2a26);
     s.rect(30, 31, 2, 3, 0x2f2a26);
+  } else if (cfg.prop === "talisman") {
+    // Phù sư: dải phù vàng dài giơ bên phải (đầu đỏ, nét chu sa), bút lông cầm bên trái (cán gỗ, đầu mực đen)
+    s.rect(25, 9, 6, 15, 0xb8923f);
+    s.rect(26, 10, 4, 13, 0xf0dfa0);
+    s.rect(26, 10, 4, 2, 0xb8372b);
+    s.line(26.6, 14, 29.4, 14, 0xb8372b, 1);
+    s.line(28, 14.5, 28, 20, 0xb8372b, 1);
+    s.line(26.8, 17, 29.2, 17, 0xb8372b, 1);
+    s.line(7, 19, 7, 31, 0x5c3d24, 1.6);
+    s.tri(6, 19, 8, 19, 7, 14.5, 0x2b2623);
   } else if (cfg.prop === "hammer") {
     // Thợ rèn cầm búa sắt
     s.line(28, 15, 28, 32, 0x5c3d24, 2);
@@ -1802,6 +1894,7 @@ function buildAtlas() {
     "tho_ren_han",
     "lao_dan",
     "tran_uy",
+    "lao_phu",
   ]) {
     push(`npc-${npcId}`, drawNpcSprite(npcId));
   }
@@ -1861,6 +1954,16 @@ function buildAtlas() {
     "dot_pha_dan",
     "kinh_chi_dan",
     "duong_anh_dan",
+    // Nghề nhỏ lát 2 (#817): chín phù (tám phù tăng sát thương cùng hệ + Tốc Phong Phù giảm hồi chiêu)
+    "phu_hoa_dan",
+    "phu_hoa_cuonghuyet",
+    "phu_kim_phicham",
+    "phu_kim_toagia",
+    "phu_hoa_lieutiem",
+    "phu_loi_loino",
+    "phu_hoa_tammoi",
+    "phu_moc_kimlan",
+    "phu_tho_tocphong",
   ];
   for (const id of itemIds) {
     const icon = drawItemIcon(id);

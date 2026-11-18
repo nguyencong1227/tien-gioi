@@ -160,5 +160,21 @@ declare module "*prompt-rules.mjs" {
     final: { w: number; h: number; maxKb: number };
     items: BossCardItem[];
   };
+  export const NPC_FACE_CLAUSE: string;
+  export interface NpcPortraitItem {
+    id: string;
+    npcId: string;
+    seeds: number[];
+    prompt: string;
+  }
+  export const NPC_PORTRAIT_BATCH: {
+    class: string;
+    aspect: string;
+    pack: string;
+    dir: string;
+    raw: { w: number; h: number };
+    final: { w: number; h: number; maxKb: number };
+    items: NpcPortraitItem[];
+  };
   export function promptViolations(prompt: unknown, negativePrompt: unknown): string[];
 }

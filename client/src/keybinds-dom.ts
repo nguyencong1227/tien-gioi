@@ -45,6 +45,7 @@ export const HUD_KEYS: readonly HudKey[] = [
   { id: "btn-bag", action: "panel.inventory", name: "Túi đồ", keycap: "kbd" },
   { id: "btn-quest", action: "panel.quest", name: "Sổ nhiệm vụ", keycap: "kbd" },
   { id: "btn-sect", action: "panel.sect", name: "Tông môn", keycap: "kbd" },
+  { id: "btn-social", action: "panel.social", name: "Xã hội", keycap: "none" },
   { id: "btn-mute", action: "sound.mute", name: "Bật hoặc tắt âm thanh", keycap: "none" },
   { id: "btn-settings", action: "panel.settings", name: "Cài đặt và phím tắt", keycap: "none" },
   { id: "minimap-wrap", action: "panel.map", name: "Bản đồ thế giới", keycap: "none" },

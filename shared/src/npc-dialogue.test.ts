@@ -36,6 +36,9 @@ const ORIG_INTROS: Record<string, string> = {
   // Trạm úy Thanh Lộ (D7 #755): NPC mới giao việc hằng ngày Hắc Phong, chốt chặn giữ dòng giới thiệu
   tran_uy:
     "Thanh Lộ Trạm là cửa ngõ duy nhất xuyên Hắc Phong Cốc, ta giữ con đường này bao năm bằng máu và nanh thú.",
+  // Bàn phù (nghề nhỏ lát 2, #817): chốt chặn giữ dòng giới thiệu của NPC mới không đổi khi mở rộng lời thoại
+  lao_phu:
+    "Bàn phù ta nhóm hương trầm cả ngày, vẽ phù trấn yêu cho kẻ qua lại. Mang nguyên liệu yêu thú tới, ta chế phù cho đạo hữu.",
 };
 
 /** Phạm vi chữ Hán (CJK) — lời thoại Tiên Giới tiếng Việt, KHÔNG được có. */

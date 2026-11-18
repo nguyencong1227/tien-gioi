@@ -35,9 +35,12 @@ const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
 const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
-/** Số nút của thanh menu (Nhân vật, Công pháp, Túi, Nhiệm vụ, Tông môn, Âm thanh, Cài đặt) và độ rộng (px) dưới đó menu gộp vào ☰ (`@media (max-width: 619px)` ở style.css, #684) */
-const MENU_BUTTONS = 7;
-const MENU_COLLAPSE_BELOW = 620;
+/** Số nút của thanh menu (Nhân vật, Công pháp, Túi, Nhiệm vụ, Tông môn, Âm thanh, Cài đặt + Xã hội) và độ rộng (px) dưới đó menu gộp vào ☰: nút Xã hội BẬT MẶC ĐỊNH từ M9 (#1137; `?social=0` gỡ
+ *  nút, về 7 nút / mốc 620): hàng 8 nút rộng ~386 px nên mốc nâng lên 670 (`@media (min-width: 620px) and (max-width: 669px) body.social-on` ở style.css) và hàng mở ra ở màn hẹp xếp 4 + 4. */
+const MENU_BUTTONS = 8;
+const MENU_COLLAPSE_BELOW = 670;
+/** Hàng nút mở ra từ ☰ ở màn hẹp xếp tối đa bấy nhiêu nút một hàng (4 + 4, #1137) */
+const MENU_PER_ROW = 4;
 
 /**
  * Cặp điều khiển cảm ứng được phép chồng nhau ở điện thoại ngang (khai báo CÓ CHỦ Ý, kèm lý do). Quan hệ chứa nhau (bản đồ nhỏ chứa phần con...) đã tự được bỏ qua.
@@ -224,8 +227,8 @@ async function main() {
       );
 
       // ---- thanh menu ----
-      const equalRow = (rs: Rect[]) => {
-        if (rs.length !== MENU_BUTTONS) return `có ${rs.length} nút (cần ${MENU_BUTTONS})`;
+      const equalRow = (rs: Rect[], want = MENU_BUTTONS) => {
+        if (rs.length !== want) return `có ${rs.length} nút (cần ${want})`;
         const w0 = rs[0].w;
         const h0 = rs[0].h;
         const t0 = rs[0].t;
@@ -239,6 +242,25 @@ async function main() {
         const minSide = v.touch ? 44 : 36;
         if (w0 < minSide - 0.5 || h0 < minSide - 0.5)
           return `nhỏ ${Math.round(w0)}x${Math.round(h0)} < ${minSide}`;
+        return "";
+      };
+      /** Hàng nút mở từ ☰: các nút chia theo toạ độ trên thành các hàng, mỗi hàng <= MENU_PER_ROW nút cùng cỡ, cách đều, trong khung (đủ MENU_BUTTONS nút) */
+      const wrappedRows = (rs: Rect[]) => {
+        if (rs.length !== MENU_BUTTONS) return `có ${rs.length} nút (cần ${MENU_BUTTONS})`;
+        const rows = new Map<number, Rect[]>();
+        for (const r of rs) {
+          const key = [...rows.keys()].find((k) => Math.abs(k - r.t) <= 1) ?? Math.round(r.t);
+          rows.set(key, [...(rows.get(key) ?? []), r]);
+        }
+        const list = [...rows.values()];
+        if (list.length !== MENU_BUTTONS / MENU_PER_ROW)
+          return `${list.length} hàng (cần ${MENU_BUTTONS / MENU_PER_ROW} hàng ${MENU_PER_ROW} nút)`;
+        for (const row of list) {
+          const e = equalRow(row, MENU_PER_ROW);
+          if (e) return e;
+        }
+        if (rs.some((r) => Math.abs(r.w - rs[0].w) > 1 || Math.abs(r.h - rs[0].h) > 1))
+          return "các hàng khác cỡ nút";
         return "";
       };
       if (v.w >= MENU_COLLAPSE_BELOW) {
@@ -262,9 +284,9 @@ async function main() {
         await sleep(250);
         m = (await T.ev(MEASURE)) as Measure;
         check(
-          `${tag}: bấm ☰ mở ra đúng MỘT hàng ${MENU_BUTTONS} nút cùng cỡ, cách đều, trong khung`,
-          m.itemsShown && m.toggleExpanded === "true" && equalRow(m.items) === "",
-          `${m.itemsShown} ${m.toggleExpanded} ${equalRow(m.items)}`,
+          `${tag}: bấm ☰ mở ra ${MENU_BUTTONS / MENU_PER_ROW} hàng ${MENU_PER_ROW} nút cùng cỡ, cách đều, trong khung`,
+          m.itemsShown && m.toggleExpanded === "true" && wrappedRows(m.items) === "",
+          `${m.itemsShown} ${m.toggleExpanded} ${wrappedRows(m.items)}`,
         );
         await T.ev(`document.getElementById('btn-char').click(); 1`);
         await sleep(300);
@@ -334,7 +356,19 @@ async function main() {
         w: m.W * 0.2,
         h: m.H * 0.2,
       };
-      const inCentre = ps.filter((p) => overlap(p, centre)).map((p) => p.id);
+      // Thanh menu 8 nút (~386 px, M9) ở điện thoại ngang 915 x 412 lấn 31 x 13 px vào góc hộp 20 % x 20 % nhưng cách nhân vật > 60 px: với riêng nó chỉ đòi chừa hộp QUANH NHÂN VẬT
+      // (46-54 % ngang, 42-58 % dọc); các bảng khác vẫn đòi chừa cả hộp 40-60 %.
+      const body: Rect = {
+        l: m.W * 0.46,
+        t: m.H * 0.42,
+        r: m.W * 0.54,
+        b: m.H * 0.58,
+        w: m.W * 0.08,
+        h: m.H * 0.16,
+      };
+      const inCentre = ps
+        .filter((p) => overlap(p, p.id === "hud-menu" ? body : centre))
+        .map((p) => p.id);
       check(
         `${tag}: vùng giữa (quanh nhân vật) không bị bảng nào che`,
         inCentre.length === 0,

@@ -3,8 +3,10 @@
 // gắn trạng thái; gửi `fx cast` cho người ở gần. Server quyết định mọi kết quả: client chỉ gửi ô và hướng.
 // Số liệu từng chiêu ở `shared/src/skills.ts`; hình học thuần ở `shapeHits` (test riêng, dùng chung cho quái và người chơi).
 import {
+  CHAIN_FX_POINTS_MAX,
   PLAYER_RADIUS,
   SKILL_BY_ID,
+  SKILL_LIMITS,
   elementMult,
   parseCast,
   realmLabel,
@@ -14,6 +16,7 @@ import {
   skillReqMet,
   slotOpen,
   statsFor,
+  statusEmpowerMult,
   statusOf,
   type SkillDef,
 } from "@tien-gioi/shared";
@@ -23,10 +26,18 @@ import { dealMonsterDamage } from "./combat";
 import { rollDamage } from "./damage";
 import { treasureElementMult } from "./treasure";
 import { duelHit } from "./duel";
+import { fireBolts } from "./pbolt";
+import { isPersistShape, placeObject } from "./objects";
+import { beginWindup, windupMsOf } from "./windup";
 import { syncPublicPos } from "./movement";
-import { cdrNow, sendSkills } from "./skills";
-import { applyMonsterStatus, applyPlayerStatus } from "./status";
-import { ampMultOf } from "./status-rules";
+import { cdrNow, creditMastery, sendSkills } from "./skills";
+import {
+  applyMonsterStatus,
+  applyPlayerStatus,
+  monsterHasStatus,
+  takeMonsterStatus,
+} from "./status";
+import { ampMultOf, entriesOf } from "./status-rules";
 
 /** Bước nhỏ nhất khi lao (px): như một bước di chuyển thường, để `moveWithCollision` không xuyên tường. */
 const DASH_STEP = 8;
@@ -117,6 +128,182 @@ function fxRange(def: SkillDef): number {
   return def.range;
 }
 
+/** Sét lan: mục tiêu ĐẦU phải ở nửa mặt phía trước hướng đánh (±90°); sét nảy sang quái gần nhất chưa trúng ở bất cứ hướng nào. */
+const CHAIN_FRONT_RAD = Math.PI / 2;
+/** Hệ số sát thương còn lại sau mỗi lần nảy khi dữ liệu không ghi `falloff` (đúng chú thích của `SkillDef`). */
+export const CHAIN_FALLOFF_DEFAULT = 0.85;
+/** Hệ số combo khi dữ liệu không ghi `combo.mult` (đúng chú thích của `SkillDef`: thiếu = 1,4). */
+export const COMBO_MULT_DEFAULT = 1.4;
+
+/**
+ * SÉT LAN (`chain`, mục 51): mục tiêu ĐẦU = quái sống gần nhất trong tầm `def.range` và nửa mặt phía trước; rồi nảy tối đa `bounces` lần (trần `SKILL_LIMITS.chainBouncesMax`) sang quái gần
+ * nhất CHƯA trúng trong `chainReach` (trần `chainReachMax`) tính từ mục tiêu vừa trúng; mỗi lần nảy sát thương nhân thêm `falloff` (kẹp [`chainFalloffMin`, 1]). Mỗi quái trúng tối đa MỘT lần.
+ * Trả thứ tự trúng kèm hệ số (`scale` 1, falloff, falloff², ...) và `pts` = toạ độ phẳng [người dùng, mục tiêu 1, 2, ...] (nguyên, tối đa `CHAIN_FX_POINTS_MAX` điểm) cho `fx chain`.
+ * Không đọc `Math.random`; hòa khoảng cách thì theo thứ tự trong bảng quái (ổn định).
+ */
+export function chainTargets(
+  w: World,
+  def: Pick<SkillDef, "range" | "bounces" | "chainReach" | "falloff">,
+  ox: number,
+  oy: number,
+  angle: number,
+): { hits: { id: string; n: number; scale: number }[]; pts: number[] } {
+  const hits: { id: string; n: number; scale: number }[] = [];
+  const pts = [Math.round(ox), Math.round(oy)];
+  const bounces = Math.min(
+    SKILL_LIMITS.chainBouncesMax,
+    Math.max(0, Math.floor(Number.isFinite(def.bounces) ? (def.bounces as number) : 0)),
+  );
+  const reach = Math.min(
+    SKILL_LIMITS.chainReachMax,
+    Math.max(0, Number.isFinite(def.chainReach) ? (def.chainReach as number) : 0),
+  );
+  const falloff = Math.min(
+    1,
+    Math.max(
+      SKILL_LIMITS.chainFalloffMin,
+      Number.isFinite(def.falloff) ? (def.falloff as number) : CHAIN_FALLOFF_DEFAULT,
+    ),
+  );
+  const done = new Set<string>();
+  /** Quái sống gần (cx, cy) nhất trong `maxD` px (tính cả bán kính quái), chưa trúng; `front` thì còn phải ở nửa mặt phía trước. */
+  const nearest = (cx: number, cy: number, maxD: number, front: boolean): string | undefined => {
+    let best: string | undefined;
+    let bd = Infinity;
+    w.state.monsters.forEach((mon, id) => {
+      const mc = w.mctrl.get(id);
+      if (!mc || mon.hp <= 0 || done.has(id)) return;
+      const d = Math.hypot(mon.x - cx, mon.y - cy);
+      if (d > maxD + mc.def.radius) return;
+      if (
+        front &&
+        d > mc.def.radius &&
+        angleDiff(Math.atan2(mon.y - cy, mon.x - cx), angle) > CHAIN_FRONT_RAD
+      )
+        return;
+      if (d < bd) {
+        bd = d;
+        best = id;
+      }
+    });
+    return best;
+  };
+  let id = nearest(ox, oy, def.range, true);
+  let scale = 1;
+  for (let i = 0; id !== undefined && i <= bounces; i++) {
+    const mon = w.state.monsters.get(id)!;
+    done.add(id);
+    hits.push({ id, n: 1, scale });
+    if (pts.length < CHAIN_FX_POINTS_MAX * 2) pts.push(Math.round(mon.x), Math.round(mon.y));
+    scale *= falloff;
+    id = i < bounces && reach > 0 ? nearest(mon.x, mon.y, reach, false) : undefined;
+  }
+  return { hits, pts };
+}
+
+/** Bước nhỏ nhất khi kéo / đẩy (px): như một bước di chuyển, để `moveWithCollision` không xuyên tường. */
+const DISPLACE_STEP = 8;
+/** Kéo tới sát người dùng thì dừng, cách chừng này (px) ngoài hai bán kính (không chồng lên người). */
+const PULL_GAP_PX = 2;
+
+/**
+ * KÉO / ĐẨY quái `id` `px` px (trần `displaceMax`) theo đường thẳng từ / tới (ox, oy) (`displace` của `SkillDef`, mục 51): qua `moveWithCollision` (không xuyên tường), dừng khi
+ * chạm khu an toàn; kéo thì dừng sát người dùng. TRÙM miễn, tinh anh nửa quãng. Trả số px thật sự đã dịch (0 = không dịch). Không `Math.random`.
+ */
+export function displaceMonster(
+  w: World,
+  id: string,
+  dir: "pull" | "push",
+  px: number,
+  ox: number,
+  oy: number,
+): number {
+  const mon = w.state.monsters.get(id);
+  const mc = w.mctrl.get(id);
+  if (!mon || !mc || mc.def.boss || mc.boss) return 0; // trùm miễn
+  const total =
+    Math.min(SKILL_LIMITS.displaceMax, Math.max(0, Number.isFinite(px) ? px : 0)) *
+    (mc.elite ? 0.5 : 1);
+  return shove(w, mon, mc.def.radius, dir, total, ox, oy);
+}
+
+/** KÉO / ĐẨY người chơi (đối thủ thách đấu) `px` px như `displaceMonster` (không có miễn trùm / tinh anh); ghi lại vị trí công khai. Trả số px thật sự đã dịch. */
+export function displacePlayer(
+  w: World,
+  sid: string,
+  dir: "pull" | "push",
+  px: number,
+  ox: number,
+  oy: number,
+): number {
+  const p = w.state.players.get(sid);
+  if (!p || p.dead) return 0;
+  const total = Math.min(SKILL_LIMITS.displaceMax, Math.max(0, Number.isFinite(px) ? px : 0));
+  const moved = shove(w, p, PLAYER_RADIUS, dir, total, ox, oy);
+  if (moved > 0) syncPublicPos(p); // dịch chuyển tức thời: người khác thấy ngay
+  return moved;
+}
+
+/** Lõi kéo / đẩy: dịch `pos` tối đa `total` px từng bước `DISPLACE_STEP` qua `moveWithCollision`; dừng khi bị chặn, chạm khu an toàn, hoặc (kéo) sát người dùng. */
+function shove(
+  w: World,
+  pos: { x: number; y: number },
+  radius: number,
+  dir: "pull" | "push",
+  total: number,
+  ox: number,
+  oy: number,
+): number {
+  const gap = radius + PLAYER_RADIUS + PULL_GAP_PX;
+  const sign = dir === "push" ? 1 : -1;
+  let left = total;
+  let moved = 0;
+  while (left > 0) {
+    const dx = pos.x - ox;
+    const dy = pos.y - oy;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-6) break; // chồng đúng lên người dùng: không có hướng
+    let s = Math.min(DISPLACE_STEP, left);
+    if (dir === "pull") {
+      if (d <= gap) break;
+      s = Math.min(s, d - gap);
+    }
+    const next = w.map.moveWithCollision(
+      pos.x,
+      pos.y,
+      (dx / d) * s * sign,
+      (dy / d) * s * sign,
+      radius,
+    );
+    if (next.x === pos.x && next.y === pos.y) break; // bị chặn
+    if (w.map.inSafe(next.x, next.y, radius)) break; // không đẩy / kéo vào khu an toàn
+    pos.x = next.x;
+    pos.y = next.y;
+    left -= s;
+    moved += s;
+  }
+  return moved;
+}
+
+/** Hình trúng của chiêu lên ĐỐI THỦ thách đấu: như `shapeHits`, riêng `chain` trúng người ở nửa mặt phía trước trong tầm (PK đợt 1: sét không nảy tới người). */
+function opponentHits(
+  def: SkillDef,
+  ox: number,
+  oy: number,
+  angle: number,
+  tx: number,
+  ty: number,
+): number {
+  if (def.shape === "chain") {
+    const d = Math.hypot(tx - ox, ty - oy);
+    if (d > def.range + PLAYER_RADIUS) return 0;
+    return d <= PLAYER_RADIUS || angleDiff(Math.atan2(ty - oy, tx - ox), angle) <= CHAIN_FRONT_RAD
+      ? 1
+      : 0;
+  }
+  return shapeHits(def, ox, oy, angle, tx, ty, PLAYER_RADIUS);
+}
+
 /** Tin `cast`: dùng chiêu ở ô `slot` (2..5) theo hướng `angle`. Client không tin được: mọi thứ kiểm lại ở đây. */
 export function cast(w: World, sid: string, raw: unknown) {
   const r = w.ready(sid);
@@ -140,6 +327,7 @@ export function cast(w: World, sid: string, raw: unknown) {
     });
     return;
   }
+  if (c.windup !== undefined) return; // đang vận khí: không dùng chiêu khác (im lặng như hồi chiêu)
   if (w.now < c.skillCd[idx]) return; // client tự hiện hồi chiêu (cdMax): im lặng, không tốn tin
   const cost = skillMpCost(def, p.maxMp);
   if (p.mp < cost) {
@@ -150,65 +338,186 @@ export function cast(w: World, sid: string, raw: unknown) {
   p.mp -= cost;
   p.meditating = false;
   p.angle = quantAngle(m.angle);
-  if (def.dodgeMs) c.dodgeUntil = w.now + def.dodgeMs; // né đòn của quái trong lúc dùng (bộ pháp)
-  const x0 = p.x;
-  const y0 = p.y;
   w.events.fx({
     kind: "cast",
     by: sid,
     skill: def.id,
-    x: x0,
-    y: y0,
+    x: p.x,
+    y: p.y,
     angle: m.angle,
     range: fxRange(def),
   });
+  // CHIÊU VẬN (CT5 lát 2): tiêu hao + hồi chiêu đã tính ở trên, `fx cast` đã báo cho người ở gần; hiệu ứng hình + sát thương chỉ tới LÚC ĐÁP (`tickWindup` gọi `release`)
+  const wind = windupMsOf(def);
+  if (wind > 0) beginWindup(w, sid, c, def, wind, () => release(w, sid, def, level, m.angle));
+  else release(w, sid, def, level, m.angle);
+  sendSkills(w, sid); // hồi chiêu mới (client đếm lùi từ đây)
+}
 
-  if (def.shape === "dash") dash(w, sid, def, m.angle);
+/**
+ * ĐÁP chiêu `def` (tầng `level`) theo `angle` từ chỗ người dùng đứng LÚC NÀY: né đòn (bộ pháp), lao, gom mục tiêu, sát thương, hiệu ứng, đạn, chia cho đồng đội. Chiêu tức thời gọi ngay trong `cast`;
+ * chiêu vận (`windupMs`) gọi sau khi vận xong. Người dùng đã rời phòng thì bỏ qua.
+ */
+function release(w: World, sid: string, def: SkillDef, level: number, angle: number) {
+  const r = w.ready(sid);
+  if (!r) return;
+  const { p, c } = r;
+  if (def.dodgeMs) c.dodgeUntil = w.now + def.dodgeMs; // né đòn của quái trong lúc dùng (bộ pháp)
+  const x0 = p.x;
+  const y0 = p.y;
+  if (def.shape === "dash") dash(w, sid, def, angle);
 
-  const mult = def.mult * skillDamageMult(level);
+  // Cường Lực (`empower`, mục 51): sát thương gây ra của MỌI chiêu nhân `1 + ratio` (một lần mỗi lần dùng chiêu)
+  const empower = c.st && c.st.list.length > 0 ? statusEmpowerMult(entriesOf(c.st, w.now)) : 1;
+  const mult = def.mult * skillDamageMult(level) * empower;
   if (mult > 0) {
     const st = statsFor(p.realm, p.tier, p, c.mult);
     const atk = st.atk;
     const amp = ampMultOf(c.st, w.now, def.element); // một lần mỗi lần dùng chiêu (không mỗi mục tiêu)
     // gom mục tiêu trước rồi mới gây sát thương: hạ quái xoá nó khỏi bảng trong lúc duyệt
-    const hits: { id: string; n: number }[] = [];
-    w.state.monsters.forEach((mon, id) => {
-      const mc = w.mctrl.get(id);
-      if (!mc) return;
-      const n =
-        def.shape === "dash"
-          ? segDist(mon.x, mon.y, x0, y0, p.x, p.y) <= DASH_HIT_RADIUS + mc.def.radius
-            ? 1
-            : 0
-          : shapeHits(def, x0, y0, m.angle, mon.x, mon.y, mc.def.radius);
-      if (n > 0) hits.push({ id, n });
-    });
-    for (const h of hits) {
-      const mon = w.state.monsters.get(h.id);
-      const mc = w.mctrl.get(h.id);
-      if (!mon || !mc) continue;
-      const em =
-        elementMult(def.element, mc.def.element ?? "none") *
-        treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
-        amp; // phù amp_<hệ> cùng hệ với chiêu (#514 lát 2); đòn lên người thách đấu (`castAtOpponent`) KHÔNG nhân
-      let first = 0;
-      for (let k = 0; k < h.n && w.mctrl.has(h.id); k++) {
-        const { dmg, crit } = rollDamage(atk, mult * em, st.crit); // bạo kích cộng thêm từ trang bị (M7.4)
-        if (k === 0) first = dmg;
-        dealMonsterDamage(w, h.id, mon, sid, dmg, crit);
-      }
-      if (!w.mctrl.has(h.id)) continue; // đã chết: không còn gắn trạng thái
-      for (const eff of def.effects)
-        if (statusOf(eff.status)?.harmful) applyMonsterStatus(w, h.id, eff, first, sid);
+    const hits: { id: string; n: number; scale: number }[] = [];
+    if (def.shape === "chain") {
+      // SÉT LAN: thứ tự trúng + hệ số giảm theo từng lần nảy; vẽ tia nối tiếp cho người ở gần
+      const ch = chainTargets(w, def, x0, y0, angle);
+      hits.push(...ch.hits);
+      if (ch.hits.length > 0)
+        w.events.fx({ kind: "chain", by: sid, skill: def.id, x: x0, y: y0, pts: ch.pts });
+    } else if (def.shape === "bolt" || isPersistShape(def.shape)) {
+      // ĐẠN BAY (CT3) / VẬT THỂ BỀN (CT4): không có mục tiêu tức thời, sát thương tới sau (`tickPBolts` / `tickObjects`)
+    } else {
+      w.state.monsters.forEach((mon, id) => {
+        const mc = w.mctrl.get(id);
+        if (!mc) return;
+        const n =
+          def.shape === "dash"
+            ? segDist(mon.x, mon.y, x0, y0, p.x, p.y) <= DASH_HIT_RADIUS + mc.def.radius
+              ? 1
+              : 0
+            : shapeHits(def, x0, y0, angle, mon.x, mon.y, mc.def.radius);
+        if (n > 0) hits.push({ id, n, scale: 1 });
+      });
     }
-    if (def.shape !== "dash" && w.duels.active) castAtOpponent(w, sid, def, x0, y0, m.angle, mult);
+    const sk: StrikeCtx = { atk, crit: st.crit, mult, amp, credited: false };
+    for (const h of hits) strikeMonster(w, sid, def, sk, h.id, h.n, h.scale, x0, y0);
+    if (isPersistShape(def.shape)) {
+      // CT4: dựng vùng / bẫy / hào quang / tượng; mỗi lần tác dụng đi CÙNG `strikeMonster` với chiêu tức thời (chỉ đánh quái, PK không)
+      const placed = placeObject(w, sid, def, x0, y0, angle, (id, fx, fy) =>
+        strikeMonster(w, sid, def, sk, id, 1, 1, fx, fy),
+      );
+      if (placed === "safe")
+        w.events.toast(sid, { text: `Không đặt được ${def.name} trong khu an toàn.`, tone: "bad" });
+    }
+    if (def.shape === "bolt") {
+      // CT3: quy hoạch đường bay + hẹn giờ trúng từng quái / đối thủ; trúng đòn nào thì đi CÙNG `strikeMonster` / `opponentAftermath` với chiêu tức thời
+      fireBolts(w, sid, def, x0, y0, angle, {
+        strike: (id, fx, fy) => strikeMonster(w, sid, def, sk, id, 1, 1, fx, fy),
+        hitOpponent: (target, fx, fy) => {
+          if (duelHit(w, sid, target, mult)) opponentAftermath(w, sid, def, target, fx, fy);
+        },
+      });
+    }
+    if (
+      def.shape !== "dash" &&
+      def.shape !== "bolt" &&
+      !isPersistShape(def.shape) &&
+      w.duels.active
+    )
+      castAtOpponent(w, sid, def, x0, y0, angle, mult);
   }
 
   // trạng thái CÓ LỢI của chiêu (hộ thể, tăng tốc, hồi phục) luôn lên chính mình; trạng thái có hại chỉ lên kẻ trúng đòn
   for (const eff of def.effects)
     if (statusOf(eff.status)?.harmful === false) applyPlayerStatus(w, sid, eff, 0, sid);
+  if (def.ally) shareWithParty(w, sid, def, x0, y0); // đồng đội cùng đội trong tầm cũng được trạng thái CÓ LỢI
+}
 
-  sendSkills(w, sid); // hồi chiêu mới (client đếm lùi từ đây)
+/** Số liệu chốt LÚC DÙNG chiêu để mọi lần trúng (tức thời hay đạn bay tới sau) tính cùng một công thức. */
+interface StrikeCtx {
+  /** Công cơ bản của người dùng lúc dùng */
+  atk: number;
+  /** Bạo kích cộng thêm từ trang bị (M7.4) */
+  crit: number;
+  /** `def.mult` x hệ số tầng x Cường Lực (một lần mỗi lần dùng chiêu) */
+  mult: number;
+  /** Hệ số phù `amp_<hệ>` cùng hệ với chiêu (một lần mỗi lần dùng chiêu, không mỗi mục tiêu) */
+  amp: number;
+  /** Đã cộng điểm luyện chiêu cho lần dùng này chưa (MỘT điểm mỗi lần dùng, dù trúng nhiều quái / nhiều viên đạn) */
+  credited: boolean;
+}
+
+/**
+ * MỘT mục tiêu quái bị chiêu `def` đánh `n` lần (fan: số tia trúng; còn lại 1) với hệ số `scale` (sét lan giảm dần): sát thương + combo + hiệu ứng có hại + kéo / đẩy
+ * (từ điểm (fromX, fromY): chỗ người dùng, hoặc chỗ bắt đầu đoạn bay của đạn). Dùng chung cho chiêu tức thời và đạn bay (CT3); người dùng đã rời phòng thì bỏ qua.
+ */
+function strikeMonster(
+  w: World,
+  sid: string,
+  def: SkillDef,
+  sk: StrikeCtx,
+  id: string,
+  n: number,
+  scale: number,
+  fromX: number,
+  fromY: number,
+) {
+  const mon = w.state.monsters.get(id);
+  const mc = w.mctrl.get(id);
+  const p = w.state.players.get(sid);
+  if (!mon || !mc || !p) return;
+  if (!sk.credited) {
+    sk.credited = true;
+    creditMastery(w, sid, def); // trúng quái đầu tiên của lần dùng này: +1 điểm luyện (chỉ quái, không phải đối thủ thách đấu)
+  }
+  const em =
+    elementMult(def.element, mc.def.element ?? "none") *
+    treasureElementMult(p, def.element) * // pháp bảo hệ (M7.4)
+    sk.amp; // phù amp_<hệ> cùng hệ với chiêu (#514 lát 2); đòn lên người thách đấu (`castAtOpponent`) KHÔNG nhân
+  // COMBO (mục 51): mục tiêu ĐANG mang trạng thái `needs` thì sát thương nhân `mult` (kẹp [1, `comboMultMax`]); xét TRƯỚC khi đánh (đòn này gỡ dấu)
+  const cb = def.combo;
+  const comboOn = cb !== undefined && monsterHasStatus(w, id, cb.needs);
+  const cm = comboOn
+    ? Math.min(
+        SKILL_LIMITS.comboMultMax,
+        Math.max(1, Number.isFinite(cb.mult) ? (cb.mult as number) : COMBO_MULT_DEFAULT),
+      )
+    : 1;
+  let first = 0;
+  for (let k = 0; k < n && w.mctrl.has(id); k++) {
+    const { dmg, crit } = rollDamage(sk.atk, sk.mult * em * scale * cm, sk.crit); // bạo kích cộng thêm từ trang bị (M7.4)
+    if (k === 0) first = dmg;
+    dealMonsterDamage(w, id, mon, sid, dmg, crit, true, comboOn);
+  }
+  if (!w.mctrl.has(id)) return; // đã chết: không còn gắn trạng thái
+  if (comboOn && cb) {
+    if (cb.consume) takeMonsterStatus(w, id, cb.needs); // gỡ dấu / trạng thái đã dùng
+    if (cb.apply) applyMonsterStatus(w, id, cb.apply, first, sid); // gắn thêm (vd dấu hệ khác, choáng ngắn)
+  }
+  for (const eff of def.effects)
+    if (statusOf(eff.status)?.harmful) applyMonsterStatus(w, id, eff, first, sid);
+  if (def.displace) displaceMonster(w, id, def.displace.dir, def.displace.px, fromX, fromY); // kéo / đẩy kẻ còn sống
+}
+
+/**
+ * `ally` (mục 51): trạng thái CÓ LỢI của chiêu cũng lên đồng đội CÙNG ĐỘI, còn sống, ở phòng này, trong `def.ally.range` px (trần `allyRangeMax`) quanh người dùng; không lên chính mình lần
+ * hai, không lên người ngoài đội, không lên người ở phòng khác; trạng thái có hại không bao giờ chia. Chỉ chạy khi chiêu có `ally` (duyệt người chơi trong phòng).
+ */
+function shareWithParty(w: World, sid: string, def: SkillDef, x0: number, y0: number) {
+  const ally = def.ally;
+  const me = w.state.players.get(sid);
+  if (!ally || !me) return;
+  const range = Math.min(
+    SKILL_LIMITS.allyRangeMax,
+    Math.max(0, Number.isFinite(ally.range) ? ally.range : 0),
+  );
+  const myKey = me.name.toLowerCase();
+  if (w.parties.partyIdOf(myKey) === undefined) return;
+  const buffs = def.effects.filter((e) => statusOf(e.status)?.harmful === false);
+  if (buffs.length === 0) return;
+  w.state.players.forEach((op, osid) => {
+    if (osid === sid || op.dead || !w.parties.sameParty(myKey, op.name.toLowerCase())) return;
+    if (Math.hypot(op.x - x0, op.y - y0) > range) return;
+    for (const eff of buffs) applyPlayerStatus(w, osid, eff, 0, sid);
+  });
 }
 
 /** Lao theo `angle` tối đa `def.reach` px, dừng ở chỗ bị chặn (`moveWithCollision` dùng chung); ghi lại vị trí công khai. */
@@ -245,10 +554,22 @@ function castAtOpponent(
   const target = w.duels.opponentOf(sid);
   const pt = target === undefined ? undefined : w.state.players.get(target);
   if (!target || !pt) return;
-  const n = shapeHits(def, x0, y0, angle, pt.x, pt.y, PLAYER_RADIUS);
+  const n = opponentHits(def, x0, y0, angle, pt.x, pt.y);
   let landed = false;
   for (let k = 0; k < n; k++) landed = duelHit(w, sid, target, mult) || landed;
-  if (!landed) return;
+  if (landed) opponentAftermath(w, sid, def, target, x0, y0);
+}
+
+/** Sau khi chiêu TRÚNG đối thủ thách đấu (đã qua `duelHit`): chỉ Tê cóng gắn được lên người, rồi kéo / đẩy từ (fromX, fromY) (đối thủ không có miễn). */
+function opponentAftermath(
+  w: World,
+  sid: string,
+  def: SkillDef,
+  target: string,
+  fromX: number,
+  fromY: number,
+) {
   for (const eff of def.effects)
     if (statusOf(eff.status)?.kind === "slow") applyPlayerStatus(w, target, eff, 0, sid);
+  if (def.displace) displacePlayer(w, target, def.displace.dir, def.displace.px, fromX, fromY);
 }

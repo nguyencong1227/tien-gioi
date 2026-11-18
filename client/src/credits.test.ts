@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SKILLS_M7 } from "@tien-gioi/shared";
+import { LEARNABLE_SKILLS } from "@tien-gioi/shared";
 import {
   AI_ASSET_DIR,
   aiAssetDirs,
@@ -170,20 +170,20 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`**${scanned.length} tệp**`);
   });
 
-  it("số tệp theo thư mục khớp tài liệu: assets 81, icons 5, fonts 5; icon vật phẩm 78 = 60 vật phẩm của game + 12 icon Hàn Vân + 6 icon kinh quyển đợt 2 vẽ trước", () => {
+  it("số tệp theo thư mục khớp tài liệu: assets 115, icons 5, fonts 5; icon vật phẩm 112 = 69 vật phẩm của game + 12 icon Hàn Vân + 6 icon kinh quyển đợt 2 vẽ trước + 6 icon kinh quyển Kim / Thổ CT6 + 6 icon chiêu dạng mới CT9 + 7 icon kinh quyển Mộc / Thủy CT7 + 6 icon kinh quyển Hỏa / Băng / Âm / Lôi / Phong CT8", () => {
     const under = (d: string) =>
       scanned.filter((f) => f.replace(/\\/g, "/").includes(`client/public/${d}/`));
     const items = under("assets").filter((f) => f.replace(/\\/g, "/").includes("/items/"));
-    // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 81 tệp tài sản thường + số ảnh AI
+    // `assets/ai/` (ảnh AI, mục 7 CREDITS.md / 2e RA_SOAT) tính trong "assets" nhưng đếm riêng: 115 tệp tài sản thường + số ảnh AI
     const ai = under("assets/ai");
-    expect(ai).toHaveLength(1); // login_bg.webp (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
-    expect(under("assets")).toHaveLength(81 + ai.length);
+    expect(ai).toHaveLength(6); // login_bg.webp + 5 thẻ bản đồ (#513): thêm ảnh AI thì sửa số này CÙNG LÚC với CREDITS.md và RA_SOAT_TAI_SAN.md
+    expect(under("assets")).toHaveLength(115 + ai.length);
     expect(under("icons")).toHaveLength(5);
     expect(under("fonts")).toHaveLength(5);
-    expect(items).toHaveLength(78);
+    expect(items).toHaveLength(112);
     const credits = doc("CREDITS.md");
-    expect(credits).toContain(`\`client/public/assets/\`: ${81 + ai.length} tệp`);
-    expect(credits).toContain("78 biểu tượng vật phẩm");
+    expect(credits).toContain(`\`client/public/assets/\`: ${115 + ai.length} tệp`);
+    expect(credits).toContain("112 biểu tượng vật phẩm");
   });
 
   it("mọi icon vật phẩm có một hàng trong bảng của docs/RA_SOAT_TAI_SAN.md (thiếu hàng thì đỏ)", () => {
@@ -197,7 +197,7 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
 });
 
 /**
- * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `SKILLS_M7` nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
+ * Chiêu GỐC của Tiên Giới (soạn riêng, KHÔNG lấy từ Vạn Kiếp Tu Tiên): id trong `LEARNABLE_SKILLS` (18 chiêu gốc + tệp nhóm `skills-*.ts`) nhưng không có dòng ở bảng nguồn `docs/NGUON_NOI_DUNG.md`. Ai thêm chiêu gốc
  * (Dev D, Dev A...) thêm id vào đây; chiêu lấy từ nguồn thì thêm DÒNG ở bảng nguồn thay vì thêm vào đây.
  *
  * 6 chiêu Nguyên Anh đợt 2 (M7.9, #654): do Dev D soạn theo thế giới Tiên Giới, KHÔNG lấy từ nguồn nào.
@@ -209,6 +209,13 @@ const ORIGINAL_SKILL_IDS: string[] = [
   "bang_hoa_loan",
   "liet_hoa_kiem",
   "van_hanh_bo",
+  // 6 chiêu DẠNG MỚI (CT9 lát 1 #1054, A): soạn riêng, mỗi chiêu một hình (bẫy, đạn bay, vùng, sét lan, tượng, chiêu vận)
+  "doc_dang_phuc",
+  "phi_kiem_tam_lien",
+  "liet_diem_tran",
+  "loi_lien_chau",
+  "hon_phien_tuong",
+  "pha_son_nhat_kich",
 ];
 
 describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517, QUYET_DINH_M3 mục 19-20)", () => {
@@ -216,7 +223,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
   const contentSourcePath = path.resolve(rootDir, "docs/NGUON_NOI_DUNG.md");
   const creditsPath = path.resolve(rootDir, "CREDITS.md");
 
-  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của SKILLS_M7 khai báo đúng MỘT nơi", () => {
+  it("docs/NGUON_NOI_DUNG.md tồn tại, bảng nguồn hợp lệ: >= 12 dòng `cong_phap` (12 chiêu M7.1), audit sạch, mỗi chiêu của LEARNABLE_SKILLS khai báo đúng MỘT nơi", () => {
     expect(fs.existsSync(contentSourcePath)).toBe(true);
     const content = fs.readFileSync(contentSourcePath, "utf-8");
     expect(content).toContain("## 3. Bảng nguồn");
@@ -239,9 +246,9 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     expect(audit.unrecordedVkttFiles).toEqual([]);
     expect(audit.unrecordedCreditsVktt).toEqual([]);
 
-    // Hai chiều: mỗi chiêu của SKILLS_M7 PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
+    // Hai chiều: mỗi chiêu của LEARNABLE_SKILLS PHẢI được khai báo MỘT trong hai nơi: (1) có đúng một dòng ở bảng nguồn (lấy từ Vạn Kiếp Tu Tiên), hoặc (2) nằm trong
     // `ORIGINAL_SKILL_IDS` bên dưới (chiêu GỐC của Tiên Giới, không lấy từ nguồn). Thêm chiêu mới mà không khai báo thì đỏ; không dòng nào trỏ id không tồn tại.
-    const ids = SKILLS_M7.map((s) => s.id);
+    const ids = LEARNABLE_SKILLS.map((s) => s.id);
     const rowsOf = (id: string) =>
       audit.entries.filter(
         (e) => e.inRepo.includes(`id \`${id}\``) || e.inRepo.includes(`id ${id}`),
@@ -260,7 +267,7 @@ describe("Nguồn nội dung, hình ảnh và âm thanh bên ngoài (M7.16 #517,
     // Dòng dữ liệu khác (du_lieu -> items.ts, trang_bi/phap_bao... sau này) KHÔNG chứa id chiêu nên bỏ qua;
     // thêm dòng dữ liệu không phải chiêu mà không muốn sửa test này thì để inRepo KHÔNG có cụm "id <id>".
     for (const e of audit.entries) {
-      if (!e.inRepo.includes("skills.ts")) continue;
+      if (!/skills[a-z-]*\.ts/.test(e.inRepo)) continue; // `skills.ts` và các tệp nhóm `skills-kim-tho.ts`...
       const m = /id `?([a-z_]+)`?/.exec(e.inRepo);
       expect(
         m && ids.includes(m[1]),
@@ -777,7 +784,14 @@ describe("Ảnh do AI sinh: nguồn, băm, siêu dữ liệu, dòng CREDITS (che
 
   it("kho thật của repo: sạch và thư mục ảnh AI chỉ có đúng ảnh đã khai báo (thêm ảnh AI thì thêm vào danh sách này CÙNG LÚC với JSON nguồn)", () => {
     expect(auditAiImages().errors).toEqual([]);
-    expect(scanFiles(AI_ASSET_DIR)).toEqual(["client/public/assets/ai/login_bg.webp"]);
+    expect(scanFiles(AI_ASSET_DIR)).toEqual([
+      "client/public/assets/ai/login_bg.webp",
+      "client/public/assets/ai/the_am_suong.webp",
+      "client/public/assets/ai/the_hac_phong.webp",
+      "client/public/assets/ai/the_han_van.webp",
+      "client/public/assets/ai/the_lac_ha.webp",
+      "client/public/assets/ai/the_linh_hu.webp",
+    ]);
   });
 
   it("một ảnh WebP hợp lệ (JSON cùng tên, băm khớp, có dòng CREDITS, không siêu dữ liệu) thì qua", () => {

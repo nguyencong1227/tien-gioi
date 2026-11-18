@@ -124,8 +124,10 @@ describe("công thức rèn", () => {
       expect(RECIPE_BY_ID[r.id]).toBe(r);
       expect(NPC_BY_ID[r.npcId]).toBeDefined();
       expect(r.output.qty).toBe(1);
-      // Công thức RÈN (thợ rèn) luôn ra TRANG BỊ; Lò đan (`lao_dan`, #763) ra đan hộ đạo (consumable), do lo-dan-lat1.test.ts kiểm
-      if (r.npcId !== "lao_dan") expect(ITEM_BY_ID[r.output.itemId]?.type).toBe("equip");
+      // Công thức RÈN (thợ rèn) luôn ra TRANG BỊ; Lò đan (`lao_dan`, #763) ra đan hộ đạo, Bàn phù (`lao_phu`, #817) ra phù —
+      // cả hai là consumable, do lo-dan-lat1.test.ts / ban-phu-lat2.test.ts kiểm.
+      if (r.npcId !== "lao_dan" && r.npcId !== "lao_phu")
+        expect(ITEM_BY_ID[r.output.itemId]?.type).toBe("equip");
     }
   });
 

@@ -10,8 +10,14 @@
 /** Đường dẫn gốc của ảnh AI (cùng chỗ với nền màn đăng nhập, `style.css`). */
 export const MAP_CARD_DIR = "/assets/ai/";
 
-/** `mapId` -> tên tệp trong `MAP_CARD_DIR`. Rỗng cho tới khi lô 1 vào game. */
-export const MAP_CARDS: Readonly<Record<string, string>> = {};
+/** `mapId` -> tên tệp trong `MAP_CARD_DIR`. Lô 1 (năm bản đồ) đã vào game; bản đồ mới thì thêm dòng CÙNG PR với ảnh. */
+export const MAP_CARDS: Readonly<Record<string, string>> = {
+  lac_ha: "the_lac_ha.webp",
+  hac_phong: "the_hac_phong.webp",
+  bi_canh_linh_hu: "the_linh_hu.webp",
+  am_suong: "the_am_suong.webp",
+  han_van: "the_han_van.webp",
+};
 
 /** Ghi đè khi thử trong trình duyệt thật (`?debug` / DEV, `check-map-card.mjs`); bản chạy thật không bao giờ có mục. */
 const overrides = new Map<string, string>();

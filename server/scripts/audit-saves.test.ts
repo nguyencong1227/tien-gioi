@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { installSectQuestFixture } from "../src/systems/sect-fixtures";
 import {
+  AMBUSH_DAY_CAP,
   COIN_CAP,
   DEFAULT_MAP,
   DUNGEON_DAILY_REWARDS,
@@ -1133,6 +1134,66 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(rawOverCap, rawOverCap.length).map((e) => e.code)).toContain(
         "invalid_dungeon_daily_rewards",
       );
+    });
+  });
+
+  describe("Gặp chặn đường: ambushDaily & ambushUntil (mục 52, CD2)", () => {
+    const codesOf = (extra: Record<string, unknown>) => {
+      const raw = JSON.stringify({ ...validPlayer, ...extra });
+      return auditPlayerSaveData(raw, raw.length).map((e) => e.code);
+    };
+
+    it("hợp lệ (n từ 0 đến AMBUSH_DAY_CAP, day chuẩn, ambushUntil hữu hạn) -> 0 lỗi", () => {
+      for (let n = 0; n <= AMBUSH_DAY_CAP; n++)
+        expect(codesOf({ ambushDaily: { day: "2026-11-10", n } }), `n=${n}`).toEqual([]);
+      expect(codesOf({ ambushUntil: 1_800_000_000_000 })).toEqual([]);
+      expect(codesOf({ ambushUntil: 0 })).toEqual([]);
+    });
+
+    it("ambushDaily sai kiểu gốc (null, mảng, chuỗi, số) -> invalid_ambush_daily và không lộ chuỗi", () => {
+      const secretStr = "secret_token_khong_duoc_lo";
+      for (const bad of [null, [], [1, 2], secretStr, 123, true]) {
+        const raw = JSON.stringify({ ...validPlayer, ambushDaily: bad });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          JSON.stringify(bad),
+        ).toContain("invalid_ambush_daily");
+        expect(JSON.stringify(errs)).not.toContain(secretStr);
+      }
+    });
+
+    it("ambushDaily.day sai dạng / ngày không có -> invalid_ambush_daily_day, không lộ nội dung", () => {
+      const sensitive = "mat_khau_ngan_123";
+      for (const day of ["", "10-11-2026", "2026-02-30", "2026-13-01", sensitive, 20261110, null]) {
+        const raw = JSON.stringify({ ...validPlayer, ambushDaily: { day, n: 1 } });
+        const errs = auditPlayerSaveData(raw, raw.length);
+        expect(
+          errs.map((e) => e.code),
+          JSON.stringify(day),
+        ).toContain("invalid_ambush_daily_day");
+        expect(JSON.stringify(errs)).not.toContain(sensitive);
+      }
+    });
+
+    it("ambushDaily.n âm, lẻ, vượt AMBUSH_DAY_CAP hoặc sai kiểu -> invalid_ambush_daily_n", () => {
+      for (const n of [-1, 1.5, AMBUSH_DAY_CAP + 1, "3", null, Number.NaN])
+        expect(codesOf({ ambushDaily: { day: "2026-11-10", n } }), JSON.stringify(n)).toContain(
+          "invalid_ambush_daily_n",
+        );
+    });
+
+    it("ambushReturnAt hữu hạn thì hợp lệ; sai kiểu / không hữu hạn -> invalid_ambush_return_at", () => {
+      expect(codesOf({ ambushReturnAt: 1_800_000_000_000 })).toEqual([]);
+      for (const v of ["123", null, true, [], {}])
+        expect(codesOf({ ambushReturnAt: v }), JSON.stringify(v)).toContain(
+          "invalid_ambush_return_at",
+        );
+    });
+
+    it("ambushUntil không phải số hữu hạn -> invalid_ambush_until", () => {
+      for (const v of ["123", null, true, [], {}])
+        expect(codesOf({ ambushUntil: v }), JSON.stringify(v)).toContain("invalid_ambush_until");
     });
   });
 

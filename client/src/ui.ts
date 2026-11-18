@@ -57,8 +57,6 @@ import {
   DEFAULT_ORIGIN,
   ORIGIN_BUY_PREFIX,
   levelOf,
-  skillOf,
-  SKILL_MAX_LEVEL,
   type SkillSlot,
   keepSlotsOf,
   engraveSlotsOf,
@@ -94,7 +92,57 @@ import {
   cleanSectName,
   cleanSectTag,
   cleanMotd,
+  BOARD_IDS,
+  BOARD_LABELS,
+  type BoardId,
+  WORLD_BOSS_SCHEDULE,
+  type WorldBossMsg,
+  type AchievementsMsg,
+  AMBUSH_OFFER_MS,
+  type AmbushChooseMsg,
+  type AmbushFleeMsg,
+  type AmbushSeenMsg,
 } from "@tien-gioi/shared";
+import {
+  arenaHudView,
+  fleeArena,
+  parseAmbushState,
+  setFleeConfirm,
+  updateArenaHud,
+  type ArenaHud,
+} from "./arena-hud-view";
+import {
+  ambushDialogView,
+  ambushEndToast,
+  ambushEndView,
+  ambushChoiceForKey,
+  ambushMarkSeen,
+  ambushNeedsSeen,
+  ambushRemainingMs,
+  chooseAmbush,
+  openAmbush,
+  parseAmbushEnd,
+  parseAmbushOffer,
+  type AmbushDialog,
+} from "./ambush-view";
+import { REFRESH_NOTE, asBoardId, boardView, sanitizeBoardsMsg } from "./board-view";
+import { chatSpeaker } from "./chat-view";
+import {
+  AskGate,
+  achievementsView,
+  sanitizeAchievementNewMsg,
+  sanitizeAchievementsMsg,
+  splitTitles,
+  titleUnlockToast,
+} from "./achievement-view";
+import {
+  SCHEDULE_TZ_NOTE,
+  WB_OVERDUE_MS,
+  bannerShown,
+  sanitizeWorldBossMsg,
+  scheduleRows,
+  worldBossView,
+} from "./world-boss-view";
 import {
   dungeonEndReasonText,
   dungeonFallenToastText,
@@ -179,6 +227,15 @@ import {
 import { quickLabel } from "./quick-label";
 import { initKeyLabels } from "./keybinds-dom";
 import {
+  DEFAULT_SOCIAL_TAB,
+  SOCIAL_TABS,
+  asSocialTab,
+  socialEnabled,
+  socialTabByKey,
+  tabByKey,
+  type SocialTabId,
+} from "./social-tabs";
+import {
   ACTION_BY_ID,
   FIXED_KEYS,
   getKeymap,
@@ -205,11 +262,23 @@ import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from 
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
 import {
+  DEFAULT_SKILL_FILTER,
+  cleanSkillFilter,
+  elementCounts,
+  filterSkills,
+  skillFilterActive,
+  skillFilterSummary,
+  sortSkills,
+  type SkillFilter,
+  type SkillSort,
+} from "./skill-filter";
+import {
   nextOpenSkill,
   resolveOpenSkill,
   type SkillRow,
   type SkillsPanelModel,
 } from "./skills-panel";
+import type { MasteryView } from "./skill-mastery";
 import { transitionMs, waitOrSkip } from "./gfx/scene-transition";
 import { getDisplay, onDisplayChange } from "./gfx/display";
 import { optionTag, skipHintText } from "./dialog-opt";
@@ -277,6 +346,7 @@ import {
 } from "./a11y";
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
 import { applyMapCard, mapCardUrl } from "./map-card";
+import { NpcPortraitSlot } from "./npc-portrait";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
@@ -351,6 +421,21 @@ export interface UiCallbacks {
   onSectVaultPolicy?: (drawPerDay: number) => void;
   /** Tab Nội vụ (M8.6): xin ảnh chụp mới (lúc mở tab, khi qua mốc đặt lại trong ngày), nhận / trả nhiệm vụ tông, mua ở cửa hàng tông */
   onSectHallGet?: () => void;
+  /** Bảng Xã hội (M9.6): xin một bảng xếp hạng (máy chủ trả tin `boards`) */
+  onBoardsGet?: (board: BoardId) => void;
+  /** Bảng Xã hội, tab Sự kiện (M9.7): xin sự kiện trùm thế giới đang diễn ra / sắp tới (máy chủ trả tin `worldBoss`) */
+  onWorldBossGet?: () => void;
+  /**
+   * Gặp chặn đường (mục 52, CD7): gửi `ambushSeen` (hộp thoại đã hiện, trang đang hiển thị) / `ambushChoose` (Chiến hoặc bỏ chạy). Trả `true` khi tin THẬT SỰ đã gửi
+   * (đang nối lại thì `false`: giao diện chưa coi là đã gửi, sẽ gửi lại khi nối lại xong).
+   */
+  onAmbushSeen?: (msg: AmbushSeenMsg) => boolean;
+  onAmbushChoose?: (msg: AmbushChooseMsg) => boolean;
+  /** Bỏ chạy giữa trận ở đấu trường (`ambushFlee { choice }`, CD7 bước 3); `true` CHỈ khi tin thật sự đã gửi. */
+  onAmbushFlee?: (msg: AmbushFleeMsg) => boolean;
+  /** Bảng Xã hội, tab Thành tựu (M9.8): xin sổ thành tựu (máy chủ trả tin `achievements`) / đeo hoặc gỡ danh hiệu (`null` = gỡ; máy chủ LUÔN trả lại `achievements`) */
+  onAchievementsGet?: () => void;
+  onTitleSet?: (id: string | null) => void;
   onSectQuestAccept?: (questId: string) => void;
   onSectQuestTurnIn?: (questId: string) => void;
   onSectShopBuy?: (itemId: string, qty?: number) => void;
@@ -465,6 +550,826 @@ let currentSect: SectView | null = null;
 let currentSectPresence: SectPresenceMsg | null = null;
 let sectModalOpen = false;
 let sectTab: "overview" | "members" | "treasury" | "vault" | "hall" = "overview";
+// Bảng Xã hội (M9, #1025): khung ba tab; mặc định BẬT, `?social=0` tắt (`socialEnabled`)
+let socialModalOpen = false;
+let socialTab: SocialTabId = DEFAULT_SOCIAL_TAB;
+
+/** Đồng bộ thanh tab + thân tab Xã hội theo `socialTab` (aria-selected, tabindex lăn, ẩn / hiện thân). */
+function renderSocialTabs() {
+  for (const t of SOCIAL_TABS) {
+    const on = t.id === socialTab;
+    const btn = $(`social-tab-btn-${t.id}`);
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.tabIndex = on ? 0 : -1;
+    $(`social-tab-${t.id}`).hidden = !on;
+  }
+}
+// Tab Xếp hạng (M9.6, #1025): bốn bảng, mỗi bảng giữ bản MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (chỉ để đo khoảng trôi của "tuổi bản chụp")
+let socialBoard: BoardId = BOARD_IDS[0];
+const socialBoards = new Map<
+  BoardId,
+  { msg: NonNullable<ReturnType<typeof sanitizeBoardsMsg>>; at: number }
+>();
+/** Bộ điều tiết xin của TỪNG bảng (`AskGate`, dùng chung với thành tựu và trùm thế giới): không xin lại trong 20 giây khi đã có bản; quá 6 giây chưa thấy trả lời thì hiện nút "Tải lại". */
+const socialBoardGates = new Map<BoardId, AskGate>();
+const boardGate = (board: BoardId): AskGate => {
+  let g = socialBoardGates.get(board);
+  if (!g) socialBoardGates.set(board, (g = new AskGate()));
+  return g;
+};
+let socialBoardTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSocialBoardTimer() {
+  if (socialBoardTimer !== null) {
+    clearTimeout(socialBoardTimer);
+    socialBoardTimer = null;
+  }
+}
+
+/** Xin bảng `board` từ máy chủ (bỏ qua nếu vừa xin chưa lâu và đã có bản; `force` = bấm "Tải lại"). Có hẹn giờ để hiện nút thử lại nếu máy chủ im. */
+function requestSocialBoard(board: BoardId, force = false) {
+  const gate = boardGate(board);
+  if (!gate.tryAsk(performance.now(), socialBoards.has(board), force)) return;
+  callbacks?.onBoardsGet?.(board);
+  clearSocialBoardTimer();
+  if (!socialBoards.has(board)) {
+    socialBoardTimer = setTimeout(() => {
+      socialBoardTimer = null;
+      if (socialModalOpen && socialTab === "rank") renderSocialRank();
+    }, gate.waitMsValue + 50);
+  }
+}
+
+/** Vẽ tab Xếp hạng: thanh tab phụ, câu "Hạng của bạn", bảng (đạo hiệu / danh hiệu / cột theo `BOARD_COLUMNS`), tuổi bản chụp, trạng thái tải / trống. Đổ chữ bằng `textContent`. */
+function renderSocialRank() {
+  for (const id of BOARD_IDS) {
+    const on = id === socialBoard;
+    const btn = $(`social-board-btn-${id}`);
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    btn.tabIndex = on ? 0 : -1;
+  }
+  $("social-board-panel").setAttribute("aria-labelledby", `social-board-btn-${socialBoard}`);
+  const entry = socialBoards.get(socialBoard);
+  const status = $("social-board-status");
+  const wrap = $("social-board-wrap");
+  const retry = $("social-board-retry");
+  const mine = $("social-board-mine");
+  const age = $("social-board-age");
+  if (!entry) {
+    const stale = boardGate(socialBoard).stale(performance.now(), false);
+    status.hidden = false;
+    status.textContent = stale
+      ? "Chưa nhận được bảng. Thử tải lại nhé."
+      : `Đang tải bảng ${BOARD_LABELS[socialBoard]}…`;
+    wrap.hidden = true;
+    retry.hidden = !stale;
+    mine.textContent = "";
+    age.textContent = "";
+    return;
+  }
+  const v = boardView(entry.msg, performance.now() - entry.at, currentSect === null);
+  retry.hidden = true;
+  mine.textContent = v.mineText;
+  const ageLine = v.ageText ? v.ageText.charAt(0).toUpperCase() + v.ageText.slice(1) + ". " : "";
+  age.textContent = v.empty ? "" : `${ageLine}${REFRESH_NOTE}`;
+  status.hidden = !v.empty;
+  status.textContent = v.empty ? "Chưa có ai trên bảng này." : "";
+  wrap.hidden = v.empty;
+  const head = $("social-board-head");
+  head.textContent = "";
+  const th = (t: string, cls: string) => {
+    const e = document.createElement("th");
+    e.scope = "col";
+    e.textContent = t;
+    e.className = cls;
+    head.appendChild(e);
+  };
+  th("Hạng", "c-rank");
+  th(v.board === "tongmon" ? "Tông môn" : "Đạo hiệu", "c-name");
+  for (const c of v.columns) th(c, "c-num");
+  $("social-board-caption").textContent = `${v.label}: ${v.rows.length} dòng đầu bảng`;
+  const body = $("social-board-body");
+  body.textContent = "";
+  const addRow = (r: (typeof v.rows)[number], extra = "") => {
+    const tr = document.createElement("tr");
+    tr.className = `${r.mine ? "mine" : ""} ${extra}`.trim();
+    const rank = document.createElement("td");
+    rank.className = "c-rank";
+    rank.textContent = String(r.rank);
+    const name = document.createElement("td");
+    name.className = "c-name";
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = r.name;
+    name.appendChild(n);
+    if (r.title) {
+      const t = document.createElement("span");
+      t.className = "t";
+      t.textContent = r.title;
+      name.appendChild(t);
+    }
+    if (r.test) {
+      const t = document.createElement("span");
+      t.className = "test";
+      t.textContent = "thử nghiệm";
+      name.appendChild(t);
+    }
+    tr.append(rank, name);
+    for (const c of r.cells) {
+      const td = document.createElement("td");
+      // ô SỐ ("40.000", "—") không xuống dòng; ô CHỮ nhiều từ (tên cảnh giới) xuống dòng ở khoảng trắng
+      td.className = /\s/.test(c) ? "c-num" : "c-num nw";
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  };
+  for (const r of v.rows) addRow(r);
+  if (v.mineRow) {
+    const gap = document.createElement("tr");
+    gap.className = "gap";
+    const td = document.createElement("td");
+    td.colSpan = 2 + v.columns.length;
+    td.textContent = "…";
+    td.setAttribute("aria-hidden", "true");
+    gap.appendChild(td);
+    body.appendChild(gap);
+    addRow(v.mineRow, "outside");
+  }
+}
+
+// ---- Gặp chặn đường (mục 52, CD7 #1067): hộp thoại Chiến / Bỏ chạy, vẽ từ `ambush-view.ts` (thuần) ----
+/** Hộp thoại đang mở (null = không có). Đồng hồ cục bộ chỉ để đo KHOẢNG TRÔI; máy chủ mới quyết (hết giờ = Chiến). */
+let ambushDlg: AmbushDialog | null = null;
+let ambushTimer: ReturnType<typeof setInterval> | null = null;
+const AMBUSH_TICK_MS = 250;
+const AMBUSH_BTN_ID: Readonly<Record<string, string>> = {
+  fight: "ambush-fight",
+  flee_coin: "ambush-flee-coin",
+  flee_exp: "ambush-flee-exp",
+};
+
+function setTextIfChanged(el: Element | null, text: string): void {
+  if (el && el.textContent !== text) el.textContent = text;
+}
+
+/** Vẽ lại hộp thoại theo đồng hồ hiện tại và gửi `ambushSeen` nếu đến lúc. Gọi mỗi `AMBUSH_TICK_MS`, khi nhận tin, khi trang hiện lại. */
+function renderAmbush(): void {
+  const d = ambushDlg;
+  if (!d) return;
+  const now = performance.now();
+  const v = ambushDialogView(d, now);
+  const reconnecting = document.body.classList.contains("reconnecting");
+  setTextIfChanged(document.getElementById("ambush-foe"), v.foe);
+  setTextIfChanged(document.getElementById("ambush-death-note"), v.deathNote); // mục 53: dòng cố định dưới nút Chiến
+  const danger = document.getElementById("ambush-danger");
+  if (danger && danger.hidden === v.danger) danger.hidden = !v.danger; // mức tinh anh / cầm đầu: nhãn NGUY HIỂM
+  setTextIfChanged(document.getElementById("ambush-scene"), v.scene);
+  // đang nối lại: máy chủ ĐÓNG BĂNG đồng hồ, nên không đếm tiếp trên màn hình
+  setTextIfChanged(
+    document.getElementById("ambush-countdown"),
+    reconnecting ? "Tạm dừng" : v.waitingServer ? "Chờ…" : v.countdown,
+  );
+  const fill = document.getElementById("ambush-bar-fill");
+  if (fill) {
+    const pct = Math.round((ambushRemainingMs(d, now) / AMBUSH_OFFER_MS) * 100);
+    const w = `${Math.min(100, Math.max(0, pct))}%`;
+    if (fill.style.width !== w) fill.style.width = w;
+  }
+  for (const b of v.buttons) {
+    const el = document.getElementById(AMBUSH_BTN_ID[b.choice]);
+    if (!el) continue;
+    setTextIfChanged(el.querySelector(".ab-label"), b.label);
+    // gợi ý phím chỉ có nghĩa khi có chuột / bàn phím (điện thoại cảm ứng không có Enter)
+    const keyHint = b.choice === "fight" && window.matchMedia("(pointer: fine)").matches;
+    setTextIfChanged(el.querySelector(".ab-sub"), keyHint ? `${b.sub} · Enter` : b.sub);
+    el.setAttribute("aria-disabled", String(!b.enabled || reconnecting));
+    el.setAttribute("aria-label", b.aria);
+  }
+  setTextIfChanged(
+    document.getElementById("ambush-note"),
+    reconnecting ? "Đang nối lại… đồng hồ tạm dừng." : v.note,
+  );
+  if (!reconnecting && ambushNeedsSeen(d, document.visibilityState === "visible")) {
+    // chỉ coi là ĐÃ GỬI khi tin thật sự đi (callback trả true); không thì lần vẽ sau thử lại
+    if (callbacks?.onAmbushSeen?.({ id: d.offer.id }) === true) ambushDlg = ambushMarkSeen(d);
+  }
+}
+
+/** Người chơi chọn (bấm nút / Enter / Y): `ambush-view.ts` quyết có gửi không (khoá 700 ms, đang chờ, nút mờ). */
+function pickAmbush(choice: unknown): void {
+  const d = ambushDlg;
+  if (!d || document.body.classList.contains("reconnecting")) return;
+  const r = chooseAmbush(d, choice, performance.now());
+  // như `pickFlee`: tin trả lời đến đồng bộ (máy chủ giả: đổi phòng đóng hộp thoại ngay) thì KHÔNG ghi đè trạng thái mới bằng bản cũ
+  if (r.send !== null && callbacks?.onAmbushChoose?.(r.send) === true && ambushDlg === d)
+    ambushDlg = r.dialog;
+  renderAmbush();
+}
+
+function hideAmbushImpl(): void {
+  hideArenaImpl();
+  hideArenaResult();
+  if (ambushTimer !== null) {
+    clearInterval(ambushTimer);
+    ambushTimer = null;
+  }
+  ambushDlg = null;
+  const el = document.getElementById("ambush-modal");
+  if (el) el.hidden = true;
+  document.body.classList.remove("in-ambush");
+  if (modalStack.remove("ambush-modal")) returnFocus(null);
+}
+
+/** Gắn sự kiện một lần lúc khởi tạo: bấm ba nút, phím Enter / Y = Chiến, trang hiện lại thì gửi `ambushSeen` đang nợ. */
+function bindAmbushDom(): void {
+  for (const id of Object.values(AMBUSH_BTN_ID)) {
+    const el = document.getElementById(id);
+    el?.addEventListener("click", () => pickAmbush(el.dataset.choice));
+  }
+  // pha BẮT: chạy trước bộ phím của thế giới. Enter trên NÚT đang có focus để nút đó nhận (click gốc); Enter / Y khi focus ở khung = Chiến. KHÔNG phím chữ nào chọn bỏ chạy.
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (!ambushDlg || e.defaultPrevented || e.repeat || e.ctrlKey || e.altKey || e.metaKey)
+        return;
+      const choice = ambushChoiceForKey(e.code);
+      if (choice === null) return;
+      const active = document.activeElement;
+      if (
+        e.code !== "KeyY" &&
+        active instanceof HTMLButtonElement &&
+        active.closest("#ambush-modal")
+      )
+        return;
+      e.preventDefault();
+      pickAmbush(choice);
+    },
+    true,
+  );
+  document.addEventListener("visibilitychange", () => {
+    if (ambushDlg) renderAmbush();
+  });
+}
+
+// ---- Đấu trường gặp chặn đường (mục 52, CD7 bước 3): HUD + bảng xác nhận bỏ chạy + thẻ kết quả, vẽ từ `arena-hud-view.ts` (thuần) ----
+/** HUD đang hiện (null = không ở đấu trường). Mỗi `ambushState` (mỗi giây) làm mới đồng hồ + giá; máy chủ quyết kết cục. */
+let arenaHud: ArenaHud | null = null;
+let arenaTimer: ReturnType<typeof setInterval> | null = null;
+let arenaResultTimer: ReturnType<typeof setTimeout> | null = null;
+const ARENA_RESULT_MS = 6_000;
+const FLEE_BTN_ID: Readonly<Record<string, string>> = {
+  flee_coin: "aflee-coin",
+  flee_exp: "aflee-exp",
+};
+
+function fleeSheetOpen(): boolean {
+  const el = document.getElementById("ambush-flee-modal");
+  return Boolean(el && !el.hidden);
+}
+
+/** Vẽ lại HUD (và bảng xác nhận nếu đang mở) theo đồng hồ hiện tại. */
+function renderArena(): void {
+  const h = arenaHud;
+  if (!h) return;
+  const v = arenaHudView(h, performance.now());
+  const reconnecting = document.body.classList.contains("reconnecting");
+  const clock = document.getElementById("ahud-clock");
+  setTextIfChanged(clock, reconnecting ? "Tạm dừng" : v.waitingServer ? "Chờ…" : v.countdown);
+  clock?.classList.toggle("urgent", v.urgent && !reconnecting);
+  const flee = document.getElementById("ahud-flee");
+  flee?.setAttribute("aria-disabled", String(!v.canOpenFlee || reconnecting));
+  flee?.setAttribute("aria-label", `Bỏ chạy giữa trận. ${v.announce}`);
+  setTextIfChanged(
+    document.getElementById("ahud-note"),
+    reconnecting ? "Đang nối lại…" : v.confirming ? "" : v.note,
+  );
+  // vận bỏ chạy (mục 53): thanh đầy dần trong 1 giây; bảng xác nhận đóng để người chơi thấy trận (vận KHÔNG bất khả xâm phạm)
+  const fleeBar = document.getElementById("ahud-flee-bar");
+  if (fleeBar) {
+    const show = v.fleeing && !reconnecting;
+    if (fleeBar.hidden === show) fleeBar.hidden = !show;
+    const fill = document.getElementById("ahud-flee-fill");
+    const w = `${Math.round(v.fleeFrac * 100)}%`;
+    if (fill && fill.style.width !== w) fill.style.width = w;
+  }
+  if (!h.confirming && fleeSheetOpen()) closeFleeSheet();
+  if (!fleeSheetOpen()) return;
+  setTextIfChanged(document.getElementById("aflee-text"), v.confirmText);
+  v.buttons.forEach((b) => {
+    const el = document.getElementById(FLEE_BTN_ID[b.choice]);
+    if (!el) return;
+    setTextIfChanged(el.querySelector(".ab-label"), b.label);
+    setTextIfChanged(el.querySelector(".ab-sub"), b.sub);
+    el.setAttribute("aria-disabled", String(!b.enabled || reconnecting));
+    el.setAttribute("aria-label", b.aria);
+  });
+  setTextIfChanged(
+    document.getElementById("aflee-note"),
+    reconnecting ? "Đang nối lại… chưa bỏ chạy được." : v.note,
+  );
+}
+
+function openFleeSheet(): void {
+  const h = arenaHud;
+  if (!h || document.body.classList.contains("reconnecting") || fleeSheetOpen()) return;
+  arenaHud = setFleeConfirm(h, true, performance.now());
+  const el = document.getElementById("ambush-flee-modal");
+  if (!el) return;
+  el.hidden = false;
+  modalStack.push("ambush-flee-modal", document.getElementById("ahud-flee"));
+  // focus vào KHUNG, không vào nút giá: đang bấm phím chiến đấu thì không được chọn nhầm cách trả
+  el.focus();
+  renderArena();
+}
+
+/** Đóng bảng xác nhận ("Ở lại đánh" / Esc). Đang chờ phản hồi của lựa chọn đã gửi thì giữ (không rút lại giữa chừng). */
+function closeFleeSheet(): void {
+  const el = document.getElementById("ambush-flee-modal");
+  if (!el || el.hidden) return;
+  if (arenaHud) {
+    const next = setFleeConfirm(arenaHud, false, performance.now());
+    if (next.confirming) return;
+    arenaHud = next;
+  }
+  el.hidden = true;
+  if (modalStack.remove("ambush-flee-modal")) returnFocus(document.getElementById("ahud-flee"));
+  renderArena();
+}
+
+/** Người chơi chọn cách trả ở bảng xác nhận (chỉ nút giá mới gửi; không phím tắt chữ cái). */
+function pickFlee(choice: unknown): void {
+  const h = arenaHud;
+  if (!h || document.body.classList.contains("reconnecting")) return;
+  const r = fleeArena(h, choice, performance.now());
+  if (r.send !== null && callbacks?.onAmbushFlee?.(r.send) === true) {
+    // tin trả lời (`ambushState` có `fleeMs`) có thể đến ĐỒNG BỘ ngay trong lúc gửi (máy chủ giả `?ambush=mock`) và đã làm mới `arenaHud`: chỉ ghi thêm dấu "đã gửi", KHÔNG ghi đè bản mới
+    arenaHud =
+      arenaHud === h ? r.hud : arenaHud === null ? null : { ...arenaHud, sent: r.hud.sent };
+  }
+  renderArena();
+}
+
+function hideArenaResult(): void {
+  if (arenaResultTimer !== null) {
+    clearTimeout(arenaResultTimer);
+    arenaResultTimer = null;
+  }
+  const card = document.getElementById("ambush-result");
+  if (card) card.hidden = true;
+}
+
+/** Thẻ kết quả ở đấu trường (thắng liệt kê thưởng; bỏ chạy / thua / hết giờ nói đúng cái giá). Tự ẩn sau `ARENA_RESULT_MS` hoặc khi đổi phòng. */
+function showArenaResult(end: Parameters<typeof ambushEndView>[0]): void {
+  const v = ambushEndView(end);
+  const card = document.getElementById("ambush-result");
+  const title = document.getElementById("ar-title");
+  const list = document.getElementById("ar-lines");
+  if (!card || !title || !list || v.silent) return;
+  card.className = `ambush-result ${v.tone}`;
+  title.textContent = v.title;
+  list.replaceChildren(
+    ...v.lines.map((t) => {
+      const li = document.createElement("li");
+      li.textContent = t;
+      return li;
+    }),
+  );
+  card.hidden = false;
+  if (arenaResultTimer !== null) clearTimeout(arenaResultTimer);
+  arenaResultTimer = setTimeout(hideArenaResult, ARENA_RESULT_MS);
+}
+
+/** Gỡ HUD đấu trường + bảng xác nhận (hết trận / đổi phòng); KHÔNG đụng thẻ kết quả. */
+function hideArenaImpl(): void {
+  if (arenaTimer !== null) {
+    clearInterval(arenaTimer);
+    arenaTimer = null;
+  }
+  arenaHud = null;
+  const hud = document.getElementById("ambush-hud");
+  if (hud) hud.hidden = true;
+  const sheet = document.getElementById("ambush-flee-modal");
+  if (sheet) sheet.hidden = true;
+  document.body.classList.remove("in-arena");
+  modalStack.remove("ambush-flee-modal");
+}
+
+/** Gắn sự kiện một lần lúc khởi tạo: nút Bỏ chạy ở HUD (mở xác nhận), hai nút giá, "Ở lại đánh". */
+function bindArenaDom(): void {
+  const flee = document.getElementById("ahud-flee");
+  flee?.addEventListener("click", () => {
+    if (flee.getAttribute("aria-disabled") !== "true") openFleeSheet();
+  });
+  for (const id of Object.values(FLEE_BTN_ID)) {
+    const el = document.getElementById(id);
+    el?.addEventListener("click", () => pickFlee(el.dataset.choice));
+  }
+  document.getElementById("aflee-cancel")?.addEventListener("click", closeFleeSheet);
+}
+
+// ---- Trùm thế giới (M9.7, #1026): banner + tab Sự kiện, vẽ từ `world-boss-view.ts` ----
+/** Tin `worldBoss` MỚI NHẤT (mọi phase) + đồng hồ máy khách lúc nhận (chỉ để đo KHOẢNG TRÔI của đồng hồ đếm ngược, không phải giờ tuyệt đối). */
+let wbLast: { msg: WorldBossMsg; at: number } | null = null;
+/** Kết quả của sự kiện vừa kết thúc, hiện thay banner một lúc (`WB_RESULT_MS`). */
+let wbResult: { text: string; tone: "info" | "good" | "bad" } | null = null;
+let wbResultTimer: ReturnType<typeof setTimeout> | null = null;
+/** Bộ điều tiết xin sự kiện trùm thế giới (`AskGate`): không xin lại trong 20 giây khi đã có tin; quá 6 giây chưa thấy tin thì hiện nút "Tải lại". */
+const wbGate = new AskGate();
+let wbTabTimer: ReturnType<typeof setTimeout> | null = null;
+let wbTickTimer: ReturnType<typeof setInterval> | null = null;
+/** Danh sách đóng góp mở sẵn trên màn rộng; điện thoại / khung thấp thu gọn (bấm "Xem đóng góp" để mở). */
+let wbExpanded =
+  typeof window !== "undefined" && window.innerWidth >= 900 && window.innerHeight >= 500;
+let wbTopKey = "";
+let wbScheduleBuilt = false;
+const WB_RESULT_MS = 10_000;
+/** Tin kết thúc giống hệt đến lại trong chừng này thì không toast lần hai (gửi lại khi vào phòng / nối lại). */
+const WB_DUP_MS = 60_000;
+
+function socialFlagOn(): boolean {
+  return typeof window !== "undefined" && socialEnabled(window.location.search);
+}
+
+function setWbText(id: string, t: string) {
+  const e = $(id);
+  if (e.textContent !== t) e.textContent = t;
+}
+
+/** Xin sự kiện trùm thế giới (bỏ qua nếu vừa xin chưa lâu và đã có tin; `force` = bấm "Tải lại" / tin đã quá hạn). */
+function requestWorldBoss(force = false) {
+  if (!wbGate.tryAsk(performance.now(), wbLast !== null, force)) return;
+  callbacks?.onWorldBossGet?.();
+  if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+  wbTabTimer = null;
+  if (!wbLast) {
+    wbTabTimer = setTimeout(() => {
+      wbTabTimer = null;
+      renderWbTab();
+    }, wbGate.waitMsValue + 50);
+  }
+}
+
+/** Banner đầu màn hình: đếm ngược / máu / phần đóng góp của mình / danh sách đóng góp, hoặc kết quả vừa kết thúc. Trả `true` nếu cần đồng hồ chạy. */
+function renderWbBanner(): boolean {
+  const banner = $("wb-banner");
+  const hide = () => {
+    if (!banner.hidden) banner.hidden = true;
+    return false;
+  };
+  if (!socialFlagOn()) return hide();
+  if (wbResult) {
+    banner.hidden = false;
+    banner.dataset.tone = wbResult.tone;
+    for (const id of ["wb-title", "wb-hp", "wb-mine"]) setWbText(id, "");
+    $("wb-timer").parentElement!.hidden = true;
+    $("wb-title").parentElement!.hidden = true;
+    $("wb-mine").hidden = true;
+    $("wb-toggle").hidden = true;
+    $("wb-top").hidden = true;
+    const r = $("wb-result");
+    r.hidden = false;
+    setWbText("wb-result", wbResult.text);
+    return false;
+  }
+  if (!wbLast) return hide();
+  const v = worldBossView(wbLast.msg, performance.now() - wbLast.at);
+  if (!bannerShown(v)) return hide();
+  banner.hidden = false;
+  banner.dataset.tone = "info";
+  $("wb-result").hidden = true;
+  $("wb-title").parentElement!.hidden = false;
+  $("wb-timer").parentElement!.hidden = v.leftMs === null;
+  setWbText("wb-title", v.title);
+  setWbText("wb-hp", v.hp);
+  setWbText("wb-timer-label", v.timerLabel);
+  setWbText("wb-timer", v.timer);
+  setWbText("wb-mine", v.mineText);
+  $("wb-mine").hidden = v.mineText === "";
+  $("wb-mine").classList.toggle("low", v.mineEligible === false);
+  const hasTop = v.top.length > 0;
+  const toggle = $("wb-toggle");
+  toggle.hidden = !hasTop;
+  toggle.setAttribute("aria-expanded", wbExpanded ? "true" : "false");
+  setWbText("wb-toggle", wbExpanded ? "Ẩn đóng góp" : "Xem đóng góp");
+  const list = $("wb-top");
+  list.hidden = !(hasTop && wbExpanded);
+  const key = v.top.map((r) => `${r.rank}|${r.name}|${r.title}|${r.pct}`).join("\n");
+  if (key !== wbTopKey) {
+    wbTopKey = key;
+    list.textContent = "";
+    for (const r of v.top) {
+      const li = document.createElement("li");
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = r.name;
+      li.append(n);
+      if (r.title) {
+        const t = document.createElement("span");
+        t.className = "t";
+        t.textContent = r.title;
+        li.append(t);
+      }
+      const pct = document.createElement("span");
+      pct.className = "pct";
+      pct.textContent = r.pct;
+      li.append(pct);
+      list.append(li);
+    }
+  }
+  return v.leftMs !== null;
+}
+
+/** Tab "Sự kiện": trạng thái hiện tại (đếm ngược / đang diễn ra / kết quả / chưa có) + bảng lịch hằng ngày (dữ liệu tĩnh của shared, giờ máy chủ). Trả `true` nếu cần đồng hồ chạy. */
+function renderWbTab(): boolean {
+  if (!socialModalOpen || socialTab !== "event") return false;
+  if (!wbScheduleBuilt) {
+    wbScheduleBuilt = true;
+    const rows = scheduleRows(WORLD_BOSS_SCHEDULE);
+    $("wbt-empty").hidden = rows.length > 0;
+    $("wbt-wrap").hidden = rows.length === 0;
+    const body = $("wbt-body");
+    body.textContent = "";
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      const cells: [string, string][] = [
+        [r.time, "c-time"],
+        [r.boss, "c-name"],
+        [r.map, ""],
+        [r.duration, "c-num nw"],
+      ];
+      for (const [t, cls] of cells) {
+        const td = document.createElement("td");
+        td.textContent = t;
+        if (cls) td.className = cls;
+        tr.append(td);
+      }
+      body.append(tr);
+    }
+    setWbText("wbt-tz", rows.length > 0 ? SCHEDULE_TZ_NOTE : "");
+  }
+  const retry = $("wbt-retry");
+  if (!wbLast) {
+    const stale = wbGate.stale(performance.now(), false);
+    setWbText(
+      "wbt-status",
+      stale ? "Chưa nhận được thông tin sự kiện. Thử tải lại nhé." : "Đang tải sự kiện…",
+    );
+    setWbText("wbt-detail", "");
+    retry.hidden = !stale;
+    return false;
+  }
+  retry.hidden = true;
+  const v = worldBossView(wbLast.msg, performance.now() - wbLast.at);
+  if (v.active && v.overdueMs > WB_OVERDUE_MS) {
+    setWbText("wbt-status", "Đang cập nhật sự kiện…");
+    setWbText("wbt-detail", "");
+    return false;
+  }
+  let status: string;
+  let detail = "";
+  if (v.phase === "none" || v.phase === "ended") status = v.resultText;
+  else if (v.phase === "soon")
+    status = `${v.title}: ${v.timerLabel.toLowerCase()} ${v.timer}`.trim();
+  else {
+    status = `${v.title}: đang diễn ra${v.timer ? `, còn ${v.timer}` : ""}.`;
+    detail = [v.hp, v.mineText].filter(Boolean).join(" · ");
+  }
+  setWbText("wbt-status", status);
+  setWbText("wbt-detail", detail);
+  return v.active && v.leftMs !== null;
+}
+
+/** Bật / tắt đồng hồ 1 giây theo nhu cầu (banner hoặc tab Sự kiện đang hiện đồng hồ); không có gì đếm thì KHÔNG chạy gì nền. */
+function syncWbTick() {
+  // vẽ CẢ HAI trước rồi mới gộp (`a || b` sẽ bỏ qua vế sau khi vế đầu đúng: tab Sự kiện không được vẽ lại khi banner đang đếm)
+  const banner = renderWbBanner();
+  const tab = renderWbTab();
+  const need = banner || tab;
+  if (need && wbTickTimer === null) {
+    wbTickTimer = setInterval(() => {
+      const b = renderWbBanner();
+      const t = renderWbTab();
+      if (!b && !t) syncWbTick();
+    }, 1000);
+  } else if (!need && wbTickTimer !== null) {
+    clearInterval(wbTickTimer);
+    wbTickTimer = null;
+  }
+}
+
+// ---- Thành tựu + danh hiệu (M9.8, #1027): tab Thành tựu, vẽ từ `achievement-view.ts` ----
+/** Sổ thành tựu MỚI NHẤT (đã làm sạch) của chính mình; `null` = chưa nhận. Danh hiệu đang đeo lấy từ đây, KHÔNG đoán trước khi bấm. */
+let achLast: AchievementsMsg | null = null;
+/** Thành tựu mới đạt mà chưa xem (đánh dấu "Mới" + chấm trên nút HUD); xoá khi rời tab Thành tựu / đóng bảng. */
+const achNew = new Set<string>();
+const achGate = new AskGate();
+let achTimer: ReturnType<typeof setTimeout> | null = null;
+/** Đang chờ máy chủ trả lời việc đổi danh hiệu (`undefined` = không chờ; `null` = đang gỡ). Hết `ACH_TITLE_WAIT_MS` mà chưa thấy thì thôi chờ. */
+let achPending: string | null | undefined;
+let achPendingTimer: ReturnType<typeof setTimeout> | null = null;
+/** Nhóm mở / đóng do NGƯỜI CHƠI chọn (vẽ lại không làm mất lựa chọn). */
+const achOpen = new Map<string, boolean>();
+/** Mục gập "Còn N danh hiệu chưa mở" của tab Thành tựu đang mở? (mặc định gập; giữ qua các lần vẽ lại) */
+let achLockedOpen = false;
+const ACH_TITLE_WAIT_MS = 5_000;
+/** Đã hiện danh sách thành tựu cho người chơi thấy kể từ lúc vào tab (điều kiện để xoá dấu "Mới" khi rời). */
+let achViewed = false;
+
+function achEl(id: string): HTMLElement {
+  return $(id);
+}
+
+/** Chấm "có thành tựu mới" trên nút HUD Xã hội (hình tròn, không chỉ màu) + nhãn đọc màn hình. */
+function syncAchDot() {
+  const btn = $("btn-social");
+  const on = achNew.size > 0 && !(socialModalOpen && socialTab === "ach");
+  btn.classList.toggle("has-new", on);
+  const base = "Xã hội: xếp hạng, thành tựu, sự kiện (Phím Shift+G)";
+  btn.setAttribute("aria-label", on ? `${base}. Có thành tựu mới` : base);
+}
+
+/** Rời tab Thành tựu (đổi tab / đóng bảng): nếu người chơi ĐÃ thấy danh sách thì xoá dấu "Mới" + chấm trên nút HUD; chưa từng thấy (mới đạt lúc đang ở tab khác) thì giữ. */
+function leaveAch() {
+  if (!achViewed) return;
+  achViewed = false;
+  if (achNew.size === 0) return;
+  achNew.clear();
+  syncAchDot();
+}
+
+function requestAch(force = false) {
+  const now = performance.now();
+  if (!achGate.tryAsk(now, achLast !== null, force)) return;
+  callbacks?.onAchievementsGet?.();
+  if (achTimer !== null) clearTimeout(achTimer);
+  achTimer = null;
+  if (!achLast) {
+    achTimer = setTimeout(() => {
+      achTimer = null;
+      renderAch();
+    }, achGate.waitMsValue + 50);
+  }
+}
+
+/** Vẽ tab Thành tựu: tóm tắt, danh hiệu (radiogroup), thành tựu theo nhóm (details). Đổ chữ bằng `textContent`; vẽ lại giữ nhóm người chơi đã mở / đóng. */
+function renderAch() {
+  if (!socialModalOpen || socialTab !== "ach") return;
+  const status = achEl("ach-status");
+  const retry = achEl("ach-retry");
+  const body = achEl("ach-body");
+  if (!achLast) {
+    const stale = achGate.stale(performance.now(), false);
+    status.hidden = false;
+    status.textContent = stale
+      ? "Chưa nhận được sổ thành tựu. Thử tải lại nhé."
+      : "Đang tải sổ thành tựu…";
+    retry.hidden = !stale;
+    body.hidden = true;
+    achEl("ach-summary").textContent = "";
+    return;
+  }
+  status.hidden = true;
+  retry.hidden = true;
+  body.hidden = false;
+  const v = achievementsView(achLast, achNew);
+  achViewed = true;
+  achEl("ach-summary").textContent = v.summary;
+  achEl("ach-worn").textContent = achPending !== undefined ? "Đang đổi danh hiệu…" : v.wornText;
+  // danh hiệu: một nút "Không đeo" + mỗi danh hiệu một nút (khoá thì aria-disabled + nói cách mở bằng CHỮ)
+  const titles = achEl("ach-titles");
+  titles.textContent = "";
+  const mkTitle = (
+    id: string | null,
+    text: string,
+    checked: boolean,
+    locked: boolean,
+    hint: string,
+  ) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ach-title" + (checked ? " on" : "") + (locked ? " locked" : "");
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", checked ? "true" : "false");
+    if (locked) b.setAttribute("aria-disabled", "true");
+    const t = document.createElement("span");
+    t.className = "ach-title-text";
+    t.textContent = text;
+    b.append(t);
+    if (hint) {
+      const h = document.createElement("span");
+      h.className = "ach-title-hint";
+      h.textContent = hint;
+      b.append(h);
+    }
+    b.addEventListener("click", () => {
+      if (locked || checked || achPending !== undefined) return;
+      achPending = id;
+      if (achPendingTimer !== null) clearTimeout(achPendingTimer);
+      achPendingTimer = setTimeout(() => {
+        achPendingTimer = null;
+        achPending = undefined;
+        renderAch();
+      }, ACH_TITLE_WAIT_MS);
+      callbacks?.onTitleSet?.(id);
+      renderAch();
+    });
+    titles.append(b);
+  };
+  mkTitle(null, "Không đeo", v.worn === null, false, "");
+  const split = splitTitles(v.titles);
+  for (const t of split.open) mkTitle(t.id, t.text, t.worn, false, "");
+  // danh hiệu CHƯA mở: một mục gập "Còn N danh hiệu chưa mở" (giữ trạng thái mở / đóng người chơi đã chọn), mỗi cái chỉ là chữ: tên + cách mở
+  const lockedBox = achEl("ach-locked") as HTMLDetailsElement;
+  lockedBox.hidden = split.locked.length === 0;
+  achEl("ach-locked-sum").textContent = split.lockedLabel;
+  lockedBox.open = achLockedOpen;
+  if (!lockedBox.dataset.wired) {
+    lockedBox.dataset.wired = "1";
+    lockedBox.addEventListener("toggle", () => (achLockedOpen = lockedBox.open));
+  }
+  const lockedList = achEl("ach-locked-list");
+  lockedList.textContent = "";
+  for (const t of split.locked) {
+    const li = document.createElement("li");
+    li.className = "ach-item";
+    const name = document.createElement("b");
+    name.className = "ach-name";
+    name.textContent = t.text;
+    const how = document.createElement("p");
+    how.className = "ach-desc";
+    how.textContent = t.hint;
+    li.append(name, how);
+    lockedList.append(li);
+  }
+  // thành tựu theo nhóm
+  const groups = achEl("ach-groups");
+  groups.textContent = "";
+  const few = v.total <= 12;
+  v.groups.forEach((g, gi) => {
+    const det = document.createElement("details");
+    det.className = "ach-group";
+    const hasNew = g.items.some((i) => i.isNew);
+    det.open = achOpen.get(g.id) ?? (few || gi === 0 || hasNew);
+    det.addEventListener("toggle", () => achOpen.set(g.id, det.open));
+    const sum = document.createElement("summary");
+    sum.textContent = `${g.label} (${g.done} / ${g.total})`;
+    det.append(sum);
+    const ul = document.createElement("ul");
+    ul.className = "ach-list";
+    for (const it of g.items) {
+      const li = document.createElement("li");
+      li.className = "ach-item" + (it.done ? " done" : "") + (it.isNew ? " new" : "");
+      const head = document.createElement("div");
+      head.className = "ach-head";
+      const name = document.createElement("b");
+      name.className = "ach-name";
+      name.textContent = it.name;
+      head.append(name);
+      if (it.isNew) {
+        const n = document.createElement("span");
+        n.className = "ach-badge";
+        n.textContent = "Mới";
+        head.append(n);
+      }
+      const st = document.createElement("span");
+      st.className = "ach-state";
+      st.textContent = it.done ? (it.at ? `Hoàn thành · ${it.at}` : "Hoàn thành") : it.progress;
+      head.append(st);
+      li.append(head);
+      const d = document.createElement("p");
+      d.className = "ach-desc";
+      d.textContent = it.desc;
+      li.append(d);
+      if (!it.done) {
+        const bar = document.createElement("div");
+        bar.className = "ach-bar";
+        bar.setAttribute("role", "progressbar");
+        bar.setAttribute("aria-label", `Tiến độ: ${it.name}`);
+        bar.setAttribute("aria-valuemin", "0");
+        bar.setAttribute("aria-valuemax", "100");
+        bar.setAttribute("aria-valuenow", String(it.pct));
+        bar.setAttribute("aria-valuetext", it.progress);
+        const fill = document.createElement("i");
+        fill.style.width = `${it.pct}%`;
+        bar.append(fill);
+        li.append(bar);
+      }
+      if (it.reward) {
+        const r = document.createElement("p");
+        r.className = "ach-reward";
+        r.textContent = it.reward;
+        li.append(r);
+      }
+      ul.append(li);
+    }
+    det.append(ul);
+    groups.append(det);
+  });
+}
+
 // ---- Nội vụ tông môn (M8.6, #843) ----
 /** Ảnh chụp "Nội vụ" MỚI NHẤT đã làm sạch + đồng hồ máy khách lúc nhận (để đếm ngược theo giờ máy chủ); `null` = chưa có. */
 let sectHall: { view: NonNullable<ReturnType<typeof sanitizeHallView>>; at: number } | null = null;
@@ -676,6 +1581,8 @@ function loadSettings() {
 
 // Hộp thoại NPC
 let currentDialog: DialogMsg | null = null;
+/** Ô chân dung ở khung hội thoại (dựng lười ở lần mở đầu tiên). */
+let dlgPortrait: NpcPortraitSlot | null = null;
 let dlgTypeTimer: number | null = null;
 let dlgFullText = "";
 let dlgTypedLen = 0;
@@ -2383,6 +3290,35 @@ function setSkillsOpen(list: HTMLElement, id: string | null, scroll: boolean) {
  * Một chiêu = MỘT hàng gọn (biểu tượng + tên + hệ + ô đang giữ, cao >= 44 px); bấm / Enter mở chi tiết ngay dưới hàng: hàng nút gắn ô / gỡ TRƯỚC (điện thoại ngang
  * chỉ còn ~180 px cho danh sách: nút phải thấy ngay, không phải cuộn qua số liệu), rồi số thật, hiệu ứng, mô tả, kinh quyển. Mũi tên + Enter đi theo hình học (`panel-nav.ts`), Delete trên bất kỳ nút nào của chiêu gỡ chiêu khỏi ô đang giữ.
  */
+/**
+ * Đoạn luyện chiêu của một hàng: dòng chữ + (khi còn luyện được) thanh tiến độ `role=progressbar`. Chữ trên màn hình ẩn với trình đọc màn hình (nhãn của thanh đã đọc
+ * đủ điểm / điểm cần), tránh đọc hai lần; dòng chữ không có thanh (tầng cuối / tối đa) thì để nguyên cho trình đọc.
+ */
+function masteryEl(m: MasteryView): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "sk-mastery";
+  const text = document.createElement("small");
+  text.className = "sk-mastery-text";
+  text.textContent = m.text;
+  box.append(text);
+  if (m.kind === "bar") {
+    text.setAttribute("aria-hidden", "true");
+    const bar = document.createElement("div");
+    bar.className = "sk-mastery-bar";
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", String(m.need));
+    bar.setAttribute("aria-valuenow", String(m.points));
+    bar.setAttribute("aria-label", m.aria);
+    const fill = document.createElement("div");
+    fill.className = "sk-mastery-fill";
+    fill.style.width = `${m.percent}%`;
+    bar.append(fill);
+    box.append(bar);
+  }
+  return box;
+}
+
 function skillRowEl(row: SkillRow): HTMLElement {
   const el = document.createElement("div");
   el.className = `sk-row${row.slotNow !== null ? " equipped" : ""}`;
@@ -2396,19 +3332,26 @@ function skillRowEl(row: SkillRow): HTMLElement {
   line.setAttribute("aria-expanded", "false");
   line.setAttribute("aria-controls", detailId);
   line.setAttribute("aria-label", row.aria);
-  const def = skillOf(row.id);
   const ico = document.createElement("span");
   ico.className = "sk-row-ico skico";
   ico.setAttribute("aria-hidden", "true");
-  if (def) {
-    ico.innerHTML = skillIconSvg(def);
-    ico.style.setProperty("--si-c", elementColor(def.element));
-  }
+  // vẽ từ DỮ LIỆU CỦA HÀNG (phong cách / phẩm đã suy bằng hàm của shared, hệ), không tra lại bảng chiêu: chiêu giả của chế độ mock và chiêu mới chưa vào bảng vẫn có hình
+  ico.innerHTML = skillIconSvg({
+    shape: undefined,
+    style: row.style,
+    grade: row.grade,
+    element: row.elementId,
+  });
+  ico.style.setProperty("--si-c", elementColor(row.elementId));
   const main = document.createElement("span");
   main.className = "sk-line-main";
   const name = document.createElement("b");
   name.className = "sk-row-name";
   name.textContent = row.name;
+  const gr = document.createElement("span");
+  gr.className = `sk-grade g${row.grade}`;
+  gr.textContent = row.gradeName;
+  name.append(gr);
   const sub = document.createElement("small");
   sub.className = "sk-row-tag";
   sub.textContent = row.sub;
@@ -2444,9 +3387,10 @@ function skillRowEl(row: SkillRow): HTMLElement {
   const pips = document.createElement("span");
   pips.className = "sk-row-pips";
   pips.textContent = ` ${row.pips}`;
-  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${SKILL_MAX_LEVEL}`);
+  pips.setAttribute("aria-label", `Tầng ${row.level} trên ${row.maxLevel}`);
   kind.append(pips);
   detail.append(kind);
+  if (row.mastery !== null) detail.append(masteryEl(row.mastery));
 
   const actions = document.createElement("div");
   actions.className = "sk-row-actions";
@@ -2512,6 +3456,84 @@ function skillRowEl(row: SkillRow): HTMLElement {
   return el;
 }
 
+/** Chỉ hiện thanh lọc / tìm khi sổ chiêu đủ dài để cần (người mới 3-7 chiêu không bị rối thêm). */
+const SKILL_FILTER_MIN = 8;
+/** Bộ lọc + cách xếp của sổ chiêu: sống trong lúc bảng mở, đóng bảng thì về mặc định (lần mở sau luôn thấy ĐỦ chiêu). */
+let skillFilter: SkillFilter = { ...DEFAULT_SKILL_FILTER };
+let skillSort: SkillSort = "slot";
+/** Chữ ký các lựa chọn hệ đã dựng ("hoa:5|kim:3"): chỉ dựng lại `<select>` khi đổi (dựng lại lúc người chơi đang chọn làm đóng danh sách thả). */
+let skillElSig = "";
+
+function resetSkillFilter() {
+  skillFilter = { ...DEFAULT_SKILL_FILTER };
+  skillSort = "slot";
+  skillElSig = "";
+}
+
+/** Đưa bộ lọc đang giữ lên các điều khiển (sau khi dựng lại lựa chọn hệ, hoặc bấm "Bỏ lọc"). */
+function syncSkillFilterControls() {
+  const q = $("skills-q") as HTMLInputElement | null;
+  if (q && q.value !== skillFilter.q) q.value = skillFilter.q;
+  const set = (id: string, v: string) => {
+    const el = $(id) as HTMLSelectElement | null;
+    if (el && el.value !== v) el.value = v;
+  };
+  set("skills-el", skillFilter.element);
+  set("skills-gr", skillFilter.grade === null ? "all" : String(skillFilter.grade));
+  set("skills-sl", skillFilter.slot);
+  set("skills-sort", skillSort);
+  const u = $("skills-usable") as HTMLInputElement | null;
+  if (u) u.checked = skillFilter.usable;
+}
+
+/** Dựng lại lựa chọn hệ theo các hệ CÓ chiêu (kèm số chiêu). Hệ đang chọn mà không còn chiêu thì về "Mọi hệ". */
+function buildSkillElementOptions(rows: readonly SkillRow[]) {
+  const sel = $("skills-el") as HTMLSelectElement | null;
+  if (!sel) return;
+  const counts = elementCounts(rows);
+  const names = new Map<string, string>();
+  for (const r of rows) names.set(r.elementId, r.element || "Vô hệ");
+  const sig = [...counts].map(([id, n]) => `${id}:${n}`).join("|");
+  if (sig === skillElSig) return;
+  skillElSig = sig;
+  if (skillFilter.element !== "all" && !counts.has(skillFilter.element))
+    skillFilter.element = "all";
+  sel.replaceChildren();
+  const add = (value: string, label: string) => {
+    const o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    sel.append(o);
+  };
+  add("all", "Mọi hệ");
+  for (const [id, n] of counts) add(id, `${names.get(id) ?? id} (${n})`);
+  syncSkillFilterControls();
+}
+
+/** Vẽ DANH SÁCH hàng (không đụng thanh lọc, để ô tìm giữ nguyên con trỏ khi gõ). */
+function renderSkillsList() {
+  const list = $("skills-list");
+  if (!list || !skillsModel) return;
+  const all = skillsModel.rows;
+  const bar = all.length >= SKILL_FILTER_MIN;
+  const shown = bar ? sortSkills(filterSkills(all, skillFilter), skillSort) : all;
+  const active = bar && skillFilterActive(skillFilter);
+  // số chiêu ở dòng phụ của tiêu đề (aria-live): "Hiện 5 / 60 chiêu" khi đang lọc, không thì "60 chiêu đã học"
+  const countEl = $("skills-count");
+  if (countEl) {
+    countEl.textContent = active
+      ? skillFilterSummary(shown.length, all.length, true)
+      : skillsModel.count;
+  }
+  const clear = $("skills-filter-clear");
+  if (clear) clear.hidden = !active;
+  const nomatch = $("skills-nomatch");
+  if (nomatch) nomatch.hidden = !(bar && all.length > 0 && shown.length === 0);
+  list.replaceChildren();
+  for (const row of shown) list.append(skillRowEl(row));
+  setSkillsOpen(list, resolveOpenSkill(skillsOpenId, shown), false);
+}
+
 function renderSkillsModalImpl() {
   const list = $("skills-list");
   const emptyEl = $("skills-empty");
@@ -2521,6 +3543,16 @@ function renderSkillsModalImpl() {
   if (emptyEl) {
     emptyEl.hidden = skillsModel.empty === null;
     if (skillsModel.empty !== null) emptyEl.textContent = skillsModel.empty;
+  }
+  const filterEl = $("skills-filter");
+  const showBar = skillsModel.empty === null && skillsModel.rows.length >= SKILL_FILTER_MIN;
+  if (filterEl) filterEl.hidden = !showBar;
+  $("skills-modal").classList.toggle("sk-has-filter", showBar);
+  if (!showBar) {
+    // sổ chiêu ngắn lại dưới ngưỡng (kiếp mới): bỏ lọc cũ để không ẩn mất chiêu mà không có nút nào gỡ
+    resetSkillFilter();
+    const nomatch = $("skills-nomatch");
+    if (nomatch) nomatch.hidden = true;
   }
   list.replaceChildren();
   if (skillsModel.empty !== null) {
@@ -2536,8 +3568,63 @@ function renderSkillsModalImpl() {
     list.append(bag);
     return;
   }
-  for (const row of skillsModel.rows) list.append(skillRowEl(row));
-  setSkillsOpen(list, resolveOpenSkill(skillsOpenId, skillsModel.rows), false);
+  if (showBar) buildSkillElementOptions(skillsModel.rows);
+  renderSkillsList();
+}
+
+/** Nối ô tìm / lựa chọn lọc (một lần lúc dựng giao diện). Mọi giá trị đi qua `cleanSkillFilter` trước khi dùng. */
+function bindSkillFilter() {
+  const apply = (patch: Partial<SkillFilter>) => {
+    skillFilter = cleanSkillFilter({ ...skillFilter, ...patch });
+    renderSkillsList();
+  };
+  $("skills-q")?.addEventListener("input", (e) =>
+    apply({ q: (e.target as HTMLInputElement).value }),
+  );
+  $("skills-q")?.addEventListener("keydown", (e) => {
+    // Esc trong ô tìm: có chữ thì xoá chữ (không đóng bảng); hết chữ rồi thì bỏ focus khỏi ô để Esc đóng bảng như thường
+    // (bộ xử lý Esc chung KHÔNG đóng bảng khi đang gõ trong ô nhập, nên ô rỗng mà không rời ô thì Esc vô tác dụng)
+    if (e.key !== "Escape") return;
+    if (skillFilter.q !== "") {
+      e.preventDefault();
+      e.stopPropagation();
+      (e.target as HTMLInputElement).value = "";
+      apply({ q: "" });
+    } else {
+      (e.target as HTMLInputElement).blur();
+    }
+  });
+  $("skills-el")?.addEventListener("change", (e) =>
+    apply({ element: (e.target as HTMLSelectElement).value }),
+  );
+  $("skills-gr")?.addEventListener("change", (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    apply({ grade: v === "all" ? null : Number(v) });
+  });
+  $("skills-sl")?.addEventListener("change", (e) =>
+    apply({ slot: (e.target as HTMLSelectElement).value as SkillFilter["slot"] }),
+  );
+  $("skills-sort")?.addEventListener("change", (e) => {
+    const v = (e.target as HTMLSelectElement).value;
+    skillSort = v === "grade" || v === "name" ? v : "slot";
+    renderSkillsList();
+  });
+  $("skills-usable")?.addEventListener("change", (e) =>
+    apply({ usable: (e.target as HTMLInputElement).checked }),
+  );
+  $("skills-filter-toggle")?.addEventListener("click", () => {
+    const more = $("skills-filter-more");
+    const btn = $("skills-filter-toggle");
+    if (!more || !btn) return;
+    more.hidden = !more.hidden;
+    btn.setAttribute("aria-expanded", String(!more.hidden));
+  });
+  $("skills-filter-clear")?.addEventListener("click", () => {
+    skillFilter = { ...DEFAULT_SKILL_FILTER };
+    syncSkillFilterControls();
+    renderSkillsList();
+    ($("skills-q") as HTMLInputElement | null)?.focus();
+  });
 }
 
 // ---------- Luân hồi (M3.2) ----------
@@ -3807,6 +4894,8 @@ export const ui = {
     // Đóng bằng closePlayerMenu (gỡ khỏi modalStack): ẩn thẳng `hidden = true` để sót mục "player-menu" trong modalStack làm
     // `isKeyboardCaptured()` kẹt true, WASD / phím thế giới không chạy cho tới khi bấm Esc (lỗi nền của #468, gặp khi dùng chuột bấm nút menu).
     bindTap("pm-close", () => this.closePlayerMenu());
+    bindAmbushDom();
+    bindArenaDom();
     bindTap("pm-invite-btn", () => {
       this.closePlayerMenu();
       if (selectedPlayerName) callbacks?.onPartyInvite?.(selectedPlayerName);
@@ -3822,6 +4911,53 @@ export const ui = {
 
     // Tông môn (M3.6, #230)
     bindTap("btn-sect", () => this.toggleSectModal());
+
+    // Xã hội (M9, #1025): nút HUD hiện mặc định; ẩn khi `?social=0`
+    const socialOn = typeof window !== "undefined" && socialEnabled(window.location.search);
+    $("btn-social").hidden = !socialOn;
+    document.body.classList.toggle("social-on", socialOn); // CSS: hàng menu 8 nút cần mốc ☰ cao hơn (xem `body.social-on` ở style.css)
+    bindTap("btn-social", () => this.toggleSocialModal());
+    bindTap("social-close", () => this.toggleSocialModal(false));
+    for (const t of SOCIAL_TABS)
+      bindTap(`social-tab-btn-${t.id}`, () => this.switchSocialTab(t.id));
+    for (const id of BOARD_IDS) bindTap(`social-board-btn-${id}`, () => this.switchSocialBoard(id));
+    bindTap("social-board-retry", () => requestSocialBoard(socialBoard, true));
+    bindTap("ach-retry", () => {
+      requestAch(true);
+      renderAch();
+    });
+    bindTap("wbt-retry", () => {
+      requestWorldBoss(true);
+      renderWbTab();
+    });
+    bindTap("wb-toggle", () => {
+      wbExpanded = !wbExpanded;
+      renderWbBanner();
+    });
+    // banner trùm thế giới nằm TRÊN thanh trùm: đo chiều cao banner vào biến CSS `--wb-h` để thanh trùm tự xuống theo (0 khi banner ẩn)
+    if (typeof ResizeObserver !== "undefined") {
+      const wb = $("wb-banner");
+      new ResizeObserver(() => {
+        const h = wb.hidden ? 0 : Math.ceil(wb.getBoundingClientRect().height) + 6;
+        document.documentElement.style.setProperty("--wb-h", `${h}px`);
+      }).observe(wb);
+    }
+    $("social-board-tabs").addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const next = tabByKey(BOARD_IDS, socialBoard, e.code);
+      if (next === null) return;
+      e.preventDefault();
+      this.switchSocialBoard(next, true);
+    });
+    // Mũi tên / Home / End trên thanh tab (WAI-ARIA tablist): đổi tab VÀ chuyển focus theo; `preventDefault` để bộ nghe phím ở `window`
+    // (`handlePanelKey`, chuyển focus theo hình học) bỏ qua, nếu không tab có `tabindex=-1` bị nhảy qua.
+    $("social-tabs").addEventListener("keydown", (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      const next = socialTabByKey(socialTab, e.code);
+      if (next === null) return;
+      e.preventDefault();
+      this.switchSocialTab(next, true);
+    });
     bindTap("sect-close", () => this.toggleSectModal(false));
 
     bindTap("sect-tab-btn-overview", () => this.switchSectTab("overview"));
@@ -4158,6 +5294,7 @@ export const ui = {
     bindTap("quest-close", () => this.toggleQuestModal(false));
     bindTap("btn-skills", () => this.toggleSkillsModal());
     bindTap("skills-close", () => this.toggleSkillsModal(false));
+    bindSkillFilter();
     bindTap("tab-q-active", () => {
       questTab = "active";
       $("tab-q-active").classList.add("active");
@@ -4669,6 +5806,8 @@ export const ui = {
       renderSkillsModal();
     } else {
       skillsOpenId = null; // lần mở sau luôn là danh sách gọn
+      resetSkillFilter();
+      syncSkillFilterControls();
       modalStack.remove("skills-modal");
       returnFocus($("btn-skills"));
     }
@@ -4722,6 +5861,7 @@ export const ui = {
   closeDialog() {
     stopTypewriter();
     currentDialog = null;
+    dlgPortrait?.clear();
     $("dialog-modal").hidden = true;
     $("dlg-options").replaceChildren();
     modalStack.remove("dialog-modal");
@@ -4774,13 +5914,23 @@ export const ui = {
       this.toggleSectModal(false);
       closedAny = true;
     }
+    if (socialModalOpen) {
+      this.toggleSocialModal(false);
+      closedAny = true;
+    }
     if (this.isPlayerMenuOpen()) {
       this.closePlayerMenu();
+      closedAny = true;
+    }
+    if (fleeSheetOpen()) {
+      closeFleeSheet();
       closedAny = true;
     }
     modalStack.clear();
     // WorldScene gọi closeAllModals mỗi lần cập nhật khi đang chết: màn Hoàng Tuyền (không phải "modal" để đóng) phải còn trong modalStack
     if (this.isLimboOpen()) modalStack.push("limbo-overlay", null);
+    // hộp thoại chặn đường KHÔNG phải bảng để đóng (chỉ ba nút hoặc hết giờ): vẫn thuộc về nó, bàn phím vẫn bị giữ
+    if (this.isAmbushOpen()) modalStack.push("ambush-modal", null);
     return closedAny;
   },
 
@@ -4819,6 +5969,9 @@ export const ui = {
       case "sect-modal":
         this.toggleSectModal(false);
         return true;
+      case "social-modal":
+        this.toggleSocialModal(false);
+        return true;
       case "dialog-modal":
         this.closeDialog();
         return true;
@@ -4828,6 +5981,11 @@ export const ui = {
       case "newbie-guide-modal":
         this.dismissNewbieGuide();
         return true;
+      case "ambush-flee-modal":
+        closeFleeSheet(); // Esc = "Ở lại đánh" (đang chờ phản hồi thì giữ)
+        return true;
+      case "ambush-modal":
+        return true; // Esc KHÔNG đóng hộp thoại chặn đường (phải chọn, hoặc hết giờ = Chiến): nuốt phím, không bỏ chọn mục tiêu
       case "limbo-overlay":
         return true; // Esc KHÔNG đóng màn Hoàng Tuyền (chỉ đầu thai mới đóng); nuốt phím để không rơi xuống bước "bỏ chọn mục tiêu"
       default: {
@@ -5156,6 +6314,12 @@ export const ui = {
     const npc = NPC_BY_ID[m.npcId];
     $("dlg-npc-name").textContent = npc?.name ?? "Kỳ nhân";
     $("dlg-npc-title").textContent = npc?.title ?? "";
+    // Chân dung NPC (ảnh AI, gói `art:npc` tải theo nhu cầu): chưa có chân dung / chưa tải xong thì chỉ có tên như cũ; cùng NPC thì giữ ảnh (không chớp)
+    const portraitImg = document.getElementById("dlg-npc-art");
+    if (portraitImg instanceof HTMLImageElement) {
+      dlgPortrait ??= new NpcPortraitSlot(portraitImg);
+      dlgPortrait.show(m.npcId);
+    }
 
     $("dialog-modal").hidden = false;
     $("dlg-options").replaceChildren();
@@ -5277,6 +6441,15 @@ export const ui = {
       }
     }
     renderPartyPanel();
+  },
+
+  /**
+   * Thẻ minh hoạ ở đầu bảng Sơn Hà Đồ cho bản đồ ĐANG XEM (không nhất thiết bản đồ mình đứng). Chưa có ảnh / ảnh lỗi / bí cảnh thì thẻ ẩn,
+   * đầu bảng giữ nguyên như cũ (map-card.ts `applyMapCard`).
+   */
+  setMapPanelCard(mapId: string) {
+    const cardEl = document.getElementById("map-card");
+    if (cardEl instanceof HTMLImageElement) applyMapCard(cardEl, mapCardUrl(mapId));
   },
 
   showTransition(mapName: string, mapId?: string) {
@@ -5459,19 +6632,20 @@ export const ui = {
     if (m.sys) {
       p.className = "sys";
       p.textContent = m.text;
-    } else if (m.channel === "party") {
-      p.className = "party";
-      const b = document.createElement("b");
-      b.textContent = `[Đội] ${m.from}: `;
-      p.append(b, document.createTextNode(m.text));
-    } else if (m.channel === "sect") {
-      p.className = "sect";
-      const b = document.createElement("b");
-      b.textContent = `[Tông môn] ${m.from}: `;
-      p.append(b, document.createTextNode(m.text));
     } else {
+      if (m.channel === "party") p.className = "party";
+      else if (m.channel === "sect") p.className = "sect";
+      // nhãn người nói: kênh + danh hiệu (trừ khi `?social=0`, `chat-view.ts`) + tên; mọi chữ vào DOM bằng textContent
+      const sp = chatSpeaker(m, socialFlagOn());
       const b = document.createElement("b");
-      b.textContent = `${m.from}: `;
+      b.append(document.createTextNode(sp.tag));
+      if (sp.title !== "") {
+        const t = document.createElement("i");
+        t.className = "chat-title";
+        t.textContent = sp.title;
+        b.append(t, document.createTextNode(" "));
+      }
+      b.append(document.createTextNode(sp.name));
       p.append(b, document.createTextNode(m.text));
     }
     const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
@@ -5814,6 +6988,68 @@ export const ui = {
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("in-limbo");
     if (modalStack.remove("limbo-overlay")) returnFocus(null);
+  },
+
+  /** Tin `ambushOffer` (mục 52): làm sạch rồi mở / CẬP NHẬT hộp thoại (cùng `id` sau nối lại = cập nhật, không đóng bảng, không tính lại khoá 700 ms). */
+  onAmbushOffer(raw: unknown) {
+    const offer = parseAmbushOffer(raw);
+    if (offer === null) return;
+    const { dialog, fresh } = openAmbush(ambushDlg, offer, performance.now());
+    ambushDlg = dialog;
+    const el = $("ambush-modal");
+    if (fresh) {
+      // lời đề nghị MỚI: bỏ mọi bảng đang mở (người chơi đọc và chọn, không bị che), rồi giữ bàn phím cho hộp thoại
+      this.closeAllModals();
+      this.closeDuelEndModal();
+      this.closeDialog();
+      this.closePlayerMenu();
+      el.setAttribute("aria-label", ambushDialogView(dialog, performance.now()).announce);
+      el.hidden = false;
+      document.body.classList.add("in-ambush");
+      modalStack.push("ambush-modal", null);
+      // focus vào KHUNG, không vào nút: người vừa đang bấm Enter / Cách không được chọn nhầm; nút nào cũng phải do Tab / mũi tên / bấm mới tới
+      el.focus();
+    }
+    renderAmbush();
+    if (ambushTimer === null) ambushTimer = setInterval(renderAmbush, AMBUSH_TICK_MS);
+  },
+
+  /** Tin `ambushEnd`: đóng hộp thoại (nếu mở) và báo kết cục; huỷ lặng lẽ (`canceled`) không báo gì. */
+  onAmbushEnd(raw: unknown) {
+    const end = parseAmbushEnd(raw);
+    if (end === null) return;
+    const inArena = arenaHud !== null; // kết cục của TRẬN trong đấu trường: hiện thẻ kết quả, không chỉ toast
+    hideAmbushImpl();
+    if (inArena) {
+      showArenaResult(end);
+      return;
+    }
+    const text = ambushEndToast(end);
+    if (text !== "") this.toast({ text, tone: ambushEndView(end).tone });
+  },
+
+  /** Tin `ambushState` (mỗi giây trong đấu trường): làm sạch rồi hiện / làm mới HUD. Tin sai dạng bị bỏ. */
+  onAmbushState(raw: unknown) {
+    const st = parseAmbushState(raw);
+    if (st === null) return;
+    arenaHud = updateArenaHud(arenaHud, st, performance.now());
+    const hud = $("ambush-hud");
+    if (hud.hidden) {
+      hud.hidden = false;
+      document.body.classList.add("in-arena");
+    }
+    renderArena();
+    if (arenaTimer === null) arenaTimer = setInterval(renderArena, AMBUSH_TICK_MS);
+  },
+
+  /** Đóng hộp thoại chặn đường không báo gì (đổi phòng / chuyển cảnh). */
+  hideAmbush() {
+    hideAmbushImpl();
+  },
+
+  isAmbushOpen(): boolean {
+    const el = document.getElementById("ambush-modal");
+    return Boolean(el && !el.hidden);
   },
 
   isLimboOpen(): boolean {
@@ -6293,6 +7529,167 @@ export const ui = {
     return sectModalOpen;
   },
 
+  // ---------- Xã hội (M9, #1025) ----------
+  /** Mở / đóng bảng Xã hội. Cờ tắt (`?social=0`) thì KHÔNG mở (phím Shift+G chạy tới đây nhưng không làm gì). */
+  toggleSocialModal(force?: boolean) {
+    const target = force ?? !socialModalOpen;
+    if (target === socialModalOpen) return;
+    if (target && !socialEnabled(window.location.search)) return;
+    socialModalOpen = target;
+    if (socialModalOpen) {
+      this.closeAllModals();
+      socialModalOpen = true;
+      $("social-modal").hidden = false;
+      $("btn-social").classList.add("active");
+      $("btn-social").setAttribute("aria-expanded", "true");
+      modalStack.push("social-modal", $("btn-social"));
+      renderSocialTabs();
+      renderSocialRank();
+      if (socialTab === "rank") requestSocialBoard(socialBoard);
+      if (socialTab === "event") requestWorldBoss();
+      if (socialTab === "ach") {
+        requestAch();
+        renderAch();
+      }
+      syncAchDot();
+      syncWbTick();
+      focusModal($("social-modal"));
+    } else {
+      $("social-modal").hidden = true;
+      $("btn-social").classList.remove("active");
+      $("btn-social").setAttribute("aria-expanded", "false");
+      modalStack.remove("social-modal");
+      clearSocialBoardTimer();
+      if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+      wbTabTimer = null;
+      if (achTimer !== null) clearTimeout(achTimer);
+      achTimer = null;
+      if (socialTab === "ach") leaveAch();
+      syncWbTick();
+      returnFocus($("btn-social"));
+    }
+  },
+
+  isSocialModalOpen(): boolean {
+    return socialModalOpen;
+  },
+
+  /** Đổi tab Xã hội; `focus` = đưa focus về nút tab (khi đổi bằng phím mũi tên). Id lạ về tab mặc định. */
+  switchSocialTab(tab: string, focus = false) {
+    const prevTab = socialTab;
+    socialTab = asSocialTab(tab);
+    if (prevTab === "ach" && socialTab !== "ach") leaveAch();
+    renderSocialTabs();
+    if (socialTab === "rank" && socialModalOpen) {
+      renderSocialRank();
+      requestSocialBoard(socialBoard);
+    }
+    if (socialTab === "event" && socialModalOpen) requestWorldBoss();
+    if (socialModalOpen) {
+      if (socialTab === "ach") {
+        requestAch();
+        renderAch();
+      }
+      syncAchDot();
+    }
+    syncWbTick();
+    if (focus) $(`social-tab-btn-${socialTab}`).focus();
+  },
+
+  /** Đổi bảng xếp hạng (tab phụ). Id lạ bị bỏ qua. `focus` = đưa focus về nút tab (đổi bằng mũi tên). */
+  switchSocialBoard(board: string, focus = false) {
+    const id = asBoardId(board);
+    if (id === null) return;
+    socialBoard = id;
+    renderSocialRank();
+    if (socialModalOpen && socialTab === "rank") requestSocialBoard(id);
+    if (focus) $(`social-board-btn-${id}`).focus();
+  },
+
+  getSocialBoard(): BoardId {
+    return socialBoard;
+  },
+
+  /** Nhận tin `boards` từ máy chủ (M9.6): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Xếp hạng. Tin sai kiểu bị bỏ, không sập. */
+  setBoards(raw: unknown) {
+    const msg = sanitizeBoardsMsg(raw);
+    if (msg === null) return;
+    socialBoards.set(msg.board, { msg, at: performance.now() });
+    if (msg.board === socialBoard) clearSocialBoardTimer();
+    if (socialModalOpen && socialTab === "rank") renderSocialRank();
+  },
+
+  /**
+   * Nhận tin `worldBoss` từ máy chủ (M9.7): làm sạch, cất bản mới nhất, vẽ banner + tab Sự kiện. Cờ tắt (`?social=0`) thì BỎ tin (người chơi chưa thấy gì).
+   * `ended` hiện kết quả thay banner `WB_RESULT_MS` + một toast (không lặp nếu vừa nhận đúng sự kiện đó); tin sai kiểu bị bỏ, không sập.
+   */
+  setWorldBoss(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeWorldBossMsg(raw);
+    if (msg === null) return;
+    const prev = wbLast;
+    wbLast = { msg, at: performance.now() };
+    if (wbTabTimer !== null) clearTimeout(wbTabTimer);
+    wbTabTimer = null;
+    if (wbResultTimer !== null) clearTimeout(wbResultTimer);
+    wbResultTimer = null;
+    wbResult = null;
+    if (msg.phase === "ended") {
+      const v = worldBossView(msg);
+      wbResult = { text: v.resultText, tone: v.tone };
+      wbResultTimer = setTimeout(() => {
+        wbResultTimer = null;
+        wbResult = null;
+        syncWbTick();
+      }, WB_RESULT_MS);
+      // `id` là KHUNG GIỜ của lịch (lặp mỗi ngày), không phải mã lần xảy ra: chỉ coi là tin LẶP khi cùng khung giờ + cùng kết quả + đến trong `WB_DUP_MS`
+      const dup =
+        prev !== null &&
+        prev.msg.phase === "ended" &&
+        prev.msg.id === msg.id &&
+        prev.msg.outcome === msg.outcome &&
+        wbLast.at - prev.at < WB_DUP_MS;
+      if (!dup) this.toast({ text: v.resultText, tone: v.tone });
+    }
+    syncWbTick();
+  },
+
+  /**
+   * Nhận tin `achievements` (M9.8): làm sạch, cất bản mới nhất, vẽ lại nếu đang xem tab Thành tựu. Đây cũng là câu trả lời của máy chủ cho `titleSet` (thành công
+   * hay bị từ chối): hết trạng thái "đang đổi". Cờ tắt (`?social=0`) thì BỎ tin; tin sai kiểu bị bỏ, không sập.
+   */
+  setAchievements(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeAchievementsMsg(raw);
+    if (msg === null) return;
+    achLast = msg;
+    achPending = undefined;
+    if (achPendingTimer !== null) clearTimeout(achPendingTimer);
+    achPendingTimer = null;
+    if (achTimer !== null) clearTimeout(achTimer);
+    achTimer = null;
+    renderAch();
+  },
+
+  /**
+   * Nhận tin `achievementNew` (M9.8): đánh dấu "Mới" + chấm trên nút HUD; máy chủ đã gửi toast "Đạt thành tựu: ..." riêng nên chỉ thêm toast khi thành tựu mở danh hiệu
+   * (mời mở bảng Xã hội để đeo). Cờ tắt / tin sai kiểu thì bỏ.
+   */
+  onAchievementNew(raw: unknown) {
+    if (!socialFlagOn()) return;
+    const msg = sanitizeAchievementNewMsg(raw);
+    if (msg === null) return;
+    achNew.add(msg.id);
+    syncAchDot();
+    renderAch();
+    const t = titleUnlockToast(msg.id);
+    if (t) this.toast({ text: t, tone: "good" });
+  },
+
+  getSocialTab(): SocialTabId {
+    return socialTab;
+  },
+
   /** Đóng hộp xác nhận tông môn nếu đang mở (Esc đóng hộp trước, rồi mới tới bảng) */
   closeSectConfirm(): boolean {
     const box = document.getElementById("sect-action-confirm");
@@ -6326,6 +7723,7 @@ export const ui = {
 
   onSect(m: SectMsg) {
     currentSect = m.sect;
+    if (socialModalOpen && socialTab === "rank") renderSocialRank(); // câu "Hạng của bạn" của bảng Tông môn phụ thuộc có tông môn hay không
     // Không còn tông môn (bị trục xuất / giải tán): hộp xác nhận cũ không còn ý nghĩa, kho đồ cũng không còn
     if (!m.sect) {
       closeSectConfirm();
