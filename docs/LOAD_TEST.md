@@ -1954,3 +1954,22 @@ Lần ĐẦU các hình của CT11 (đạn bay, sét lan, vật thể bền, chi
 | Phá Sơn Nhất Kích | chiêu vận 1200 ms | `fx cast` chưa có sát thương, vòng tụ khí hiện ngay và TIẾN DẦN (0,36 -> 0,65); hết vận đòn mới đáp, vòng tắt |
 
 Còn kiểm: thanh chiêu máy tính hiện đủ bốn ô >= 44 px trong khung nhìn; 0 lỗi console / exception. Chrome khởi động với `--blink-settings=primaryPointerType=4,...` vì headless không có chuột nên `(pointer: fine)` sai và thanh chiêu L U I O bị ẩn (ảnh `E2E_SHOTS` cũng cần). **Đột biến (6 / 6 đỏ đúng bước):** bỏ `persists.add` (bẫy không hiện), bỏ `windups.begin` (không vòng tụ khí), bỏ `pbolts.add` (đạn không đếm), bỏ `playFxPoints` của `chain` (0 điểm hạt), bỏ vòng nổ của `fxEnd pop`, máy chủ bỏ `k.land()` của chiêu vận (đòn không đáp). Ảnh: `E2E_SHOTS=<thư mục>` ghi mỗi hình một ảnh. Chạy: `npm run build -w client && npm run e2e:chieu-moi -w server`; nằm trong `e2e:all`.
+
+## 35. E2E thật dấu / kích / đồng đội (CT8 lát 2, #1053; `npm run e2e:chieu-dau -w server`)
+
+Chiêu dữ liệu ĐẦU TIÊN dùng cơ chế `mark` + `combo` + `ally` (Thiên La Lôi Cấm, Chưởng Tâm Lôi Bạo, Bách Thú Khiếu Phong). Cơ chế đã có test đơn vị / `skill-kit` ở máy chủ và `monster-status.test.ts` ở client, nhưng chưa có kịch bản thấy chúng chạy trọn vẹn từ máy chủ tới màn hình. Máy chủ Colyseus thật + Chrome + phím thật (L U I), nhân vật Nguyên Anh hậu kỳ (Bách Thú đòi hậu kỳ, Chưởng Tâm đòi trung kỳ), quái Linh Thố choáng làm bao cát.
+
+| Ca | Quan sát |
+|---|---|
+| đối chứng | Chưởng Tâm Lôi Bạo KHÔNG dấu: tin `dmg` không `combo`, không vụ nổ; lấy trung bình hai đòn không chí mạng |
+| gắn dấu | Thiên La Lôi Cấm (xác suất 0,8, thử lại): `mark_loi` ở máy chủ; client vẽ chấm "Dấu Lôi" (`monsterPips`) |
+| kích dấu | Chưởng Tâm Lôi Bạo: tin `dmg` có `combo`, vụ nổ dấu (điểm hạt do CHÍNH tin đó), máy chủ gỡ dấu, chấm tắt, sát thương trong (1,2; 1,9) lần đối chứng (nominal 1,5) |
+| đồng đội | Bách Thú Khiếu Phong: mình nhận tăng tốc + hồi phục; đồng đội cùng đội ở 800 px KHÔNG nhận, ở 200 px nhận |
+
+Kết quả: cả ba cơ chế đúng, không phát hiện lỗi; 8 / 8 lần chạy liền đạt. Đột biến (cây thật, `git checkout --` sau mỗi lần): bỏ `shareWithParty` ĐỎ ca đồng đội trong tầm; bỏ kiểm tầm `ally` ĐỎ ca ngoài tầm; combo `mult` 1,0 ĐỎ (4 / 4 lần) ca tỉ lệ; combo `consume: false` ĐỎ ca gỡ dấu; client bỏ vụ nổ combo ĐỎ ca vụ nổ; client bỏ nhận `Monster.mark` ĐỎ ca chấm dấu. Lưu ý: sát thương có độ lệch ngẫu nhiên và chí mạng, nên tỉ lệ so với trung bình HAI đòn đối chứng không chí mạng (một mẫu lẻ làm đột biến 'mất thưởng combo' lọt ~1 / 2 lần). Bậc đồ hoạ ghim `tg_quality=high` (`E2E_QUALITY` để đổi) như `e2e:chieu-moi`.
+
+Cách chạy:
+```bash
+npm run build -w client
+npm run e2e:chieu-dau -w server
+```
