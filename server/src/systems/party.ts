@@ -17,6 +17,7 @@ import {
   type PartyMember,
   type PartyMsg,
 } from "@tien-gioi/shared";
+import { titleField } from "./chat-title";
 import type { World } from "../world";
 import type { Located } from "../hub";
 
@@ -381,7 +382,7 @@ export function partyChat(w: World, sid: string, text: string) {
   if (!p) return;
   const id = w.parties.partyIdOf(keyOfName(p.name));
   if (id === undefined) return bad(w, sid, "Ngươi chưa ở trong đội nào.");
-  const out: ChatOut = { from: p.name, text, channel: "party" };
+  const out: ChatOut = { from: p.name, text, channel: "party", ...titleField(p) };
   for (const key of w.parties.membersOf(id)) {
     const loc = w.hub.locate(key);
     if (loc) loc.w.events.chatTo(loc.sid, out);

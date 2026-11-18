@@ -1,8 +1,8 @@
-// Kinh quyển (sách công pháp, M7.4, #505): mỗi chiêu của `SKILLS_M7` có MỘT quyển (`ItemType` "book", `ItemDef.teaches`): dùng quyển = học chiêu, quyển trùng = +1 tầng (tối đa
+// Kinh quyển (sách công pháp, M7.4, #505): mỗi chiêu của `LEARNABLE_SKILLS` có MỘT quyển (`ItemType` "book", `ItemDef.teaches`): dùng quyển = học chiêu, quyển trùng = +1 tầng (tối đa
 // 3, `learnSkill`). Dựng từ dữ liệu chiêu nên tên quyển (`bookName`), độ hiếm, yêu cầu cảnh giới và giá KHÔNG thể lệch với chiêu. Chỉ import KIỂU từ `items.ts` (`items.ts` nạp tệp
 // này vào `ITEMS`: import giá trị sẽ thành vòng). Nguồn quyển: cửa hàng (chiêu cơ bản, `SHOPS`), rơi hiếm từ quái, rơi trùm (chiêu cao cấp) ở `DROP_TABLES`.
 import type { ItemDef } from "./items";
-import { SKILLS_M7, type Element } from "./skills";
+import { LEARNABLE_SKILLS, type Element } from "./skills";
 
 /** Id quyển của chiêu `skillId`. */
 export const bookIdOf = (skillId: string) => `kinh_${skillId}`;
@@ -21,7 +21,7 @@ const BOOK_COLOR: Record<Element, number> = {
   none: 0xb8b0a0,
 };
 
-export const SKILL_BOOK_ITEMS: ItemDef[] = SKILLS_M7.map((def) => ({
+export const SKILL_BOOK_ITEMS: ItemDef[] = LEARNABLE_SKILLS.map((def) => ({
   id: bookIdOf(def.id),
   name: def.bookName,
   type: "book",
@@ -37,10 +37,10 @@ export const SKILL_BOOK_ITEMS: ItemDef[] = SKILLS_M7.map((def) => ({
  * (luôn thấp hơn giá mua, test của `currency.ts` giữ).
  */
 export const SKILL_BOOK_VALUE: Record<string, number> = Object.fromEntries(
-  SKILLS_M7.map((def) => [bookIdOf(def.id), Math.ceil(def.price / 2)]),
+  LEARNABLE_SKILLS.map((def) => [bookIdOf(def.id), Math.ceil(def.price / 2)]),
 );
 
 /** Chiêu CƠ BẢN (độ hiếm <= 1, cảnh giới Luyện Khí): bán ở cửa hàng. Chiêu cao cấp chỉ rơi từ quái / trùm. */
-export const SHOP_BOOK_IDS: string[] = SKILLS_M7.filter((d) => d.rarity <= 1).map((d) =>
+export const SHOP_BOOK_IDS: string[] = LEARNABLE_SKILLS.filter((d) => d.rarity <= 1).map((d) =>
   bookIdOf(d.id),
 );

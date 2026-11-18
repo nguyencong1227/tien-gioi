@@ -27,6 +27,10 @@ import {
   type SectHallMsg,
   type SectVaultMsg,
   type NetShieldMsg,
+  type AmbushOfferMsg,
+  type AmbushEndMsg,
+  type AmbushStateMsg,
+  type WorldBossMsg,
   type SectMsg,
   type SectPresenceMsg,
   type DuelInvitedMsg,
@@ -47,7 +51,7 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const fx: FxMsg[] = [];
   const toasts: { sid: string; msg: ToastMsg }[] = [];
   const sys: string[] = [];
-  const chats: { from: string; text: string }[] = [];
+  const chats: { from: string; text: string; titleId?: string }[] = [];
   const invs: { sid: string; msg: InvMsg }[] = [];
   const quests: { sid: string; msg: QuestsMsg }[] = [];
   const skillMsgs: { sid: string; msg: SkillsMsg }[] = [];
@@ -73,6 +77,10 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
   const sectVaults: { sid: string; msg: SectVaultMsg }[] = [];
   const sectHalls: { sid: string; msg: SectHallMsg }[] = [];
   const netShields: { sid: string; msg: NetShieldMsg }[] = [];
+  const ambushOffers: { sid: string; msg: AmbushOfferMsg }[] = [];
+  const ambushEnds: { sid: string; msg: AmbushEndMsg }[] = [];
+  const ambushStates: { sid: string; msg: AmbushStateMsg }[] = [];
+  const worldBosses: { sid: string; msg: WorldBossMsg }[] = [];
   const dmgs: DmgMsg[] = [];
   /** Số sát thương gửi RIÊNG cho chủ (sát thương theo giây): tách khỏi `dmgs` (gửi gần). */
   const dmgsTo: { sid: string; msg: DmgMsg }[] = [];
@@ -83,7 +91,8 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       dmg: (m) => dmgs.push(m),
       dmgTo: (sid, msg) => dmgsTo.push({ sid, msg }),
       sys: (t) => sys.push(t),
-      chat: (from, text) => chats.push({ from, text }),
+      chat: (from, text, titleId) =>
+        chats.push(titleId === undefined ? { from, text } : { from, text, titleId }),
       toast: (sid, msg) => toasts.push({ sid, msg }),
       inv: (sid, msg) => invs.push({ sid, msg }),
       quests: (sid, msg) => quests.push({ sid, msg }),
@@ -110,6 +119,10 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
       sectVault: (sid, msg) => sectVaults.push({ sid, msg }),
       sectHall: (sid, msg) => sectHalls.push({ sid, msg }),
       netShield: (sid, msg) => netShields.push({ sid, msg }),
+      ambushOffer: (sid, msg) => ambushOffers.push({ sid, msg }),
+      ambushEnd: (sid, msg) => ambushEnds.push({ sid, msg }),
+      ambushState: (sid, msg) => ambushStates.push({ sid, msg }),
+      worldBoss: (sid, msg) => worldBosses.push({ sid, msg }),
     },
     map,
     hub,
@@ -145,6 +158,10 @@ export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
     sectVaults,
     sectHalls,
     netShields,
+    ambushOffers,
+    ambushEnds,
+    ambushStates,
+    worldBosses,
     dmgs,
     dmgsTo,
   };

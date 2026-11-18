@@ -9,6 +9,7 @@
 //
 // Mọi hàm tin nhắn là async (kho lưu bất đồng bộ): WorldRoom gọi bằng `void`. Người chơi có thể rời giữa các `await`: sau mỗi `await`
 // kiểm lại `ctrl` còn đó (và cùng danh tính) trước khi đụng tới ví.
+import { trackSocial } from "./social";
 import {
   COIN_CAP,
   ITEM_BY_ID,
@@ -67,6 +68,7 @@ import {
   type SectHallCtx,
   shopKnown,
 } from "../sect-service";
+import { titleField } from "./chat-title";
 import type { World } from "../world";
 import { exchangeItems, sendInv, takeFromSlot } from "./inventory";
 import { gainExp } from "./progression";
@@ -233,6 +235,7 @@ function applySectBuff(w: World, sid: string, sect: Sect) {
   if (!c) return;
   const level = sectLevelOf(sect.points ?? 0);
   c.sectBuff = level >= 2 ? sectBuffOf(level) : undefined;
+  trackSocial(w, sid, ["sect_level", level]); // thành tựu tông môn (M9.5 / M9.9): cấp tông CAO NHẤT từng ở (chế độ max, theo linh hồn; rời tông không mất)
 }
 
 /** Phần của người xem mà bản ghi tông môn không có (cảnh giới, nhiệm vụ đang làm): đọc từ `World` cho ảnh chụp Nội vụ. */
@@ -492,7 +495,12 @@ export function sectChat(w: World, sid: string, text: string) {
   const book = w.hub.sects;
   const sect = w.sectService ? book.cache.get(book.online.get(a.soulKey) ?? "") : undefined;
   if (!sect) return toastFail(w, sid, "not_in_sect");
-  const out: ChatOut = { from: a.name, text, channel: "sect" };
+  const out: ChatOut = {
+    from: a.name,
+    text,
+    channel: "sect",
+    ...titleField(w.state.players.get(sid)),
+  };
   for (const m of sect.members) {
     const loc = locateMember(w, m);
     if (loc) loc.w.events.chatTo(loc.sid, out);

@@ -95,7 +95,7 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&crowd=6` });
+  await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1&crowd=6&social=1` });
   for (let k = 0; k < 40; k++) {
     await sleep(300);
     if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
@@ -127,6 +127,7 @@ try {
     ["shop-modal", "toggleShopModal"],
     ["forge-modal", "toggleForgeModal"],
     ["sect-modal", "toggleSectModal"],
+    ["social-modal", "toggleSocialModal"], // M9 (cờ `?social=1` bật ở địa chỉ trang): ba tab Xếp hạng / Thành tựu / Sự kiện
   ];
   const CARDS = ["dungeon-end-modal", "duel-end-modal", "newbie-guide-modal", "outdated-modal"];
   // Hộp thoại NPC (#dialog-modal, dock đáy): mở bằng ui.onDialog với tin mẫu có đủ loại nhãn (tiêu đề, huy hiệu, chữ, gợi ý, lựa chọn + nhãn phụ)
@@ -141,6 +142,15 @@ try {
       { label: "Bí cảnh Hắc Phong", action: { kind: "dungeon" }, disabled: true },
       { label: "Rời đi", action: { kind: "close" } },
     ],
+  };
+  // Lời đề nghị chặn đường mẫu (cùng dạng `ambushOffer` của máy chủ): văn mẫu dài, mức "Cầm đầu", số lớn có dấu chấm ngăn nghìn
+  const AMBUSH_MSG = {
+    id: "0123456789abcdef",
+    scene:
+      "Đường đi bỗng vắng hẳn. Từ bụi cỏ ven lối, một bóng đen lao ra chắn trước mặt, mắt đỏ ngầu. Gió cuốn bụi mù mịt, tiếng gầm gừ vang lên từ phía sau những tảng đá lớn bên đường.",
+    foe: { name: "Đạo Tặc Đầu Lĩnh", tier: "leader", count: 3 },
+    price: { exp: 123456, coin: { price: 12345, enough: true } },
+    ms: 10000,
   };
   const HUD = ["#hud", "#quest-tracker", "#party-panel", "#skills", "#quickbar", "#minimap-wrap"];
   /** Cỡ chữ tính ra của mọi phần tử đang hiện có chữ trực tiếp dưới `root`: { px: { khoá: số lượng } }. */
@@ -262,6 +272,80 @@ try {
       if (mode === "large" && vp.phone)
         check(await noOverflow(), `${vp.name} [large] #dialog-modal: không tràn ngang / dọc`);
       await evalJs("window.__ui.closeDialog();0");
+      await sleep(100);
+      // Hộp thoại gặp chặn đường (mục 52, CD7): chữ >= 14 px trên điện thoại (kể cả Nhỏ), không tràn khi cỡ Lớn; ba nút hiện đủ
+      await evalJs(`window.__ui.onAmbushOffer(${JSON.stringify(AMBUSH_MSG)});0`);
+      await sleep(300);
+      const amb = await scan("#ambush-modal");
+      if (vp.phone) {
+        const bad = offenders(amb, 14);
+        check(
+          !bad,
+          `${vp.name} [${mode}] #ambush-modal (chặn đường): mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+        );
+      }
+      if (mode === "large" && vp.phone)
+        check(await noOverflow(), `${vp.name} [large] #ambush-modal: không tràn ngang / dọc`);
+      await evalJs('window.__ui.onAmbushEnd({ result: "canceled" });0');
+      await sleep(100);
+      // Banner trùm thế giới (M9.7, `#wb-banner`) lúc đang diễn ra (có danh sách đóng góp): là lớp phủ kiểu HUD nằm trên màn chiến đấu nên theo sàn HUD (nhãn >= 12 px trên điện thoại, kể cả Nhỏ), không tràn khi cỡ Lớn
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("live"));0`);
+      await sleep(300);
+      const wb = await scan("#wb-banner");
+      check(
+        wb !== null && Object.keys(wb).length > 0,
+        `${vp.name} [${mode}] #wb-banner: hiện có chữ`,
+      );
+      if (vp.phone && wb) {
+        const bad = offenders(wb, 12);
+        check(
+          !bad,
+          `${vp.name} [${mode}] #wb-banner (trùm thế giới, kiểu HUD): mọi nhãn >= 12 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+        );
+      }
+      if (mode === "large" && vp.phone)
+        check(await noOverflow(), `${vp.name} [large] #wb-banner: không tràn ngang / dọc`);
+      await evalJs(`window.__ui.setWorldBoss(window.__sample.worldBoss("none"));0`);
+      await sleep(100);
+      // Đấu trường chặn đường (CD7 bước 3): HUD, bảng xác nhận bỏ chạy, thẻ kết quả: chữ >= 14 px trên điện thoại, không tràn ở cỡ Lớn
+      await evalJs(
+        `window.__ui.onAmbushState(${JSON.stringify({ msLeft: 83000, price: { exp: 123456, coin: { price: 12345, enough: true } } })});0`,
+      );
+      await sleep(300);
+      const hud = await scan("#ambush-hud");
+      await evalJs('document.getElementById("ahud-flee").click();0');
+      await sleep(300);
+      const flee = await scan("#ambush-flee-modal");
+      if (vp.phone) {
+        for (const [name, o] of [
+          ["#ambush-hud (HUD đấu trường)", hud],
+          ["#ambush-flee-modal (xác nhận bỏ chạy)", flee],
+        ]) {
+          const bad = offenders(o, 14);
+          check(
+            !bad,
+            `${vp.name} [${mode}] ${name}: mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+          );
+        }
+      }
+      if (mode === "large" && vp.phone)
+        check(
+          await noOverflow(),
+          `${vp.name} [large] đấu trường chặn đường: không tràn ngang / dọc`,
+        );
+      await evalJs(
+        'window.__ui.onAmbushEnd({ result: "won", rewards: { exp: 360, coin: 48, items: [] } });0',
+      );
+      await sleep(200);
+      const res = await scan("#ambush-result");
+      if (vp.phone) {
+        const bad = offenders(res, 14);
+        check(
+          !bad,
+          `${vp.name} [${mode}] #ambush-result (thẻ kết quả): mọi chữ >= 14 px${bad ? " (nhỏ hơn: " + bad + ")" : ""}`,
+        );
+      }
+      await evalJs("window.__ui.hideAmbush();0");
       await sleep(100);
       // HUD: điện thoại >= 12 px; HUD không co giãn theo cỡ chữ
       if (vp.phone) {

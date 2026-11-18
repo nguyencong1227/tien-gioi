@@ -39,7 +39,7 @@ export function formatSectRole(rank: SectRank): string {
 
 /**
  * Định dạng một dòng biến động kho tông môn
- * Ví dụ: "10:30 · Tiêu Viêm đã góp +50.000 Linh thạch"
+ * Ví dụ: "10:30 · Phó Hồng Ngạn đã góp +50.000 Linh thạch"
  */
 export function formatSectLog(log: SectLogEntry): string {
   const d = new Date(log.at);
@@ -207,16 +207,16 @@ export const MOCK_SECT_SAMPLES = {
       myRank: "chu",
       createdAt: Date.now() - 86_400_000 * 30,
       members: [
-        { name: "Tiêu Phong", rank: "chu", joinedAt: Date.now() - 86_400_000 * 10 },
-        { name: "Hư Trúc", rank: "truong_lao", joinedAt: Date.now() - 86_400_000 * 7 },
-        { name: "Đoàn Dự", rank: "truong_lao", joinedAt: Date.now() - 86_400_000 * 5 },
-        { name: "Vương Ngữ Yên", rank: "de_tu", joinedAt: Date.now() - 86_400_000 * 3 },
+        { name: "Bùi Chấn Nhạc", rank: "chu", joinedAt: Date.now() - 86_400_000 * 10 },
+        { name: "Vũ Thanh Tùng", rank: "truong_lao", joinedAt: Date.now() - 86_400_000 * 7 },
+        { name: "Cát Mặc Lâm", rank: "truong_lao", joinedAt: Date.now() - 86_400_000 * 5 },
+        { name: "Doãn Nhược Vy", rank: "de_tu", joinedAt: Date.now() - 86_400_000 * 3 },
         { name: "A Châu", rank: "de_tu", joinedAt: Date.now() - 86_400_000 * 2 },
       ],
       log: [
-        { at: Date.now() - 3600_000 * 5, name: "Tiêu Phong", kind: "deposit", amount: 50_000 },
-        { at: Date.now() - 3600_000 * 3, name: "Hư Trúc", kind: "deposit", amount: 20_000 },
-        { at: Date.now() - 3600_000 * 1, name: "Tiêu Phong", kind: "withdraw", amount: 10_000 },
+        { at: Date.now() - 3600_000 * 5, name: "Bùi Chấn Nhạc", kind: "deposit", amount: 50_000 },
+        { at: Date.now() - 3600_000 * 3, name: "Vũ Thanh Tùng", kind: "deposit", amount: 20_000 },
+        { at: Date.now() - 3600_000 * 1, name: "Bùi Chấn Nhạc", kind: "withdraw", amount: 10_000 },
       ],
     };
   },
@@ -240,14 +240,14 @@ export const MOCK_SECT_SAMPLES = {
   presence(): SectPresenceMsg {
     return {
       online: [
-        { name: "Tiêu Phong", realm: 1, tier: 2, mapId: "lac_ha" },
-        { name: "Hư Trúc", realm: 0, tier: 8, mapId: "hac_phong" },
-        { name: "Vương Ngữ Yên", realm: 0, tier: 3, mapId: "lac_ha" },
+        { name: "Bùi Chấn Nhạc", realm: 1, tier: 2, mapId: "lac_ha" },
+        { name: "Vũ Thanh Tùng", realm: 0, tier: 8, mapId: "hac_phong" },
+        { name: "Doãn Nhược Vy", realm: 0, tier: 3, mapId: "lac_ha" },
       ],
     };
   },
 
-  invited(from = "Tiêu Phong", sect = "Tiêu Dao Phái", tag = "TD"): SectInvitedMsg {
+  invited(from = "Bùi Chấn Nhạc", sect = "Tiêu Dao Phái", tag = "TD"): SectInvitedMsg {
     return {
       from,
       sect,

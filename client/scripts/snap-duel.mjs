@@ -173,7 +173,7 @@ for (const sz of SIZES) {
     await cdpSend("Runtime.evaluate", {
       expression: `
         window.__mockDuel.hide();
-        window.__ui.openPlayerMenu("Diệp Phàm", 1, 4, ${sz.w < 600 ? 50 : 250}, ${sz.w < 600 ? 120 : 180}, { ok: true });
+        window.__ui.openPlayerMenu("Ngô Tử Khiêm", 1, 4, ${sz.w < 600 ? 50 : 250}, ${sz.w < 600 ? 120 : 180}, { ok: true });
       `,
     });
     await snap(`duel-menu-${sz.name}.png`);
@@ -183,7 +183,7 @@ for (const sz of SIZES) {
     await cdpSend("Runtime.evaluate", {
       expression: `
         window.__ui.closePlayerMenu();
-        window.__mockDuel.showInvite("Diệp Phàm");
+        window.__mockDuel.showInvite("Ngô Tử Khiêm");
       `,
     });
     await snap(`duel-invite-${sz.name}.png`);
@@ -192,7 +192,7 @@ for (const sz of SIZES) {
     console.log("- Chụp đếm ngược 3-2-1...");
     await cdpSend("Runtime.evaluate", {
       expression: `
-        window.__mockDuel.showCountdown("Diệp Phàm");
+        window.__mockDuel.showCountdown("Ngô Tử Khiêm");
       `,
     });
     await snap(`duel-countdown-${sz.name}.png`);
@@ -201,7 +201,7 @@ for (const sz of SIZES) {
     console.log("- Chụp HUD quyết đấu...");
     await cdpSend("Runtime.evaluate", {
       expression: `
-        window.__mockDuel.showFighting("Diệp Phàm");
+        window.__mockDuel.showFighting("Ngô Tử Khiêm");
         window.__mockDuel.updateOpponentHp(4200, 5000);
       `,
     });
@@ -211,7 +211,7 @@ for (const sz of SIZES) {
     console.log("- Chụp kết quả Đại Thắng...");
     await cdpSend("Runtime.evaluate", {
       expression: `
-        window.__mockDuel.showWon("Diệp Phàm");
+        window.__mockDuel.showWon("Ngô Tử Khiêm");
       `,
     });
     await snap(`duel-won-${sz.name}.png`);
@@ -220,7 +220,7 @@ for (const sz of SIZES) {
     console.log("- Chụp kết quả Chiến Bại...");
     await cdpSend("Runtime.evaluate", {
       expression: `
-        window.__mockDuel.showLost("Diệp Phàm");
+        window.__mockDuel.showLost("Ngô Tử Khiêm");
       `,
     });
     await snap(`duel-lost-${sz.name}.png`);

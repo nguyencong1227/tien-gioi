@@ -259,7 +259,7 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
     );
     expect(slackOf(pooled, "nhan")).toBeGreaterThan(1);
     expect(slackOf(pooled, "cong")).toBeGreaterThan(0);
-  }, 60_000);
+  }, 120_000); // chạy riêng ~18 s; cả bộ test song song trên máy chung (nhiều dev + CI) đã quá 60 s một lần: trần nới 2x, thước đo không đổi
 
   it("ngưỡng hoà vốn của Xích Mãng: mô hình (90 giây) đạt nên ngưỡng không cao hơn; đạt ở ngưỡng, KHÔNG đạt ngay dưới ngưỡng; khôi phục ASSUME.searchSec", () => {
     const before = { ...ASSUME.searchSec };
@@ -285,8 +285,8 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
     const before = { ...ASSUME.searchSec };
     const s = searchSensitivity(getRows());
     expect({ ...ASSUME.searchSec }).toEqual(before);
-    // số liệu mô hình khớp bảng Kim Đan sau nội dung (5,2 giờ tối ưu, 5,7 giờ bãi mới): chặn trôi mà không ai hay
-    expect(s.model.kimDan / 60).toBeGreaterThan(4.5);
+    // số liệu mô hình khớp bảng Kim Đan sau nội dung (mục 30: 4,2 giờ tối ưu; trước đó 5,2 giờ, 5,7 giờ bãi mới): chặn trôi mà không ai hay
+    expect(s.model.kimDan / 60).toBeGreaterThan(4);
     expect(s.model.kimDan / 60).toBeLessThan(6);
     expect(s.model.kimDanNoMang).toBeGreaterThanOrEqual(s.model.kimDan);
     expect(s.measured.luyenKhi).toBeLessThan(s.model.luyenKhi);

@@ -185,7 +185,7 @@ export function applyRebirth(
   applyStats(p, true, c.mult);
   sendInv(w, sid);
   sendQuests(w, sid);
-  sendSkills(w, sid);
+  sendSkills(w, sid, true); // sổ chiêu kiếp mới: điểm luyện trắng (`{}`), client bỏ thanh cũ
   sendWallet(w, sid);
   w.events.reborn(sid, { kiep: c.soul.kiep });
   w.events.sys(`${p.name} luân hồi, bước vào kiếp thứ ${c.soul.kiep}.`);

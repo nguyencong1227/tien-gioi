@@ -3,7 +3,10 @@
 // server quyết định; file này chỉ nối luật với túi đồ, dữ liệu riêng của người chơi và tin nhắn. Dùng chiêu (cast) làm ở M7.2b.
 import {
   LEARNABLE_SLOTS,
+  MASTERY_PER_MIN_CAP,
   SKILL_BY_ID,
+  addMastery,
+  masteryNeedOf,
   emptySkillBook,
   assignSlot,
   equipBonus,
@@ -13,6 +16,7 @@ import {
   skillCooldownMs,
   type ItemDef,
   type SkillBook,
+  type SkillDef,
   type SkillsMsg,
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
@@ -49,8 +53,16 @@ export function cooldownsMax(c: PlayerCtrl, cdr = 0): SkillsMsg["cdMax"] {
   }) as SkillsMsg["cdMax"];
 }
 
-/** Gửi sổ chiêu + hồi chiêu cho chủ. Khi đổi sổ và lúc vào phòng; không gọi mỗi tick. */
-export function sendSkills(w: World, sid: string) {
+/** Nhịp gửi `SkillsMsg.mastery` (ms): mỗi lần dùng chiêu đều gửi lại sổ (hồi chiêu) nhưng điểm luyện chỉ kèm theo tối đa 1 lần mỗi chừng này (client tự cộng giữa hai lần để hiện). */
+export const MASTERY_SEND_MS = 30_000;
+/** Cửa sổ tính trần điểm luyện (ms): `MASTERY_PER_MIN_CAP` điểm mỗi cửa sổ mỗi người. */
+export const MASTERY_WINDOW_MS = 60_000;
+
+/**
+ * Gửi sổ chiêu + hồi chiêu cho chủ. Khi đổi sổ và lúc vào phòng; không gọi mỗi tick. `mastery` (điểm luyện dở dang, CT5) kèm theo khi `force` (vào phòng, lên tầng), hoặc đã
+ * `MASTERY_SEND_MS` kể từ lần gửi trước; khi KHÔNG ép mà sổ chưa có điểm nào thì không có trường (client cũ / hồ sơ cũ y hệt như trước), còn ép thì luôn có (`{}` nếu rỗng).
+ */
+export function sendSkills(w: World, sid: string, force = false) {
   const c = w.ctrl.get(sid);
   const p = w.state.players.get(sid);
   if (!c || !p) return;
@@ -60,7 +72,41 @@ export function sendSkills(w: World, sid: string) {
     cd: cooldownsLeft(c, w.now),
     cdMax: cooldownsMax(c, cdrNow(w, sid, p, c)),
   };
+  if (force) {
+    // ÉP (lên tầng): LUÔN kèm mastery, `{}` nếu hết điểm dở (B, #1112: trường vắng mà không có nghĩa "sổ hết điểm" thì client không phân biệt được với "giãn nhịp 30 giây")
+    msg.mastery = { ...(c.skills.mastery ?? {}) };
+    c.masterySentAt = w.now;
+  } else if (
+    c.skills.mastery &&
+    (c.masterySentAt === undefined || w.now - c.masterySentAt >= MASTERY_SEND_MS)
+  ) {
+    msg.mastery = { ...c.skills.mastery };
+    c.masterySentAt = w.now;
+  }
   w.events.skills(sid, msg);
+}
+
+/**
+ * LUYỆN CHIÊU (CT5, `docs/PHAN_CONG_CHIEU_THUC.md` mục 6): chiêu `def` của `sid` vừa TRÚNG ít nhất một quái (gọi MỘT lần mỗi lần dùng chiêu, không mỗi mục tiêu / mỗi viên đạn) -> +1 điểm luyện.
+ *  - Chỉ chiêu còn luyện được (`masteryNeedOf` khác `null`: tầng cuối chỉ bằng kinh quyển trùng) mới được điểm và mới tốn trần.
+ *  - Trần `MASTERY_PER_MIN_CAP` điểm mỗi `MASTERY_WINDOW_MS` mỗi người (chống cày); cửa sổ mở ở điểm đầu tiên sau khi hết cửa sổ cũ.
+ *  - Đủ điểm thì lên tầng (`addMastery`), báo cho chủ và gửi lại sổ ngay (có `mastery`); điểm dở dang đi theo `c.skills.mastery` vào file lưu.
+ */
+export function creditMastery(w: World, sid: string, def: SkillDef) {
+  const r = w.ready(sid);
+  if (!r) return;
+  const { c } = r;
+  const level = c.skills.learned[def.id];
+  if (level === undefined || masteryNeedOf(def, level) === null) return;
+  let win = c.masteryWin;
+  if (!win || w.now - win.start >= MASTERY_WINDOW_MS) win = c.masteryWin = { start: w.now, n: 0 };
+  if (win.n >= MASTERY_PER_MIN_CAP) return;
+  win.n++;
+  const res = addMastery(c.skills, def, 1);
+  c.skills = res.book;
+  if (res.leveledTo === undefined) return;
+  w.events.toast(sid, { text: `${def.name} đã luyện lên tầng ${res.leveledTo}.`, tone: "good" });
+  sendSkills(w, sid, true);
 }
 
 /** Sổ chiêu của kiếp mới: trống, trừ các chiêu đã khắc vào chân linh (giữ ở tầng 1, ô trống: người chơi tự gắn lại). */

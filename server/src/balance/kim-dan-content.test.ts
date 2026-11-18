@@ -28,25 +28,27 @@ describe("quái Kim Đan: ai săn được ở bậc nào (mô hình: mất <= 5
     for (const m of [...NEW, BOSS]) expect(huntRate(m, 2, 2), m.id).toBeNull();
   });
 
-  it("Sương Hồ và Thạch Quy an toàn từ Sơ kỳ; Độc Thiềm (đòn nặng) chỉ từ Trung kỳ", () => {
+  it("Sương Hồ và Thạch Quy an toàn từ Sơ kỳ; Độc Thiềm (đòn nặng) KHÔNG an toàn solo ở bậc nào (mục 30: máu x1,5) nhưng đội 2 người an toàn cả ba bậc", () => {
     for (let t = 0; t < 3; t++) {
       expect(huntRate(MONSTER_BY_ID.suong_ho, KD, t), `suong_ho t${t}`).not.toBeNull();
       expect(huntRate(MONSTER_BY_ID.thach_quy, KD, t), `thach_quy t${t}`).not.toBeNull();
+      // Trước mục 30 (QUYET_DINH_M3, 16/11) Độc Thiềm solo được từ Trung kỳ (danger 0,47 -> 0,34); máu 2600 -> 3900 làm mất 0,97 / 0,70 / 0,51 khí huyết mỗi trận (> 0,5)
+      expect(huntRate(MONSTER_BY_ID.doc_thiem, KD, t), `doc_thiem solo t${t}`).toBeNull();
+      expect(huntRate(MONSTER_BY_ID.doc_thiem, KD, t, 2), `doc_thiem đội 2 t${t}`).not.toBeNull();
     }
-    expect(huntRate(MONSTER_BY_ID.doc_thiem, KD, 0)).toBeNull();
-    expect(huntRate(MONSTER_BY_ID.doc_thiem, KD, 1)).not.toBeNull();
-    expect(huntRate(MONSTER_BY_ID.doc_thiem, KD, 2)).not.toBeNull();
   });
 
-  it("Hắc Giao: một người và đội 2 không an toàn; đội 3 từ Trung kỳ; đội 4 từ Sơ kỳ", () => {
+  it("Hắc Giao (mục 30: máu 75.000, tu vi 6.400): một người, đội 2 và đội 3 không an toàn ở bậc nào; đội 4 từ Trung kỳ; Sơ kỳ không đội nào hạ nổi (cần đội 5 mà PARTY_MAX = 4)", () => {
     for (let t = 0; t < 3; t++) {
       expect(huntRate(BOSS, KD, t, 1), `1 người t${t}`).toBeNull();
       expect(huntRate(BOSS, KD, t, 2), `đội 2 t${t}`).toBeNull();
-      expect(huntRate(BOSS, KD, t, 4), `đội 4 t${t}`).not.toBeNull();
+      expect(huntRate(BOSS, KD, t, 3), `đội 3 t${t}`).toBeNull(); // trước mục 30: đội 3 từ Trung kỳ
     }
-    expect(huntRate(BOSS, KD, 0, 3)).toBeNull();
-    expect(huntRate(BOSS, KD, 1, 3)).not.toBeNull();
-    expect(huntRate(BOSS, KD, 2, 3)).not.toBeNull();
+    expect(huntRate(BOSS, KD, 0, 4), "đội 4 Sơ kỳ").toBeNull(); // trước mục 30: đội 4 từ Sơ kỳ
+    expect(huntRate(BOSS, KD, 1, 4), "đội 4 Trung kỳ").not.toBeNull();
+    expect(huntRate(BOSS, KD, 2, 4), "đội 4 Hậu kỳ").not.toBeNull();
+    // đội 5 (ngoài `PARTY_MAX`) sẽ hạ được từ Sơ kỳ: số đo để biết "thiếu bao nhiêu" nếu sau này nâng cỡ đội
+    expect(huntRate(BOSS, KD, 0, 5), "đội 5 Sơ kỳ (ngoài cỡ đội tối đa)").not.toBeNull();
   });
 });
 
@@ -66,7 +68,7 @@ describe("không có đường tắt: bãi nào cũng <= ~1,5x bãi Kim Đan đ�
     }
   });
 
-  it("Linh thạch / giờ solo: loài cũ <= 2x loài mới tốt nhất ở cùng bậc", () => {
+  it("Linh thạch / giờ solo: loài cũ <= ~2,1x loài mới tốt nhất ở cùng bậc (mục 30: máu loài mới x1,5 mà tiền rơi giữ nguyên nên Linh thạch / giờ loài mới giảm, Xích Mãng cũ lên 2,02x)", () => {
     for (let t = 0; t < 3; t++) {
       const coin = (m: MonsterKind) => monsterEconomy(m, KD, t)?.totalCoinPerHour ?? 0;
       const designed = Math.max(...NEW.map(coin));
@@ -74,17 +76,17 @@ describe("không có đường tắt: bãi nào cũng <= ~1,5x bãi Kim Đan đ�
         expect(
           coin(m) / designed,
           `${m.id} t${t}: ${coin(m).toFixed(0)} / ${designed.toFixed(0)}`,
-        ).toBeLessThanOrEqual(2);
+        ).toBeLessThanOrEqual(2.1);
     }
   });
 
-  it("đội 3 người hạ Hắc Giao: mỗi người nhanh hơn săn solo tốt nhất nhưng không quá 1,5x (Trung kỳ trở đi)", () => {
+  it("đội 4 người hạ Hắc Giao: mỗi người nhanh hơn săn solo tốt nhất nhưng không quá ~1,55x (Trung kỳ trở đi; mục 30: đội 3 không còn hạ nổi)", () => {
     for (const t of [1, 2]) {
-      const party = huntRate(BOSS, KD, t, 3)!.rate * 3600;
+      const party = huntRate(BOSS, KD, t, 4)!.rate * 3600;
       const solo =
         Math.max(...[...WILD_MONSTERS, ...NEW].map((m) => huntRate(m, KD, t)?.rate ?? 0)) * 3600;
       expect(party / solo, `t${t}`).toBeGreaterThan(1);
-      expect(party / solo, `t${t}`).toBeLessThanOrEqual(1.5);
+      expect(party / solo, `t${t}`).toBeLessThanOrEqual(1.55);
     }
   });
 });
@@ -93,22 +95,22 @@ describe("nhịp tu luyện (mô hình simulate, có nội dung mới)", () => {
   const minutes = (rows: ReturnType<typeof simulate>, realm: number) =>
     rows.filter((r) => r.realm === realm).reduce((a, r) => a + r.minutes, 0);
 
-  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 52 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ)", () => {
+  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 50 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ)", () => {
     const before = simulate(2);
     const after = withKimDan(() => simulate(2));
     expect(after.map((r) => r.minutes)).toEqual(before.map((r) => r.minutes));
-    expect(Math.round(after.at(-1)!.total)).toBe(172);
-    // Luyện Khí không đổi: 53 phút cộng dồn
-    expect(Math.round(after.filter((r) => r.realm <= 1).at(-1)!.total)).toBe(53);
+    expect(Math.round(after.at(-1)!.total)).toBe(170);
+    // Luyện Khí: 51 phút cộng dồn (bao gồm 3 việc phụ Lạc Hà #754 thưởng exp 25/30/35 = 90, trong trần 2,5 %)
+    expect(Math.round(after.filter((r) => r.realm <= 1).at(-1)!.total)).toBe(51);
   });
 
-  it("Kim Đan ~5-7 giờ (mục tiêu M6): người tối ưu (cả Xích Mãng) và người chỉ săn bãi mới", () => {
+  it("Kim Đan ~4-7 giờ (mục tiêu M6 5-7 giờ, mục 30: tu vi x2 + máu x1,5 rút còn ~4,2 giờ, người dùng chủ ý thưởng nhiều tu vi hơn): người tối ưu (cả Xích Mãng) và người chỉ săn bãi mới", () => {
     const optimal =
       minutes(
         withKimDan(() => simulate(3)),
         KD,
       ) / 60;
-    expect(optimal).toBeGreaterThan(4.5);
+    expect(optimal).toBeGreaterThan(4);
     expect(optimal).toBeLessThan(7);
     // chỉ bãi mới + Hắc Hổ / Sói / Thỏ (không đụng Xích Mãng)
     const noMang = withKimDan(() => simulate(3), true);
@@ -210,25 +212,28 @@ describe("luân hồi khi cày tới Kim Đan (#406 mục 4): mọi cách chơi 
 describe("đi theo đội ở Kim Đan (#406 mục 5): số đo, không đổi quy tắc chia tu vi", () => {
   const rows = kimDanPartyRows();
 
-  it("ba bậc x ba cỡ đội; không ô nào vượt 1,5x (mục tiêu #74) hay dưới 0,65x (khoá hiện trạng), mọi số hữu hạn dương", () => {
+  it("ba bậc x ba cỡ đội; không ô nào vượt ~1,55x (mục tiêu #74 là 1,5x; mục 30: đội 4 Trung kỳ 1,51x) hay dưới 0,65x (khoá hiện trạng), mọi số hữu hạn dương", () => {
     expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(row.cells.map((c) => c.n)).toEqual([2, 3, 4]);
       for (const c of row.cells) {
         expect(Number.isFinite(c.ratio) && c.ratio > 0, `${row.label} đội ${c.n}`).toBe(true);
-        expect(c.ratio, `${row.label} đội ${c.n}`).toBeLessThanOrEqual(1.5);
+        expect(c.ratio, `${row.label} đội ${c.n}`).toBeLessThanOrEqual(1.55);
         // cận dưới: khoá hiện trạng (đội 3 ở Sơ kỳ 0,69x), đi đội không được xấu thêm mà test vẫn xanh (nit của B ở #437)
         expect(c.ratio, `${row.label} đội ${c.n}`).toBeGreaterThanOrEqual(0.65);
       }
     }
   });
 
-  it("đội 4 hạ Hắc Giao từ Sơ kỳ, đội 3 từ Trung kỳ (khớp bảng an toàn); đội 2 không đủ người hạ trùm", () => {
+  it("đội 4 hạ Hắc Giao từ Trung kỳ (mục 30: Sơ kỳ không đội nào hạ nổi); đội 2 và đội 3 không đủ người hạ trùm (khớp bảng an toàn)", () => {
     const pick = (t: number, n: number) => rows[t].cells.find((c) => c.n === n)!.party;
-    expect(pick(0, 4)).toBe("hac_giao");
-    expect(pick(1, 3)).toBe("hac_giao");
-    expect(pick(2, 3)).toBe("hac_giao");
-    for (let t = 0; t < 3; t++) expect(pick(t, 2)).not.toBe("hac_giao");
+    expect(pick(0, 4)).not.toBe("hac_giao"); // trước mục 30: đội 4 từ Sơ kỳ
+    expect(pick(1, 4)).toBe("hac_giao");
+    expect(pick(2, 4)).toBe("hac_giao");
+    for (let t = 0; t < 3; t++) {
+      expect(pick(t, 2)).not.toBe("hac_giao");
+      expect(pick(t, 3)).not.toBe("hac_giao"); // trước mục 30: đội 3 từ Trung kỳ
+    }
   });
 
   it("danh sách săn của mô hình được khôi phục (không còn Hắc Giao sau khi đo)", () => {
@@ -237,7 +242,7 @@ describe("đi theo đội ở Kim Đan (#406 mục 5): số đo, không đổi q
 });
 
 describe("chuỗi nhiệm vụ chính làm được MỘT MÌNH (không chặn người chơi không có đội)", () => {
-  it("mọi bước kill của chuỗi chính, trừ nhiệm vụ cuối (trùm theo đội), là loài an toàn solo ở bậc người chơi đang có", () => {
+  it("mọi bước kill của chuỗi chính, trừ nhiệm vụ cuối (trùm theo đội), Độc Thiềm, Độc Tước và Phong Nha Sơ kỳ (mục 30: cần đội 2), là loài an toàn solo ở bậc người chơi đang có", () => {
     const chain: string[] = [];
     for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next)
       chain.push(id);
@@ -250,10 +255,17 @@ describe("chuỗi nhiệm vụ chính làm được MỘT MÌNH (không chặn n
         if (st.kind === "reachRealm") cur = Math.max(cur, stepOf(st.realm, st.tier));
         if (st.kind !== "kill") continue;
         const { realm: r, tier: t } = realmTierOfStep(cur);
+        // NGOẠI LỆ GHI CÓ CHỦ Ý (mục 30, QUYET_DINH_M3 16/11; người dùng giữ nguyên số ở mục 54): Độc Thiềm máu x1,5 không còn an toàn solo ở mọi bậc Kim Đan nên bước hạ Độc Thiềm
+        // của `doc_thiem_nang` (và `phong_nha_cham` ở Sơ kỳ Nguyên Anh) cần ĐỘI 2 (danh sách ngoại lệ dưới đây; thêm loài khác vào đây thì test này mất ý nghĩa). Nếu sau này muốn khôi phục "chuỗi chính làm được một mình":
+        // máu Độc Thiềm <= ~3.250 (x1,25) hoặc đổi mục tiêu bước (xem questions.md, A / B / C).
+        // Phong Nha (mục 30) chỉ hụt ở Sơ kỳ Nguyên Anh (danger 0,52 > 0,5; Trung kỳ trở đi solo được): `phong_nha_cham` ở bậc 16 cần đội 2 nếu chưa lên Trung kỳ.
+        const needsTeam = ["doc_thiem", "phong_nha", "doc_tuoc"].includes(st.monster); // Độc Tước (đòn nặng nhất): 0,97 / 0,75 / 0,58 khí huyết mỗi trận ở ba bậc Nguyên Anh
         expect(
-          huntRate(MONSTER_BY_ID[st.monster], r, t),
-          `${id}: hạ ${st.monster} ở bậc ${cur} phải làm được solo`,
+          huntRate(MONSTER_BY_ID[st.monster], r, t, needsTeam ? 2 : 1),
+          `${id}: hạ ${st.monster} ở bậc ${cur} phải làm được ${needsTeam ? "theo đội 2" : "solo"}`,
         ).not.toBeNull();
+        if (st.monster === "doc_thiem")
+          expect(huntRate(MONSTER_BY_ID[st.monster], r, t, 1), `${id}: Độc Thiềm solo`).toBeNull();
       }
     }
     // nhiệm vụ cuối là trùm theo đội (từ M7.5c: Thiên Hàn Vương ở Hàn Vân): solo không an toàn ở mọi bậc Nguyên Anh, đúng thiết kế

@@ -8,6 +8,7 @@
 // Mọi hàm ở đây là hàm thuần dùng chung cho client (hiển thị đúng số server tính) và server (kết quả thật).
 import { REALMS, expToNext, stepOf } from "./realms";
 import { ENGRAVE_COSTS, sanitizeEngraved, skillOf } from "./skills";
+import { sanitizeSocial, type SoulSocial } from "./social-soul";
 
 // ---------------------------------------------------------------------------------------------------------------
 // Duyên (điểm luân hồi)
@@ -290,6 +291,11 @@ export interface Soul {
   /** lifeId cuối cùng đã cộng Duyên: chống cộng hai lần khi chạy lại sau sập máy */
   lastCreditedLife: string;
   history: SoulHistoryEntry[];
+  /**
+   * Phần XÃ HỘI theo linh hồn (M9, `social-soul.ts`): thống kê PK, bộ đếm, thành tựu đã đạt, danh hiệu đang đeo. TUỲ CHỌN khi đọc (file cũ không có; `newSoul` không tạo sẵn để tệp chân linh
+   * chưa dùng tính năng này giữ nguyên); ghi qua `socialTrack` / `socialGrant` / `socialPkRecord`, đọc qua `sanitizeSocial` (đã nằm trong `sanitizeSoul`).
+   */
+  social?: SoulSocial;
   createdAt: string;
   updatedAt: string;
 }
@@ -355,6 +361,8 @@ export function sanitizeSoul(raw: unknown, now = ""): Soul | null {
       at: str(e.at, 40),
     });
   }
+  const social = sanitizeSocial(r.social); // M9: tuỳ chọn, không tin file
+  if (social) soul.social = social;
   soul.updatedAt = str(r.updatedAt, 40) || soul.createdAt;
   return soul;
 }

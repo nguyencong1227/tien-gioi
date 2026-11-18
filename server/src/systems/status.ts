@@ -10,9 +10,11 @@ import {
   addStatus,
   cdrPhuStored,
   entriesOf,
+  hasStatus,
   isStunned,
   maskOf,
   newStatusBox,
+  newestMarkIndex,
   takeDotDamage,
   pruneStatuses,
   stripDots,
@@ -63,6 +65,22 @@ function syncMonsterFx(w: World, id: string, box: StatusBox) {
   if (!mon) return;
   const mask = maskOf(box, w.now);
   if (mon.fx !== mask) mon.fx = mask;
+  const mark = newestMarkIndex(box, w.now); // DẤU hệ mới nhất (`Monster.mark`, mục 51)
+  if (mon.mark !== mark) mon.mark = mark;
+}
+
+/** Quái `id` đang mang trạng thái `statusId` (còn hiệu lực) không. */
+export function monsterHasStatus(w: World, id: string, statusId: string): boolean {
+  return hasStatus(w.mctrl.get(id)?.st, statusId, w.now);
+}
+
+/** Gỡ trạng thái `statusId` khỏi quái `id` (combo `consume`, thanh tẩy...) và đồng bộ huy hiệu / dấu. Trả `true` nếu có gỡ. */
+export function takeMonsterStatus(w: World, id: string, statusId: string): boolean {
+  const box = w.mctrl.get(id)?.st;
+  if (!box) return false;
+  const had = takeStatus(box, statusId, w.now) !== undefined;
+  if (had) syncMonsterFx(w, id, box);
+  return had;
 }
 
 /**

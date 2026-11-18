@@ -1,6 +1,15 @@
 // Kho lưu nhân vật (M3 bước 3b, docs/THIET_KE_TAI_KHOAN.md mục 6): giao diện để thay backend (file JSON hôm nay,
 // PostgreSQL ở bước 3e) mà `WorldRoom` không biết. Cùng kiểu với `SoulStore` (`soul.ts`).
-import { deletePlayer, loadPlayer, savePlayer, type SavedPlayer } from "./store";
+import {
+  deletePlayer,
+  listPlayerProfiles,
+  loadPlayer,
+  savePlayer,
+  type ProfileRow,
+  type SavedPlayer,
+} from "./store";
+
+export { profileRowOf, type ProfileRow } from "./store";
 
 export interface PlayerStore {
   /** Nhân vật theo đạo hiệu (không phân biệt hoa thường, NFC); chưa có thì `null`. */
@@ -12,6 +21,10 @@ export interface PlayerStore {
   save(p: SavedPlayer): Promise<void>;
   /** Xoá nhân vật theo đạo hiệu; trả về true nếu có và đã xoá, false nếu không tìm thấy. */
   delete(name: string): Promise<boolean>;
+  /**
+   * Liệt kê hồ sơ để XẾP HẠNG (M9): tối đa `limit` nhân vật (mặc định `BOARD_SCAN_MAX`), sắp theo tên chuẩn hoá để tất định. CHỈ ĐỌC, bản ghi hỏng bị bỏ qua. Không dùng ở đường nóng. LƯU Ý: quá `BOARD_SCAN_MAX` nhân vật thì cắt theo THỨ TỰ TÊN (không phải top theo tu vi) nên các tên cuối bảng chữ cái không được xét; quy mô thật là vài chục người, chấp nhận (docs/PHAN_CONG_M9.md mục 7). TUỲ CHỌN trong kiểu (kho giả của test); mọi kho THẬT có, `store-contract.ts` kiểm.
+   */
+  listProfiles?(limit?: number): Promise<ProfileRow[]>;
 }
 
 /** Bản file JSON: `server/data/players/<sha1(tên)>.json`, đúng hành vi của `loadPlayer` / `savePlayer` ở `store.ts`. */
@@ -24,6 +37,9 @@ export class FilePlayerStore implements PlayerStore {
   }
   delete(name: string) {
     return deletePlayer(name);
+  }
+  listProfiles(limit?: number) {
+    return listPlayerProfiles(limit);
   }
 }
 

@@ -1,13 +1,28 @@
 // Giữ các tối ưu băng thông / CPU của vòng lặp tick (xem AGENTS.md, mục Hiệu năng).
 import { describe, expect, it } from "vitest";
 import { Encoder, StateView } from "@colyseus/schema";
-import { MONSTER_BY_ID, TOWN_PX, getMap, MAX_BOLTS } from "@tien-gioi/shared";
+import {
+  AMBUSH_MIN_PROTOCOL,
+  DEFAULT_MAP_ID,
+  MAX_AMBUSH_ROOMS,
+  MONSTER_BY_ID,
+  TICK_MS,
+  TOWN_PX,
+  arenaMapIdOf,
+  getMap,
+  MAX_BOLTS,
+  SKILL_BY_ID,
+  type SkillDef,
+} from "@tien-gioi/shared";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
 import { tickWorld } from "./tick";
+import { ambushOf, createAmbushRuntime } from "./ambush";
+import { arenaJoined, createArena, type AmbushTicket } from "./arena";
 import { slash, tickRespawn } from "./combat";
 import { cast } from "./cast";
+import { MAX_PLAYER_BOLTS } from "./pbolt";
 import { MONSTER_WAKE_DIST, WANDER_STRIDE, spawnInitial, tickMonsters } from "./monsters";
 import { EXP_FLUSH_MS, tickRecovery } from "./progression";
 import {
@@ -381,7 +396,9 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     expect(r.eventKbNear).toBeLessThan(r.eventKbBroadcast / 2);
     // M7.3 tinh anh: 3,80 -> 4,01 KB/s (100 người tranh ~20 con trong bench; tinh anh x2,5 khí huyết sống lâu hơn nên nhiều đòn trúng / số sát thương hơn). Roll tinh anh KHÔNG
     // gọi `Math.random` (`eliteHash`): lần đầu dùng `Math.random` nhích tới 4,43 dù xác suất 0 vì lệch chuỗi có hạt giống, không phải do tinh anh.
-    expect(r.eventKbNear).toBeLessThan(4.5);
+    // Mục 48 (trùm tìm đường, #1012): chỗ sinh trùm có thêm điều kiện (rộng, thuộc vùng chính) nên số lần gọi `Math.random` lúc sinh đổi và quỹ đạo có hạt giống lệch: 4,0 -> 5,2 KB/s.
+    // A đã thử TẮT hẳn tìm đường (chỉ giữ luật chỗ sinh): vẫn 5,2 KB/s, tức do lệch chuỗi chứ không phải do quái tìm đường. Vẫn ít hơn nửa broadcast cả phòng (16 KB/s) ở dòng trên.
+    expect(r.eventKbNear).toBeLessThan(6);
   });
 
   it("tin tổ đội (PartyMsg) cho một client dưới ngân sách < 1 KB/s (#76)", () => {
@@ -398,6 +415,126 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     // Băng thông rất nhỏ nhưng > 0 khi có quái bị hạ, giữ ngân sách < 0.5 KB/s mỗi client.
     expect(r.walletKbPerClient).toBeGreaterThan(0);
     expect(r.walletKbPerClient).toBeLessThan(0.5);
+  });
+
+  it("chặn đường (mục 52): 100 người đi hoang, hộp thoại mở đồng loạt: mỗi người đúng MỘT tin ambushOffer (không lặp mỗi tick), tick dưới 10 ms", () => {
+    const { w, ambushOffers, ambushEnds } = makeWorld();
+    const mapId = w.map.def.id;
+    w.ambush = createAmbushRuntime({
+      random: () => 0, // luôn trúng: ca xấu nhất, ai đủ một chặng cũng bị chặn
+      scenes: [
+        {
+          id: "canh",
+          text: "Bóng đen chắn đường {dia_danh}, {ke_dich}.",
+          mapIds: [mapId],
+          tiers: ["normal"],
+          source: "test",
+        },
+      ],
+      foes: [
+        {
+          id: "bay",
+          name: "Sói Hoang",
+          mapId,
+          minStep: 0,
+          maxStep: 100,
+          tier: "normal",
+          foes: [{ kind: "tho", count: 2 }],
+        },
+      ],
+    });
+    const heroes = Array.from({ length: 100 }, (_, i) => {
+      const h = addPlayer(w, `walker_${i}`, 1, 0);
+      h.c.proto = AMBUSH_MIN_PROTOCOL;
+      h.c.coin = 1000;
+      h.p.exp = 100;
+      h.p.expMax = 1000;
+      ambushOf(w, h.c).cooldownUntil = 0;
+      return h;
+    });
+    // Đi qua lại ở vùng hoang tới khi MỌI người đã bị chặn (cùng tốc độ nên gần như cùng lúc)
+    let seq = 0;
+    const walk = (tick: number) => {
+      w.now += TICK_MS;
+      seq++;
+      for (const h of heroes) {
+        h.c.inputs.push({ seq, dx: Math.floor(tick / 100) % 2 === 0 ? 1 : -1, dy: 0 });
+        h.c.moveBudget = 5;
+      }
+      tickWorld(w, TICK_MS);
+    };
+    for (let t = 0; t < 600 && heroes.some((h) => h.c.ambush!.offer === undefined); t++) walk(t);
+    expect(heroes.every((h) => h.c.ambush!.offer !== undefined)).toBe(true);
+    expect(ambushOffers).toHaveLength(100); // đúng MỘT tin mỗi người lúc mở
+    // Cả 100 hộp thoại đang mở: đo tick (ví dụ `tickAmbush` duyệt 100 người, hộ thể, khoá input) và đếm tin phát thêm
+    for (const h of heroes) h.c.ambush!.offer!.seen = true; // người thật đã xác nhận: giữ hộp thoại mở suốt phép đo
+    const ticks: number[] = [];
+    for (let t = 0; t < 100; t++) {
+      const t0 = performance.now();
+      w.now += TICK_MS;
+      tickWorld(w, TICK_MS);
+      ticks.push(performance.now() - t0);
+    }
+    const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
+    expect(avg).toBeLessThan(10);
+    expect(ambushOffers).toHaveLength(100); // không phát lại mỗi tick
+    expect(ambushEnds).toHaveLength(0);
+    expect(w.ambush.open.size).toBe(100);
+  });
+
+  it("đấu trường chặn đường (mục 52): MAX_AMBUSH_ROOMS phòng solo chạy cùng lúc (mỗi phòng một người + 3 kẻ địch đang đánh): tổng tick một vòng dưới 10 ms; ambushState đúng mỗi giây", () => {
+    const arenaMap = getMap(arenaMapIdOf(DEFAULT_MAP_ID))!;
+    const rooms = Array.from({ length: MAX_AMBUSH_ROOMS }, (_, i) => {
+      const h = makeWorld(arenaMap);
+      h.w.now = 1_800_000_000_000;
+      h.w.ambush = createAmbushRuntime({ random: () => 0, scenes: [], foes: [] });
+      const ticket: AmbushTicket = {
+        id: `${i}`.padStart(32, "a"),
+        key: `p${i}`,
+        name: `p${i}`,
+        origin: { mapId: DEFAULT_MAP_ID, x: 2200, y: 1536 },
+        group: {
+          id: "g",
+          name: "Sói Hoang",
+          mapId: DEFAULT_MAP_ID,
+          minStep: 0,
+          maxStep: 100,
+          tier: "normal",
+          foes: [{ kind: "lang", count: 3 }],
+        },
+        tier: "normal",
+        roomId: `room-${i}`,
+        createdAt: h.w.now,
+        expiresAt: h.w.now + 30_000,
+        ended: false,
+      };
+      h.w.hub.ambushes._add(ticket);
+      createArena(h.w, ticket);
+      const { p } = addPlayer(h.w, `p${i}`, 1, 2);
+      p.x = h.w.map.townPx.x;
+      p.y = h.w.map.townPx.y;
+      p.hp = p.maxHp = 1_000_000; // trụ vững suốt phép đo: chỉ đo chi phí tick, không đo kết cục
+      arenaJoined(h.w, `p${i}`);
+      return h;
+    });
+    const ticks: number[] = [];
+    const rounds = 200; // 10 giây
+    for (let t = 0; t < rounds; t++) {
+      const t0 = performance.now();
+      for (const h of rooms) {
+        h.w.now += TICK_MS;
+        tickWorld(h.w, TICK_MS);
+      }
+      ticks.push(performance.now() - t0);
+    }
+    const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
+    expect(avg).toBeLessThan(10); // tổng cả 20 phòng trong MỘT vòng tick (mỗi phòng thật chạy trong timer riêng, đây là chặn trên nghiêm hơn thực tế)
+    for (const h of rooms) {
+      // ambushState ~ mỗi giây (10 giây -> 9..11 tin: tin đầu lúc vào + mỗi giây một tin), không mỗi tick
+      expect(h.ambushStates.length).toBeGreaterThanOrEqual(9);
+      expect(h.ambushStates.length).toBeLessThanOrEqual(12);
+      expect(h.w.arena!.phase).toBe("fighting");
+    }
   });
 
   it("kho đồ tông môn (sectVault): không tick nào gửi sectVault khi không ai đụng kho (Issue #790 K6)", () => {
@@ -952,6 +1089,166 @@ describe("benchmark bốn bản đồ chạy đồng thời (M7.10 #511)", () =>
     expect(res.p95TotalMs).toBeLessThan(10);
     for (const r of res.rooms) {
       expect(r.patchBytes).toBeLessThan(600);
+    }
+  });
+});
+
+describe("đạn của người chơi (mục 51, CT3 #1048)", () => {
+  it("100 người bắn đạn nhiều viên (xuyên + nảy) liên tục vào đám quái đông: tick < 10 ms, đạn đang bay không vượt trần phòng, fx pbolt chỉ theo đoạn (không mỗi tick)", () => {
+    const { w, fx, dmgs } = makeWorld();
+    const id = "dan_perf";
+    const def = {
+      ...SKILL_BY_ID["bon_thach_quyen"]!,
+      id,
+      shape: "bolt",
+      mult: 0.05,
+      range: 560,
+      arc: Math.PI / 3,
+      count: 5,
+      speed: 700,
+      pierce: 3,
+      bounce: 2,
+      element: "none",
+      effects: [],
+    } as SkillDef;
+    (SKILL_BY_ID as Record<string, SkillDef>)[id] = def;
+    try {
+      w.now = 1_000_000;
+      const heroes: { sid: string; c: ReturnType<typeof addPlayer>["c"] }[] = [];
+      for (let i = 0; i < 100; i++) {
+        const sid = `bp_${i}`;
+        const { p, c } = addPlayer(w, sid, 4, 0);
+        p.x = w.map.townPx.x + 260 + (i % 10) * 24;
+        p.y = w.map.townPx.y + 260 + Math.floor(i / 10) * 24;
+        p.hp = p.maxHp = 1e9; // sống suốt phép đo
+        p.mp = p.maxMp = 1e9;
+        syncPublicPos(p);
+        c.skills = { learned: { [id]: 1 }, slots: [id, "", "", ""] };
+        heroes.push({ sid, c });
+      }
+      // đám quái đông trước mặt (hướng +x), máu cực lớn để không chết giữa phép đo
+      for (let k = 0; k < 80; k++) {
+        const m = addMonster(
+          w,
+          "tho",
+          w.map.townPx.x + 560 + (k % 10) * 30,
+          w.map.townPx.y + 250 + Math.floor(k / 10) * 40,
+        );
+        m.m.hp = m.m.maxHp = 1e12;
+        m.mc.homeX = m.m.x;
+        m.mc.homeY = m.m.y;
+      }
+      const ticks = 80;
+      const durations: number[] = [];
+      let peak = 0;
+      let maxFxPerTick = 0;
+      for (let t = 0; t < ticks; t++) {
+        w.now += TICK_MS;
+        const fx0 = fx.filter((f) => f.kind === "pbolt").length;
+        // bắn mỗi tick: ca xấu nhất (thật chỉ bắn theo hồi chiêu); 100 lần quy hoạch 5 viên + tick đo CHUNG một nhịp
+        durations.push(
+          measureSyncStepMs(() => {
+            for (const h of heroes) {
+              h.c.skillCd[0] = 0;
+              cast(w, h.sid, { slot: 2, angle: 0 });
+            }
+            tickWorld(w, TICK_MS);
+          }),
+        );
+        peak = Math.max(peak, w.pbolts.length);
+        maxFxPerTick = Math.max(maxFxPerTick, fx.filter((f) => f.kind === "pbolt").length - fx0);
+      }
+      const s = summarizeTickMs(durations);
+      expect(s.avgMs).toBeLessThan(10); // trung bình (CI chậm 2-3 lần máy dev; khởi động JIT làm tick đầu lâu): đo cả 100 lần quy hoạch 5 viên + tick
+      expect(peak).toBeGreaterThan(0);
+      expect(peak).toBeLessThanOrEqual(MAX_PLAYER_BOLTS);
+      expect(dmgs.length).toBeGreaterThan(0); // đạn thật sự trúng
+      expect(maxFxPerTick).toBeLessThanOrEqual(MAX_PLAYER_BOLTS * 3); // mỗi tick: tối đa trần viên mới (đoạn đầu) + các đoạn nảy tới hạn; không tăng theo số người bắn
+      expect(w.pbolts.length).toBeLessThanOrEqual(MAX_PLAYER_BOLTS);
+    } finally {
+      delete (SKILL_BY_ID as Record<string, SkillDef>)[id];
+    }
+  });
+});
+
+describe("vật thể bền của người chơi (mục 51, CT4 #1049)", () => {
+  it("100 người liên tục đặt vùng / hào quang / tượng / bẫy vào đám quái đông: tick < 10 ms (trung bình), vật thể <= trần phòng, fx mỗi tick bị chặn (không tăng theo số tick)", () => {
+    const { w, fx, dmgs } = makeWorld();
+    const mk = (id: string, shape: string, extra: Record<string, unknown>) => {
+      (SKILL_BY_ID as Record<string, SkillDef>)[id] = {
+        ...SKILL_BY_ID["bon_thach_quyen"]!,
+        id,
+        shape,
+        mult: 0.05,
+        range: 90,
+        reach: 60,
+        element: "none",
+        effects: [],
+        ...extra,
+      } as SkillDef;
+      return id;
+    };
+    const ids = [
+      mk("pf_zone", "zone", { durationMs: 8000, tickMs: 400 }),
+      mk("pf_aura", "aura", { durationMs: 12_000, tickMs: 500, reach: 0 }),
+      mk("pf_totem", "totem", { durationMs: 8000, tickMs: 800, range: 200 }),
+      mk("pf_trap", "trap", { durationMs: 20_000, armMs: 400 }),
+    ];
+    try {
+      w.now = 2_000_000;
+      const heroes: { sid: string; c: ReturnType<typeof addPlayer>["c"] }[] = [];
+      for (let i = 0; i < 100; i++) {
+        const sid = `vp_${i}`;
+        const { p, c } = addPlayer(w, sid, 4, 0);
+        p.x = w.map.townPx.x + 260 + (i % 10) * 24;
+        p.y = w.map.townPx.y + 260 + Math.floor(i / 10) * 24;
+        p.hp = p.maxHp = 1e9;
+        p.mp = p.maxMp = 1e9;
+        syncPublicPos(p);
+        c.skills = {
+          learned: Object.fromEntries(ids.map((id) => [id, 1])),
+          slots: ids as unknown as typeof c.skills.slots,
+        };
+        heroes.push({ sid, c });
+      }
+      for (let k = 0; k < 80; k++) {
+        const m = addMonster(
+          w,
+          "tho",
+          w.map.townPx.x + 280 + (k % 10) * 28,
+          w.map.townPx.y + 250 + Math.floor(k / 10) * 30,
+        );
+        m.m.hp = m.m.maxHp = 1e12;
+        m.mc.homeX = m.m.x;
+        m.mc.homeY = m.m.y;
+      }
+      const ticks = 80;
+      const durations: number[] = [];
+      let peak = 0;
+      let maxFxPerTick = 0;
+      for (let t = 0; t < ticks; t++) {
+        w.now += TICK_MS;
+        const fx0 = fx.length;
+        durations.push(
+          measureSyncStepMs(() => {
+            for (const h of heroes) {
+              h.c.skillCd = [0, 0, 0, 0];
+              cast(w, h.sid, { slot: (2 + (t % 4)) as 2 | 3 | 4 | 5, angle: 0 });
+            }
+            tickWorld(w, TICK_MS);
+          }),
+        );
+        peak = Math.max(peak, w.objs.length);
+        maxFxPerTick = Math.max(maxFxPerTick, fx.length - fx0);
+      }
+      expect(summarizeTickMs(durations).avgMs).toBeLessThan(10); // trung bình: đo cả 100 lần dựng + dọn trần + tick
+      expect(peak).toBeGreaterThan(0);
+      expect(peak).toBeLessThanOrEqual(60); // persistPerRoomMax
+      expect(dmgs.length).toBeGreaterThan(0); // vật thể thật sự tác dụng
+      // mỗi tick: tối đa 100 `fx cast` + 100 `fx` dựng + (<= 100 đẩy trần + <= số vật thể nổ / mất) `fxEnd`: chặn theo số người, không theo số tick
+      expect(maxFxPerTick).toBeLessThanOrEqual(100 * 4);
+    } finally {
+      for (const id of ids) delete (SKILL_BY_ID as Record<string, SkillDef>)[id];
     }
   });
 });

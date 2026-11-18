@@ -135,6 +135,28 @@ describe("input dừng cắt hàng đợi (queueInput)", () => {
     }
   });
 
+  it("`dropped` chỉ đếm input DI CHUYỂN bị cắt: input DỪNG thừa bị cắt (tin dừng lặp) không tính (B đo ở #963: 1 bước chờ + 3 tin dừng cùng tick từng cho dropped = 1)", () => {
+    // 1 bước chờ + 3 tin dừng: tin dừng thứ ba cắt tin dừng thứ hai: KHÔNG bước di chuyển nào bị bỏ
+    {
+      const { w } = rig(1);
+      for (const seq of [2, 3, 4]) queueInput(w, "a", { seq, dx: 0, dy: 0 });
+      expect(w.inputStats.dropped).toBe(0);
+    }
+    // chỉ tin dừng, nhiều lần: không bỏ gì tính vào dropped
+    {
+      const { w } = rig(0);
+      for (let seq = 1; seq <= 10; seq++) queueInput(w, "a", { seq, dx: 0, dy: 0 });
+      expect(w.inputStats.dropped).toBe(0);
+    }
+    // 5 bước + 3 tin dừng: tin dừng đầu cắt 3 bước di chuyển (còn 2), hai tin dừng sau chỉ cắt tin dừng: đúng 3 bước bị bỏ
+    {
+      const { w, c } = rig(5);
+      for (const seq of [6, 7, 8]) queueInput(w, "a", { seq, dx: 0, dy: 0 });
+      expect(w.inputStats.dropped).toBe(5 - STOP_KEEP_INPUTS);
+      expect(c.inputs.map((i) => i.seq)).toEqual([1, 2, 8]);
+    }
+  });
+
   it("ba input dừng liên tiếp (client lặp cho chắc) không làm hỏng: còn <= STOP_KEEP_INPUTS + 1 input, input dừng CUỐI có mặt, seq tăng dần", () => {
     const { w, c } = rig(25);
     for (const seq of [26, 27, 28]) queueInput(w, "a", { seq, dx: 0, dy: 0 });

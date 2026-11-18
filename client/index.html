@@ -73,6 +73,13 @@
           <path d="M5.5 21.5V3" />
           <path d="M5.5 4.5h13l-3.2 4 3.2 4h-13" />
         </symbol>
+        <symbol id="i-social" viewBox="0 0 24 24">
+          <path d="M9 20V9.5h6V20" />
+          <path d="M3.5 20v-6H9" />
+          <path d="M15 20v-3.5h5.5V20" />
+          <path d="M3 20.5h18" />
+          <path d="M12 3.5v3.5" />
+        </symbol>
         <symbol id="i-pickup" viewBox="0 0 24 24">
           <path d="M12 3.5v10" />
           <path d="M7.5 9.5l4.5 4.5 4.5-4.5" />
@@ -377,9 +384,42 @@
         Chế độ Quyết đấu giả lập (DEV / Debug)
       </div>
 
+      <!-- Banner TRÙM THẾ GIỚI (M9.7, #1026; vẽ bằng ui.ts từ world-boss-view.ts; hiện mặc định; `?social=0` tắt): đếm ngược, máu, phần đóng góp của mình, kết quả. Không chặn chạm / nhấp xuống thế giới (chỉ nút "Xem đóng góp" nhận chạm). -->
+      <section id="wb-banner" class="wb-banner" hidden aria-label="Trùm thế giới">
+        <div class="wb-head">
+          <b id="wb-title" class="wb-title"></b>
+          <span id="wb-hp" class="wb-hp"></span>
+          <span class="wb-timer"
+            ><span id="wb-timer-label"></span> <b id="wb-timer" class="wb-time"></b
+          ></span>
+        </div>
+        <p id="wb-mine" class="wb-mine"></p>
+        <button
+          type="button"
+          id="wb-toggle"
+          class="wb-toggle"
+          aria-expanded="false"
+          aria-controls="wb-top"
+          hidden
+        >
+          Xem đóng góp
+        </button>
+        <ol id="wb-top" class="wb-top" aria-label="Người đóng góp nhiều nhất" hidden></ol>
+        <p id="wb-result" class="wb-result" role="status" hidden></p>
+      </section>
+
       <!-- Thanh máu TRÙM (mục 42, T4 #873): trùm gần nhất / trùm bí cảnh; mốc giai đoạn, tên chiêu đang vận, chỉ báo cuồng nộ, giáp + gọi quái con (vẽ bằng boss-bar-ui.ts) -->
       <section id="boss-bar" class="boss-bar" hidden aria-label="Trùm">
         <div class="boss-bar-head">
+          <img
+            id="boss-bar-art"
+            class="boss-bar-art"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable="false"
+            hidden
+          />
           <b id="boss-bar-name"></b>
           <span id="boss-bar-phase" class="boss-bar-phase" hidden></span>
           <span id="boss-bar-enrage" class="boss-bar-enrage" hidden>🔥 Cuồng nộ</span>
@@ -647,6 +687,19 @@
               <span class="ico"
                 ><svg aria-hidden="true" focusable="false"><use href="#i-sect" /></svg></span
               ><small>Tông môn</small>
+            </button>
+            <button
+              type="button"
+              id="btn-social"
+              class="hud-btn"
+              hidden
+              title="Xã hội (Shift+G)"
+              aria-label="Xã hội: xếp hạng, thành tựu, sự kiện (Phím Shift+G)"
+              aria-expanded="false"
+            >
+              <span class="ico"
+                ><svg aria-hidden="true" focusable="false"><use href="#i-social" /></svg></span
+              ><small>Xã hội</small>
             </button>
             <button
               type="button"
@@ -936,6 +989,7 @@
             aria-labelledby="inv-drop-text"
           >
             <p id="inv-drop-text"></p>
+            <div id="inv-drop-qty" class="inv-drop-qty" hidden></div>
             <small id="inv-drop-warn" hidden></small>
             <div class="inv-drop-btns">
               <button type="button" id="inv-drop-no" class="act-btn">Giữ lại</button>
@@ -1228,6 +1282,15 @@
         tabindex="-1"
       >
         <header class="dlg-head">
+          <img
+            id="dlg-npc-art"
+            class="dlg-npc-art"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable="false"
+            hidden
+          />
           <div>
             <b id="dlg-npc-name">NPC</b>
             <span id="dlg-npc-title" class="dlg-badge"></span>
@@ -1294,7 +1357,7 @@
         <header class="inv-head">
           <div>
             <h2 id="skills-title">Công Pháp</h2>
-            <small id="skills-count">0 chiêu đã học</small>
+            <small id="skills-count" aria-live="polite">0 chiêu đã học</small>
           </div>
           <button
             type="button"
@@ -1311,6 +1374,59 @@
           học ở kinh quyển trong Túi đồ.
         </p>
         <p id="skills-empty" class="lrelic-empty" hidden></p>
+        <!-- Lọc / tìm sổ chiêu (CT11a, #1056): chỉ hiện khi có từ SKILL_FILTER_MIN chiêu trở lên (ui.ts). Ô tìm + Lọc (+ Bỏ lọc khi đang lọc) luôn thấy trên MỘT hàng; các lựa chọn gập sau nút Lọc
+          và tự mô tả bằng chữ trong ô chọn (không nhãn riêng: màn ngang điện thoại thấp). Số chiêu "Hiện X / Y" nằm ở dòng phụ của tiêu đề. -->
+        <div id="skills-filter" class="sk-filter" role="search" aria-label="Lọc chiêu thức" hidden>
+          <div class="sk-filter-top">
+            <input
+              id="skills-q"
+              type="search"
+              class="sk-q"
+              maxlength="64"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="Tìm chiêu…"
+              aria-label="Tìm chiêu theo tên, kinh quyển hoặc hệ (không cần gõ dấu)"
+            />
+            <button
+              type="button"
+              id="skills-filter-toggle"
+              class="sk-slot-btn sk-filter-toggle"
+              aria-expanded="false"
+              aria-controls="skills-filter-more"
+            >
+              Lọc
+            </button>
+            <button type="button" id="skills-filter-clear" class="sk-slot-btn" hidden>
+              Bỏ lọc
+            </button>
+          </div>
+          <div id="skills-filter-more" class="sk-filter-more" hidden>
+            <select id="skills-el" aria-label="Lọc theo hệ"></select>
+            <select id="skills-gr" aria-label="Lọc theo phẩm">
+              <option value="all">Mọi phẩm</option>
+              <option value="0">Hoàng</option>
+              <option value="1">Huyền</option>
+              <option value="2">Địa</option>
+              <option value="3">Thiên</option>
+            </select>
+            <select id="skills-sl" aria-label="Lọc theo ô đang gắn">
+              <option value="all">Mọi ô</option>
+              <option value="equipped">Đang gắn</option>
+              <option value="free">Chưa gắn</option>
+            </select>
+            <select id="skills-sort" aria-label="Sắp xếp chiêu">
+              <option value="slot">Xếp: đã gắn</option>
+              <option value="grade">Xếp: phẩm</option>
+              <option value="name">Xếp: tên</option>
+            </select>
+            <label class="sk-filter-check">
+              <input id="skills-usable" type="checkbox" />
+              <span>Chỉ chiêu dùng được ngay</span>
+            </label>
+          </div>
+        </div>
+        <p id="skills-nomatch" class="lrelic-empty" hidden>Không có chiêu nào khớp bộ lọc.</p>
         <div id="skills-list" class="skills-list"></div>
       </section>
 
@@ -1324,6 +1440,15 @@
         tabindex="-1"
       >
         <header class="inv-head">
+          <img
+            id="map-card"
+            class="map-panel-card"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable="false"
+            hidden
+          />
           <div>
             <h2 id="map-title">Sơn Hà Đồ · Vân Mộng Sơn</h2>
             <small id="map-coords"
@@ -1408,6 +1533,204 @@
               <span><i class="lg pin"></i> Đích nhiệm vụ đang theo dõi</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Bảng Xã hội (M9, #1025 / #1026 / #1027): MỘT bảng ba tab; thân từng tab nối dữ liệu ở M9.6-M9.8 -->
+      <section
+        id="social-modal"
+        class="panel modal-box sheet"
+        hidden
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="social-head-title"
+        tabindex="-1"
+      >
+        <header class="inv-head">
+          <div>
+            <h2 id="social-head-title">Xã Hội</h2>
+            <small id="social-head-sub">Xếp hạng, thành tựu, sự kiện</small>
+          </div>
+          <button
+            type="button"
+            id="social-close"
+            class="modal-close"
+            title="Đóng (Shift+G / Esc)"
+            aria-label="Đóng bảng xã hội (Phím Shift+G hoặc Esc)"
+          >
+            ✕
+          </button>
+        </header>
+        <div id="social-tabs" class="sect-tabs" role="tablist" aria-label="Mục xã hội">
+          <button
+            type="button"
+            id="social-tab-btn-rank"
+            class="sect-tab active"
+            role="tab"
+            aria-selected="true"
+            aria-controls="social-tab-rank"
+            tabindex="0"
+          >
+            Xếp hạng
+          </button>
+          <button
+            type="button"
+            id="social-tab-btn-ach"
+            class="sect-tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="social-tab-ach"
+            tabindex="-1"
+          >
+            Thành tựu
+          </button>
+          <button
+            type="button"
+            id="social-tab-btn-event"
+            class="sect-tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="social-tab-event"
+            tabindex="-1"
+          >
+            Sự kiện
+          </button>
+        </div>
+        <div
+          id="social-tab-rank"
+          class="social-pane"
+          role="tabpanel"
+          aria-labelledby="social-tab-btn-rank"
+          tabindex="0"
+        >
+          <div
+            id="social-board-tabs"
+            class="social-subtabs"
+            role="tablist"
+            aria-label="Chọn bảng xếp hạng"
+          >
+            <button
+              type="button"
+              id="social-board-btn-tuvi"
+              class="social-subtab active"
+              role="tab"
+              aria-selected="true"
+              aria-controls="social-board-panel"
+              tabindex="0"
+            >
+              Tu vi
+            </button>
+            <button
+              type="button"
+              id="social-board-btn-linhhon"
+              class="social-subtab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="social-board-panel"
+              tabindex="-1"
+            >
+              Linh hồn
+            </button>
+            <button
+              type="button"
+              id="social-board-btn-tongmon"
+              class="social-subtab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="social-board-panel"
+              tabindex="-1"
+            >
+              Tông môn
+            </button>
+            <button
+              type="button"
+              id="social-board-btn-pk"
+              class="social-subtab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="social-board-panel"
+              tabindex="-1"
+            >
+              Thách đấu
+            </button>
+          </div>
+          <div id="social-board-panel" role="tabpanel" aria-labelledby="social-board-btn-tuvi">
+            <p id="social-board-mine" class="social-mine" aria-live="polite"></p>
+            <p id="social-board-status" class="social-empty" role="status"></p>
+            <div id="social-board-wrap" class="social-table-wrap" hidden>
+              <table id="social-board-table" class="social-table">
+                <caption id="social-board-caption" class="sr-only"></caption>
+                <thead>
+                  <tr id="social-board-head"></tr>
+                </thead>
+                <tbody id="social-board-body"></tbody>
+              </table>
+            </div>
+            <p id="social-board-age" class="social-age"></p>
+            <button type="button" id="social-board-retry" class="social-retry" hidden>
+              Tải lại bảng
+            </button>
+          </div>
+        </div>
+        <div
+          id="social-tab-ach"
+          class="social-pane"
+          role="tabpanel"
+          aria-labelledby="social-tab-btn-ach"
+          tabindex="0"
+          hidden
+        >
+          <p id="ach-summary" class="social-mine" role="status" aria-live="polite"></p>
+          <p id="ach-status" class="social-empty" role="status"></p>
+          <button type="button" id="ach-retry" class="social-retry" hidden>Tải lại</button>
+          <div id="ach-body" hidden>
+            <h3 class="wbt-h">Danh hiệu</h3>
+            <p id="ach-worn" class="social-age" role="status" aria-live="polite"></p>
+            <div
+              id="ach-titles"
+              class="ach-titles"
+              role="radiogroup"
+              aria-label="Chọn danh hiệu đeo cạnh đạo hiệu"
+            ></div>
+            <!-- Danh hiệu CHƯA mở: gập lại (chỉ chữ, không phải nút chọn); M9.9 có 32 danh hiệu nên không liệt kê hết ngay -->
+            <details id="ach-locked" class="ach-group ach-locked" hidden>
+              <summary id="ach-locked-sum"></summary>
+              <ul id="ach-locked-list" class="ach-list"></ul>
+            </details>
+            <h3 class="wbt-h">Thành tựu</h3>
+            <div id="ach-groups"></div>
+          </div>
+        </div>
+        <div
+          id="social-tab-event"
+          class="social-pane"
+          role="tabpanel"
+          aria-labelledby="social-tab-btn-event"
+          tabindex="0"
+          hidden
+        >
+          <p id="wbt-status" class="social-mine" role="status" aria-live="polite"></p>
+          <p id="wbt-detail" class="social-age"></p>
+          <button type="button" id="wbt-retry" class="social-retry" hidden>Tải lại</button>
+          <h3 class="wbt-h">Lịch hằng ngày</h3>
+          <p id="wbt-empty" class="social-empty">Lịch sự kiện chưa được công bố.</p>
+          <div id="wbt-wrap" class="social-table-wrap" hidden>
+            <table id="wbt-table" class="social-table">
+              <caption class="sr-only">
+                Lịch trùm thế giới hằng ngày
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="c-time">Giờ</th>
+                  <th scope="col" class="c-name">Trùm</th>
+                  <th scope="col">Bản đồ</th>
+                  <th scope="col" class="c-num">Thời lượng</th>
+                </tr>
+              </thead>
+              <tbody id="wbt-body"></tbody>
+            </table>
+          </div>
+          <p id="wbt-tz" class="social-age"></p>
         </div>
       </section>
 
@@ -1598,31 +1921,16 @@
               <!-- Góp quỹ -->
               <form id="sect-form-deposit" class="sect-treasury-form">
                 <h4>Góp quỹ tông môn</h4>
-                <div class="sect-input-row">
-                  <input
-                    type="number"
-                    id="sect-input-deposit"
-                    min="1"
-                    max="999999999"
-                    placeholder="Số lượng..."
-                  />
-                  <button type="submit" id="sect-btn-deposit" class="sect-primary-btn">Góp</button>
-                </div>
+                <!-- Ô nhập SỐ LƯỢNG dùng chung (qty-stepper.ts, mục 47): ui.ts gắn vào đây; ô gõ giữ id sect-input-deposit -->
+                <div id="sect-deposit-qty" class="sect-qty-mount"></div>
+                <button type="submit" id="sect-btn-deposit" class="sect-primary-btn">Góp</button>
               </form>
 
               <!-- Rút quỹ (chỉ Tông chủ) -->
               <form id="sect-form-withdraw" class="sect-treasury-form" hidden>
                 <h4>Rút từ kho tông môn (Tông chủ)</h4>
-                <div class="sect-input-row">
-                  <input
-                    type="number"
-                    id="sect-input-withdraw"
-                    min="1"
-                    max="999999999"
-                    placeholder="Số lượng..."
-                  />
-                  <button type="submit" id="sect-btn-withdraw" class="sect-danger-btn">Rút</button>
-                </div>
+                <div id="sect-withdraw-qty" class="sect-qty-mount"></div>
+                <button type="submit" id="sect-btn-withdraw" class="sect-danger-btn">Rút</button>
               </form>
             </div>
 
@@ -1652,11 +1960,8 @@
             ></div>
             <div id="sect-vault-actions" class="sect-vault-actions">
               <div id="sect-vault-sel" class="sect-vault-sel" role="status">Chưa chọn món nào.</div>
-              <div id="sect-vault-qty-box" class="sect-vault-qty" hidden>
-                <button type="button" id="sect-vault-minus" aria-label="Bớt một">-</button>
-                <b id="sect-vault-qty" aria-live="polite">1</b>
-                <button type="button" id="sect-vault-plus" aria-label="Thêm một">+</button>
-              </div>
+              <!-- Ô nhập SỐ LƯỢNG dùng chung (qty-stepper.ts): ui.ts gắn vào đây; giữ id sect-vault-qty (ô gõ), sect-vault-minus, sect-vault-plus -->
+              <div id="sect-vault-qty-box" class="sect-vault-qty" hidden></div>
               <button type="button" id="sect-vault-act" class="sect-primary-btn" disabled>
                 Chọn món
               </button>
@@ -2014,10 +2319,101 @@
       <!-- Màn hình chuyển cảnh bản đồ -->
       <div id="transition-overlay" class="transition-overlay" hidden>
         <div class="transition-content">
+          <img
+            id="transition-card"
+            class="transition-card"
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable="false"
+            hidden
+          />
           <div id="transition-map-name" class="transition-map-name">Hắc Phong Cốc</div>
           <div class="transition-sub">Đang tiến nhập...</div>
         </div>
       </div>
+
+      <!-- Gặp chặn đường (mục 52, CD7): hộp thoại Chiến / Bỏ chạy. KHÔNG đóng bằng Esc hay bấm nền; chỉ ba nút (hoặc hết giờ = Chiến do máy chủ quyết) -->
+      <section
+        id="ambush-modal"
+        class="ambush-modal"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Chặn đường"
+        tabindex="-1"
+      >
+        <div class="ambush-box">
+          <h2 id="ambush-title" class="ambush-title">Chặn đường!</h2>
+          <p id="ambush-foe" class="ambush-foe"></p>
+          <p id="ambush-danger" class="ambush-danger" hidden>NGUY HIỂM</p>
+          <p id="ambush-scene" class="ambush-scene"></p>
+          <div class="ambush-timer" aria-hidden="true">
+            <span id="ambush-countdown" class="ambush-countdown"></span>
+            <span class="ambush-bar"><i id="ambush-bar-fill"></i></span>
+          </div>
+          <button
+            id="ambush-fight"
+            type="button"
+            class="ambush-btn ambush-fight"
+            data-choice="fight"
+          >
+            <b class="ab-label"></b><span class="ab-sub"></span>
+          </button>
+          <p id="ambush-death-note" class="ambush-death-note"></p>
+          <p class="ambush-or" aria-hidden="true">hoặc bỏ chạy, mất:</p>
+          <div class="ambush-flee">
+            <button id="ambush-flee-coin" type="button" class="ambush-btn" data-choice="flee_coin">
+              <b class="ab-label"></b><span class="ab-sub"></span>
+            </button>
+            <button id="ambush-flee-exp" type="button" class="ambush-btn" data-choice="flee_exp">
+              <b class="ab-label"></b><span class="ab-sub"></span>
+            </button>
+          </div>
+          <p id="ambush-note" class="ambush-note" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <!-- Đấu trường gặp chặn đường (mục 52, CD7 bước 3): đồng hồ + nút Bỏ chạy (mở bảng xác nhận), thẻ kết quả -->
+      <section id="ambush-hud" class="ambush-hud" hidden aria-label="Đấu trường chặn đường">
+        <span class="ahud-title">Chặn đường</span>
+        <span id="ahud-clock" class="ahud-clock" aria-hidden="true">02:00</span>
+        <button id="ahud-flee" type="button" class="ahud-flee">Bỏ chạy</button>
+        <p id="ahud-note" class="ahud-note" role="status" aria-live="polite"></p>
+        <span id="ahud-flee-bar" class="ahud-flee-bar" hidden aria-hidden="true"
+          ><i id="ahud-flee-fill"></i
+        ></span>
+      </section>
+      <section
+        id="ambush-flee-modal"
+        class="ambush-modal ambush-sheet"
+        hidden
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Bỏ chạy giữa trận"
+        tabindex="-1"
+      >
+        <div class="ambush-box">
+          <h2 class="ambush-title">Bỏ chạy?</h2>
+          <p id="aflee-text" class="ambush-scene"></p>
+          <div class="ambush-flee">
+            <button id="aflee-coin" type="button" class="ambush-btn" data-choice="flee_coin">
+              <b class="ab-label"></b><span class="ab-sub"></span>
+            </button>
+            <button id="aflee-exp" type="button" class="ambush-btn" data-choice="flee_exp">
+              <b class="ab-label"></b><span class="ab-sub"></span>
+            </button>
+          </div>
+          <button id="aflee-cancel" type="button" class="ambush-btn ambush-stay">
+            <b class="ab-label">Ở lại đánh</b>
+          </button>
+          <p id="aflee-note" class="ambush-note" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+      <section id="ambush-result" class="ambush-result" hidden role="status" aria-live="polite">
+        <h2 id="ar-title" class="ar-title"></h2>
+        <ul id="ar-lines" class="ar-lines"></ul>
+      </section>
 
       <!-- Màn hình Hoàng Tuyền · Bến Vong Xuyên (Luân hồi M3.2) -->
       <section

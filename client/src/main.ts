@@ -1,4 +1,4 @@
-import Phaser from "phaser";
+import { installMockAmbush, isMockAmbushEnabled, mockAmbushOutcome } from "./ambush-mock";
 import { Client, type Room } from "colyseus.js";
 import {
   DEFAULT_MAP_ID,
@@ -15,6 +15,9 @@ import {
   RECIPES,
   SHOPS,
   sampleSectHall,
+  sampleBoards,
+  sampleWorldBossEvent,
+  sampleAchievements,
   SKILLS_M7,
   getMap,
   isDungeonMap,
@@ -22,8 +25,12 @@ import {
   type LimboMsg,
   type SkillsMsg,
 } from "@tien-gioi/shared";
-import { WorldScene } from "./scenes/WorldScene";
+import type { WorldScene } from "./scenes/WorldScene";
+import { loadGameModules, prefetchGameModulesWhenIdle } from "./game-modules";
 import { ui } from "./ui";
+import { setBossCardOverride } from "./boss-card";
+import { setMapCardOverride } from "./map-card";
+import { setNpcPortraitOverride } from "./npc-portrait";
 import {
   buildMockThuMonDialog,
   dungeonFallenDeathText,
@@ -46,6 +53,7 @@ import { mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
 import { parseMockStatus } from "./status-badges";
 import { questKind } from "./quest-log";
 import { captureEarlyMessages } from "./early-messages";
+import { dispatchMockMessage } from "./mock-dispatch";
 import { joinWithRedirect, isClientOutdatedError } from "./connection";
 import { clearToken, getToken } from "./auth";
 import { initAuthUi, switchAuthView } from "./auth-ui";
@@ -142,9 +150,7 @@ function createMockDungeonRoom(
       };
     },
     // Giả lập máy chủ gửi tin `type` tới handler đã đăng ký của cảnh (script kiểm ở chế độ ?debug dùng để thử đúng đường tin nhắn, không gọi thẳng hàm)
-    emit: (type: string, msg: unknown) => {
-      for (const fn of handlers.get(type) ?? []) fn(msg);
-    },
+    emit: (type: string, msg: unknown) => dispatchMockMessage(handlers, type, msg),
     // Máy chủ thật gọi lại ngay khi có state: cảnh lấy vị trí người chơi làm gốc (reconcile). Mock chỉ làm vậy khi `syncState` (xem mockSyncsState)
     onStateChange: (fn: () => void) => {
       if (syncState) setTimeout(fn, 0);
@@ -160,7 +166,7 @@ function createMockDungeonRoom(
           [
             "mock-session-01",
             {
-              name: "Trương Tiểu Phàm",
+              name: "Tô Vân Hạc",
               realm,
               tier: 8,
               hp: dead ? 0 : 2500,
@@ -410,6 +416,9 @@ initAuthUi({
   },
 });
 
+// Màn đăng nhập đã dựng xong: tải sẵn Phaser + cảnh thế giới lúc rảnh để bấm Vào không phải chờ (#1097)
+prefetchGameModulesWhenIdle();
+
 // Giả lập hiển thị modal phiên bản quá cũ khi có cờ ?outdated=N (phục vụ kiểm thử và nghiệm thu giao diện, M4 2.5)
 if (
   typeof window !== "undefined" &&
@@ -431,6 +440,7 @@ if (
     isMockDuelEnabled() ||
     isMockSectEnabled() ||
     isMockSkillsEnabled() ||
+    isMockAmbushEnabled() ||
     new URLSearchParams(location.search).has("crowd"))
 ) {
   const isFallen = isMockDungeonFallen();
@@ -444,8 +454,19 @@ if (
     isMockSkillsEnabled() ? mockRealm(location.search, mockSkillCount(location.search)) : 1,
   );
   if (isMockSkillsEnabled()) installMockSkills(mockRoom);
+  // `?ambush=mock`: máy chủ giả chạy trọn luồng chặn đường (hộp thoại -> đấu trường -> kết quả) qua `room.emit`, đi ĐÚNG đường nhận tin của cảnh
+  const ambushMock = isMockAmbushEnabled()
+    ? installMockAmbush(mockRoom, {
+        onTravel: () => ui.hideAmbush(),
+        outcome: mockAmbushOutcome(),
+        // chết thật (`?ambush=mock&die=1`): màn Hoàng Tuyền mẫu ngay sau `ambushEnd`, như tin `limbo` của máy chủ thật
+        onDied: () => (window as any).__debugLimbo?.(),
+      })
+    : null;
+  if (ambushMock) (window as any).__ambushMock = ambushMock;
   start(mockRoom, startMapId)
     .then(() => {
+      if (ambushMock) setTimeout(() => ambushMock.begin(), 600);
       if (isFallen) {
         setTimeout(() => {
           (window as any).__mockDungeon?.showFallen?.();
@@ -600,7 +621,9 @@ function setupRoomLifecycle(room: Room) {
     isTraveling = true;
     stopLiveness();
     activeScene?.setReconnecting(true);
-    ui.showTransition(targetMap.def.name);
+    // chọn Chiến ở hộp thoại chặn đường: máy chủ KHÔNG gửi `ambushEnd` lúc bắt đầu trận, hộp thoại ("Đang xử lý…") còn mở tới lúc đổi phòng -> đóng ngay, không để nó đè lên màn chuyển cảnh và phòng mới
+    ui.hideAmbush();
+    ui.showTransition(targetMap.def.name, msg.mapId);
 
     try {
       // Chờ màn chuyển cảnh khép (mống mắt 400 ms, giảm chuyển động: mờ 300 ms); bấm / gõ phím thì bỏ qua (gfx/scene-transition.ts)
@@ -689,11 +712,24 @@ function setupRoomLifecycle(room: Room) {
 
 async function start(room: Room, mapId: string) {
   captureEarlyMessages(room); // trước mọi await: tin lúc vào phòng tới trước khi cảnh đăng ký handler
+  // Phaser + WorldScene ở chunk riêng (#1097): thường đã được tải sẵn lúc người chơi còn ở màn đăng nhập; chưa thì tải song song với chờ phông. Lỗi tải gói thành `null` ngay
+  // (không để lời hứa bị từ chối khi chưa ai chờ) rồi báo bên dưới.
+  const modulesLoading = loadGameModules().then(
+    (m) => m,
+    () => null,
+  );
   // Chờ font tiếng Việt tải xong trước khi Phaser vẽ Text lên canvas lần đầu
   await Promise.race([
     document.fonts.load('16px "Noto Serif"', "Tiếng Việt"),
     new Promise((r) => setTimeout(r, 3000)),
   ]);
+  const modules = await modulesLoading;
+  if (!modules) {
+    // mất mạng / gói trò chơi không tải được: rời phòng vừa vào (không để nhân vật đứng ngoài đó) rồi báo người chơi bấm Vào lại
+    room.leave?.();
+    throw new Error("Không tải được gói trò chơi. Kiểm tra mạng rồi bấm Vào lại.");
+  }
+  const { Phaser, WorldScene } = modules;
   ui.show();
   ui.setCurrentMapId(mapId);
   const currentMap = getMap(mapId) || getMap(DEFAULT_MAP_ID)!;
@@ -705,12 +741,24 @@ async function start(room: Room, mapId: string) {
     (import.meta.env.DEV || new URLSearchParams(location.search).has("debug"))
   ) {
     (window as any).__ui = ui;
+    // Cho `check-map-card.mjs`: thử thẻ minh hoạ của màn chuyển cảnh với ảnh thế chỗ (bản chạy thật không có mục ghi đè)
+    (window as any).__mapCardOverride = setMapCardOverride;
+    // Cho `check-boss-card.mjs`: thử thẻ trùm trên thanh máu với gói giả (bản chạy thật không có mục ghi đè)
+    (window as any).__bossCardOverride = setBossCardOverride;
+    // Cho `check-npc-portrait.mjs`: thử chân dung NPC ở hộp thoại với gói giả (bản chạy thật không có mục ghi đè)
+    (window as any).__npcPortraitOverride = setNpcPortraitOverride;
     // Cho `check-quest-log.mjs` (#409): id mọi nhiệm vụ chính tuyến / lặp THẬT của game để nạp vào sổ nhiệm vụ
     // Cho `check-forge-shop.mjs` (#409): công thức rèn + cửa hàng THẬT của game (nguyên liệu, phí) để nạp túi / ví đúng ca "đủ" / "thiếu"
     // Cho `check-craft-ui.mjs` (#769): đối tượng dữ liệu DÙNG CHUNG để script chèn NPC / đan / công thức THỬ (nghề nhỏ chưa có dữ liệu thật: D làm ở #763) rồi dọn
     (window as any).__craftData = { NPC_BY_ID, ITEM_BY_ID, RECIPES };
     // Cho `check-sect-hall.mjs` (M8.6, #843): ảnh chụp "Nội vụ" MẪU khớp kiểu thật (`sampleSectHall` của `shared/`) để nạp vào bảng Tông môn
     (window as any).__sampleSectHall = sampleSectHall;
+    // Cho `check-social-shell.mjs` (M9): tin MẪU khớp kiểu thật (`shared/src/social.ts`) để nạp vào bảng Xã hội khi chưa có máy chủ M9
+    (window as any).__sample = {
+      boards: sampleBoards,
+      worldBoss: sampleWorldBossEvent,
+      achievements: sampleAchievements,
+    };
     (window as any).__catalog = () => ({
       recipes: RECIPES.map((r) => ({
         id: r.id,
@@ -773,7 +821,7 @@ async function start(room: Room, mapId: string) {
           buildMockThuMonDialog({
             canOpen: false,
             failReason: "member_low",
-            failWho: "Lâm Kinh Vũ",
+            failWho: "Mạc Khinh Trần",
           }),
         ),
       showInvite: () => ui.onDungeonInvite(MOCK_DUNGEON_SAMPLES.invite()),
@@ -817,14 +865,14 @@ async function start(room: Room, mapId: string) {
       },
     };
     (window as any).__mockDuel = {
-      showInvite: (from = "Diệp Phàm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
-      showCountdown: (opponent = "Diệp Phàm") =>
+      showInvite: (from = "Ngô Tử Khiêm") => ui.onDuelInvited(MOCK_DUEL_SAMPLES.invited(from)),
+      showCountdown: (opponent = "Ngô Tử Khiêm") =>
         ui.onDuelState(MOCK_DUEL_SAMPLES.stateCountdown(opponent)),
-      showFighting: (opponent = "Diệp Phàm") =>
+      showFighting: (opponent = "Ngô Tử Khiêm") =>
         ui.onDuelState(MOCK_DUEL_SAMPLES.stateFighting(opponent)),
       updateOpponentHp: (hp: number, maxHp: number) => ui.updateDuelOpponentHp(hp, maxHp),
-      showWon: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
-      showLost: (opponent = "Diệp Phàm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
+      showWon: (opponent = "Ngô Tử Khiêm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endWon(opponent)),
+      showLost: (opponent = "Ngô Tử Khiêm") => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endLost(opponent)),
       showDraw: () => ui.onDuelEnd(MOCK_DUEL_SAMPLES.endDraw()),
       hide: () => {
         ui.hideDuelHud();

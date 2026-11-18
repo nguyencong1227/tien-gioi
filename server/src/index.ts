@@ -5,18 +5,21 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { defineRooms, WorldRoom } from "./rooms/WorldRoom";
+import { defineRooms, ensureWorldBossRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
 import { portPolicy, startupWarnings } from "./startup";
 import { startAudit } from "./audit";
 import { minProtocolOf } from "./protocol";
 import { earnWarmupOf } from "./sect-config";
 import { testExpMultOf } from "./test-exp";
+import { LeaderboardService } from "./leaderboard";
 import { mountAuth } from "./auth-http";
 import { mountCors } from "./cors";
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 import { applyStaticHeaders } from "./static-headers";
+import { bossMovesNotice } from "./systems/boss-config";
+import { ambushNotice } from "./systems/ambush-config";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -25,6 +28,12 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 for (const w of startupWarnings(process.env)) console.warn(`[CẢNH BÁO] ${w}`);
 // Nhật ký kiểm toán (M4 2.4): một dòng JSON mỗi sự kiện nhạy cảm ra stdout; AUDIT_LOG=off tắt
 if (startAudit(process.env)) console.log("Nhật ký kiểm toán: bật (AUDIT_LOG=off để tắt)");
+// Bộ chiêu trùm (mục 42): in MỘT dòng khi BẬT để người vận hành kiểm được sau khi triển khai (`./prod.sh logs game | grep BOSS_MOVES`); tắt thì im như trước
+const bossNotice = bossMovesNotice(process.env);
+if (bossNotice) console.log(bossNotice);
+// Gặp chặn đường (mục 52): cũng in MỘT dòng khi BẬT (`grep AMBUSH`); tắt thì im
+const ambushMsg = ambushNotice(process.env);
+if (ambushMsg) console.log(ambushMsg);
 
 // Cổng 2567 chỉ của bản chạy thật: dev / test / bot dùng cổng riêng (portPolicy từ chối, thoát mã 1)
 const portCheck = portPolicy(process.env);
@@ -44,6 +53,23 @@ async function main() {
   WorldRoom.souls = stores.souls;
   WorldRoom.sects = new SectService(stores.sects); // tông môn cùng backend với nhân vật / chân linh (`SECTS=off` gỡ tính năng)
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
+  // Bảng xếp hạng (M9.3): làm mới mỗi 5 phút ngoài tick; `LEADERBOARD=off` gỡ. Chế độ tài khoản: đạo hiệu nằm ở tài khoản.
+  WorldRoom.achievements = process.env.ACHIEVEMENTS === "on"; // cấp thành tựu / Duyên / danh hiệu (M9.5): MẶC ĐỊNH TẮT cho tới khi M9 phát hành
+  // Trùm thế giới theo giờ (M9.4, `systems/world-boss.ts`): chỉ chạy khi `WORLD_BOSS_SCHEDULE` có khung giờ (dữ liệu của E, M9.10); `WORLD_BOSS=off` gỡ hẳn
+  WorldRoom.hub.worldBoss.enabled = process.env.WORLD_BOSS !== "off";
+  if (WorldRoom.hub.worldBoss.active)
+    console.log(`Trùm thế giới: bật (${WorldRoom.hub.worldBoss.slots.length} khung giờ mỗi ngày)`);
+  if (process.env.LEADERBOARD !== "off") {
+    const lb = new LeaderboardService({
+      souls: stores.souls,
+      players: stores.players,
+      sects: stores.sects,
+      accounts: process.env.AUTH_MODE === "account" ? stores.accounts : null,
+      testExp: () => WorldRoom.testExpMult,
+    });
+    WorldRoom.leaderboards = lb;
+    lb.start();
+  }
 
   const app = express();
   // CORS theo danh sách cho phép (CORS_ORIGINS, mặc định TẮT) cho /health và /api/*: gắn TRƯỚC mountAuth (app đóng gói khác nguồn)
@@ -95,6 +121,7 @@ async function main() {
     return stores.close();
   });
   await gameServer.listen(PORT);
+  await ensureWorldBossRooms(); // bản đồ có trùm theo giờ phải có phòng sẵn để sinh trùm (không đợi người vào lần đầu)
   console.log(`Tiên Giới server: http://localhost:${PORT}`);
 }
 

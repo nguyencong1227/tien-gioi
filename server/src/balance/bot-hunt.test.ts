@@ -104,7 +104,8 @@ describe("bot-hunt: mô phỏng bot THẬT Nguyên Anh (có độ trễ phản x
       });
       expect(summary.deathsTotal, `${mId} tinh anh solo`).toBe(0);
       expect(summary.killedAll, `${mId} tinh anh solo`).toBe(true);
-      expect(summary.lowestHpFrac).toBeLessThan(0.8); // đáy khí huyết không tụt quá sâu
+      // Đáy khí huyết: trước mục 30 < 0,8; máu quái x1,5 làm trận dài hơn nhưng bot né + đan vẫn sống 100% (đáy lên ~0,86 vì đan hồi nhiều lần): cận mới < 0,9 vẫn phát hiện bot không bao giờ bị đánh
+      expect(summary.lowestHpFrac).toBeLessThan(0.9);
     }
 
     // Độc Tước tinh anh (độc tầm xa dồn dập): solo tử vong kể cả mang 8 đan (do cd đan 12s)

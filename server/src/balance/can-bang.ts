@@ -24,7 +24,10 @@ import { renderNguyenAnhSau } from "./nguyen-anh-kinh-te";
 import { renderOwnerGearSensitivity } from "./do-o-rieng";
 import { renderTinhAnh } from "./tinh-anh";
 import { renderBotHuntSection } from "./bot-hunt";
+import { renderSectEconomy } from "./tong-mon";
+import { renderBossBalance } from "./trum";
 import { renderSkillBalanceMarkdown } from "./skills-model";
+import { renderSkillDpsMarkdown } from "./skills-dps";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
 import {
   ASSUME_DUNGEON,
@@ -97,7 +100,7 @@ const kdHours = (r: ReturnType<typeof simulate>) =>
 const summary = [
   `- Hết Luyện Khí (sẵn sàng Trúc Cơ): **${fmt(minutesToFinish(rows, 1))}** (mục tiêu ~1 giờ)`,
   `- Hết Trúc Cơ (sẵn sàng Kim Đan): **${fmt(minutesToFinish(rows, 2))}** (mục tiêu ~3 giờ)`,
-  `- Cả Kim Đan (sau nội dung M6, bảng ở mục "Kim Đan sau nội dung"): **${kdHours(kdDesigned).toFixed(1)} giờ** săn bãi mới, **${kdHours(kdOptimal).toFixed(1)} giờ** tối ưu (mục tiêu 5-7 giờ); kinh tế, trang bị và PK ở mục 6-8 của mục đó`,
+  `- Cả Kim Đan (sau nội dung M6, bảng ở mục "Kim Đan sau nội dung"): **${kdHours(kdDesigned).toFixed(1)} giờ** săn bãi mới, **${kdHours(kdOptimal).toFixed(1)} giờ** tối ưu (mục tiêu M6 5-7 giờ; QUYET_DINH_M3 mục 30 chủ ý rút còn ~4 giờ: tu vi x2, máu x1,5); kinh tế, trang bị và PK ở mục 6-8 của mục đó`,
 ].join("\n");
 
 // ---------- Kinh tế Linh thạch (#102) ----------
@@ -469,7 +472,13 @@ ${renderOwnerGearSensitivity()}
 ${renderTinhAnh()}
 ${renderBotHuntSection()}
 
-${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}`,
+${renderSectEconomy()}
+
+${renderBossBalance()}
+
+${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}
+
+${renderSkillDpsMarkdown()}`,
   );
   console.log(`Đã ghi ${out}\n\n${summary}`);
 }

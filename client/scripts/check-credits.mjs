@@ -18,6 +18,8 @@ import { Buffer } from "node:buffer";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promptViolations } from "./art/prompt-rules.mjs";
+import { parsePackDir } from "./build-packs.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -525,6 +527,32 @@ export function auditContentSources(
 /** Thư mục RIÊNG của ảnh AI trong gói phát hành, và thư mục tệp nguồn (mỗi ảnh một JSON cùng tên). */
 export const AI_ASSET_DIR = path.join(CLIENT_PUBLIC, "assets/ai");
 export const AI_SOURCE_DIR = path.resolve(ROOT_DIR, "docs/art/nguon");
+/** Thư mục gốc của các gói tải theo nhu cầu (`build-packs.mjs`); ảnh AI nằm trong các gói loại `art` (art-<tên> hoặc art/<tên>). */
+export const PACKS_DIR = path.join(CLIENT_PUBLIC, "packs");
+
+/**
+ * MỌI thư mục có thể chứa ảnh AI: `assets/ai` (tải ngay) và từng gói `art` (tải theo nhu cầu, docs/art/PHONG_CACH_MINH_HOA.md mục 4).
+ * Ảnh AI ở gói `art` chịu ĐÚNG luật như ảnh ở `assets/ai` (JSON nguồn, băm, siêu dữ liệu, dòng CREDITS, prompt): không có "cửa sau".
+ * @param {string} [packsDir]
+ * @param {string} [aiDir] thư mục `assets/ai` (mặc định của repo thật)
+ * @returns {string[]}
+ */
+export function aiAssetDirs(packsDir = PACKS_DIR, aiDir = AI_ASSET_DIR) {
+  const dirs = [aiDir];
+  if (fs.existsSync(packsDir)) {
+    for (const e of fs.readdirSync(packsDir, { withFileTypes: true })) {
+      if (!e.isDirectory() || e.name.startsWith(".")) continue;
+      if (e.name === "art") {
+        for (const sub of fs.readdirSync(path.join(packsDir, "art"), { withFileTypes: true }))
+          if (sub.isDirectory() && !sub.name.startsWith("."))
+            dirs.push(path.join(packsDir, "art", sub.name));
+      } else if (parsePackDir(e.name)?.kind === "art") {
+        dirs.push(path.join(packsDir, e.name));
+      }
+    }
+  }
+  return dirs.sort();
+}
 /** Định dạng ảnh AI được vào game: đã mã hoá lại sạch (WebP) hoặc PNG đã xoá khối văn bản. */
 export const AI_ALLOWED_EXT = new Set([".webp", ".png"]);
 /** Tiêu đề mục riêng của CREDITS.md cho ảnh AI (mục chứa dòng của từng ảnh). */
@@ -672,6 +700,8 @@ export function validateAiSource(j) {
   )
     bad.push("`workflow` phải có `path` và `sha256` (64 hex)");
   if (!str(j.prompt)) bad.push("thiếu `prompt`");
+  // Luật prompt của phong cách minh hoạ (docs/art/PHONG_CACH_MINH_HOA.md): từ cấm / bắt buộc, prompt âm đủ chữ-chữ ký-logo-CJK
+  else bad.push(...promptViolations(j.prompt, j.negativePrompt));
   if (typeof j.negativePrompt !== "string")
     bad.push("`negativePrompt` phải là chuỗi (có thể rỗng)");
   if (!(Number.isInteger(j.seed) || (typeof j.seed === "string" && /^-?\d+$/.test(j.seed))))
@@ -699,20 +729,40 @@ export function validateAiSource(j) {
 
 /**
  * Rà ảnh AI: nguồn (JSON cùng tên, băm khớp, dòng riêng ở CREDITS.md), siêu dữ liệu sạch, định dạng. Không có ảnh nào thì sạch (cũng báo JSON mồ côi).
- * @param {{ aiDir?: string, sourceDir?: string, creditsPath?: string, rootDir?: string }} [opts]
+ * @param {{ aiDir?: string, aiDirs?: string[], packsDir?: string, sourceDir?: string, creditsPath?: string, rootDir?: string }} [opts]
  * @returns {{ files: string[], sources: string[], errors: Array<{ kind: string, file: string, detail: string }> }}
  */
 export function auditAiImages(opts = {}) {
   const rootDir = opts.rootDir ?? ROOT_DIR;
-  const aiDir = opts.aiDir ?? AI_ASSET_DIR;
+  const aiDirs =
+    opts.aiDirs ??
+    (opts.aiDir
+      ? [opts.aiDir]
+      : aiAssetDirs(
+          opts.packsDir ?? path.join(rootDir, "client/public/packs"),
+          path.join(rootDir, "client/public/assets/ai"),
+        ));
   const sourceDir = opts.sourceDir ?? AI_SOURCE_DIR;
   const creditsPath = opts.creditsPath ?? CREDITS_FILE;
   const errors = [];
   const err = (kind, file, detail) => errors.push({ kind, file, detail });
   const rel = (abs) => path.relative(rootDir, abs).replace(/\\/g, "/");
-  const aiPrefix = `${rel(aiDir)}/`;
+  const aiPrefixes = aiDirs.map((d) => `${rel(d)}/`);
 
-  const files = scanFiles(aiDir, rootDir).sort();
+  const files = aiDirs.flatMap((d) => scanFiles(d, rootDir)).sort();
+  // JSON nguồn đặt theo TÊN ẢNH (không kèm thư mục): hai ảnh cùng tên ở hai thư mục (assets/ai và gói art, hoặc hai gói) sẽ chung một JSON
+  const byStem = new Map();
+  for (const f of files) {
+    const stem = path.posix.basename(f, path.posix.extname(f));
+    byStem.set(stem, [...(byStem.get(stem) ?? []), f]);
+  }
+  for (const [stem, list] of byStem)
+    if (list.length > 1)
+      err(
+        "dupName",
+        list[0],
+        `trùng tên ảnh "${stem}" ở ${list.join(", ")} (mỗi ảnh một JSON cùng tên)`,
+      );
   const jsonNames = fs.existsSync(sourceDir)
     ? fs
         .readdirSync(sourceDir, { withFileTypes: true })
@@ -761,8 +811,12 @@ export function auditAiImages(opts = {}) {
     for (const problem of validateAiSource(j)) err("schema", jsonRel, problem);
     const asset =
       typeof j?.asset === "string" ? path.posix.normalize(j.asset.replace(/\\/g, "/")) : "";
-    if (!asset.startsWith(aiPrefix) || asset.includes("..")) {
-      err("assetPath", jsonRel, `\`asset\` "${j?.asset}" phải nằm dưới ${aiPrefix}`);
+    if (!aiPrefixes.some((pre) => asset.startsWith(pre)) || asset.includes("..")) {
+      err(
+        "assetPath",
+        jsonRel,
+        `\`asset\` "${j?.asset}" phải nằm dưới ${aiPrefixes.join(" hoặc ")}`,
+      );
       continue;
     }
     const stem = path.posix.basename(asset, path.posix.extname(asset));
