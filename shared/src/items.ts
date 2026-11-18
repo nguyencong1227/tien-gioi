@@ -991,11 +991,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_tung_bo"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.018, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.012, min: 1, max: 1 },
-    // Kinh quyển 4 chiêu hệ Mộc cao cấp (CT7 #1052, Dev E): rơi hiếm từ Độc Tước (quái Mộc)
-    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.02, min: 1, max: 1 },
-    { itemId: bookIdOf("thiem_to_cong"), chance: 0.02, min: 1, max: 1 },
-    { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.02, min: 1, max: 1 },
-    { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.02, min: 1, max: 1 },
+    // Kinh quyển 4 chiêu hệ Mộc cao cấp (CT7 #1052, Dev E; A hạ 2 % -> 1,2 % theo mức 0,6-1,2 % của AGENTS.md): rơi hiếm từ Độc Tước (quái Mộc)
+    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("thiem_to_cong"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.012, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [
