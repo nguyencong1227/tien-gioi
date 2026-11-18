@@ -114,6 +114,12 @@ async function main() {
     if (!cond) throw new Error(msg);
   };
   const SECRET = "e2e_secret_chieu_moi_1111111";
+  /**
+   * Bậc chất lượng đồ hoạ GHIM cho kịch bản (mặc định "high"; `E2E_QUALITY=low` để tái hiện lỗi CI). Bậc "Tự động" chọn theo phần cứng: máy nhà có GPU thật -> high, còn runner CI
+   * (Chrome headless, SwiftShader phần mềm) -> low, mà bậc Thấp giảm số điểm hạt của tia sét (`planChainFx`: `emitterBudget` nhỏ) nên ca "chain vẽ >= n - 1 điểm hạt" đỏ
+   * trên CI (nightly thủ công trên main 18/11, cả hai lần thử) dù xanh trên máy nhà.
+   */
+  const QUALITY = process.env.E2E_QUALITY ?? "high";
   const NAME = "Chieu Moi Mot";
 
   try {
@@ -174,7 +180,7 @@ async function main() {
 
     // Đăng nhập bằng form thật
     await T.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
+      source: `localStorage.setItem("tg_newbie_guide_dismissed", "1"); localStorage.setItem("tg_quality", ${JSON.stringify(QUALITY)}); localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
     });
     await T.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug=1` });
     await T.waitFor(
