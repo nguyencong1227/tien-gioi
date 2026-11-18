@@ -1361,7 +1361,7 @@ export class WorldRoom extends Room<WorldState> {
     if (!p || !c) return;
     if (!c.limbo) {
       this.rebirthFail(sid, "no_limbo");
-      this.world.events.toast(sid, { text: "Ngươi chưa ở Hoàng Tuyền.", tone: "info" });
+      this.world.events.toast(sid, { text: "Ngươi chưa ở Hoàng Tuyền.", tone: "bad" }); // tone bad: client (màn Hoàng Tuyền) coi là LỜI TỪ CHỐI và hiện lý do bền
       return;
     }
     if (this.rebirthing.has(sid)) return; // đang ghi chân linh (khắc chiêu): tin `rebirth` thứ hai bị bỏ, không đầu thai hai lần
