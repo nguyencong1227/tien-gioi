@@ -39,6 +39,7 @@
     "e2e:chieu-moi": "tsx scripts/e2e-chieu-moi.ts",
     "e2e:chieu-dau": "tsx scripts/e2e-chieu-dau.ts",
     "e2e:chieu-vo-sac": "tsx scripts/e2e-chieu-vo-sac.ts",
+    "e2e:dau-thai-moi": "tsx scripts/e2e-dau-thai-moi.ts",
     "e2e:nguoi-moi": "tsx scripts/e2e-nguoi-moi.ts",
     "e2e:kiep-moi": "tsx scripts/e2e-kiep-moi.ts",
     "e2e:doc-duoc": "tsx scripts/e2e-doc-duoc.ts",
