@@ -258,6 +258,7 @@ import {
   toggleEngrave,
   ENGRAVE_CHECKED_BG,
 } from "./engrave";
+import { isRebirthRefusal, safeRebirthChoice } from "./rebirth-choice";
 import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from "./prompts";
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
@@ -3638,6 +3639,28 @@ let selectedEngrave: string[] | null = null;
 let rebirthBusy = false;
 let rebirthBusyTimer: ReturnType<typeof setTimeout> | null = null;
 const REBIRTH_BUSY_MS = 3000;
+
+/**
+ * Dòng trạng thái ngay trên nút "Đầu thai" (lỗi gấp mục 58): hiện phần bị bỏ khỏi lựa chọn, "đang chờ", và LÝ DO khi máy chủ từ chối; ở lại tới lần bấm kế
+ * (toast chỉ 3 giây nên người chơi chưa kịp đọc đã thấy "tắt luôn"). `kind` "bad" = tô đỏ.
+ */
+function setLimboRebirthStatus(text: string | null, kind: "info" | "bad" = "info") {
+  const el = document.getElementById("limbo-rebirth-status");
+  if (!el) return;
+  el.hidden = text === null || text === "";
+  el.textContent = text ?? "";
+  el.classList.toggle("bad", kind === "bad");
+}
+
+/** Máy chủ chưa đầu thai được (toast từ chối / hết giờ chờ): mở khoá nút, ở lại Hoàng Tuyền, hiện lý do. */
+function limboRebirthFailed(reason: string) {
+  if (!activeLimboMsg || !rebirthBusy) return;
+  rebirthBusy = false;
+  if (rebirthBusyTimer) clearTimeout(rebirthBusyTimer);
+  rebirthBusyTimer = null;
+  document.getElementById("limbo-btn-rebirth")?.removeAttribute("aria-disabled");
+  setLimboRebirthStatus(`Chưa đầu thai được: ${reason}`, "bad");
+}
 let limboBuyCb: ((id: string) => void) | null = null;
 let limboRebirthCb: ((choice: RebirthChoice) => void) | null = null;
 
@@ -6804,6 +6827,8 @@ export const ui = {
     // đang chờ máy chủ trả lời thao tác kho đồ mà có toast tới: coi là lời từ chối / báo (`sectFailMessage`), mở khoá nút (ảnh chụp kho mới tới riêng)
     if (vaultBusy) endVaultBusy();
     if (hallBusy.size) endHallBusy(); // thao tác Nội vụ có toast trả lời (kết quả / từ chối): mở khoá nút
+    // đang chờ máy chủ trả lời "đầu thai" mà có toast TỪ CHỐI tới (`isRebirthRefusal`): là lời từ chối (lựa chọn không hợp lệ, chưa ghi sổ...): giữ lý do trên màn Hoàng Tuyền
+    if (rebirthBusy && activeLimboMsg && isRebirthRefusal(m)) limboRebirthFailed(m.text);
     const p = document.createElement("p");
     p.className = m.tone ?? "info";
     p.textContent = m.text;
@@ -6903,6 +6928,7 @@ export const ui = {
     rebirthBusy = false;
     if (rebirthBusyTimer) clearTimeout(rebirthBusyTimer);
     rebirthBusyTimer = null;
+    setLimboRebirthStatus(null);
     limboBuyCb = callbacks?.onBuy ?? null;
     limboRebirthCb = callbacks?.onRebirth ?? null;
 
@@ -6930,17 +6956,25 @@ export const ui = {
         if (rebirthBusy) return; // đã gửi, đang chờ máy chủ: máy chủ cũng bỏ tin `rebirth` thứ hai
         if (ghostClick(e)) return; // click ma sau khi đóng hộp xác nhận (cảm ứng)
         const soul = activeSoulView;
-        const choice: RebirthChoice = { origin: selectedOrigin, keep: selectedRelics };
         // `engrave` CHỈ khi người chơi đã đổi tập chiêu khắc (vắng = giữ nguyên chiêu đã khắc); kẹp lại theo danh sách / nấc hiện hành
+        let engraveWish: string[] | undefined;
         if (soul && activeLimboMsg) {
           const cap = engraveSlotsOf(soul.unlocks);
           const sel =
             selectedEngrave === null
               ? null
               : clampEngrave(selectedEngrave, activeLimboMsg.engravable, cap);
-          const engrave = engraveToSend(soul.engraved, sel);
-          if (engrave !== undefined) choice.engrave = engrave;
+          engraveWish = engraveToSend(soul.engraved, sel);
         }
+        // CHỈ GỬI phần máy chủ chấp nhận (lỗi gấp mục 58: một chỗ sai là máy chủ từ chối cả yêu cầu, người chơi kẹt): bỏ phần vượt ô / không có rồi báo
+        const { choice, dropped } = safeRebirthChoice(soul, activeLimboMsg, {
+          origin: selectedOrigin,
+          keep: selectedRelics,
+          engrave: engraveWish,
+        });
+        setLimboRebirthStatus(
+          dropped.length > 0 ? `Đã bỏ khỏi lựa chọn (không hợp lệ): ${dropped.join("; ")}.` : null,
+        );
         // Tóm tắt trước khi đầu thai (issue #779): xuất thân, số di vật giữ, số chiêu khắc. Đường DUY NHẤT ra khỏi Hoàng Tuyền nên chỉ để bắt lỗi chọn nhầm ("Xem lại" quay về màn chọn)
         const originName = ORIGINS.find((o) => o.id === choice.origin)?.name ?? choice.origin;
         const engraveCount = (choice.engrave ?? soul?.engraved ?? []).length;
@@ -6951,7 +6985,10 @@ export const ui = {
             rebirthBusy = true;
             rebirthBtn.setAttribute("aria-disabled", "true");
             // máy chủ từ chối (toast, vẫn ở Hoàng Tuyền) thì cho bấm lại sau một lát
+            if (dropped.length === 0) setLimboRebirthStatus("Đang uống canh Mạnh Bà...");
+            // máy chủ im lặng (không đầu thai, không toast): cho bấm lại và nói rõ, KHÔNG để người chơi nhìn nút khoá không lý do
             rebirthBusyTimer = setTimeout(() => {
+              limboRebirthFailed("máy chủ chưa phản hồi, bấm lại để thử.");
               rebirthBusy = false;
               rebirthBusyTimer = null;
               rebirthBtn.removeAttribute("aria-disabled");
@@ -6984,6 +7021,7 @@ export const ui = {
     rebirthBusy = false;
     if (rebirthBusyTimer) clearTimeout(rebirthBusyTimer);
     rebirthBusyTimer = null;
+    setLimboRebirthStatus(null);
     const overlay = $("limbo-overlay");
     if (overlay) overlay.hidden = true;
     document.body.classList.remove("in-limbo");
