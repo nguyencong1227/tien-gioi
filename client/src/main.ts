@@ -810,7 +810,8 @@ async function start(room: Room, mapId: string) {
         onRebirth: (choice) => {
           // script kiểm đọc đúng tin sẽ gửi (`engrave` vắng = giữ nguyên chiêu đã khắc)
           (window.__rebirthChoices ??= []).push(choice);
-          ui.showReborn(mock.summary.kiep + 1);
+          // `__rebirthNoReply`: giả máy chủ KHÔNG trả lời (mạng chập chờn) để kiểm dòng lý do trong màn Hoàng Tuyền (check-limbo-confirm bước 8)
+          if (!(window as any).__rebirthNoReply) ui.showReborn(mock.summary.kiep + 1);
         },
       });
     };

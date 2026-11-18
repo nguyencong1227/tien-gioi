@@ -4755,6 +4755,22 @@ body.in-limbo #chat-log {
   margin-top: 18px;
 }
 
+/* Lý do đầu thai chưa xong (mục 58): nằm ngay trong màn, không như toast 3 giây rồi tắt */
+.limbo-rebirth-msg {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: rgba(127, 29, 29, 0.35);
+  color: #fee2e2;
+  font-size: var(--fs-13);
+  line-height: 1.45;
+}
+
+.limbo-rebirth-msg[hidden] {
+  display: none;
+}
+
 .limbo-btn-rebirth {
   width: 100%;
   min-height: 48px;

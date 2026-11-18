@@ -445,6 +445,71 @@ async function main() {
       await evalJs(`window.__ui.hideLimbo(); 1`);
       await sleep(200);
       check(!(await box()).open, "hideLimbo: hộp xác nhận cũng đóng");
+
+      console.log(
+        "  [8] đầu thai chưa xong (QUYET_DINH_M3 mục 58): lý do hiện NGAY TRONG màn Hoàng Tuyền (không chỉ toast 3 giây), nút bấm lại được, màn KHÔNG tự đóng",
+      );
+      const msgState = () =>
+        evalJs(`(() => {
+          const m = document.getElementById("limbo-rebirth-msg");
+          const b = document.getElementById("limbo-btn-rebirth");
+          return { shown: !!m && !m.hidden, text: m ? m.textContent : "", locked: b.getAttribute("aria-disabled") === "true" };
+        })()`);
+      const confirmRebirth = async () => {
+        b = await center("#limbo-btn-rebirth");
+        await tap(b.x, b.y);
+        await sleep(700);
+        const y = await center("#act-btn-yes");
+        await tap(y.x, y.y);
+        await sleep(300);
+      };
+      await evalJs(`window.__rebirthNoReply = true; 1`); // mock không đầu thai ngay: giữ trạng thái "đã gửi, chờ máy chủ"
+      // (a) máy chủ trả lời bằng toast (từ chối / báo phần bỏ): hiện bền trong màn + mở khoá nút
+      await openLimbo();
+      check(!(await msgState()).shown, "mở màn: chưa có dòng lý do");
+      await confirmRebirth();
+      check((await msgState()).locked, "vừa gửi: nút khoá, chờ máy chủ");
+      await evalJs(`window.__ui.toast({ text: "Ngươi chưa ở Hoàng Tuyền.", tone: "info" }); 1`);
+      await sleep(100);
+      let ms = await msgState();
+      check(
+        ms.shown && ms.text === "Ngươi chưa ở Hoàng Tuyền." && !ms.locked && (await limboOpen()),
+        `toast của máy chủ hiện bền trong màn, nút mở khoá, màn còn mở (${JSON.stringify(ms)})`,
+      );
+      await sleep(3300); // toast đã tắt sau 3 giây, dòng lý do VẪN còn
+      ms = await msgState();
+      check(
+        ms.shown && ms.text === "Ngươi chưa ở Hoàng Tuyền.",
+        "toast đã tắt mà dòng lý do vẫn còn",
+      );
+      await shot("hoang-tuyen-ly-do");
+      // (b) máy chủ im lặng (mạng chập chờn, tin lạc): sau 4 giây báo rõ và cho bấm lại
+      await openLimbo();
+      check(!(await msgState()).shown, "mở lại màn: dòng lý do cũ đã xoá");
+      await confirmRebirth();
+      await sleep(4500);
+      ms = await msgState();
+      check(
+        ms.shown && /Chưa nhận được phản hồi/.test(ms.text) && !ms.locked && (await limboOpen()),
+        `im lặng quá 4 giây: báo rõ + mở khoá + màn còn mở (${JSON.stringify(ms)})`,
+      );
+      b = await center("#limbo-btn-rebirth");
+      await tap(b.x, b.y);
+      await sleep(300);
+      check(
+        (await box()).open && (await msgState()).shown,
+        "bấm lại: hộp xác nhận mở, dòng lý do vẫn còn trong lúc người chơi cân nhắc",
+      );
+      await sleep(400);
+      const yes8 = await center("#act-btn-yes");
+      await tap(yes8.x, yes8.y);
+      await sleep(300);
+      ms = await msgState();
+      check(
+        !ms.shown && ms.locked,
+        `xác nhận gửi lại: dòng lý do cũ ẩn, nút khoá chờ máy chủ (${JSON.stringify(ms)})`,
+      );
+      await evalJs(`window.__rebirthNoReply = false; 1`);
     }
   } finally {
     try {
