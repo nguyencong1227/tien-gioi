@@ -82,7 +82,6 @@ import {
   originMult,
   engraveSlotsOf,
   soulView,
-  validateRebirth,
   DEFAULT_MAP,
   cleanName,
   sanitizeSkillBook,
@@ -188,6 +187,7 @@ import {
   type Run,
 } from "../systems/dungeon";
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
+import { lenientRebirth } from "../systems/rebirth-choice";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
@@ -254,6 +254,8 @@ export class WorldRoom extends Room<WorldState> {
   static players: PlayerStore | null = null; // null: `defaultPlayerStore()` (file JSON)
   /** Người đang ghi chân linh lúc đầu thai (khắc chiêu): chặn tin `rebirth` thứ hai chen vào giữa lúc chờ ghi */
   private readonly rebirthing = new Set<string>();
+  /** Lý do `rebirth` thất bại đã ghi nhật ký cho từng người (mỗi lý do một lần: tin lặp không làm phình nhật ký) */
+  private readonly rebirthFailLogged = new WeakMap<PlayerCtrl, Set<string>>();
   static souls: SoulStore | null = null; // null: `defaultSoulStore()` (dựng lười, đọc DATA_DIR lúc dùng)
   /**
    * Dịch vụ tài khoản khi chạy `AUTH_MODE=account` (đặt ở `index.ts`): vào phòng bằng `JoinOptions.token`, BỎ QUA `name` /
@@ -1336,24 +1338,43 @@ export class WorldRoom extends Room<WorldState> {
     }
   }
 
-  /** `rebirth`: đầu thai (chỉ ở Hoàng Tuyền, sau khi đã cộng Duyên): kiểm lựa chọn, dựng kiếp mới, lưu. Phòng khác Lạc Hà thì đưa về Lạc Hà. */
+  /** Ghi nhật ký lý do một tin `rebirth` không đầu thai được (mục 58: lần trước KHÔNG có dấu vết nào nên không biết vì sao người chơi kẹt). Mỗi lý do một lần mỗi người. */
+  private rebirthFail(sid: string, reason: string) {
+    const p = this.state.players.get(sid);
+    const c = this.world.ctrl.get(sid);
+    if (!c) return;
+    let seen = this.rebirthFailLogged.get(c);
+    if (!seen) this.rebirthFailLogged.set(c, (seen = new Set()));
+    if (seen.has(reason)) return;
+    seen.add(reason);
+    audit("soul.rebirth_fail", { name: p?.name ?? sid, reason, map: this.mapId });
+  }
+
+  /**
+   * `rebirth`: đầu thai (chỉ ở Hoàng Tuyền): dựng kiếp mới, lưu. Phòng khác Lạc Hà thì đưa về Lạc Hà.
+   * KHOAN DUNG (mục 58): lựa chọn sai / vượt ô chỉ bị BỎ phần sai (kèm toast báo), không bao giờ từ chối cả yêu cầu.
+   * Mọi nhánh không đầu thai được đều trả lời người chơi (toast) và ghi `soul.rebirth_fail`.
+   */
   private async rebirth(sid: string, msg: unknown) {
     const p = this.state.players.get(sid);
     const c = this.world.ctrl.get(sid);
-    if (!p || !c?.limbo) return;
+    if (!p || !c) return;
+    if (!c.limbo) {
+      this.rebirthFail(sid, "no_limbo");
+      this.world.events.toast(sid, { text: "Ngươi chưa ở Hoàng Tuyền.", tone: "bad" }); // tone bad: client (màn Hoàng Tuyền) coi là LỜI TỪ CHỐI và hiện lý do bền
+      return;
+    }
+    if (this.rebirthing.has(sid)) return; // đang ghi chân linh (khắc chiêu): tin `rebirth` thứ hai bị bỏ, không đầu thai hai lần
     if (!c.limbo.credited) {
+      // Duyên chưa vào sổ (lần cộng trước lỗi, `resumeLimbo` đang thử lại mỗi 3 giây; client chỉ hiện màn Hoàng Tuyền SAU khi đã cộng nên tin này là bất thường)
+      this.rebirthFail(sid, "not_credited");
       this.world.events.toast(sid, {
         text: "Linh hồn chưa kịp ghi sổ, chờ một lát.",
         tone: "info",
       });
       return;
     }
-    if (this.rebirthing.has(sid)) return; // đang ghi chân linh (khắc chiêu): tin `rebirth` thứ hai bị bỏ, không đầu thai hai lần
-    const choice = validateRebirth(c.soul, msg, c.limbo.keepable, c.limbo.engravable);
-    if (!choice) {
-      this.world.events.toast(sid, { text: "Lựa chọn đầu thai không hợp lệ.", tone: "bad" });
-      return;
-    }
+    const { choice, notes } = lenientRebirth(c.soul, msg, c.limbo.keepable, c.limbo.engravable);
     if (choice.engrave !== undefined) {
       // Khắc chiêu: GHI chân linh TRƯỚC (kiếp mới dựng từ `Soul.engraved`). Sập giữa chừng thì còn ở Hoàng Tuyền với chân linh đã khắc và đầu thai lại được.
       const engrave = choice.engrave;
@@ -1365,6 +1386,7 @@ export class WorldRoom extends Room<WorldState> {
         }));
       } catch (e) {
         console.error("[luân hồi] khắc chân linh thất bại", e);
+        this.rebirthFail(sid, "engrave_write_failed");
         this.world.events.toast(sid, {
           text: "Chưa khắc được chân linh, thử lại sau.",
           tone: "bad",
@@ -1377,6 +1399,10 @@ export class WorldRoom extends Room<WorldState> {
       if (this.world.ctrl.get(sid) !== c || !c.limbo || !this.state.players.get(sid)) return;
     }
     applyRebirth(this.world, sid, p, c, choice); // đồng bộ: tin `rebirth` thứ hai thấy `c.limbo` đã xoá
+    if (notes.length > 0) {
+      audit("soul.rebirth_trim", { name: p.name, notes: notes.join("; "), map: this.mapId });
+      this.world.events.toast(sid, { text: `Đầu thai: ${notes.join("; ")}.`, tone: "info" });
+    }
     if (this.mapId !== DEFAULT_MAP_ID) {
       const spot = safeSpot(DEFAULT_MAP);
       await this.handOff(sid, { mapId: DEFAULT_MAP_ID, x: spot.x, y: spot.y });

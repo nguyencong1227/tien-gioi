@@ -76,6 +76,9 @@ function parseCliArgs(args: string[]): E2eArgs {
 }
 
 /** Gieo dữ liệu nhân vật và chân linh mẫu cho kịch bản E2E. */
+/** `E2E_LIMBO_MOI=1`: gieo nhân vật MỚI chết ngay (kiếp không tính) thay cho người đã tu tới Luyện Khí; kiếp mới vẫn là kiếp 1 (xem `seedTestData`) */
+const E2E_LIMBO_MOI = process.env.E2E_LIMBO_MOI === "1";
+
 function seedTestData(dataDir: string, scenario: "limbo" | "normal", name: string, secret: string) {
   const playersDir = dataDir;
   const soulsDir = path.join(dataDir, "souls");
@@ -85,7 +88,50 @@ function seedTestData(dataDir: string, scenario: "limbo" | "normal", name: strin
   const now = new Date().toISOString();
   const fileKey = sha1Nfc(name);
 
-  if (scenario === "limbo") {
+  if (scenario === "limbo" && E2E_LIMBO_MOI) {
+    // Nhân vật MỚI chết ngay (QUYET_DINH_M3 mục 58, `hanh` / `hanh1` ở bản thật v0.5.1): kiếp 1, Phàm Nhân, chưa chơi phút nào (kiếp không tính),
+    // Duyên đã cộng (0), chân linh trắng, không đồ để giữ, không chiêu để khắc
+    const player: SavedPlayer = {
+      name,
+      secretHash: hashSecret(secret),
+      realm: 0,
+      tier: 0,
+      exp: 0,
+      coin: 0,
+      mapId: DEFAULT_MAP_ID,
+      x: 2048,
+      y: 2048,
+      life: { playMs: 0, kills: 0, bossKills: 0 },
+      limbo: {
+        endedLifeId: "life-e2e-moi",
+        summary: { kiep: 1, realm: 0, tier: 0, minutes: 0, kills: 0, bossKills: 0, gain: 0 },
+        keepable: [],
+        engravable: [],
+        coinAtDeath: 0,
+        counts: false,
+        credited: true,
+      },
+      createdAt: now,
+      updatedAt: now,
+    };
+    writeFileSync(path.join(playersDir, `${fileKey}.json`), JSON.stringify(player, null, 2));
+    const soul: Soul = {
+      v: 1,
+      id: name.normalize("NFC").toLowerCase().trim(),
+      kiep: 1,
+      duyen: 0,
+      duyenTotal: 0,
+      unlocks: {},
+      origins: [],
+      engraved: [],
+      best: { step: 0, realm: 0, tier: 0 },
+      lastCreditedLife: "life-e2e-moi",
+      history: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    writeFileSync(path.join(soulsDir, `${fileKey}.json`), JSON.stringify(soul, null, 2));
+  } else if (scenario === "limbo") {
     const player: SavedPlayer = {
       name,
       secretHash: hashSecret(secret),
@@ -474,8 +520,9 @@ async function runE2e() {
         `document.getElementById('hud-kiep')?.textContent || '(chưa hiển thị)'`,
       );
       // Hạt giống: kiếp 1 vừa kết thúc, đã cộng Duyên -> kiếp mới là kiếp 2 (HUD phải ghi đúng, không chỉ "có gì đó")
-      if (!/2/.test(hudKiep))
-        throw new Error(`HUD kiếp mới phải ghi kiếp 2, thực tế: "${hudKiep}"`);
+      const kiepMoi = E2E_LIMBO_MOI ? /1/ : /2/; // kiếp không tính (nhân vật mới chết ngay) thì bộ đếm kiếp đứng yên
+      if (!kiepMoi.test(hudKiep))
+        throw new Error(`HUD kiếp mới phải khớp ${kiepMoi}, thực tế: "${hudKiep}"`);
       console.log(`  ✓ [5/5] Vào kiếp mới thành công! HUD hiển thị: ${hudKiep}`);
       await screenshot("4-new-life.png");
     } else {
