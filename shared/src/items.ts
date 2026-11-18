@@ -918,6 +918,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Trùm Trúc Cơ rơi kinh quyển chiêu cao cấp (M7.4): phần thưởng của việc hạ trùm
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.25, min: 1, max: 1 },
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.25, min: 1, max: 1 },
+    // Vô sắc Trúc Cơ, Huyền phẩm (CT8 lát 3, A): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ vì bí cảnh đòi thưởng >= 15 phút săn quái tốt nhất cùng bậc (`balance/dungeon.test.ts` đỏ ở 14,86 khi thêm 0,3 % x 2 vào Hắc Hổ)
+    { itemId: bookIdOf("su_tu_hong"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("cam_long_khau"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -947,6 +950,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("liet_diem_tran"), chance: 0.008, min: 1, max: 1 }, // vùng cháy Hỏa (CT9 lát 1)
     { itemId: bookIdOf("xich_tuoc_phu"), chance: 0.005, min: 1, max: 1 }, // phù Hỏa Kim Đan (CT8 lát 1)
+    { itemId: bookIdOf("hoa_huyet_phe_nguyen"), chance: 0.005, min: 1, max: 1 }, // vô sắc Kim Đan (CT8 lát 3)
   ],
   // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
   hac_giao: [
@@ -987,6 +991,7 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("van_thach_tran"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("van_hanh_bo"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("pha_son_nhat_kich"), chance: 0.006, min: 1, max: 1 }, // chiêu vận Thổ (CT9 lát 1)
+    { itemId: bookIdOf("long_tuong_ho_the"), chance: 0.006, min: 1, max: 1 }, // vô sắc hộ thể Nguyên Anh (CT8 lát 3)
   ],
   doc_tuoc: [
     { itemId: "doc_tuoc_nang", chance: 0.45, min: 1, max: 2 },
