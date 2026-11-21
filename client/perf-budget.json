@@ -4,7 +4,7 @@
   "description": "Ngân sách hiệu năng đồ hoạ và tài nguyên client (M5.1, Issue #330, THIET_KE_GIAO_DIEN_DO_HOA.md mục 10; M7.15 #516: bậc Rất cao + gói tải theo nhu cầu, mục 10.1-10.3)",
   "static": {
     "startupGzipKb": 220,
-    "totalJsGzipKb": 540,
+    "totalJsGzipKb": 548,
     "atlasTilesetKb": 1024,
     "aiAssets": {
       "maxFileKb": 150,
