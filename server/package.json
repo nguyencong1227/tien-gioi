@@ -18,6 +18,7 @@
     "e2e": "tsx scripts/e2e.ts",
     "e2e:tai-khoan": "tsx scripts/e2e-account.ts",
     "e2e:bi-canh": "tsx scripts/e2e-bi-canh.ts",
+    "e2e:chan-duong": "tsx scripts/e2e-chan-duong.ts",
     "e2e:pk": "tsx scripts/e2e-pk.ts",
     "e2e:tong-mon": "tsx scripts/e2e-tong-mon.ts",
     "e2e:xa-hoi": "tsx scripts/e2e-xa-hoi.ts",
