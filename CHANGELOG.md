@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.5.2
 
+### Giao diện
+- **Điều khoản sử dụng + bản quyền trong game; production không lộ source map (QUYET_DINH_M3 mục 59.1, chống sao chép / dùng ké; phần CLIENT) (B):** trang mới `terms.html` (cùng kiểu `privacy.html`: bản quyền thuộc chủ dự án, không được sao chép / phân phối; phần bên thứ ba giữ giấy phép riêng; được phép / không được phép; khoá tài khoản gian lận; liên hệ xin phép), dòng pháp lý (`#login-legal`) dưới MỌI màn đăng nhập / đăng ký và đoạn `#set-legal` ở Cài đặt (Giới thiệu và ghi công), liên kết sang `terms.html` + `privacy.html` (`rel=noopener`). Test `terms.test.ts` (đủ ý, không chỗ trống, liên kết ở cả hai nơi, đột biến) + `build-config.test.ts` (`build.sourcemap` tắt ở production; nếu có `client/dist` thì không có `.map` / `sourceMappingURL`). Đột biến thật: bật `sourcemap: true`, đổi liên kết màn đăng nhập, xoá câu bản quyền đều làm test đỏ. KHÔNG đổi giao thức / máy chủ (Origin, CSP, LICENSE gốc là phần của A). Câu chữ điều khoản mục 4 (khoá tài khoản, 'như hiện có') là bản nháp CHỜ người dùng duyệt.
+
 ### Công cụ và tài liệu
 - **`e2e:nhip-tim` in thêm chẩn đoán khi thất bại (QA v0.5.2 trên runner CI: ca 1 đỏ MỘT lần rồi đạt khi thử lại, `FLAKY`; chỉ test, KHÔNG đổi mã trò chơi) (B):** lần đỏ đó 'chip Mạng chậm' không hiện trong 12 s sau blackhole, nhưng log chỉ có dòng 'hết giờ chờ' nên không biết vì sao. Nay ca 1 đo độ đứng hình lớn nhất của luồng chính trong trang (`NetSlowDetector` bỏ mốc chờ khi hai lần `poll` cách nhau quá 2 s) và khi thất bại IN dòng `[LIVENESS]`: chip / banner, `pongSeen`, `waitingSince` / `lastPoll`, nhịp tim (`supported`, `pendingSince`, RTT), `stallMaxMs` và thời gian từ lúc bật blackhole. Kiểm: ép hết giờ 1 s thì dòng `[LIVENESS]` in đủ; chạy bình thường 7 ca đạt. Lần FLAKY kế tiếp sẽ tự giải thích (đứng hình luồng chính hay mốc chờ bị đặt lại).
 
