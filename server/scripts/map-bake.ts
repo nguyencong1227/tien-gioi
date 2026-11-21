@@ -10,7 +10,10 @@ import { GameMap, PROCEDURAL_MAPS, bakeTiledMap, formatTiledJson } from "@tien-g
 import { isHandEditedTiled } from "../src/systems/map-hand-edited";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const dir = path.resolve(here, "../../shared/maps");
+// `MAP_BAKE_DIR` chỉ để TEST chạy công cụ trên thư mục tạm (không dùng thật)
+const dir = process.env.MAP_BAKE_DIR
+  ? path.resolve(process.env.MAP_BAKE_DIR)
+  : path.resolve(here, "../../shared/maps");
 const check = process.argv.includes("--check");
 
 let bad = 0;
