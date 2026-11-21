@@ -199,6 +199,23 @@ export function privatePackViolations(m: unknown): string[] {
   return bad;
 }
 
+/**
+ * Manifest nhận từ mạng, CÓ KIỂU: hợp lệ (`privatePackViolations` rỗng) thì trả CHÍNH đối tượng đã kiểm, còn lại `null` (tất cả hoặc không gì: máy chủ đã lọc tệp thiếu nên manifest phục vụ luôn hợp lệ;
+ * thứ hỏng nghĩa là không đáng tin, coi như KHÔNG có gói). Client dùng hàm này thay vì ép kiểu `as PrivatePackManifest` (B, review #1262). Thuần.
+ */
+export function parsePrivatePackManifest(raw: unknown): PrivatePackManifest | null {
+  return privatePackViolations(raw).length === 0 ? (raw as PrivatePackManifest) : null;
+}
+
+/** Tra tệp theo (mã gói, đường dẫn) trong manifest ĐÃ KIỂM: so sánh chuỗi bằng `find` (không tra thuộc tính đối tượng nên `constructor` / `__proto__` không thành kết quả), phân biệt hoa thường. Thuần. */
+export function privatePackFile(
+  m: PrivatePackManifest,
+  packId: string,
+  path: string,
+): PrivatePackFile | undefined {
+  return m.packs.find((p) => p.id === packId)?.files.find((f) => f.path === path);
+}
+
 /** Khoá tra bảng `"<gói>/<đường dẫn>"` (cùng dạng máy chủ dùng để tra tệp được phục vụ). */
 export function privatePackKey(packId: string, path: string): string {
   return `${packId}/${path}`;

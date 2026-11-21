@@ -9,6 +9,8 @@ import {
   PRIVATE_PACK_URL_MAX_LEN,
   PRIVATE_PACK_VERSION_HEX,
   isSafePrivatePackUrl,
+  parsePrivatePackManifest,
+  privatePackFile,
   PRIVATE_PACK_MAX_FILES,
   PRIVATE_PACK_MAX_PACKS,
   PRIVATE_PACK_MIME,
@@ -370,5 +372,49 @@ describe("privatePackKey / privatePackUrl / privatePackVersionMatches", () => {
     ])
       expect(one({ license }), JSON.stringify(license)).toMatch(/license/);
     expect(one({ license: "x".repeat(PRIVATE_PACK_LICENSE_MAX_LEN) })).toBe("");
+  });
+});
+
+describe("parsePrivatePackManifest / privatePackFile (API có kiểu cho client)", () => {
+  it("parse: hợp lệ trả CHÍNH đối tượng; sai bất kỳ chỗ nào (kể cả một tệp xấu giữa nhiều tệp tốt) trả null: tất cả hoặc không gì", () => {
+    const ok = manifest() as unknown as PrivatePackManifest;
+    expect(parsePrivatePackManifest(ok)).toBe(ok);
+    expect(parsePrivatePackManifest(PRIVATE_PACK_EMPTY_MANIFEST)).toBe(PRIVATE_PACK_EMPTY_MANIFEST);
+    const oneBad = manifest({
+      packs: [pack({ files: [file("a.png"), file("../x.png"), file("b.png")] })],
+    });
+    expect(parsePrivatePackManifest(oneBad)).toBeNull();
+    for (const bad of [null, undefined, 3, "x", [], {}, { packs: {} }, { version: 1, packs: [] }])
+      expect(parsePrivatePackManifest(bad), JSON.stringify(bad)).toBeNull();
+    // đi qua JSON như client thật
+    expect(parsePrivatePackManifest(JSON.parse(JSON.stringify(ok)))).toEqual(ok);
+    expect(parsePrivatePackManifest(JSON.parse('{"packs":[],"__proto__":{"x":1}}'))).toBeNull();
+  });
+
+  it("tra tệp: đúng (gói, đường dẫn) trả tệp; gói / đường dẫn lạ, hoa thường khác, tên nguyên mẫu trả undefined", () => {
+    const m = parsePrivatePackManifest(
+      manifest({
+        packs: [
+          pack({ files: [file("atlas.png", { bytes: 11 }), file("tiles/a.webp", { bytes: 22 })] }),
+          pack({ id: "g2", files: [file("atlas.png", { bytes: 33 })] }),
+        ],
+      }),
+    )!;
+    expect(privatePackFile(m, "cainos_basic", "atlas.png")?.bytes).toBe(11);
+    expect(privatePackFile(m, "cainos_basic", "tiles/a.webp")?.bytes).toBe(22);
+    expect(privatePackFile(m, "g2", "atlas.png")?.bytes).toBe(33); // cùng đường dẫn ở gói khác: đúng gói
+    for (const [g, p] of [
+      ["khong_co", "atlas.png"],
+      ["cainos_basic", "khong-co.png"],
+      ["cainos_basic", "ATLAS.PNG"],
+      ["CAINOS_BASIC", "atlas.png"],
+      ["constructor", "atlas.png"],
+      ["__proto__", "atlas.png"],
+      ["cainos_basic", "constructor"],
+      ["cainos_basic", "__proto__"],
+      ["", ""],
+    ] as const)
+      expect(privatePackFile(m, g, p), `${g} / ${p}`).toBeUndefined();
+    expect(privatePackFile(PRIVATE_PACK_EMPTY_MANIFEST, "g", "a.png")).toBeUndefined();
   });
 });
