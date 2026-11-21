@@ -28,6 +28,28 @@ export function driftFinding(
 }
 
 /**
+ * Giữ phím hướng mà pred HẦU NHƯ KHÔNG đổi (< ngưỡng) giữa hai mẫu = stuck (đứng im khi giữ phím).
+ * Ngược với driftFinding: drift là đổi QUÁ nhiều SAU khi nhả; stuck là KHÔNG đổi TRONG lúc giữ.
+ * Dùng `<` chặt nên đúng tại ngưỡng KHÔNG tính là stuck (vẫn coi là đã di chuyển).
+ */
+export function stuckFinding(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  threshold = 1.5,
+  windowLabel = "trong lúc giữ phím",
+): Finding | null {
+  const dist = Math.hypot(bx - ax, by - ay);
+  if (dist < threshold)
+    return {
+      kind: "stuck",
+      detail: `pred chỉ đổi ${dist.toFixed(1)}px ${windowLabel} (dưới ngưỡng ${threshold}px)`,
+    };
+  return null;
+}
+
+/**
  * FPS rAF bất thường cao (khung đóng băng / dt ~0 → `1000/dt` lớn) = stall. Ngưỡng mặc định 900
  * (khung nhanh hơn ~1,1 ms là bất thường). `>=` nên đúng tại ngưỡng cũng tính stall.
  */

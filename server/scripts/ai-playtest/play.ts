@@ -27,7 +27,13 @@ import {
   type Viewport,
   type Finding,
 } from "./manifest";
-import { driftFinding, stallFinding, closedFailFinding, ioErrorsBlockOk } from "./detect";
+import {
+  driftFinding,
+  stuckFinding,
+  stallFinding,
+  closedFailFinding,
+  ioErrorsBlockOk,
+} from "./detect";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
@@ -280,18 +286,37 @@ async function sampleMetrics(
   };
 }
 
+/** Lấy toạ độ dự đoán client (predX/predY) một lần. */
+async function samplePred(tab: PlayTab): Promise<{ x: number; y: number }> {
+  return (await tab.ev(`({x: window.__scene?.predX ?? 0, y: window.__scene?.predY ?? 0})`)) as {
+    x: number;
+    y: number;
+  };
+}
+
 /** Sau khi nhả MỌI phím hướng: nếu `pred` còn đổi > ngưỡng trong `windowMs` = drift (trôi sau nhả phím). */
 async function detectDrift(tab: PlayTab, windowMs = 300, threshold = 1.5): Promise<Finding | null> {
-  const a = (await tab.ev(`({x: window.__scene?.predX ?? 0, y: window.__scene?.predY ?? 0})`)) as {
-    x: number;
-    y: number;
-  };
+  const a = await samplePred(tab);
   await sleep(windowMs);
-  const b = (await tab.ev(`({x: window.__scene?.predX ?? 0, y: window.__scene?.predY ?? 0})`)) as {
-    x: number;
-    y: number;
-  };
+  const b = await samplePred(tab);
   return driftFinding(a.x, a.y, b.x, b.y, threshold, `trong ${windowMs}ms sau khi nhả phím`);
+}
+
+/**
+ * Lấy pred TRƯỚC khi giữ, giữ phím `holdMs`, lấy pred SAU → nếu pred hầu không đổi = stuck (đứng im
+ * khi giữ phím). Đây là detector cho mutation (b) của mục 60.1 (khác stall: stall là khung đóng băng,
+ * stuck là khung vẫn vẽ nhưng nhân vật không chạy).
+ */
+async function detectStuck(
+  tab: PlayTab,
+  key: (typeof KEY)[keyof typeof KEY],
+  holdMs = 2000,
+  threshold = 1.5,
+): Promise<Finding | null> {
+  const a = await samplePred(tab);
+  await tab.hold(key, holdMs);
+  const b = await samplePred(tab);
+  return stuckFinding(a.x, a.y, b.x, b.y, threshold, `trong ${holdMs}ms giữ phím`);
 }
 
 /** Bảng có còn thấy thật không (shown(): tồn tại, không hidden, checkVisibility, có kích thước). */
@@ -335,13 +360,14 @@ const STEPS: StepDef[] = [
   {
     id: "move-hold-w",
     scenario: "move",
-    title: "Di chuyển: giữ W 2s rồi nhả, kiểm trôi",
+    title: "Di chuyển: giữ W 2s (kiểm đứng im) rồi nhả (kiểm trôi)",
     input: "keyboard",
     viewports: ["412x915", "1366x768"],
     action: async (tab) => {
       const findings: Finding[] = [];
-      await tab.hold(KEY.w, 2000);
-      const d = await detectDrift(tab, 300, 1.5);
+      const s = await detectStuck(tab, KEY.w, 2000, 1.5); // đứng im khi giữ phím (mutation b)
+      if (s) findings.push(s);
+      const d = await detectDrift(tab, 300, 1.5); // trôi sau khi nhả phím (mutation a)
       if (d) findings.push(d);
       return findings;
     },
