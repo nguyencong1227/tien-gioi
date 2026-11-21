@@ -13,7 +13,6 @@ import {
   type TiledMap,
 } from "@tien-gioi/shared";
 import { RELOCATE_MAX_PX, nearestFreeSpot, safeSpot } from "./movement";
-import { inMainRegion } from "./nav";
 
 const map = getMap(DEFAULT_MAP_ID)!;
 const blocked = (m: GameMap, x: number, y: number) => m.circleBlocked(x, y, PLAYER_RADIUS);
@@ -47,17 +46,17 @@ describe("nearestFreeSpot / safeSpot: vị trí lưu rơi vào ô chặn", () =>
     expect(Number.isInteger(s.x) && Number.isInteger(s.y)).toBe(true);
   });
 
-  it("GẦN NHẤT thật: không có điểm lưới 8 px thoáng VÀ nối với thế giới mở nào gần hơn kết quả quá một nửa bước lấy mẫu", () => {
+  it("GẦN NHẤT thật: không có điểm lưới 8 px thoáng VÀ đi bộ tới được từ trấn nào gần hơn kết quả quá một nửa bước lấy mẫu", () => {
     const w = wallSpot();
+    const reach = walkableFromTown(map);
     const s = nearestFreeSpot(map, w.x, w.y)!;
     const d = Math.hypot(s.x - w.x, s.y - w.y);
     let best = Infinity;
     for (let y = w.y - 6 * TILE; y <= w.y + 6 * TILE; y += 8)
       for (let x = w.x - 6 * TILE; x <= w.x + 6 * TILE; x += 8)
-        if (!blocked(map, x, y) && inMainRegion(map, PLAYER_RADIUS, x, y))
-          best = Math.min(best, Math.hypot(x - w.x, y - w.y));
+        if (!blocked(map, x, y) && reach(x, y)) best = Math.min(best, Math.hypot(x - w.x, y - w.y));
     expect(d).toBeLessThanOrEqual(best + TILE / 4 + 0.5); // lấy mẫu nửa ô (16 px) thô hơn lưới 8 px: sai lệch tối đa nửa bước
-    expect(inMainRegion(map, PLAYER_RADIUS, s.x, s.y)).toBe(true);
+    expect(reach(s.x, s.y)).toBe(true);
   });
 
   it("TÚI KÍN gần hơn vùng mở: KHÔNG chọn túi (người chơi sẽ kẹt), chọn chỗ nối với thế giới", () => {
@@ -68,14 +67,97 @@ describe("nearestFreeSpot / safeSpot: vị trí lưu rơi vào ô chặn", () =>
     expect(blocked(g, x, y)).toBe(true);
     // túi có chỗ đứng thật (nếu không thì test này vô nghĩa)
     expect(blocked(g, 23 * TILE, 23 * TILE)).toBe(false);
-    expect(inMainRegion(g, PLAYER_RADIUS, 23 * TILE, 23 * TILE)).toBe(false);
+    expect(walkableFromTown(g)(23 * TILE, 23 * TILE)).toBe(false);
     const s = safeSpot(g, x, y);
     expect(s.moved?.to).toBe("near");
     const inPocket = s.x > 22 * TILE && s.x < 24 * TILE && s.y > 22 * TILE && s.y < 24 * TILE;
     expect(inPocket).toBe(false);
-    expect(inMainRegion(g, PLAYER_RADIUS, s.x, s.y)).toBe(true);
+    expect(walkableFromTown(g)(s.x, s.y)).toBe(true);
     expect(blocked(g, s.x, s.y)).toBe(false);
   });
+
+  it("vị trí lưu KHÔNG đè ô chặn nhưng nằm TRONG TÚI KÍN (hồ sơ cũ sau khi bản đồ bị sửa tay): phải dời tới chỗ nối với thế giới, `moved.to = near`", () => {
+    const g = pocketWorld();
+    const x = 23 * TILE; // giữa túi 2 x 2 ô (22..23): thoáng thật nhưng bao kín
+    const y = 23 * TILE;
+    expect(blocked(g, x, y)).toBe(false);
+    const reach = walkableFromTown(g);
+    expect(reach(x, y)).toBe(false); // tiền đề: oracle độc lập xác nhận là túi kín
+    const s = safeSpot(g, x, y);
+    expect(s.moved?.to).toBe("near");
+    expect(reach(s.x, s.y)).toBe(true);
+    expect(blocked(g, s.x, s.y)).toBe(false);
+    // chỗ thoáng ở vùng mở thì giữ nguyên (không dời oan)
+    expect(safeSpot(g, 40 * TILE, 40 * TILE)).toEqual({ x: 40 * TILE, y: 40 * TILE });
+  });
+
+  it("người chơi ĐỨNG SÁT TƯỜNG (cách tường đúng cỡ thân, như sau khi trượt dọc tường) là vị trí hợp lệ: nút lưới gần nhất bị chặn nhưng nút kề thoáng, KHÔNG được dời oan", () => {
+    const g = pocketWorld();
+    // khối đá bắt đầu ở x = 20 ô (640 px); đứng cách mép 11,01 px (vừa chạm thân) ở vùng mở bên trái
+    const x = 20 * TILE - PLAYER_RADIUS - 0.01;
+    const y = 24.5 * TILE;
+    expect(blocked(g, x, y)).toBe(false);
+    // tiền đề: nút lưới 8 px gần nhất (632, 784) bị chặn (cách đá 8 px < thân), nên chỉ nút kề mới cứu được
+    expect(blocked(g, Math.round(x / 8) * 8, Math.round(y / 8) * 8)).toBe(true);
+    expect(safeSpot(g, x, y)).toEqual({ x, y });
+  });
+
+  it("tâm trấn KHÔNG đứng được (bản đồ cấu hình hỏng): không kiểm được liên thông thì KHÔNG dời hàng loạt, giữ vị trí thoáng như cũ", () => {
+    const g = pocketWorld(true);
+    expect(blocked(g, g.townPx.x, g.townPx.y)).toBe(true);
+    for (const [tx, ty] of [
+      [40, 40],
+      [23, 23], // cả chỗ trong túi (không phân biệt được nên giữ)
+      [50, 12],
+    ] as const)
+      expect(safeSpot(g, tx * TILE, ty * TILE), `${tx},${ty}`).toEqual({
+        x: tx * TILE,
+        y: ty * TILE,
+      });
+  });
+
+  it("nửa bản đồ bị TRẤN cắt đôi vẫn là đất đi bộ tới được (đi qua trấn): vị trí lưu ở đó được GIỮ NGUYÊN, không bị dời oan", () => {
+    const g = townSplitWorld();
+    const reach = walkableFromTown(g);
+    for (const [tx, ty] of [
+      [74, 16],
+      [70, 8],
+      [76, 24],
+      [10, 16],
+    ] as const) {
+      const x = tx * TILE + 8;
+      const y = ty * TILE + 8;
+      expect(reach(x, y), `${tx},${ty}`).toBe(true);
+      expect(safeSpot(g, x, y), `${tx},${ty}`).toEqual({ x, y });
+    }
+  });
+
+  it("bản đồ thật: vị trí thoáng đi bộ tới được thì GIỮ NGUYÊN; thoáng nhưng bao kín thì được dời tới chỗ tới được (mẫu mỗi ô thoáng thứ 5)", () => {
+    for (const def of MAPS) {
+      const m = getMap(def.id)!;
+      const reach = walkableFromTown(m);
+      let kept = 0;
+      let moved = 0;
+      let k = 0;
+      for (let ty = 1; ty < def.h - 1; ty++)
+        for (let tx = 1; tx < def.w - 1; tx++) {
+          const x = tx * TILE + TILE / 2;
+          const y = ty * TILE + TILE / 2;
+          if (blocked(m, x, y) || k++ % 5 !== 0) continue;
+          const s = safeSpot(m, x, y);
+          if (reach(x, y)) {
+            expect(s, `${def.id} ô (${tx},${ty})`).toEqual({ x, y });
+            kept++;
+          } else {
+            expect(s.moved, `${def.id} ô (${tx},${ty})`).toBeDefined();
+            expect(reach(s.x, s.y), `${def.id} ô (${tx},${ty}) -> (${s.x},${s.y})`).toBe(true);
+            moved++;
+          }
+        }
+      // đa số chỗ thoáng là đất mở: nếu kiểm "tới được" sai thì gần như mọi vị trí bị dời oan
+      expect(kept, def.id).toBeGreaterThan(moved * 10);
+    }
+  }, 60_000);
 
   it("ORACLE độc lập trên bốn bản đồ thật: MỌI vị trí lưu rơi vào ô chặn (mẫu mỗi ô thứ 7, nội thất lẫn viền) đều được đưa tới chỗ ĐI BỘ TỚI ĐƯỢC từ trấn", () => {
     for (const def of MAPS) {
@@ -161,7 +243,7 @@ function rockWorld(): GameMap {
 /**
  * Bản đồ thử 64 x 64: cỏ, viền đá, một khối đá 10 x 10 ô ở (20..29, 20..29) có TÚI KÍN 2 x 2 ô ở (22..23, 22..23) hoàn toàn bao bằng đá; trấn ở (10, 10). Vùng mở (vùng chính) là phần còn lại.
  */
-function pocketWorld(): GameMap {
+function pocketWorld(townBlocked = false): GameMap {
   const side = 64;
   const t = new Uint8Array(side * side).fill(T.Grass);
   for (let i = 0; i < side; i++) {
@@ -172,6 +254,8 @@ function pocketWorld(): GameMap {
   }
   for (let y = 20; y < 30; y++) for (let x = 20; x < 30; x++) t[y * side + x] = T.Rock;
   for (let y = 22; y < 24; y++) for (let x = 22; x < 24; x++) t[y * side + x] = T.Grass;
+  if (townBlocked)
+    for (let y = 9; y < 12; y++) for (let x = 9; x < 12; x++) t[y * side + x] = T.Rock; // tâm trấn (10, 10) hỏng: đá
   return new GameMap({
     id: "thu_tui",
     name: "Thử Túi",
@@ -229,4 +313,32 @@ function walkableFromTown(m: GameMap): (x: number, y: number) => boolean {
       }
     return false;
   };
+}
+
+/**
+ * Bản đồ thử 80 x 32 với trấn bán kính 15 ô ở giữa (50, 16) chạm gần hết chiều cao: với LƯỚI CỦA QUÁI (khu an toàn là tường) trấn cắt bản đồ làm hai nửa, nhưng người chơi đi qua trấn được
+ * (như Âm Sương Trạch: nửa nhỏ ~20 % diện tích, B đo ở review #1214).
+ */
+function townSplitWorld(): GameMap {
+  const w = 80;
+  const h = 32;
+  const t = new Uint8Array(w * h).fill(T.Grass);
+  for (let x = 0; x < w; x++) {
+    t[x] = T.Rock;
+    t[(h - 1) * w + x] = T.Rock;
+  }
+  for (let y = 0; y < h; y++) {
+    t[y * w] = T.Rock;
+    t[y * w + w - 1] = T.Rock;
+  }
+  return new GameMap({
+    id: "thu_rong",
+    name: "Thử Rộng",
+    seed: 1,
+    w,
+    h,
+    town: { cx: 50, cy: 16, r: 15 },
+    monsterCap: { tho: 1 },
+    tiles: t,
+  });
 }
