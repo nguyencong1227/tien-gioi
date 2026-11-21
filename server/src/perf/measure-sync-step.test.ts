@@ -13,28 +13,35 @@ function blockWithoutCpu(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-/** Đốt CPU của luồng này ít nhất `ms` mili giây (đo bằng đồng hồ tường: đủ cho kiểm tra thô). */
+/** CPU (ms) đã dùng của luồng này (Node cũ chưa có `threadCpuUsage` thì CPU cả tiến trình: chỉ dùng để đốt đủ CPU, không dùng để khẳng định). */
+function threadCpuMs(): number {
+  const read = (process as unknown as { threadCpuUsage?: () => NodeJS.CpuUsage }).threadCpuUsage;
+  const u = read ? read.call(process) : process.cpuUsage();
+  return (u.user + u.system) / 1000;
+}
+
+/**
+ * Đốt ÍT NHẤT `ms` mili giây CPU của luồng này. Đếm theo CPU của luồng chứ KHÔNG theo đồng hồ tường: máy tải cao làm luồng bị chen
+ * thì vòng lặp chạy lâu hơn về tường nhưng vẫn đủ CPU (đếm theo tường từng làm ca "đo >= 20 ms" đỏ giả khi chạy cả bộ).
+ */
 function burnCpu(ms: number): void {
-  const end = performance.now() + ms;
+  const end = threadCpuMs() + ms;
   let x = 0;
-  while (performance.now() < end) x += Math.sqrt(x + 1);
+  while (threadCpuMs() < end) x += Math.sqrt(x + 1);
   if (x < 0) throw new Error("không bao giờ"); // chống tối ưu bỏ vòng lặp
 }
 
 describe("measureSyncStepMs", () => {
   it.skipIf(!hasThreadCpu)(
-    "KHÔNG cộng CPU của luồng khác trong cùng tiến trình: luồng bị chặn 40 ms tường với một worker đang quay vẫn đo ~0, không ~40",
+    "KHÔNG cộng CPU của luồng khác trong cùng tiến trình: luồng bị chặn 250 ms tường với một worker đang quay vẫn đo ~0, không hàng chục ms",
     async () => {
       const busy = new Worker("for(;;){}", { eval: true }); // như một tệp test khác đang chạy song song
       try {
         await new Promise((r) => setTimeout(r, 300)); // cho luồng bận chạy hẳn
-        const before = process.cpuUsage();
-        const ms = measureSyncStepMs(() => blockWithoutCpu(40));
-        const proc = process.cpuUsage(before);
-        const procCpuMs = (proc.user + proc.system) / 1000;
-        // điều kiện của phép thử: CPU CẢ TIẾN TRÌNH thật sự bị luồng bận đội lên (nếu không thì phép thử không chứng minh gì)
-        expect(procCpuMs).toBeGreaterThan(20);
-        // `process.cpuUsage()` cũ sẽ ra ~40 (= wall) vì cộng luồng bận; CPU luồng thì ~0
+        // Cửa sổ 250 ms (không phải 40): máy quá tải làm luồng bận chỉ nhận một phần CPU, cửa sổ dài thì vẫn tích đủ hàng chục ms CPU cho
+        // `process.cpuUsage()` cũ đo ra "hàng chục ms" và phép thử bắt được nó. Phía ĐÚNG (CPU của luồng này, đang ngủ trong nhân) luôn ~0
+        // nên KHÔNG BAO GIỜ đỏ giả dù máy tải đến đâu (tải quá cao chỉ làm phép thử mất khả năng phân biệt bản cũ, không làm nó đỏ).
+        const ms = measureSyncStepMs(() => blockWithoutCpu(250));
         expect(ms).toBeLessThan(10);
       } finally {
         await busy.terminate();
