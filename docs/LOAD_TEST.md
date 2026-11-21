@@ -2007,3 +2007,86 @@ Các ca (đều qua giao diện thật; mỗi ca kèm kiểm trạng thái phía
 
 **Số đo (B, 21/11/2026):** một lượt đầy đủ ~50 giây; 10 / 10 lượt liền ĐẠT. Đột biến phía máy chủ (cây sạch sau mỗi lần), kịch bản ĐỎ ở đúng ca: trừ giá Linh thạch sai +1 (ca 2), về sai chỗ +200 px (ca 1), bỏ bảo hộ sau khi về (ca 1), gục trong đấu trường không chết thật (ca 4), hộp thoại không đóng băng khi rớt mạng (ca 5a), đồng hồ trận không đóng băng (ca 5c), rớt quá hạn lúc hộp thoại không trừ tu vi (ca 5b). `E2E_ONLY=1,3` chạy riêng các ca (dev). Cần `npm run build` và google-chrome.
 
+
+
+## 38. Thử tải dài 10 phút v0.4.0 với bộ chiêu trùm (`BOSS_MOVES=on`) và Tông môn (`SECTS=on`) (M4 3.5, Issue #1001)
+
+Bài đo thử tải dài 10 phút (600 giây) trên phiên bản v0.4.0 đánh giá tính ổn định của máy chủ thật dưới áp lực của 100 bot đồng thời trên cả 4 bản đồ (`lac_ha`, `hac_phong`, `am_suong`, `han_van`), kết hợp bí cảnh `linh_hu`, đấu trường PK và tông môn (`SECTS=on`), cùng bộ chiêu trùm thế giới nhiều giai đoạn (`BOSS_MOVES=on`, Xích Mãng tại Hắc Phong Cốc) và hệ thống sổ chiêu M7 (`--m7`).
+
+### 38.1. Cấu hình & Lệnh chạy
+- **Lệnh thực thi:**
+  ```bash
+  npm run soak -w server -- --bots=100 --minutes=10 --boss --m7 --sect
+  ```
+- **Quy mô:** 100 bot kết nối qua WebSocket thật, cổng cách ly ngẫu nhiên.
+- **Phân bổ kịch bản:**
+  - Săn quái hoang dã & săn trùm: 24 bot (trong đó 15 bot rải đều 15 điểm an toàn `BOSS_HUNTER_SPOTS` tại vùng nguy hiểm cao Hắc Phong Cốc để giao chiến Xích Mãng; cờ `--boss` bật chế độ bot tập trung đánh trùm và thả diều; `BOSS_MOVES=on` là cờ mặc định của máy chủ).
+  - Trấn / Cửa hàng Dược Đồng: 16 bot.
+  - Chuyển cảnh liên bản đồ qua cổng: 8 bot (qua lại giữa Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân).
+  - Bí cảnh Linh Hồ Động (`LINH_HU_ID`): 12 bot (3 đội 4 người).
+  - PK thách đấu: 8 bot (4 cặp giao tranh ngoài trấn).
+  - Tông môn: 12 bot (4 tông môn, Tông chủ và Đệ tử nạp/rút kho và chat `/s`; cờ `--sect` ghi nhận tương tác tông môn; `SECTS=on` kích hoạt lưu trữ tông môn).
+  - Nguyên Anh săn tại Hàn Vân Lĩnh: 20 bot (thi triển toàn bộ 6 chiêu thức Nguyên Anh).
+
+### 38.2. Kết quả đo đạc thực tế (PASS)
+
+| Hạng mục đo lường | Số liệu thực tế v0.4.0 | Ngưỡng yêu cầu | Kết luận |
+|---|---:|---:|:---:|
+| **Thời lượng đo đạc** | 10.0 phút (60 mẫu x 10s) | 10.0 phút | ĐẠT |
+| **Bot tham gia / hoàn thành** | 100 khởi tạo / 100 kết thúc (rớt 0) | Rớt mạng <= 5% | **ĐẠT** |
+| **Bộ nhớ VmRSS ban đầu** | 170.14 MB | - | - |
+| **Bộ nhớ VmRSS sau khởi động (5.0m)** | 229.03 MB | - | - |
+| **Bộ nhớ VmRSS kết thúc (10.0m)** | 227.93 MB | - | - |
+| **Tăng trưởng bộ nhớ sau warmup** | **-1.10 MB** | <= 50.0 MB | **ĐẠT** |
+| **Dốc VmRSS nửa sau (OLS)** | **-0.046 MB/phút** | <= 1.00 MB/phút | **XUẤT SẮC** |
+| **Tick p95 phòng tệ nhất (TB / Max)** | **1.60 ms / 2.05 ms** | <= 10.0 ms | **ĐẠT** |
+| **Tick overruns (>50ms)** | **0** | 0 | **ĐẠT** |
+| **CPU luồng chính trung bình** | **4.43 ms/tick** | < 50 ms/tick | **ĐẠT** |
+| **Hàng đợi ghi nhân vật (Inflight / Lỗi)**| Inflight max 0, Tuổi max 0.0s, Lỗi 0 | Lỗi = 0, Tuổi < 30s | **ĐẠT** |
+| **Độ trễ vòng lặp sự kiện (p99)** | **23.6 ms** | <= 100 ms | **ĐẠT** |
+| **Băng thông nhận WebSocket TB / p95**| **145 B/tick / 206 B/tick** | <= 600 B/tick | **ĐẠT** |
+| **Băng thông nhận trung bình mỗi bot** | **2.82 KB/s** | Tối ưu băng thông | **ĐẠT** |
+| **Lỗi nhật ký máy chủ (Server Log Errors)**| **0** | <= 0 | **ĐẠT** |
+| **Cảnh báo giám sát (Monitor Alerts)** | **0** | <= 0 | **ĐẠT** |
+| **Kiểm tra file lưu (`kiem-save`)** | **100 nhân vật, 100 chân linh, 4 tông môn: 0 lỗi** | 0 lỗi | **ĐẠT** |
+| **Tệp hỏng cách ly (`*.hong-*`)** | **0** | 0 | **ĐẠT** |
+| **Bảo toàn tiền tệ (Linh thạch)** | Ban đầu 29600 + Thả 7112 - Tiêu 21453 = Trần 36712 \| Thực tế: 19569 (Lệch ví: 0) | Thực tế <= Trần | **ĐẠT** |
+
+### 38.3. Nội dung M7 & Bộ chiêu trùm (`BOSS_MOVES=on`)
+- **Nội dung M7 (Sổ chiêu & Nguyên Anh):**
+  - Bot theo cảnh giới ban đầu: Luyện Khí 56, Trúc Cơ 4, Kim Đan 20, Nguyên Anh 20.
+  - Tổng lượt thi triển chiêu thức xác nhận qua `fx cast`: **621 lượt**.
+  - Toàn bộ **6/6 chiêu Nguyên Anh đợt 2** đều được thi triển đầy đủ:
+    - `me_tung_bo`: 118
+    - `kim_chung_trao`: 94
+    - `han_quang_tien`: 57
+    - `van_thach_tran`: 56
+    - `bang_hoa_loan`: 49
+    - `van_hanh_bo`: 49
+  - **12 chiêu còn lại trong tập 18 chiêu mẫu của bot** (`sampleSkillsForRealm` rải từ Luyện Khí -> Kim Đan) đều có lượt dùng thực tế:
+    - `bich_thuy_hoi_xuan`: 42
+    - `thanh_tung_phi_cham`: 24
+    - `cuu_cung_khon_sat`: 21
+    - `lac_tuyet_phan_phi`: 21
+    - `bach_kim_trao`: 19
+    - `huyen_bang_chi`: 18
+    - `liet_hoa_kiem`: 12
+    - `phieu_phong_bo`: 10
+    - `trong_nhac_tram`: 10
+    - `bon_thach_quyen`: 9
+    - `hoa_van_kiem`: 9
+    - `ung_trao`: 3
+  - Ghi chú: Game hiện có tổng cộng 53 chiêu học được (`LEARNABLE_SKILLS`) + 2 chiêu nền (`slash`, `meditate`); bài đo soak sử dụng tập 18 chiêu mẫu được gán tự động cho bot theo cảnh giới.
+- **Bộ chiêu trùm Xích Mãng (`BOSS_MOVES=on`):**
+  - Tổng lượt thi triển chiêu thức trùm xác nhận qua `fx bossCast`: **19 lượt**.
+  - Đầy đủ **4/4 chiêu thức bắt buộc** theo thiết kế nhiều giai đoạn:
+    1. `quat_duoi` (Quất đuôi, sát thương nón, cự ly gần `< 170px`): **9 lượt**.
+    2. `phun_doc` (Phun độc bủa vũng, tạo hồ độc 5s rút máu theo thời gian): **6 lượt**.
+    3. `cuon_minh` (Cuộn mình lao tới, sát thương đường thẳng 320px, cự ly xa `minDist 120px`): **3 lượt**.
+    4. `goi_ran_con` (Triệu hồi 2 rắn con hỗ trợ khi trùm vào Giai đoạn 2 `HP <= 50%` và rắn con cũ bị hạ): **1 lượt**.
+- **Lưu lượng di chuyển liên bản đồ:**
+  - Hắc Phong Cốc: 272 lượt.
+  - Âm Sương Trạch: 264 lượt.
+  - Lạc Hà Trấn: 173 lượt.
+  - Hàn Vân Lĩnh: 159 lượt.
+  - Bí cảnh Linh Hồ: 12 lượt.

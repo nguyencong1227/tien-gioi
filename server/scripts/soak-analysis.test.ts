@@ -370,6 +370,47 @@ describe("analyzeSoak", () => {
     });
   });
 
+  describe("bộ chiêu trùm (--boss)", () => {
+    const samples = generateSamples(60, 10, () => 90);
+    const required = ["quat_duoi", "phun_doc", "cuon_minh", "goi_ran_con"];
+
+    it("không có boss: không có phần bộ chiêu trùm và không làm đỏ", () => {
+      const res = analyzeSoak(samples, {}, {});
+      expect(res.pass).toBe(true);
+      expect(res.boss).toBeUndefined();
+      expect(formatSoakTable(res)).not.toContain("BỘ CHIÊU TRÙM");
+    });
+
+    it("ĐẠT khi mọi chiêu trùm bắt buộc đều được thi triển", () => {
+      const abilityCastCounts = { quat_duoi: 12, phun_doc: 8, cuon_minh: 6, goi_ran_con: 4 };
+      const res = analyzeSoak(
+        samples,
+        {},
+        { boss: { requiredAbilities: required, abilityCastCounts } },
+      );
+      expect(res.pass).toBe(true);
+      expect(res.boss?.missingRequired).toEqual([]);
+      expect(res.boss?.totalAbilityCasts).toBe(30);
+      const table = formatSoakTable(res);
+      expect(table).toContain("BỘ CHIÊU TRÙM (BOSS_MOVES=on)");
+      expect(table).toContain("30 (máy chủ xác nhận qua fx bossCast)");
+      expect(table).toContain("4/4 có lượt thi triển");
+      expect(table).toContain("quat_duoi 12");
+    });
+
+    it("KHÔNG ĐẠT khi một chiêu trùm bắt buộc không được thi triển (ví dụ trùm chưa vào giai đoạn 2 để gọi rắn con)", () => {
+      const abilityCastCounts = { quat_duoi: 12, phun_doc: 8, cuon_minh: 6, goi_ran_con: 0 };
+      const res = analyzeSoak(
+        samples,
+        {},
+        { boss: { requiredAbilities: required, abilityCastCounts } },
+      );
+      expect(res.pass).toBe(false);
+      expect(res.boss?.missingRequired).toEqual(["goi_ran_con"]);
+      expect(res.reasons.some((r) => r.includes("1/4") && r.includes("goi_ran_con"))).toBe(true);
+    });
+  });
+
   it("formatSoakTable hiển thị đầy đủ các trường và số đo từ /metrics", () => {
     const samples = generateSamples(60, 10, () => 90);
     const res = analyzeSoak(samples, {}, { serverLogErrors: 0, monitorAlerts: 0 });
