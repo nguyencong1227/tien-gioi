@@ -437,6 +437,27 @@ describe("độ nhạy theo giả định: phép tính", () => {
     expect(r.deadToEnd).toBeGreaterThan(0);
     expect(r.fledFlee).toBeGreaterThan(0); // HARD (tinh anh) buộc người biết bỏ chạy phải thoát
     expect(r.fledFlee).toBeLessThanOrEqual(1);
+    // tính lại ĐỘC LẬP bằng tay: mỗi mức một bầy nên trộn = (w1 x a + w2 x b) / (w1 + w2)
+    const [de, ha] = r.sums;
+    const w = AMBUSH_TIER_WEIGHTS;
+    const mix = (pick: (s: GroupSummary) => number) =>
+      (w.normal * pick(de!) + w.elite * pick(ha!)) / (w.normal + w.elite);
+    expect(r.deadToEnd).toBeCloseTo(
+      mix((s) => s.toEnd.lost),
+      12,
+    );
+    expect(r.deadFlee).toBeCloseTo(
+      mix((s) => s.flee.lost),
+      12,
+    );
+    expect(r.fledFlee).toBeCloseTo(
+      mix((s) => s.flee.fled),
+      12,
+    );
+    expect(mix((s) => s.flee.fled)).not.toBeCloseTo(
+      mix((s) => s.flee.lost),
+      6,
+    ); // hai đại lượng khác nhau thật: đột biến lẫn chúng sẽ bị bắt
     expect(r.deadDayToEnd).toBeCloseTo(atLeastOnce(r.deadToEnd, AMBUSH_DAY_CAP), 12);
     expect(r.deadDayFlee).toBeCloseTo(atLeastOnce(r.deadFlee, AMBUSH_DAY_CAP), 12);
     expect(r.deadFlee).toBeLessThanOrEqual(r.deadToEnd + 1e-12); // bỏ chạy không bao giờ chết nhiều hơn đánh tới cùng
