@@ -16,6 +16,8 @@ import {
   statsFor,
   type BossDef,
   type GameMap,
+  type MonsterKind,
+  worldBossHpOf,
 } from "@tien-gioi/shared";
 import { runDodgeBot } from "../systems/boss-dodge-bot";
 import { slash } from "../systems/combat";
@@ -124,8 +126,18 @@ export interface BossFight {
  * khí huyết dưới ngưỡng, KHÔNG né (ca khó nhất: trùm trúng mọi đòn có người trong vùng, kể cả đòn đánh thường). Có quái con của trùm thì đánh quái con gần nhất trước (chúng đông
  * và đánh đau; đứng chém trùm mặc cho chúng đánh không phải lối chơi hợp lý), hết quái con mới quay lại trùm.
  */
-export function fightBossMoves(def: BossDef, party: number, seed: number): BossFight {
-  const boss = MONSTER_BY_ID[def.kind]!;
+export function fightBossMoves(
+  def: BossDef,
+  party: number,
+  seed: number,
+  /** Nhân MÁU loài (trùm thế giới, `WorldBossSlot.hpMult`); mặc định 1 = đúng trùm đội như `CAN_BANG.md` mục "Trùm nhiều chiêu". */
+  hpMult = 1,
+  /** Giây mô phỏng tối đa (mặc định `ASSUME_BOSS.maxSeconds`). */
+  maxSeconds: number = ASSUME_BOSS.maxSeconds,
+): BossFight {
+  const kind = MONSTER_BY_ID[def.kind]!;
+  const boss: MonsterKind =
+    hpMult === 1 ? kind : { ...kind, hp: worldBossHpOf({ boss: def.kind, hpMult }) };
   const { realm, tier } = bossStep(def);
   const saved = Math.random;
   Math.random = seeded(seed);
@@ -153,7 +165,7 @@ export function fightBossMoves(def: BossDef, party: number, seed: number): BossF
     let seconds = 0;
     let potionsUsed = 0;
     w.now = 1_000_000;
-    while (seconds < ASSUME_BOSS.maxSeconds) {
+    while (seconds < maxSeconds) {
       w.now += TICK_MS;
       seconds += dt;
       w.tick++;
