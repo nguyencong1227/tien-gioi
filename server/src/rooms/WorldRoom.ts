@@ -189,7 +189,7 @@ import {
 } from "../systems/dungeon";
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { lenientRebirth } from "../systems/rebirth-choice";
-import { headersAllowed, type OriginPolicy } from "../origin-guard";
+import { headersAllowed, isProduction, type OriginPolicy } from "../origin-guard";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
@@ -361,6 +361,7 @@ export class WorldRoom extends Room<WorldState> {
     if (ambushOn(process.env)) {
       w.ambush = createAmbushRuntime({
         random: Math.random,
+        exemptBots: !isProduction(process.env),
         ambushBots: ambushBotsOn(process.env),
       });
       // "Chiến": lập vé, mở phòng đấu trường solo rồi đưa người chơi sang (chỗ cũ luôn được lưu trước)

@@ -65,12 +65,38 @@ describe("CD9: Bot chặn đường (Issue #1069)", () => {
     expect(isBotPlayer("botanist")).toBe(false);
   });
 
-  it("mặc định bot BỊ BỎ QUA khi AMBUSH_BOTS tắt (rt.ambushBots !== true)", () => {
+  it("ở production (exemptBots: false): người chơi đặt tên 'Bot 001' / 'Bot Hoang' VẪN bị chặn đường như người thường (chống lách luật)", () => {
+    const { w } = makeWorld(DEFAULT_MAP);
+    // Ở production, WorldRoom truyền exemptBots: !isProduction(process.env) => false
+    w.ambush = createAmbushRuntime({
+      random: () => 0,
+      scenes: [SCENE],
+      foes: [FOE_GROUP],
+      exemptBots: false, // Production: không miễn trừ bot theo tên
+      ambushBots: false, // Mặc định tắt
+    });
+
+    const fakeNames = ["Bot 001", "Bot Hoang", "bot_vip_99", "Bot Sát Thần"];
+    for (const [i, name] of fakeNames.entries()) {
+      const sid = `player_${i}`;
+      const { p, c } = addPlayer(w, sid, 1, 2);
+      p.name = name;
+      c.proto = AMBUSH_MIN_PROTOCOL;
+      p.x = 2200;
+      p.y = 1536;
+      ambushOf(w, c).cooldownUntil = 0;
+      // Không bị chặn bởi nhánh "bot", được chặn đường bình thường
+      expect(ambushBlocked(w, sid)).toBeNull();
+    }
+  });
+
+  it("mặc định ở môi trường thử nghiệm (exemptBots: true): bot BỊ BỎ QUA khi AMBUSH_BOTS tắt (rt.ambushBots !== true)", () => {
     const { w } = makeWorld(DEFAULT_MAP);
     w.ambush = createAmbushRuntime({
       random: () => 0,
       scenes: [SCENE],
       foes: [FOE_GROUP],
+      exemptBots: true, // Dev/test: bật cơ chế miễn trừ bot
       ambushBots: false, // Mặc định TẮT
     });
 

@@ -129,6 +129,11 @@ export interface AmbushRuntime {
   readonly open: Set<string>;
   /** Có sự kiện đặc biệt đang diễn ra trong bản đồ (trùm thế giới, M9.4)? Có thì không chặn. */
   eventBusy?: (w: World) => boolean;
+  /**
+   * Miễn trừ bot theo tên (tiền tố 'Bot ')? CHỈ bật ở môi trường dev / test (!isProduction).
+   * Ở production mặc định false để tránh người chơi đặt tên 'Bot ' để trốn chặn đường (CD9 #1069).
+   */
+  exemptBots?: boolean;
   /** Cho phép tài khoản bot gặp chặn đường? Mặc định false (mục 52, CD9 #1069). */
   ambushBots?: boolean;
   /**
@@ -147,7 +152,13 @@ export function isBotPlayer(name: string): boolean {
 export function createAmbushRuntime(
   opts: Pick<AmbushRuntime, "random"> & Partial<Omit<AmbushRuntime, "random" | "open">>,
 ): AmbushRuntime {
-  return { scenes: AMBUSH_SCENES, foes: AMBUSH_FOES, ...opts, open: new Set() };
+  return {
+    scenes: AMBUSH_SCENES,
+    foes: AMBUSH_FOES,
+    exemptBots: opts.exemptBots ?? false,
+    ...opts,
+    open: new Set(),
+  };
 }
 
 /** Phiên bản giao thức client khai lúc vào phòng (`JoinOptions.v`): số nguyên 0..999, không thì `undefined` (không tin client; coi như client cũ). */
@@ -283,7 +294,7 @@ export function ambushBlocked(w: World, sid: string): AmbushBlock | null {
   const c = w.ctrl.get(sid);
   if (!rt || !p || !c) return "off";
   if ((c.proto ?? 0) < AMBUSH_MIN_PROTOCOL) return "protocol";
-  if (isBotPlayer(p.name) && !rt.ambushBots) return "bot";
+  if (rt.exemptBots && isBotPlayer(p.name) && !rt.ambushBots) return "bot";
   if (w.runId !== null || w.arena !== null) return "run";
   if (p.dead) return "dead";
   if (c.limbo) return "limbo";

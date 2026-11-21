@@ -135,8 +135,21 @@ describe("ambushBlocked: từng nhánh của mục 4.2 (không kích hoạt SAI 
     expect(ambushBlocked(s.w, s.sid)).toBeNull();
   });
 
-  it("bot: tài khoản bot mặc định bị bỏ qua (trả về 'bot'), trừ khi AMBUSH_BOTS bật (rt.ambushBots = true)", () => {
+  it("bot: ở production (exemptBots: false, mặc định) người chơi đặt tên Bot VẪN bị chặn đường bình thường (chống lách luật)", () => {
     const s = setup();
+    // createAmbushRuntime mặc định exemptBots: false
+    expect(s.w.ambush!.exemptBots).toBe(false);
+    s.p.name = "Bot 001";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+    s.p.name = "Bot Hoang";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+    s.p.name = "bot_vip_99";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+  });
+
+  it("bot: ở môi trường thử nghiệm (exemptBots: true) tài khoản bot mặc định bị bỏ qua, trừ khi AMBUSH_BOTS bật", () => {
+    const s = setup();
+    s.w.ambush!.exemptBots = true;
     s.p.name = "Bot 001";
     expect(ambushBlocked(s.w, s.sid)).toBe("bot");
     s.p.name = "bot_u_042";
