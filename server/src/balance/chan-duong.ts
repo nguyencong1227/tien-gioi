@@ -3,7 +3,7 @@
 //
 // Mô hình: chạy ĐẤU TRƯỜNG THẬT (`createArena` + `tickWorld`: AI quái, đòn trùm, thưởng `payRewards` của `arena.ts`) trên `AMBUSH_FOES` THẬT, nên thêm / sửa bầy là báo cáo đổi theo
 // (như `trum.ts`). Người chơi "bình thường": đúng bậc `minStep` của bầy (ca KHÓ NHẤT bầy có thể gặp), mặc đồ tốt nhất đủ bậc (`bestGear`), mang `ASSUME_DUNGEON.potions` Hồi Huyết Đan,
-// đứng đánh thường liên tục vào con gần nhất (không né, không dùng chiêu: như `dungeon.ts`; người chơi thật né được một phần và dùng chiêu, hai việc triệt tiêu nhau nên kết quả sống / chết
+// đánh thường liên tục vào con gần nhất, tiến sát nó khi ngoài tầm chém (không né, không dùng chiêu: như `dungeon.ts`; người chơi thật né được một phần và dùng chiêu, hai việc triệt tiêu nhau nên kết quả sống / chết
 // dùng được, còn thời gian thật = giây mô phỏng / uptime). Hai cách chơi đo CÙNG MỘT trận (cùng hạt giống):
 //  - "đánh tới cùng": không bao giờ bỏ chạy (cận trên tỉ lệ chết);
 //  - "biết bỏ chạy": khi khí huyết < `fleeBelow` thì bấm Bỏ chạy, phải VẬN `AMBUSH_FLEE_CHANNEL_MS` (không bất khả xâm phạm, vẫn đánh / uống đan); sống qua giây vận thì thoát (trả giá), thắng
@@ -21,11 +21,13 @@ import {
   AMBUSH_TIME_MS,
   MONSTER_BY_ID,
   REALMS,
+  SKILLS,
   TICK_MS,
   ambushPrice,
   arenaMapIdOf,
   expToNext,
   getMap,
+  statsFor,
   stepOf,
   type AmbushFoeGroup,
   type AmbushTier,
@@ -68,7 +70,7 @@ export const ASSUME_AMBUSH = {
   expInBarShare: 0.5,
   /** Mục tiêu (thiết kế mục 9). */
   targets: {
-    /** Tỉ lệ thắng tối thiểu theo mức (ca khó: không né, đứng yên đánh). */
+    /** Tỉ lệ thắng tối thiểu theo mức (ca khó: không né, không chiêu, chỉ đánh thường). */
     winRate: { normal: 0.9, elite: 0.8, leader: 0.6 } as Readonly<Record<AmbushTier, number>>,
     /** Thời gian trận thật (giây). */
     seconds: { min: 30, max: 70 },
@@ -143,6 +145,7 @@ export function fightAmbush(g: AmbushFoeGroup, o: AmbushFightOptions): AmbushFig
     p.y = lair.y + ASSUME_AMBUSH.startOffsetPx;
     arenaJoined(w, sid);
 
+    const speed = statsFor(realm, tier, bestGear(realm, tier)).speed; // px / giây: người chơi TIẾN SÁT con gần nhất khi ngoài tầm chém (quái tầm xa lùi khi bị áp sát nên không thể đứng yên chờ)
     const uptime = ASSUME_AMBUSH.uptime[g.tier];
     const limitSec = (AMBUSH_TIME_MS / 1000) * uptime; // trận thật dài ra 1 / uptime nên hết giờ sớm hơn theo giây mô phỏng
     const dt = TICK_MS / 1000;
@@ -160,7 +163,7 @@ export function fightAmbush(g: AmbushFoeGroup, o: AmbushFightOptions): AmbushFig
           potionsUsed++;
         }
       }
-      let near: { x: number; y: number } | null = null;
+      let near: { x: number; y: number; kind: string } | null = null;
       let best = Infinity;
       for (const id of a.foes) {
         const m = w.state.monsters.get(id);
@@ -171,7 +174,15 @@ export function fightAmbush(g: AmbushFoeGroup, o: AmbushFightOptions): AmbushFig
           near = m;
         }
       }
-      if (near) slash(w, sid, Math.atan2(near.y - p.y, near.x - p.x));
+      if (near) {
+        const reach = SKILLS.slash.range + (MONSTER_BY_ID[near.kind]?.radius ?? 0) - 10;
+        if (best > reach) {
+          // ngoài tầm: đi thẳng tới (không vướng vật cản: lõi đấu trường đã san phẳng), chưa chém tick này
+          const step = Math.min(speed * dt, best - reach);
+          p.x += ((near.x - p.x) / best) * step;
+          p.y += ((near.y - p.y) / best) * step;
+        } else slash(w, sid, Math.atan2(near.y - p.y, near.x - p.x));
+      }
       tickWorld(w, TICK_MS);
       if (fleeAt === null && p.hp < p.maxHp * ASSUME_AMBUSH.fleeBelow) fleeAt = seconds;
       // `a.end` đặt ĐỒNG BỘ lúc kết thúc, kể cả khi người chơi bị hạ (tin `ambushEnd` chỉ đi sau lần lưu bất đồng bộ nên không dùng `h.ambushEnds` ở đây);
@@ -417,7 +428,7 @@ export function renderAmbushBalance(foes: readonly AmbushFoeGroup[] = AMBUSH_FOE
   const head = `## Chặn đường: tỉ lệ chết khi chọn Chiến (mục 52 / 59, CD6 #1066)
 
 > Phần này sinh từ \`server/src/balance/chan-duong.ts\`: chạy ĐẤU TRƯỜNG THẬT (\`createArena\` + \`tickWorld\`, thưởng \`payRewards\`) trên \`AMBUSH_FOES\` thật, nên thêm / sửa bầy là báo cáo đổi theo (chạy lại \`npm run can-bang -w server\`).
-> Người chơi đúng bậc \`minStep\` của bầy (ca khó nhất bầy có thể gặp), mặc đồ tốt nhất đủ bậc, ${ASSUME_DUNGEON.potions} Hồi Huyết Đan (uống khi khí huyết < ${ASSUME_DUNGEON.potionBelow * 100}%), đứng đánh thường vào con gần nhất, KHÔNG né, KHÔNG dùng chiêu (ca khó, như bí cảnh); ${ASSUME_AMBUSH.runs} trận (hạt giống 1..${ASSUME_AMBUSH.runs}) mỗi bầy. Thời gian thật = giây mô phỏng / uptime (thường và tinh anh ${ASSUME_AMBUSH.uptime.normal}, kẻ cầm đầu ${ASSUME_AMBUSH.uptime.leader}); hết giờ trận ${AMBUSH_TIME_MS / 1000} giây thật.
+> Người chơi đúng bậc \`minStep\` của bầy (ca khó nhất bầy có thể gặp), mặc đồ tốt nhất đủ bậc, ${ASSUME_DUNGEON.potions} Hồi Huyết Đan (uống khi khí huyết < ${ASSUME_DUNGEON.potionBelow * 100}%), đánh thường vào con gần nhất (tiến sát khi ngoài tầm chém; quái tầm xa lùi khi bị áp sát), KHÔNG né, KHÔNG dùng chiêu (ca khó, như bí cảnh); ${ASSUME_AMBUSH.runs} trận (hạt giống 1..${ASSUME_AMBUSH.runs}) mỗi bầy. Thời gian thật = giây mô phỏng / uptime (thường và tinh anh ${ASSUME_AMBUSH.uptime.normal}, kẻ cầm đầu ${ASSUME_AMBUSH.uptime.leader}); hết giờ trận ${AMBUSH_TIME_MS / 1000} giây thật.
 > **Thua = chết thật** (mục 53), nên đây là số quyết định có bật \`AMBUSH=on\` hay không (mục 59). Hai cách chơi đo trên CÙNG một trận: **tới cùng** (không bao giờ bỏ chạy: cận trên tỉ lệ chết) và **biết bỏ chạy** (bấm khi khí huyết < ${ASSUME_AMBUSH.fleeBelow * 100}%, vận ${AMBUSH_FLEE_CHANNEL_MS / 1000} giây không bất khả xâm phạm rồi thoát, trả giá).
 `;
   if (foes.length === 0)

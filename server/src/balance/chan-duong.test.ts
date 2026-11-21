@@ -28,7 +28,7 @@ const group = (
 
 /** Dễ: hai Hôi Lang (cấp 1) đối đầu người bậc 1 (Luyện Khí tầng 1). */
 const EASY = group("mau_de", 1, "normal", [{ kind: "lang", count: 2 }]);
-/** Khó: Hắc Hổ tinh anh đối đầu người bậc 5: người đứng đánh thường không sống nổi. */
+/** Khó: Hắc Hổ tinh anh đối đầu người bậc 5: người chỉ đánh thường không sống nổi. */
 const HARD = group("mau_kho", 5, "elite", [{ kind: "ho", count: 1 }]);
 
 const fight = (over: Partial<AmbushFight>): AmbushFight => ({
@@ -56,6 +56,13 @@ describe("fightAmbush: chạy đấu trường thật", () => {
     expect(f.exp).toBe(0);
     expect(f.fleeAt).not.toBeNull();
     expect(f.fleeAt!).toBeLessThanOrEqual(f.seconds);
+  });
+
+  it("quái TẦM XA (Sương Hồ đứng bắn, lùi khi bị áp sát): người chơi phải TIẾN SÁT mới hạ được; đứng yên thì không bao giờ chạm tới", () => {
+    const ranged = group("mau_xa", 13, "normal", [{ kind: "suong_ho", count: 1 }]);
+    const f = fightAmbush(ranged, { step: ranged.minStep, seed: 1 });
+    expect(f.result).toBe("won");
+    expect(summarizeGroup(ranged, 4).toEnd.won).toBe(1);
   });
 
   it("tất định: cùng hạt giống cho đúng cùng kết quả; không làm rò Math.random", () => {
