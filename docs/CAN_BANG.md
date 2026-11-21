@@ -946,7 +946,12 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 
 > Phần này sinh từ `server/src/balance/trum-the-gioi.ts` (chạy bộ thực thi trùm thật `fightBossMoves`, máu = `worldBossHpOf`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x 0.6)) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội 5 người hạ trùm ở máu gốc (8 trận đạt). Thưởng (`WorldBossReward` là MỘT quỹ chia theo tỉ lệ đóng góp) quy ra phút săn quái tốt nhất cùng bậc cho một người trong đội 10 người (mục tiêu 12-25; bí cảnh 15-20). Mục tiêu: số người tối thiểu hạ được trong thời lượng là 4-8 (cộng đồng nhỏ vẫn hạ được, không một mình), đội 50 người không dưới 3 phút.
 
-**Chưa có khung giờ nào** (`WORLD_BOSS_SCHEDULE` rỗng, #1029): chưa có gì để đo; lịch rỗng thì tính năng không chạy. Khi có lịch, chạy lại `npm run can-bang -w server`.
+| Khung | Trùm (máu thật) | Bản đồ | Giờ / thời lượng | DPS mỗi người | **Người tối thiểu** | Thưởng một người (đội 10): quỹ -> phút săn (tu vi / Linh thạch) | Né hoàn hảo: 5 / 20 / 50 người | Không né: 5 / 20 / 50 người (thắng, thời gian thật, chết) |
+|---|---|---|---|--:|--:|---|---|---|
+| han_van_trua | Thiên Hàn Vương x38 (4.674.000 máu) | han_van | 12:00 / 30 ph | 456 | **6** | 69.000 + 51.000 -> 17,4 / 17,3 ph | 34,2 ph / 8,5 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 75% 3,9 ph, 36,5 chết |
+| am_suong_toi | Hắc Giao x40 (3.000.000 máu) | am_suong | 21:00 / 30 ph | 290 | **6** | 94.000 + 49.000 -> 17,5 / 17,6 ph | 34,4 ph / 8,6 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 0%, 50 chết |
+
+**Không vi phạm mục tiêu nào.**
 
 
 ## Chặn đường: tỉ lệ chết khi chọn Chiến (mục 52 / 59, CD6 #1066)
