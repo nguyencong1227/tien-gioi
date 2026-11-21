@@ -749,6 +749,98 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
+    it("kiểm tra Soul.social (M9, #1033): hợp lệ và các lỗi cấu trúc / khoá / trần", () => {
+      const validSocial = {
+        v: 1,
+        pk: { won: 5, lost: 2 },
+        counters: { kiep: 2, pk_won: 5, "boss:mang": 1 },
+        ach: { kiep_2: "2026-11-20T00:00:00.000Z" },
+        title: "lh2",
+      };
+
+      // 1. Hợp lệ -> không lỗi
+      const rawGood = JSON.stringify({ ...validSoul, social: validSocial });
+      expect(auditSoulSaveData(rawGood, rawGood.length)).toEqual([]);
+
+      // 2. social không phải object -> invalid_soul_social
+      const rawNotObj = JSON.stringify({ ...validSoul, social: "invalid_string" });
+      expect(auditSoulSaveData(rawNotObj, rawNotObj.length).map((e) => e.code)).toContain(
+        "invalid_soul_social",
+      );
+
+      // 3. social.v !== 1 -> invalid_soul_social_version
+      const rawBadV = JSON.stringify({ ...validSoul, social: { ...validSocial, v: 2 } });
+      expect(auditSoulSaveData(rawBadV, rawBadV.length).map((e) => e.code)).toContain(
+        "invalid_soul_social_version",
+      );
+
+      // 4. pk sai (won âm, lost vượt cap)
+      const rawBadPk = JSON.stringify({
+        ...validSoul,
+        social: { ...validSocial, pk: { won: -1, lost: 2_000_000 } },
+      });
+      const pkCodes = auditSoulSaveData(rawBadPk, rawBadPk.length).map((e) => e.code);
+      expect(pkCodes).toContain("invalid_soul_social_pk_won");
+      expect(pkCodes).toContain("invalid_soul_social_pk_lost");
+
+      // 5. counters có khoá lạ hoặc giá trị âm
+      const rawBadCounter = JSON.stringify({
+        ...validSoul,
+        social: {
+          ...validSocial,
+          counters: { khoá_lạ_không_hợp_lệ: 10, kiep: -5 },
+        },
+      });
+      const counterCodes = auditSoulSaveData(rawBadCounter, rawBadCounter.length).map(
+        (e) => e.code,
+      );
+      expect(counterCodes).toContain("invalid_soul_social_counter_key");
+      expect(counterCodes).toContain("invalid_soul_social_counter_val");
+
+      // 6. ach có id sai quy cách hoặc date không phải chuỗi hợp lệ
+      const rawBadAch = JSON.stringify({
+        ...validSoul,
+        social: {
+          ...validSocial,
+          ach: { "ID-CÓ-HOA": "2026-11-20T00:00:00.000Z", kiep_2: "" },
+        },
+      });
+      const achCodes = auditSoulSaveData(rawBadAch, rawBadAch.length).map((e) => e.code);
+      expect(achCodes).toContain("invalid_soul_social_ach_id");
+      expect(achCodes).toContain("invalid_soul_social_ach_date");
+
+      // 7. title sai dạng (chứa ký tự lạ hoặc quá dài > 4 ký tự)
+      const rawBadTitle = JSON.stringify({
+        ...validSoul,
+        social: { ...validSocial, title: "danh_hieu_dai" },
+      });
+      expect(auditSoulSaveData(rawBadTitle, rawBadTitle.length).map((e) => e.code)).toContain(
+        "invalid_soul_social_title",
+      );
+    });
+
+    it("đột biến: nới lỏng kiểm tra Soul.social (bỏ kiểm tra socialCounterMode) thì test bắt buộc phát hiện", () => {
+      const mutantSocialData = JSON.stringify({
+        ...validSoul,
+        social: {
+          v: 1,
+          pk: { won: 0, lost: 0 },
+          counters: { khoá_đột_biến_sai: 10 },
+          ach: {},
+          title: null,
+        },
+      });
+      const errors = auditSoulSaveData(mutantSocialData, mutantSocialData.length);
+      expect(errors.some((e) => e.code === "invalid_soul_social_counter_key")).toBe(true);
+
+      // Nếu đột biến nới lỏng: không kiểm tra socialCounterMode
+      const relaxedCheck = (errs: typeof errors) =>
+        errs.filter((e) => e.code !== "invalid_soul_social_counter_key");
+      expect(relaxedCheck(errors).some((e) => e.code === "invalid_soul_social_counter_key")).toBe(
+        false,
+      );
+    });
+
     it("auditSavesDirectory kiểm tra thư mục souls/ và đối chiếu limbo", () => {
       const soulsSubDir = path.join(tmpDir, "souls");
       mkdirSync(soulsSubDir, { recursive: true });
