@@ -255,7 +255,7 @@ describe("ambushBlocked: từng nhánh của mục 4.2 (không kích hoạt SAI 
     expect(ambushBlocked(s.w, s.sid)).toBeNull();
   });
 
-  it("potion (AMBUSH_MIN_POTIONS, CD6c): túi có ít Hồi Huyết Đan hơn ngưỡng thì KHÔNG chặn đường; đủ thì cho; mặc định (vắng / 0) không đòi; chỉ tính hoi_huyet_dan, cộng mọi ô", () => {
+  it("potion (AMBUSH_MIN_POTIONS, CD6c): túi có ít đan hồi huyết hơn ngưỡng thì KHÔNG chặn đường; đủ thì cho; mặc định (vắng / 0) không đòi; cộng mọi ô, mọi bậc đan (thường / Đại / Thượng)", () => {
     const s = setup();
     s.c.inv.fill(null);
     // mặc định: không đòi, túi trống vẫn bị chặn được
@@ -269,16 +269,30 @@ describe("ambushBlocked: từng nhánh của mục 4.2 (không kích hoạt SAI 
     expect(ambushBlocked(s.w, s.sid)).toBe("potion"); // 1 < 2
     s.c.inv[3] = { itemId: "hoi_huyet_dan", qty: 1 }; // cộng cả hai ô
     expect(ambushBlocked(s.w, s.sid)).toBeNull(); // 2 >= 2
-    s.c.inv[3] = { itemId: "hoi_linh_dan", qty: 5 }; // loại đan khác KHÔNG tính
+    // đan Đại / Thượng (người Kim Đan trở lên) CŨNG tính: không bị coi là 'không đan' (B, review #1257)
+    s.c.inv[3] = { itemId: "dai_hoi_huyet_dan", qty: 1 };
+    expect(ambushBlocked(s.w, s.sid)).toBeNull(); // 1 thường + 1 Đại
+    s.c.inv[0] = null;
+    s.c.inv[3] = { itemId: "thuong_hoi_huyet_dan", qty: 2 };
+    expect(ambushBlocked(s.w, s.sid)).toBeNull(); // chỉ Thượng x2
+    s.c.inv[3] = { itemId: "thuong_hoi_huyet_dan", qty: 1 };
+    expect(ambushBlocked(s.w, s.sid)).toBe("potion"); // 1 < 2
+    // đan KHÔNG hồi khí huyết (hồi linh lực) và id lạ KHÔNG tính
+    s.c.inv[0] = { itemId: "hoi_linh_dan", qty: 5 };
+    s.c.inv[1] = { itemId: "constructor", qty: 5 };
+    s.c.inv[2] = { itemId: "khong_co_vat_pham_nay", qty: 5 };
     expect(ambushBlocked(s.w, s.sid)).toBe("potion");
     s.c.inv[0] = { itemId: "hoi_huyet_dan", qty: Number.NaN }; // số rác coi là 0
+    s.c.inv[1] = null;
+    s.c.inv[2] = null;
+    s.c.inv[3] = null;
     s.w.ambush!.minPotions = 1;
     expect(ambushBlocked(s.w, s.sid)).toBe("potion");
     // rollAmbush cũng không mở hộp thoại cho người thiếu đan
     s.c.inv[0] = null;
     expect(rollAmbush(s.w, s.sid, s.p, s.c)).toBe(false);
     expect(s.c.ambush?.offer).toBeUndefined();
-    s.c.inv[0] = { itemId: "hoi_huyet_dan", qty: 1 };
+    s.c.inv[0] = { itemId: "dai_hoi_huyet_dan", qty: 1 };
     expect(rollAmbush(s.w, s.sid, s.p, s.c)).toBe(true);
   });
 

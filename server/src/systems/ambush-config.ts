@@ -21,7 +21,7 @@ export function ambushBotsOn(env: NodeJS.ProcessEnv): boolean {
 export const AMBUSH_MIN_POTIONS_MAX = 8;
 
 /**
- * `AMBUSH_MIN_POTIONS` -> số Hồi Huyết Đan TỐI THIỂU trong túi để bị chặn đường (người có ít đan hơn thì KHÔNG bị chặn: bị hạ là chết thật, mục 53, mà đo cho thấy chiến với 2 đan gần như không chết còn
+ * `AMBUSH_MIN_POTIONS` -> số ĐAN HỒI KHÍ HUYẾT (mọi bậc: thường / Đại / Thượng) TỐI THIỂU trong túi để bị chặn đường (người có ít đan hơn thì KHÔNG bị chặn: bị hạ là chết thật, mục 53, mà đo cho thấy chiến với 2 đan gần như không chết còn
  * không có đan chết ~16% / lần). Mặc định 0 (không đòi, như trước). Số nguyên 0..`AMBUSH_MIN_POTIONS_MAX`; giá trị lạ / ngoài khoảng coi là 0 (KHÔNG chặn ngầm) và có cảnh báo. Khuyến nghị 2 nếu bật.
  */
 export function ambushMinPotions(env: NodeJS.ProcessEnv): number {
@@ -63,6 +63,6 @@ export function ambushNotice(env: NodeJS.ProcessEnv): string | null {
   const botPart = ambushBotsOn(env) ? " [bật bot (AMBUSH_BOTS)]" : "";
   const min = ambushMinPotions(env);
   const potionPart =
-    min > 0 ? ` [không chặn người có dưới ${min} Hồi Huyết Đan (AMBUSH_MIN_POTIONS)]` : "";
+    min > 0 ? ` [không chặn người có dưới ${min} đan hồi huyết (AMBUSH_MIN_POTIONS)]` : "";
   return `Gặp chặn đường: BẬT (AMBUSH)${botPart}${potionPart}`;
 }

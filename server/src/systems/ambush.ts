@@ -33,6 +33,7 @@ import {
   ambushFillScene,
   ambushPrice,
   ambushRollP,
+  ITEM_BY_ID,
   MONSTER_BY_ID,
   dayKey,
   parseAmbushChoose,
@@ -52,6 +53,7 @@ import { randomBytes } from "node:crypto";
 import type { Player } from "../schema";
 import type { PlayerCtrl, World } from "../world";
 import type { AmbushDaily } from "../store";
+import { byId } from "./lookup";
 import { MONSTER_WAKE_DIST, forgetTarget } from "./monsters";
 import { trySpendCoin } from "./wallet";
 
@@ -137,7 +139,7 @@ export interface AmbushRuntime {
   exemptBots?: boolean;
   /** Cho phép tài khoản bot gặp chặn đường? Mặc định false (mục 52, CD9 #1069). */
   ambushBots?: boolean;
-  /** Số Hồi Huyết Đan tối thiểu trong túi để bị chặn (`AMBUSH_MIN_POTIONS`, CD6c): ít hơn thì KHÔNG chặn. Mặc định 0 / vắng = không đòi. */
+  /** Số đan hồi khí huyết (mọi bậc: thường / Đại / Thượng) tối thiểu trong túi để bị chặn (`AMBUSH_MIN_POTIONS`, CD6c): ít hơn thì KHÔNG chặn. Mặc định 0 / vắng = không đòi. */
   minPotions?: number;
   /**
    * CD3 gắn vào: dựng đấu trường solo cho lựa chọn `fight`. Trả `true` nếu ĐÃ nhận việc (từ đây CD3 lo kết cục + `ambushEnd`); `false` (đầy phòng, lỗi) thì huỷ lặng lẽ không phạt.
@@ -146,12 +148,17 @@ export interface AmbushRuntime {
   startFight?: (w: World, sid: string, offer: AmbushOfferCtrl) => boolean;
 }
 
-/** Số Hồi Huyết Đan trong túi (cộng mọi ô; số lượng rác coi là 0). Đây là loại đan mà mô phỏng cân bằng chặn đường giả định (`ASSUME_DUNGEON.potions`). */
+/**
+ * Số ĐAN HỒI KHÍ HUYẾT trong túi (cộng mọi ô; số lượng rác coi là 0): MỌI vật phẩm có `effect.kind === "healHp"` (Hồi Huyết Đan 40%, Đại 70%, Thượng 90%), không riêng `hoi_huyet_dan`:
+ * người từ Kim Đan thường mang đan Đại / Thượng (B, review #1257). Mô phỏng cân bằng chặn đường dùng Hồi Huyết Đan 40% (`ASSUME_DUNGEON.potions`) nên đếm mọi đan là hướng AN TOÀN
+ * (mỗi viên hồi >= 40%, không lạc quan hơn số đo). Tra bảng bằng `byId` (id lấy từ hồ sơ lưu, không tin).
+ */
 export function potionCount(c: PlayerCtrl): number {
   let n = 0;
-  for (const slot of c.inv)
-    if (slot && slot.itemId === "hoi_huyet_dan" && Number.isFinite(slot.qty) && slot.qty > 0)
-      n += slot.qty;
+  for (const slot of c.inv) {
+    if (!slot || !Number.isFinite(slot.qty) || slot.qty <= 0) continue;
+    if (byId(ITEM_BY_ID, slot.itemId)?.effect?.kind === "healHp") n += slot.qty;
+  }
   return n;
 }
 

@@ -86,9 +86,9 @@ describe("AMBUSH_MIN_POTIONS (CD6c): số Hồi Huyết Đan tối thiểu để
       expect(ambushWarnings(env)).toEqual([]);
     }
     expect(ambushNotice({ AMBUSH: "on", AMBUSH_MIN_POTIONS: "2" })).toContain(
-      "dưới 2 Hồi Huyết Đan",
+      "dưới 2 đan hồi huyết",
     );
-    expect(ambushNotice({ AMBUSH: "on", AMBUSH_MIN_POTIONS: "0" })).not.toContain("Hồi Huyết Đan");
+    expect(ambushNotice({ AMBUSH: "on", AMBUSH_MIN_POTIONS: "0" })).not.toContain("đan hồi huyết");
     // tắt AMBUSH thì không có dòng log nào dù đặt núm này
     expect(ambushNotice({ AMBUSH_MIN_POTIONS: "2" })).toBeNull();
   });
