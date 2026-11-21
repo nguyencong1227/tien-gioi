@@ -15,6 +15,7 @@ Mục lục:
 - [Tổ đội](#tổ-đội)
 - [Bí cảnh](#bí-cảnh)
 - [Trùm nhiều chiêu: học né](#trùm-nhiều-chiêu-học-né)
+- [Gặp chặn đường (đang thử nghiệm)](#gặp-chặn-đường-đang-thử-nghiệm)
 - [Luân hồi và Hoàng Tuyền](#luân-hồi-và-hoàng-tuyền)
 - [PK thách đấu](#pk-thách-đấu)
 - [Tông môn](#tông-môn)
@@ -305,6 +306,26 @@ Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hà
 - Thứ tự an toàn: **quan sát vùng, bước ra, rồi đánh**. Đừng tham thêm một đòn trong lúc vùng đã hiện.
 
 > **Mẹo:** Cả đội đứng sát nhau thì một vòng tròn trúng cả đội. Chia nhau ra vừa phải: một người chịu mục tiêu của trùm, người còn lại đứng nghiêng ra ngoài vùng của đòn quét.
+
+---
+
+## Gặp chặn đường (đang thử nghiệm)
+
+> **Tính năng này chỉ có khi máy chủ bật.** Hiện nó **TẮT** ở bản chạy thật cho tới khi nghiệm thu xong (xem `docs/THIET_KE_CHAN_DUONG.md`). Khi bật, nó chỉ chạy với bản trò chơi mới: nếu thấy trang cũ, tải lại trang.
+
+- **Khi nào gặp:** đi bộ ngoài vùng hoang, **thỉnh thoảng** (đi liên tục ngoài vùng hoang vài phút tới mười mấy phút mới gặp một lần, tuỳ độ nguy hiểm của vùng) có kẻ chặn đường: tán tu, tà tu, cường đạo hay yêu thú tuỳ vùng. Có thời gian hồi (khoảng 8 phút sau một lần) và **trần mỗi ngày** (12 lần). Chỉ **đi bộ thật** mới tính; dịch chuyển tức thời không tính.
+- **Sẽ KHÔNG bị chặn khi:** đang ở trấn / khu an toàn, trong bí cảnh, đang thách đấu PK, khí huyết dưới 30%, vừa đánh nhau hoặc bị đánh (8 giây), có đồng đội ở gần (khoảng 700 px) đang giao chiến, vừa đầu thai, hoặc đang rớt mạng chờ nối lại.
+- **Hộp thoại (10 giây):** nhân vật đứng yên, không ai đánh được. Có ba nút: **Chiến** (phím Enter), **Bỏ chạy: trả Linh thạch**, **Bỏ chạy: trả tu vi**. **Giá hiện ngay trên nút và đúng bằng số bị trừ**; giá tu vi là một phần nhỏ thanh tu vi và **không bao giờ làm rớt cảnh giới**. Hết 10 giây không bấm thì tính là **Chiến**. Bỏ chạy ở hộp thoại: trả giá rồi đi tiếp như chưa có gì.
+- **Chiến:** bạn vào một đấu trường nhỏ **một mình** với kẻ chặn đường (đồng đội không vào được), có đồng hồ 2 phút. Hạ hết kẻ chặn đường là **thắng**: nhận tu vi và Linh thạch (đồ rơi và sách chiêu sẽ có sau khi chốt cân bằng); sau vài giây bạn về **đúng chỗ cũ** và được bảo hộ 5 giây.
+- **Bỏ chạy giữa trận** luôn bấm được (kể cả khi bị khống chế) nhưng phải **vận 1 giây** mới thoát, và giá **cao gấp đôi** giá ở hộp thoại. Bị hạ giữa lúc vận thì tính là thua.
+- **Thua là CHẾT THẬT:** bị hạ khi đang đánh trong đấu trường giống như chết ở bản đồ thường: bạn vào **Hoàng Tuyền và mất kiếp** (xem mục Luân hồi bên dưới), không trừ thêm giá. Để việc này công bằng: kẻ chặn đường **không mạnh vượt cảnh giới** của bạn, và **Bỏ chạy luôn là một lựa chọn**.
+- **Hết giờ, rời phòng, thoát chủ động:** trả giá giữa trận bằng tu vi (không thể né giá bằng cách thoát).
+- **Rớt mạng:** trò chơi **chờ nối lại 90 giây**, đồng hồ hộp thoại / trận **đóng băng** và kẻ địch bỏ mục tiêu; nối lại kịp thì mọi thứ còn nguyên. Chỉ khi quá hạn mới tính giá. Không ai bị phạt oan vì mạng chập chờn.
+- **Đội:** người trong đội gặp chặn đường vẫn đấu **một mình** (đấu trường chỉ nhận đúng một người, đồng đội không vào giúp được).
+
+> **Mẹo:** Hộp thoại có giá ngay trên nút, nên hãy quyết định theo khí huyết và đan còn lại. Nếu khí huyết đầy và bạn quen đánh bậc này thì **Chiến** là cách duy nhất để nhận thưởng; chưa chắc thì **Bỏ chạy** bằng Linh thạch cho khỏi tốn tu vi (thua trận là mất kiếp, nên đừng liều). Các con số trong mục này (xác suất, hồi, giá, thưởng) **có thể chỉnh** sau khi cân bằng.
+
+Chi tiết thiết kế: [docs/THIET_KE_CHAN_DUONG.md](THIET_KE_CHAN_DUONG.md).
 
 ---
 
