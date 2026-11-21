@@ -1991,3 +1991,19 @@ Cách chạy:
 npm run build -w client
 npm run e2e:chieu-vo-sac -w server
 ```
+
+## 37. E2E thật Gặp chặn đường (CD11, #1230; `npm run e2e:chan-duong -w server`)
+Điều kiện của CD10 (#1070: "npm test + E2E + bench") trước khi bật `AMBUSH` ở bản chạy thật. Cùng khung `server/scripts/e2e-kit.ts` (`Tab`, `shown`, `listenWithRetry`): server Colyseus thật trong tiến trình (thư mục dữ liệu tạm, KHÔNG ghi `server/data/players`, KHÔNG cổng 2567), proxy TCP giữa Chrome và server (như `e2e-noi-lai.ts`), MỘT tab Chrome headless điều khiển bằng CDP, phím thật (D đi, Enter = Chiến, J đánh). Mỗi ca một nhân vật mới.
+
+**Tất định, không sửa mã trò chơi:** `AMBUSH=on` đặt trước khi dựng phòng; sau khi phòng có người, kịch bản tiêm vào `world.ambush` (`AmbushRuntime` vốn dành cho việc tiêm): `random = () => 0` (luôn trúng xúc xắc) và MỘT bầy `lang` nhỏ (bảng thật `AMBUSH_FOES` còn rỗng, CD5b). Kích hoạt: dịch nhân vật tới chỗ đi bộ ngoài trấn XA TRÙM NHẤT (`ambushBlocked` nhánh "boss" chặn khi trùm sống trong 900 px; kiểm lại tại chỗ, thử lại tối đa 4 lần vì quái / trùm lang thang) rồi đặt quãng đã đi sát một bước chân (`AMBUSH_STRIDE_PX`), cho CLIENT THẬT giữ phím D để máy chủ tự cộng quãng đi thật.
+
+Các ca (đều qua giao diện thật; mỗi ca kèm kiểm trạng thái phía máy chủ):
+1. **Chiến, thắng:** hộp thoại (tên kẻ chặn, văn mẫu, ba nút có giá, đếm ngược, dòng "chết thật") -> Enter -> đấu trường (HUD, đồng hồ, nút Bỏ chạy) -> hạ kẻ địch bằng đòn của client thật -> thẻ "Chiến thắng" + thưởng -> về ĐÚNG chỗ cũ (lệch 0 px), bảo hộ, ví / tu vi tăng, `ambushDaily.n = 1`.
+2. **Bỏ chạy ở hộp thoại bằng Linh thạch:** ví giảm ĐÚNG giá hiện trên nút (client không gửi số), đi tiếp được, hồi đã đặt.
+3. **Bỏ chạy giữa trận:** giá Linh thạch GẤP ĐÔI hộp thoại, tấm xác nhận hiện đúng giá, máy chủ VẬN 1 giây (ví chưa đổi trong lúc vận), trừ đúng giá, về chỗ cũ.
+4. **Thua = chết thật (mục 53):** Hoàng Tuyền ở PHÒNG GỐC, `limbo.coinAtDeath` = ví trước trận, kết cục `{ result: "lost", died: true }` không có `paid` (không trừ thêm giá).
+5. **Rớt mạng (proxy chặn kết nối mới):** (a) lúc hộp thoại: đồng hồ ĐÓNG BĂNG (còn 9501 -> 9501 ms sau 800 ms), nối lại còn nguyên cùng hộp thoại; (b) quá hạn chờ lúc hộp thoại: trả giá hộp thoại bằng tu vi, hồ sơ lưu đúng; (c) giữa trận: đồng hồ trận đóng băng, nối lại còn nguyên; (d) quá hạn giữa trận: trả giá bằng tu vi.
+6. **Hồ sơ + console:** hồ sơ ca 1 trên đĩa (`ambushDaily`, `ambushUntil`, bản đồ gốc); không lỗi console / cảnh báo mất tin (Tab gom `errors` suốt kịch bản).
+
+**Số đo (B, 21/11/2026):** một lượt đầy đủ ~50 giây; 10 / 10 lượt liền ĐẠT. Đột biến phía máy chủ (cây sạch sau mỗi lần), kịch bản ĐỎ ở đúng ca: trừ giá Linh thạch sai +1 (ca 2), về sai chỗ +200 px (ca 1), bỏ bảo hộ sau khi về (ca 1), gục trong đấu trường không chết thật (ca 4), hộp thoại không đóng băng khi rớt mạng (ca 5a), đồng hồ trận không đóng băng (ca 5c), rớt quá hạn lúc hộp thoại không trừ tu vi (ca 5b). `E2E_ONLY=1,3` chạy riêng các ca (dev). Cần `npm run build` và google-chrome.
+
