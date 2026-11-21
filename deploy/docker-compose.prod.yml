@@ -44,6 +44,10 @@ services:
       - DATABASE_URL=postgres://tiengioi:${POSTGRES_PASSWORD}@db:5432/tiengioi
       - AUTH_MODE=account
       - TRUST_PROXY=1 # Tin tưởng proxy Cloudflare Tunnel (1 tầng proxy đặt X-Forwarded-For)
+      - ASSETS_PRIVATE_DIR=/assets-private # Gói tài nguyên RIÊNG (mục 63): thư mục dưới đây; thiếu manifest.json = TẮT, client dùng hình thay thế
+    volumes:
+      # Gói hình cấm phân phối lại: CHỈ ĐỌC, chỉ thư mục dist đã đóng (không có tệp nguồn); thư mục chủ thiếu thì Docker tạo thư mục rỗng = tắt. Xem docs/THIET_KE_GOI_TAI_NGUYEN_RIENG.md
+      - ${ASSETS_PRIVATE_DIST:-/mnt/data/assets-private/dist}:/assets-private:ro
     depends_on:
       db:
         condition: service_healthy

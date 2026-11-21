@@ -18,8 +18,11 @@ services:
       - PORT=2567
       - TIEN_GIOI_PROD=1 # Cổng 2567 chỉ cho bản chạy thật: server từ chối khởi động ở 2567 nếu thiếu cờ này (server/src/startup.ts)
       - DATA_DIR=/app/data/players
+      - ASSETS_PRIVATE_DIR=/assets-private # Gói tài nguyên RIÊNG (mục 63); thiếu manifest.json = TẮT
     volumes:
       - tien-gioi-data:/app/data/players
+      # Gói hình cấm phân phối lại: CHỈ ĐỌC (docs/THIET_KE_GOI_TAI_NGUYEN_RIENG.md); thư mục chủ thiếu thì Docker tạo thư mục rỗng = tắt
+      - ${ASSETS_PRIVATE_DIST:-/mnt/data/assets-private/dist}:/assets-private:ro
     logging:
       driver: json-file
       options:
