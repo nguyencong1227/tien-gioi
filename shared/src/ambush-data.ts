@@ -545,10 +545,11 @@ export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [
 const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 /**
  * Chặn đường chỉ kích hoạt khi người chơi ĐI BỘ thật (`systems/ambush.ts`; đứng yên / dịch chuyển không tính), nên văn mẫu không được viết như người chơi đang NGỒI / vừa thiền
- * ("thẳng về chỗ ngươi ngồi", "ngươi mở mắt", "quanh chỗ ngồi"): nhiều cảnh lấy từ sự kiện BẾ QUAN của nguồn nên dễ lọt (B bắt 3 cảnh ở review #1240). Chỉ bắt dạng nói về NGƯƠI / chỗ ngồi
- * của ngươi; kẻ địch "ngồi" / "mở mắt" (ngôi thứ ba) vẫn hợp lệ.
+ * ("thẳng về chỗ ngươi ngồi", "ngươi mở mắt", "quanh chỗ ngồi của ngươi"): nhiều cảnh lấy từ sự kiện BẾ QUAN của nguồn nên dễ lọt (B bắt 3 cảnh ở review #1240). Chỉ bắt dạng nói về NGƯƠI:
+ * "ngươi ngồi / mở mắt / ..." hoặc "chỗ ngươi ngồi / chỗ ngồi của ngươi"; kẻ địch "ngồi / mở mắt" (ngôi thứ ba) và "chỗ ngồi của hắn" vẫn hợp lệ (B, #1242).
  */
-const SITTING_RE = /(?:ngươi|chỗ)\s+(?:ngồi|mở mắt|nhập định|đả tọa|bế quan)|chỗ ngồi/iu;
+const SITTING_RE =
+  /(?:ngươi|chỗ\s+(?:của\s+)?ngươi)\s+(?:ngồi|mở mắt|nhập định|đả tọa|bế quan)|chỗ\s+ngồi\s+(?:của\s+)?ngươi/iu;
 const ID_RE = /^[a-z][a-z0-9_]{0,47}$/;
 const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 const MAP_IDS: ReadonlySet<string> = new Set(MAPS.map((m) => m.id));

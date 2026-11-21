@@ -141,6 +141,19 @@ describe("ambushViolations: cảnh", () => {
     ])
       expect(ambushViolations([scene({ text })], []), text).toEqual([]);
   });
+  it("KHÔNG bắt 'chỗ ngồi' ngôi thứ ba (của hắn / của tên trùm); vẫn bắt 'chỗ ngồi của ngươi'", () => {
+    // ngôi thứ ba: hợp lệ (B, #1242 — thu hẹp nhánh 'chỗ ngồi' trần)
+    for (const text of [
+      "Sơn tặc đứng dậy khỏi chỗ ngồi của hắn, vuốt gươm: 'Đường này qua lại phải nộp mạng.'",
+      "Tên trùm ngồi trên ngai xương, tay đặt lên chỗ ngồi của hắn bên tả, nhìn ngươi đến.",
+    ])
+      expect(ambushViolations([scene({ text })], []), text).toEqual([]);
+    // ngôi hai: vẫn bị bắt
+    for (const text of [
+      "Quanh chỗ ngồi của ngươi đã kín mắt xanh mắt đỏ, bầy yêu vây từ lúc nào chẳng hay.",
+    ])
+      expect(ambushViolations([scene({ text })], []).join("\n")).toMatch(/NGỒI/);
+  });
   it("bắt id trùng", () => {
     expect(ambushViolations([scene(), scene()], []).join("\n")).toMatch(/trùng id/);
   });
