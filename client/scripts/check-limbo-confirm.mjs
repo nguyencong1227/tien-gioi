@@ -445,6 +445,76 @@ async function main() {
       await evalJs(`window.__ui.hideLimbo(); 1`);
       await sleep(200);
       check(!(await box()).open, "hideLimbo: hộp xác nhận cũng đóng");
+
+      console.log(
+        "  [8] máy chủ TỪ CHỐI đầu thai (lỗi gấp mục 58): ở lại Hoàng Tuyền, LÝ DO nằm trên nút (không chỉ toast 3 s), nút mở lại, bấm lại được",
+      );
+      const REASON = "Lựa chọn đầu thai không hợp lệ.";
+      const status = () =>
+        evalJs(
+          `(() => { const e = document.getElementById("limbo-rebirth-status"); return { hidden: e.hidden, text: e.textContent, bad: e.classList.contains("bad") }; })()`,
+        );
+      const btnBusy = () =>
+        evalJs(
+          `document.getElementById("limbo-btn-rebirth").getAttribute("aria-disabled") === "true"`,
+        );
+      await openLimbo();
+      check((await status()).hidden, "chưa bấm gì: dòng trạng thái ẩn");
+      await evalJs(`window.__limboRefuse = ${JSON.stringify(REASON)}; 1`);
+      b = await center("#limbo-btn-rebirth");
+      await tap(b.x, b.y);
+      await sleep(600);
+      await tap((await center("#act-btn-yes")).x, (await center("#act-btn-yes")).y);
+      await sleep(400);
+      let sRefuse = await status();
+      check(
+        !sRefuse.hidden && sRefuse.bad && sRefuse.text.includes(REASON),
+        `lý do hiện trên nút, tô đỏ: "${sRefuse.text}"`,
+      );
+      check(await limboOpen(), "vẫn ở màn Hoàng Tuyền (KHÔNG tự đóng)");
+      check(!(await btnBusy()), "nút Đầu thai mở lại ngay (không chờ hết giờ)");
+      await shot("hoang-tuyen-tu-choi");
+      await sleep(3300); // quá 3 s của toast: toast đã tắt, lý do vẫn còn
+      check(
+        (await evalJs(`document.querySelectorAll("#toast p").length`)) === 0,
+        "toast đã tắt sau 3 s",
+      );
+      sRefuse = await status();
+      check(!sRefuse.hidden && sRefuse.text.includes(REASON), "lý do VẪN còn sau khi toast tắt");
+      check(await limboOpen(), "vẫn ở Hoàng Tuyền sau 3,3 s");
+      // máy chủ sửa lại: bấm lại đầu thai được, màn đóng theo Mạnh Bà
+      await evalJs(`window.__limboRefuse = undefined; 1`);
+      b = await center("#limbo-btn-rebirth");
+      await tap(b.x, b.y);
+      await sleep(600);
+      await tap((await center("#act-btn-yes")).x, (await center("#act-btn-yes")).y);
+      await sleep(500);
+      check(!(await limboOpen()), "bấm lại sau khi hết lỗi: đầu thai, Hoàng Tuyền đóng");
+      // toast KHÔNG liên quan lúc chờ (thông báo quái, thành tựu) không bị coi là lời từ chối
+      await evalJs(`document.getElementById("reborn-overlay").hidden = true; 1`); // màn Mạnh Bà của lần đầu thai vừa rồi che nút
+      await openLimbo();
+      b = await center("#limbo-btn-rebirth");
+      await tap(b.x, b.y);
+      await sleep(600);
+      await evalJs(`window.__limboHold = true; 1`);
+      await tap((await center("#act-btn-yes")).x, (await center("#act-btn-yes")).y);
+      await evalJs(
+        `window.__ui.toast({ text: "★ Hôi Lang tinh anh: nên đi đội.", tone: "info" }); window.__ui.toast({ text: "Đạt thành tựu: Nhập Thế Lạc Hà", tone: "good" }); 1`,
+      );
+      await sleep(200);
+      check(
+        (await btnBusy()) && /Đang uống canh/.test((await status()).text),
+        `toast không liên quan: vẫn "đang chờ", không báo lỗi oan ("${(await status()).text}")`,
+      );
+      // máy chủ IM LẶNG tới hết giờ chờ (3 s): nói rõ + mở lại nút (không để người chơi nhìn nút khoá không lý do)
+      await sleep(3300);
+      const sSilent = await status();
+      check(
+        !sSilent.hidden && sSilent.bad && /chưa phản hồi/.test(sSilent.text),
+        `hết giờ chờ: báo "máy chủ chưa phản hồi" ("${sSilent.text}")`,
+      );
+      check(!(await btnBusy()), "hết giờ chờ: nút Đầu thai mở lại");
+      await evalJs(`window.__limboHold = undefined; window.__ui.hideLimbo(); 1`);
     }
   } finally {
     try {

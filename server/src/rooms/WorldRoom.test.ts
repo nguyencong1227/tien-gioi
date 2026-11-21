@@ -2801,17 +2801,10 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(soulOf(name)).toMatchObject({ duyen: gain - 12, unlocks: { du_am: 1 } });
     expect(a.souls).toHaveLength(2); // vào phòng + một lần mua
 
-    // đầu thai: lựa chọn không hợp lệ bị từ chối (chưa mở Ký vật nên không giữ được đồ)
-    // Đợi ĐÚNG toast "không hợp lệ", không phải "toast cuối cùng": loạt soulBuy rác ở trên gửi 8 tin
-    // nhưng test chỉ đợi 2 toast, nên toast "Mục này không có." đến muộn (máy CI chậm) từng bị bắt
-    // nhầm làm phản hồi của rebirth (main đỏ 11/11).
-    const t1 = a.toasts.length;
+    // đầu thai KHOAN DUNG (mục 58): đòi giữ đồ khi chưa mở Ký vật KHÔNG làm kẹt ở Hoàng Tuyền: vẫn đầu thai, đồ bị bỏ, toast báo phần đã bỏ.
+    // Gửi hai tin cùng lúc: chỉ một lần đầu thai.
     a.room.send("rebirth", { keep: ["hac_ho_kiem"] });
-    await waitFor(() => a.toasts.slice(t1).some((t) => /không hợp lệ/.test(t.text)));
-    expect(a.reborns).toHaveLength(0);
-    // hợp lệ: gửi hai tin cùng lúc, chỉ một lần đầu thai
-    a.room.send("rebirth", { keep: [] });
-    a.room.send("rebirth", { keep: [] });
+    a.room.send("rebirth", { keep: ["hac_ho_kiem"] });
     const reborn = await waitFor(() => a.reborns[0]);
     expect(reborn.kiep).toBe(2);
     await sleep(300);
@@ -2823,13 +2816,48 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(c).toBeDefined();
     const after = playerOf(name);
     expect(after.limbo).toBeUndefined();
+    expect(a.toasts.some((t) => /Đầu thai:.*bỏ 1 món/.test(t.text))).toBe(true);
+    expect(after.inventory.every((x: unknown) => x === null)).toBe(true); // đồ đòi giữ vượt ô đã bị bỏ
     // Hoàng Tuyền đóng: đi lại được, Duyên và mở khóa vẫn còn
     a.room.send("input", { seq: 99, dx: 1, dy: 0 });
     await waitFor(() => a.me().lastSeq === 99);
     expect(soulOf(name)).toMatchObject({ kiep: 2, duyen: gain - 12, unlocks: { du_am: 1 } });
   });
 
-  it("khắc chân linh (M7.2c): LimboMsg có `engravable`; đầu thai kèm `engrave` ghi vào chân linh, kiếp mới có chiêu tầng 1 ô trống; lựa chọn xấu bị từ chối; hai tin cùng lúc chỉ một lần đầu thai", async () => {
+  // Lỗi gấp bản thật v0.5.1 (QUYET_DINH_M3 mục 58): nhân vật MỚI (kiếp 1, Phàm Nhân, chưa chơi phút nào) chết rồi KHÔNG đầu thai được
+  it("nhân vật mới tinh chết ngay (kiếp không tính, chân linh trắng): gửi đúng tin client thật vẫn đầu thai được", async () => {
+    const name = "Moi Tinh Chet";
+    WorldRoomClass.achievements = true; // bản thật v0.5.1 chạy `ACHIEVEMENTS=on`
+    const a = await join(name);
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const p = serverState(a.room).players.get(sid)!;
+    p.x = sr.world.map.townPx.x + sr.world.map.townPx.r + 300;
+    p.y = sr.world.map.townPx.y;
+    const [, m] = [...serverState(a.room).monsters].find(([, mm]) => mm.kind === "lang")!;
+    const { hurtPlayer } = await import("../systems/combat");
+    hurtPlayer(sr.world, sid, p, 1e9, m);
+    const limbo = await waitFor(() => a.limbos[0]);
+    expect(limbo.summary).toMatchObject({ kiep: 1, realm: 0, tier: 0, gain: 0 });
+    expect(playerOf(name).limbo).toMatchObject({ credited: true, counts: false });
+    // người chơi thoát rồi đăng nhập lại (như `hanh` ở bản thật): Hoàng Tuyền hiện lại từ hồ sơ
+    await leave(a);
+    const b = await join(name);
+    await waitFor(() => b.limbos[0]);
+    const pb = serverState(b.room).players.get(b.room.sessionId)!;
+    // đúng như client (`ui.ts`, nút Đầu thai): xuất thân mặc định, không giữ gì, KHÔNG có `engrave`
+    b.room.send("rebirth", { origin: "pham_gia", keep: [] });
+    const reborn = await waitFor(() => b.reborns[0], 4000).catch(() => undefined);
+    expect(
+      reborn,
+      `không đầu thai được; toast: ${JSON.stringify(b.toasts.map((t) => t.text))}`,
+    ).toBeDefined();
+    expect(pb.dead).toBe(false);
+    expect(playerOf(name).limbo).toBeUndefined();
+    WorldRoomClass.achievements = false;
+  });
+
+  it("khắc chân linh (M7.2c): LimboMsg có `engravable`; đầu thai kèm `engrave` ghi vào chân linh, kiếp mới có chiêu tầng 1 ô trống; hai tin cùng lúc chỉ một lần đầu thai", async () => {
     const name = "Khac Chan Linh";
     const a = await join(name);
     const sr0 = serverRoom(a.room) as any;
@@ -2852,23 +2880,7 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(limbo.soul.engraved ?? []).toEqual([]);
     expect(playerOf(name).limbo.engravable).toEqual(["hoa_van_kiem", "me_tung_bo", "ung_trao"]); // lưu cùng hồ sơ
 
-    // lựa chọn xấu: quá nấc (3 > 2), chiêu không có trong engravable, trùng, sai kiểu: toast, VẪN ở Hoàng Tuyền, chân linh không đổi
-    for (const bad of [
-      ["hoa_van_kiem", "me_tung_bo", "ung_trao"],
-      ["huyen_bang_chi"],
-      ["me_tung_bo", "me_tung_bo"],
-      "me_tung_bo",
-      [5],
-      ["constructor"],
-    ]) {
-      const n = a.toasts.length;
-      a.room.send("rebirth", { keep: [], engrave: bad });
-      await waitFor(() => a.toasts.slice(n).some((t) => /không hợp lệ/.test(t.text)));
-    }
-    expect(a.reborns).toHaveLength(0);
-    expect(soulOf(name).engraved).toEqual([]);
-    expect(sr0.world.ctrl.get(sid0).limbo).toBeDefined();
-
+    // (lựa chọn xấu KHÔNG còn bị từ chối: xem test 'đầu thai khoan dung' bên dưới và `rebirth-choice.test.ts`)
     // hợp lệ, gửi hai tin cùng lúc: chỉ MỘT lần đầu thai, chân linh khắc đúng hai chiêu
     const skills: SkillsMsg[] = [];
     a.room.onMessage("skills", (m: SkillsMsg) => skills.push(m));
@@ -2886,6 +2898,33 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(sk.slots).toEqual(["", "", "", ""]);
     expect(playerOf(name).limbo).toBeUndefined();
     expect(playerOf(name).skills.learned).toEqual({ me_tung_bo: 1, hoa_van_kiem: 1 });
+  });
+
+  it("đầu thai khoan dung (mục 58): tin xấu (chiêu lạ, quá ô, xuất thân chưa mở) KHÔNG làm kẹt ở Hoàng Tuyền: phần sai bị bỏ, chân linh đã khắc giữ nguyên, có toast báo", async () => {
+    const name = "Khoan Dung Xau";
+    const a = await join(name);
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const c = sr.world.ctrl.get(sid);
+    c.soul = await sr.souls.update(c.identity.soulKey, (x: any) => ({
+      ...x,
+      unlocks: { khac: 2 },
+      engraved: ["me_tung_bo"],
+    }));
+    await playAndDie(a);
+    await waitFor(() => a.limbos[0]);
+    // MỘT chiêu lạ + quá ô + xuất thân chưa mở + giữ đồ khi chưa mở Ký vật: vẫn đầu thai
+    a.room.send("rebirth", {
+      origin: "the_tu",
+      keep: ["hac_ho_kiem"],
+      engrave: ["huyen_bang_chi", "me_tung_bo", "hoa_van_kiem"],
+    });
+    const reborn = await waitFor(() => a.reborns[0]);
+    expect(reborn.kiep).toBe(2);
+    expect(soulOf(name).engraved).toEqual(["me_tung_bo"]); // chiêu lạ => bỏ CẢ phần khắc, KHÔNG xoá chiêu đã khắc
+    expect(sr.world.ctrl.get(sid).origin).toBe("pham_gia");
+    expect(sr.world.ctrl.get(sid).limbo).toBeUndefined();
+    expect(a.toasts.some((t) => /Đầu thai:.*xuất thân.*khắc chiêu/.test(t.text))).toBe(true);
   });
 
   it("đầu thai KHÔNG gửi `engrave`: giữ nguyên chiêu đã khắc từ trước (client cũ / không đổi ý)", async () => {

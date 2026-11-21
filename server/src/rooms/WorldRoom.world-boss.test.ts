@@ -26,8 +26,8 @@ let WorldRoomCls: typeof import("./WorldRoom").WorldRoom;
 let ensureWorldBossRooms: typeof import("./WorldRoom").ensureWorldBossRooms;
 const rooms: Room[] = [];
 
-/** 00:00 giờ máy chủ (UTC+7) của ngày 18/11/2026. */
-const DAY0 = Date.UTC(2026, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
+/** 00:00 giờ máy chủ (UTC+7) của một ngày TƯƠNG LAI XA (18/11/2036): đồng hồ GIẢ phải luôn SAU đồng hồ thật, vì sổ trùm coi giờ lùi là "đồng hồ đi lùi" và lỡ giờ (đặt ngày 18/11/2026 thì test đỏ từ lúc đồng hồ thật qua giờ giả, 18/11/2026 ~04:50 UTC, làm CI mọi PR đỏ). */
+const DAY0 = Date.UTC(2036, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
 const at = (h: number, m = 0, s = 0) => DAY0 + ((h * 60 + m) * 60 + s) * 1000;
 
 /** Khung giờ thử: Xích Mãng (có bộ chiêu) ở Lạc Hà Trấn, 12:00, 30 phút. */

@@ -263,10 +263,13 @@ describe("nội dung nhiệm vụ (#19)", () => {
     }
   });
 
-  it("3 nhiệm vụ lặp ở Bảng cáo thị (Lạc Hà), 3 ở Vọng Sương Trạm (Kim Đan, M6) và 3 ở Hàn Vân Trạm (Nguyên Anh, M7.5c)", () => {
+  it("3 nhiệm vụ lặp ở Bảng cáo thị (Lạc Hà), 3 ở Trạm úy Thanh Lộ (Trúc Cơ, D7 #755), 3 ở Vọng Sương Trạm (Kim Đan, M6) và 3 ở Hàn Vân Trạm (Nguyên Anh, M7.5c)", () => {
     const daily = QUESTS.filter((q) => q.daily);
-    expect(daily).toHaveLength(9);
+    expect(daily).toHaveLength(12);
     expect(daily.filter((q) => q.giver === "cao_thi")).toHaveLength(3);
+    const hp = daily.filter((q) => q.giver === "tran_uy");
+    expect(hp).toHaveLength(3);
+    for (const q of hp) expect(q.minRealm, q.id).toEqual(expect.objectContaining({ realm: 2 }));
     const vs = daily.filter((q) => q.giver === "tram_truong");
     expect(vs).toHaveLength(3);
     for (const q of vs) expect(q.minRealm, q.id).toEqual(expect.objectContaining({ realm: 3 }));

@@ -12,6 +12,11 @@ export function ambushOn(env: NodeJS.ProcessEnv): boolean {
   return flag(env.AMBUSH);
 }
 
+/** `AMBUSH_BOTS` -> bật / tắt cho bot gặp chặn đường (mục 52, CD9 #1069). Mặc định TẮT. */
+export function ambushBotsOn(env: NodeJS.ProcessEnv): boolean {
+  return flag(env.AMBUSH_BOTS);
+}
+
 function warn(name: string, raw: string | undefined, effect: string): string[] {
   const v = (raw ?? "").trim();
   if (v === "") return [];
@@ -20,12 +25,17 @@ function warn(name: string, raw: string | undefined, effect: string): string[] {
   return [`${name}='${v}' không hợp lệ (dùng on hoặc off): đang TẮT, ${effect}.`];
 }
 
-/** Cảnh báo lúc khởi động khi `AMBUSH` có giá trị lạ (gõ nhầm `enable`, `onn`): lặng lẽ tắt mà người vận hành tưởng đã bật. Không đặt / rỗng: không cảnh báo. */
+/** Cảnh báo lúc khởi động khi `AMBUSH` hoặc `AMBUSH_BOTS` có giá trị lạ. Không đặt / rỗng: không cảnh báo. */
 export function ambushWarnings(env: NodeJS.ProcessEnv): string[] {
-  return warn("AMBUSH", env.AMBUSH, "người chơi không bị chặn đường");
+  return [
+    ...warn("AMBUSH", env.AMBUSH, "người chơi không bị chặn đường"),
+    ...warn("AMBUSH_BOTS", env.AMBUSH_BOTS, "bot bị bỏ qua khi gặp chặn đường"),
+  ];
 }
 
 /** Dòng log lúc khởi động khi BẬT (để `./prod.sh logs game | grep AMBUSH` xác nhận sau khi triển khai); tắt thì không có dòng nào (`null`). */
 export function ambushNotice(env: NodeJS.ProcessEnv): string | null {
-  return ambushOn(env) ? "Gặp chặn đường: BẬT (AMBUSH)" : null;
+  if (!ambushOn(env)) return null;
+  const botPart = ambushBotsOn(env) ? " [bật bot (AMBUSH_BOTS)]" : "";
+  return `Gặp chặn đường: BẬT (AMBUSH)${botPart}`;
 }

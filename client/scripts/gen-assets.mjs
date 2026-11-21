@@ -1721,6 +1721,8 @@ function drawNpcSprite(id) {
     lao_phu: { robe: 0x7a5aa0, trim: 0xe9dcf5, hair: 0xe8e4da, beard: true, prop: "talisman" },
     // Hắc Phong Cốc và bí cảnh (trước M6 dùng ảnh dự phòng)
     lai_buon: { robe: 0x6b4f8a, trim: 0xe6c365, hair: 0x241c18, beard: false, prop: "pack" },
+    // Trạm úy Thanh Lộ (D7 #755): đội trưởng thợ săn trấn thủ cửa ải, áo xanh ô-liu, tay cầm giáo dài
+    tran_uy: { robe: 0x4a6b3a, trim: 0xc9d36a, hair: 0x241c18, beard: true, prop: "spear" },
     thu_mon: { robe: 0x3a6f8f, trim: 0xb8e0f0, hair: 0xd8d2c5, beard: true, prop: "lantern" },
     // Vọng Sương Trạm (Âm Sương Trạch, M6)
     tram_truong: { robe: 0x4a6b78, trim: 0xd9e7ec, hair: 0xd8d2c5, beard: true, prop: "lantern" },
@@ -1818,6 +1820,11 @@ function drawNpcSprite(id) {
     s.line(28, 15, 28, 32, 0x5c3d24, 2);
     s.rect(24, 12, 8, 5, 0x6e737b);
     s.rect(25, 13, 6, 2, 0x9aa0a8);
+  } else if (cfg.prop === "spear") {
+    // Trạm úy cầm giáo dài: cán gỗ, đầu giáo kim loại nhọn — vũ khí trấn thủ cửa ải
+    s.line(30, 3, 30, 36, 0x6e5a3a, 2);
+    s.tri(30, 1, 27, 9, 33, 9, 0xc8d4dc);
+    s.set(30, 2, 0xf0f6fa);
   }
 
   return s;
@@ -1898,6 +1905,7 @@ function buildAtlas() {
     "lai_buon_han",
     "tho_ren_han",
     "lao_dan",
+    "tran_uy",
     "lao_phu",
   ]) {
     push(`npc-${npcId}`, drawNpcSprite(npcId));
