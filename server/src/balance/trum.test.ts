@@ -51,32 +51,53 @@ function fakeBoss(over: {
   };
 }
 
+/**
+ * Hạn tường minh cho ba ca chạy mô phỏng trên dữ liệu THẬT (#1215). Đo 22/11 trên máy dev: 0,65 / 0,76 / 1,6 giây (hạn mặc định 15 giây của `vitest.config.ts`, nên dư ~9 lần); số ca
+ * và số bầy tăng theo dữ liệu D / E / G, còn CI chậm 2-3 lần và cả bộ chạy song song nên ca nặng nhất có thể phình lên vài lần. Hạn dài chỉ làm test CHẬM-NHƯNG-ĐÚNG khỏi đỏ,
+ * không che lỗi: kết quả sai vẫn đỏ ngay (khẳng định, không phải thời gian).
+ */
+const DATA_TEST_TIMEOUT_MS = 60_000;
+
 describe("cân bằng trùm trên dữ liệu THẬT (BOSSES, T5 #874)", () => {
-  it("dữ liệu qua `bossViolations` (tiền đề) và qua `bossBalanceViolations` (mọi đòn <= 55% khí huyết, bot né hoàn hảo không bị trúng)", () => {
-    expect(bossViolations()).toEqual([]);
-    expect(bossBalanceViolations()).toEqual([]);
-  });
+  it(
+    "dữ liệu qua `bossViolations` (tiền đề) và qua `bossBalanceViolations` (mọi đòn <= 55% khí huyết, bot né hoàn hảo không bị trúng)",
+    () => {
+      expect(bossViolations()).toEqual([]);
+      expect(bossBalanceViolations()).toEqual([]);
+    },
+    DATA_TEST_TIMEOUT_MS,
+  );
 
-  it("mỗi trùm: có bậc đúng bậc, có chiêu sát thương, bot đứng yên bị trúng (đối chứng) còn bot né thì không", () => {
-    for (const def of BOSSES) {
-      const st = bossStep(def);
-      expect(st.step, def.kind).toBe(BOSS_PLAYER_STEP[def.kind] ?? MONSTER_BY_ID[def.kind]!.level);
-      expect(hitFractions(def).length, def.kind).toBeGreaterThan(0);
-      const d = dodgeSummary(def);
-      expect(d.casts, def.kind).toBeGreaterThan(0);
-      expect(d.dodgeHits, def.kind).toBe(0);
-      expect(d.standHits, def.kind).toBeGreaterThan(0);
-    }
-  });
+  it(
+    "mỗi trùm: có bậc đúng bậc, có chiêu sát thương, bot đứng yên bị trúng (đối chứng) còn bot né thì không",
+    () => {
+      for (const def of BOSSES) {
+        const st = bossStep(def);
+        expect(st.step, def.kind).toBe(
+          BOSS_PLAYER_STEP[def.kind] ?? MONSTER_BY_ID[def.kind]!.level,
+        );
+        expect(hitFractions(def).length, def.kind).toBeGreaterThan(0);
+        const d = dodgeSummary(def);
+        expect(d.casts, def.kind).toBeGreaterThan(0);
+        expect(d.dodgeHits, def.kind).toBe(0);
+        expect(d.standHits, def.kind).toBeGreaterThan(0);
+      }
+    },
+    DATA_TEST_TIMEOUT_MS,
+  );
 
-  it("báo cáo sinh từ dữ liệu thật: nêu từng trùm, đủ cỡ đội, không NaN / Infinity / undefined, không dòng VI PHẠM", () => {
-    const md = renderBossBalance();
-    for (const def of BOSSES) expect(md).toContain(MONSTER_BY_ID[def.kind]!.name);
-    for (const n of ASSUME_BOSS.parties) expect(md).toContain(n === 1 ? "1 người" : `${n} người`);
-    expect(md).not.toMatch(/NaN|Infinity|undefined/);
-    expect(md).not.toContain("VI PHẠM");
-    expect(md).toContain("**Không vi phạm bất biến nào**");
-  });
+  it(
+    "báo cáo sinh từ dữ liệu thật: nêu từng trùm, đủ cỡ đội, không NaN / Infinity / undefined, không dòng VI PHẠM",
+    () => {
+      const md = renderBossBalance();
+      for (const def of BOSSES) expect(md).toContain(MONSTER_BY_ID[def.kind]!.name);
+      for (const n of ASSUME_BOSS.parties) expect(md).toContain(n === 1 ? "1 người" : `${n} người`);
+      expect(md).not.toMatch(/NaN|Infinity|undefined/);
+      expect(md).not.toContain("VI PHẠM");
+      expect(md).toContain("**Không vi phạm bất biến nào**");
+    },
+    DATA_TEST_TIMEOUT_MS,
+  );
 });
 
 describe("hàm đo", () => {

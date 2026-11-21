@@ -16,7 +16,7 @@ describe("Bot đo DPS thật của chiêu thức (CT13, #1058)", () => {
     expect(Number.isFinite(report.diffPct)).toBe(true);
   });
 
-  it("chạy đo toàn bộ 53 chiêu: kiểm tra tính ổn định, độ lệch và định dạng báo cáo", () => {
+  it("chạy đo toàn bộ 53 chiêu: kiểm tra tính ổn định, độ lệch <= 25% và định dạng báo cáo", () => {
     const reports = measureAllBotSkills();
 
     expect(reports.length).toBe(LEARNABLE_SKILLS.length);
@@ -30,17 +30,13 @@ describe("Bot đo DPS thật của chiêu thức (CT13, #1058)", () => {
     expect(md).toContain("## Báo cáo đo DPS thật của chiêu thức bằng Bot");
     expect(md).toContain("hoa_van_kiem");
 
-    const deviations = reports.filter((r) => r.deviated);
-    if (deviations.length > 0) {
-      console.warn(
-        `[CT13] Phát hiện ${deviations.length} chiêu thức lệch > 25% giữa thực chiến bot và mô phỏng tĩnh:\n` +
-          deviations
-            .map(
-              (d) =>
-                `  - ${d.name} (${d.id}): Sim ${d.simRatio.toFixed(2)}x vs Real ${d.realRatio.toFixed(2)}x (${d.diffPct.toFixed(1)}%)`,
-            )
-            .join("\n"),
+    // Khóa cứng độ lệch <= 25%: test đỏ nếu có chiêu thức nào lệch quá ngưỡng
+    const deviations = reports
+      .filter((r) => r.deviated)
+      .map(
+        (d) =>
+          `${d.id} (${d.name}): Sim ${d.simRatio.toFixed(2)}× vs Real ${d.realRatio.toFixed(2)}× (lệch ${d.diffPct.toFixed(1)}%)`,
       );
-    }
-  });
+    expect(deviations).toEqual([]);
+  }, 120_000);
 });
