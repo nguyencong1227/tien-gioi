@@ -1,10 +1,11 @@
 // Gói tài nguyên riêng (QUYET_DINH_M3 mục 63): nạp manifest, bảng phục vụ, route `/assets-private/*` (traversal, không liệt kê, tệp ngoài manifest, 404 sạch khi tắt), công cụ manifest / check,
 // và chốt chặn "không gói nào trong git". Mọi yêu cầu HTTP dùng `http.request` THÔ: `fetch` / URL tự chuẩn hoá `..` nên không thử được đường dẫn nguy hiểm.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import http from "node:http";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -18,10 +19,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { PRIVATE_PACK_FILE_MAX_BYTES, type PrivatePackManifest } from "@tien-gioi/shared";
+import { main } from "../scripts/assets-private";
 import { originGuardMiddleware, originPolicyOf } from "./origin-guard";
 import {
   buildPrivatePackManifest,
   checkPrivatePackManifest,
+  listSkippedPrivatePackFiles,
   loadPrivatePacks,
   mountPrivatePacks,
   privatePackLookupKey,
@@ -568,6 +571,85 @@ describe("công cụ manifest / check", () => {
     mkdirSync(path.join(dir, "g1"), { recursive: true });
     writeFileSync(path.join(dir, "g1", "lon.png"), Buffer.alloc(PRIVATE_PACK_FILE_MAX_BYTES + 1));
     expect(() => buildPrivatePackManifest(dir)).toThrow(/không hợp lệ/);
+  });
+
+  describe("tệp bị BỎ QUA vì tên sai luật (gói tải từ itch.io hay có khoảng trắng)", () => {
+    const mkSkip = (name: string) => {
+      const dir = mk(name);
+      writeFileSync(path.join(dir, "g1", "Blue House.png"), "K"); // khoảng trắng
+      writeFileSync(path.join(dir, "g1", "dấu.webp"), "D"); // chữ có dấu
+      mkdirSync(path.join(dir, "g2", "sub dir"));
+      writeFileSync(path.join(dir, "g2", "sub dir", "x.json"), "{}"); // thư mục có khoảng trắng
+      mkdirSync(path.join(dir, "g1", "d".repeat(60), "e".repeat(60)), { recursive: true });
+      writeFileSync(path.join(dir, "g1", "d".repeat(60), "e".repeat(60), "x.png"), "L"); // đường dẫn 127 ký tự > 120
+      // KHÔNG tính: đuôi ngoài danh sách trắng (bỏ qua là chủ ý), tệp ẩn, liên kết tượng trưng
+      writeFileSync(path.join(dir, "g1", "Doc Me.txt"), "T");
+      writeFileSync(path.join(dir, "g1", ".an ten.png"), "H");
+      mkdirSync(path.join(dir, ".git")); // thư mục ẩn và tệp lẻ ở gốc `dist` không phải gói: không tính
+      writeFileSync(path.join(dir, ".git", "Khong Phai Goi.png"), "G");
+      writeFileSync(path.join(dir, "Tep Le.png"), "R");
+      symlinkSync(path.join(outside, "leak.png"), path.join(dir, "g1", "lk ngoai.png"));
+      return dir;
+    };
+
+    it("`listSkippedPrivatePackFiles` liệt kê đúng các tệp đuôi hợp lệ mà tên sai luật (sắp xếp, tất định); thư mục sạch thì rỗng", () => {
+      const dir = mkSkip("skip-1");
+      expect(listSkippedPrivatePackFiles(dir)).toEqual([
+        "g1/Blue House.png",
+        `g1/${"d".repeat(60)}/${"e".repeat(60)}/x.png`,
+        "g1/dấu.webp",
+        "g2/sub dir/x.json",
+      ]);
+      expect(listSkippedPrivatePackFiles(mk("skip-2"))).toEqual([]);
+      // khớp với manifest: những tệp được liệt kê KHÔNG nằm trong manifest, mọi tệp còn lại thì có
+      const listed = new Set(
+        buildPrivatePackManifest(dir).packs.flatMap((p) => p.files.map((f) => `${p.id}/${f.path}`)),
+      );
+      for (const sk of listSkippedPrivatePackFiles(dir)) expect(listed.has(sk)).toBe(false);
+      expect([...listed].sort()).toEqual(["g1/a.png", "g1/b.png", "g1/sub/c.webp", "g2/x.json"]);
+    });
+
+    it("CLI `manifest`: in BỎ QUA từng tệp và vẫn ghi manifest (không có tệp xấu); thư mục sạch thì không in gì", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      try {
+        const dir = mkSkip("skip-3");
+        expect(main(["manifest", dir])).toBe(0);
+        const out = warn.mock.calls.map((c) => String(c[0]));
+        expect(out.filter((l) => l.startsWith("BỎ QUA"))).toHaveLength(4);
+        expect(out.some((l) => l.includes("g1/Blue House.png"))).toBe(true);
+        expect(out.some((l) => l.includes("g2/sub dir/x.json"))).toBe(true);
+        expect(out.some((l) => /^4 tệp ảnh/.test(l))).toBe(true);
+        const m = JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8"));
+        expect(JSON.stringify(m)).not.toContain("Blue House");
+        warn.mockClear();
+        expect(main(["manifest", mk("skip-4")])).toBe(0);
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+        log.mockRestore();
+      }
+    });
+
+    it("CLI `manifest --strict`: có tệp bị bỏ qua thì thoát 1 và KHÔNG ghi manifest; thư mục sạch vẫn thoát 0 và ghi", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      try {
+        const dir = mkSkip("skip-5");
+        expect(main(["manifest", dir, "--strict"])).toBe(1);
+        expect(existsSync(path.join(dir, "manifest.json"))).toBe(false);
+        expect(err.mock.calls.some((c) => String(c[0]).includes("--strict"))).toBe(true);
+        const clean = mk("skip-6");
+        expect(main(["--strict-khong-co", "manifest"])).toBe(2); // tuỳ chọn lạ vẫn bị từ chối
+        expect(main(["manifest", clean, "--strict"])).toBe(0);
+        expect(existsSync(path.join(clean, "manifest.json"))).toBe(true);
+      } finally {
+        warn.mockRestore();
+        err.mockRestore();
+        log.mockRestore();
+      }
+    });
   });
 });
 

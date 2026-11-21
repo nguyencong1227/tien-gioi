@@ -76,7 +76,7 @@ Biến môi trường **`ASSETS_PRIVATE_DIR`** (rỗng = TẮT, mặc định; k
 | 0 | GĐ1 Ninja Adventure xong (hình thay thế có sẵn) | G (#1197), B | có |
 | 1 | `docs/GIAY_PHEP_TAI_NGUYEN_RIENG.md` + danh sách gói nên dùng | G | docs |
 | 2 | `shared/src/private-pack.ts` (hợp đồng, mục 3) | A | `shared/` riêng, B / C review |
-| 3 | (PR #1265, đã xong) `server/src/private-packs.ts` + nối `index.ts` + test + `docker-compose.yml` + `TRIEN_KHAI.md` + công cụ `assets-private:check` / `:manifest` | A | server |
+| 3 | (PR #1265, đã xong) `server/src/private-packs.ts` + nối `index.ts` + test + `docker-compose.yml` + `TRIEN_KHAI.md` + công cụ `assets-private:check` / `:manifest` (B bổ sung: `manifest` in `BỎ QUA` tệp tên sai luật, `--strict` thoát 1) | A | server |
 | 4 | Client: gói riêng như nguồn thứ hai của `gfx/packs.ts` (bảng `private-art.ts`, lùi từng khoá, hook bản đồ hiện tại, Service Worker 12 hex, Vite proxy `/assets-private`, ghi công `title` + `url` + `license`, test hai nhánh) | B | client |
 | 5 | Người dùng tải gói (itch.io), chép vào `src/`, đóng `dist/` bằng công cụ + gắn vào container | người dùng / B | - |
 

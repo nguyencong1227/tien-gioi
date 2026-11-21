@@ -280,6 +280,24 @@ export function buildPrivatePackManifest(
   return m;
 }
 
+/**
+ * Tệp có đuôi hợp lệ (danh sách trắng) nhưng TÊN / đường dẫn sai luật (`isSafePrivatePackPath`: khoảng trắng, dấu, ký tự lạ, quá dài): `buildPrivatePackManifest` BỎ QUA nên máy chủ sẽ KHÔNG phục vụ
+ * và client lặng lẽ lùi về hình thay thế (gói tải từ itch.io hay có tên "Blue House.png"). Đuôi ngoài danh sách trắng (`readme.txt`, `SOURCES.md`) KHÔNG tính: bỏ qua là chủ ý. Trả `<gói>/<đường dẫn>`,
+ * sắp xếp tất định; cùng bộ lọc thư mục / tệp ẩn / liên kết tượng trưng với `buildPrivatePackManifest`.
+ */
+export function listSkippedPrivatePackFiles(distDir: string): string[] {
+  const root = path.resolve(distDir);
+  const out: string[] = [];
+  for (const name of readdirSync(root).sort()) {
+    const abs = path.join(root, name);
+    if (name.startsWith(".") || !lstatSync(abs).isDirectory()) continue;
+    for (const p of walk(abs))
+      if (!isSafePrivatePackPath(p) && privatePackExtension(p) !== undefined)
+        out.push(`${name}/${p}`);
+  }
+  return out;
+}
+
 /** Ghi manifest (đẹp, kết thúc bằng xuống dòng) vào `<dist>/manifest.json`. */
 export function writePrivatePackManifest(
   distDir: string,

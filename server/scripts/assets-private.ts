@@ -1,18 +1,24 @@
 // Công cụ đóng gói / kiểm GÓI TÀI NGUYÊN RIÊNG (QUYET_DINH_M3 mục 63, docs/THIET_KE_GOI_TAI_NGUYEN_RIENG.md). Chạy trên MÁY CHỦ, không bao giờ trong CI.
-//   npm run assets-private:manifest -w server -- [<dist>] [--title id=Tên] [--url id=https://...] [--license id=Giấy phép]...   sinh <dist>/manifest.json từ các thư mục gói (id = tên thư mục)
+//   npm run assets-private:manifest -w server -- [<dist>] [--strict] [--title id=Tên] [--url id=https://...] [--license id=Giấy phép]...   sinh <dist>/manifest.json từ các thư mục gói (id = tên thư mục)
+//       Tệp ảnh / âm thanh có TÊN sai luật (khoảng trắng, dấu...) bị bỏ qua: in `BỎ QUA` từng tệp; `--strict` coi đó là lỗi (thoát 1, KHÔNG ghi manifest).
 //   npm run assets-private:check    -w server -- [<dist>]                                 so manifest với đĩa (số byte + SHA-256); thoát 1 nếu lệch
 // <dist> mặc định: biến ASSETS_PRIVATE_DIR, rồi /mnt/data/assets-private/dist.
 import path from "node:path";
-import { checkPrivatePackManifest, writePrivatePackManifest } from "../src/private-packs";
+import {
+  checkPrivatePackManifest,
+  listSkippedPrivatePackFiles,
+  writePrivatePackManifest,
+} from "../src/private-packs";
 
 const DEFAULT_DIST = "/mnt/data/assets-private/dist";
 
-function main(argv: string[]): number {
+export function main(argv: string[]): number {
   const [cmd, ...rest] = argv;
   const titles: Record<string, string> = {};
   const urls: Record<string, string> = {};
   const licenses: Record<string, string> = {};
   let dist: string | undefined;
+  let strict = false;
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--title" || a === "--url" || a === "--license") {
@@ -25,6 +31,8 @@ function main(argv: string[]): number {
       (a === "--title" ? titles : a === "--url" ? urls : licenses)[kv.slice(0, eq)] = kv.slice(
         eq + 1,
       );
+    } else if (a === "--strict") {
+      strict = true;
     } else if (a.startsWith("--")) {
       console.error(`tuỳ chọn lạ: ${a}`);
       return 2;
@@ -32,6 +40,17 @@ function main(argv: string[]): number {
   }
   const dir = path.resolve(dist ?? (process.env.ASSETS_PRIVATE_DIR || DEFAULT_DIST));
   if (cmd === "manifest") {
+    const skipped = listSkippedPrivatePackFiles(dir);
+    for (const s of skipped)
+      console.warn(`BỎ QUA (tên sai luật, máy chủ sẽ KHÔNG phục vụ tệp này): ${s}`);
+    if (skipped.length > 0)
+      console.warn(
+        `${skipped.length} tệp ảnh / âm thanh bị bỏ qua: đổi tên chỉ gồm chữ / số / . _ - (không khoảng trắng, không dấu) rồi chạy lại.`,
+      );
+    if (strict && skipped.length > 0) {
+      console.error("--strict: có tệp bị bỏ qua, KHÔNG ghi manifest.");
+      return 1;
+    }
     const m = writePrivatePackManifest(dir, titles, { urls, licenses });
     const n = m.packs.reduce((s, p) => s + p.files.length, 0);
     console.log(`Đã ghi ${path.join(dir, "manifest.json")}: ${m.packs.length} gói, ${n} tệp.`);
@@ -49,9 +68,10 @@ function main(argv: string[]): number {
     return 0;
   }
   console.error(
-    "Dùng: assets-private.ts manifest|check [<dist>] [--title id=Tên] [--url id=https://...] [--license id=Giấy phép]",
+    "Dùng: assets-private.ts manifest|check [<dist>] [--strict] [--title id=Tên] [--url id=https://...] [--license id=Giấy phép]",
   );
   return 2;
 }
 
-process.exit(main(process.argv.slice(2)));
+// Chạy khi gọi thẳng bằng tsx; import từ test thì không thoát tiến trình (cùng khuôn `audit-saves.ts`)
+if (process.argv[1]?.endsWith("assets-private.ts")) process.exit(main(process.argv.slice(2)));
