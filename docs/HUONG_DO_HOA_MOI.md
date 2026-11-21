@@ -154,6 +154,7 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 - Trang chính thức: `https://pixel-boy.itch.io/ninja-adventure-asset-pack`, đọc ngày **21/11/2026**: "They are released under the Creative Commons Zero (CC0) license", "Asset license: Creative Commons Zero v1.0 Universal", "Made by Pixel-Boy and AAA", "Attribution is not required but appreciated". Trang cũng ghi dự án Godot 4 nằm ở GitHub và nội dung hai dự án Godot khác nhau.
 - Bản clone: `https://github.com/pixel-boy/NinjaAdventure`, commit `6ac78232d5aedcc85ce5f27d060ea92366f7c24a` (19/04/2024). **Không có tệp LICENSE, API GitHub `license: null`.** Chấp nhận giấy phép dựa trên trang itch.io (Q3).
 - Ảnh mẫu trong `docs/art/huong-moi/` là tác phẩm phái sinh từ gói CC0 và atlas hiện tại của nhóm; không nằm trong `client/public/` nên `check:credits` không quét. `CREDITS.md` mục 2 đã liệt kê Ninja Adventure (CC0 1.0) là nguồn tham chiếu.
+- **Bằng chứng giấy phép phải lưu ĐỦ (điều kiện của A cho Q3; việc của #1197 / G):** URL trang itch.io, ngày đọc, câu nguyên văn "released under the Creative Commons Zero (CC0) license" + ô "Asset license", băm SHA-256 + kích thước tệp của gói tải về (nếu người dùng tải), commit SHA của bản clone; ghi ở `docs/art/nguon/ninja-adventure.json` và một mục riêng trong `CREDITS.md` (quy tắc Asset nguồn 1).
 - **Khi nhập tệp thật** (bước sau): chỉ chép phần dùng, đã chỉnh, vào `client/public/` (không đưa nguyên gói vào repo); MỖI tệp một dòng ở `CREDITS.md` mục 6 kèm SHA-256 thật + ngày + commit gói; thêm thư mục vào `hashDirs` của `check-credits.mjs`; `npm run check:credits` xanh; không chữ Hán; đo ngân sách.
 
 ## 9. Kế hoạch triển khai (SAU khi người dùng duyệt)
@@ -161,7 +162,7 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 | Bước | Việc | Người | Ghi chú |
 |---|---|---|---|
 | 0 | Tài liệu + ảnh mẫu (tệp này) | B | xong, chờ duyệt |
-| 1 | Bật lọc điểm ảnh; **lớp nền ghép góc** (`gfx/nen-moi.ts`) dựng từ `tileAt`, cỏ / đất / cát / nước / sàn; cờ cài đặt; ảnh chụp 6 cỡ trước / sau | B | khó nhất về kỹ thuật; không đổi server |
+| 1 | Bật lọc điểm ảnh; **lớp nền ghép góc** (`gfx/nen-moi.ts`) dựng từ `tileAt`, cỏ / đất / cát / nước / sàn; cờ cài đặt; ảnh chụp 6 cỡ trước / sau. **Phép ghép góc viết thành hàm thuần dùng chung `shared/src/autotile.ts`** (mặt nạ 8 hàng xóm -> chỉ số ô theo bảng 56 ô của `tileset.tres`, có test; bảng ô là dữ liệu trong repo, không đọc `tileset.tres` lúc chạy), để client giai đoạn 1 và công cụ `map:build` (S4, C) cùng một bản, khỏi lệch nhau (đề nghị của A trên #1204; B làm khi tới bước vẽ nền, PR `shared/` riêng cần dev khác review) | B | khó nhất về kỹ thuật; không đổi server |
 | 2 | Cây, đá, tường, công trình bằng tilemap nhiều ô; kiểm tầm nhìn và va chạm | B | đo `drawCalls` |
 | 3 | Khí quyển (tia sáng, mây, hạt gói) | B | trong ngân sách hạt |
 | 4 | UI khung 9 mảnh | B | `contrast.test.ts` xanh |
