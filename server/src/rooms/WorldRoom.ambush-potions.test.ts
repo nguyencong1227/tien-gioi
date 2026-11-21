@@ -42,7 +42,6 @@ afterAll(async () => {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const serverRoom = (room: Room) => matchMaker.getLocalRoomById(room.roomId) as WorldRoom;
 const serverState = (room: Room) => serverRoom(room).state as WorldState;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const worldOf = (room: Room) => (serverRoom(room) as any).world;
 
 describe("AMBUSH_MIN_POTIONS qua phòng thật (AMBUSH=on, AMBUSH_MIN_POTIONS=2)", () => {
