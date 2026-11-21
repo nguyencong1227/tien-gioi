@@ -178,6 +178,24 @@ export interface ExtraSoakContext {
   currencyConservationPassed?: boolean;
   /** Chỉ có khi soak chạy với `--m7`; vắng thì không kiểm gì về chiêu (đúng như soak cũ) */
   m7?: M7SoakContext;
+  /** Chỉ có khi soak chạy với `--boss` (bộ chiêu trùm nhiều chiêu BOSS_MOVES=on) */
+  boss?: BossSoakContext;
+}
+
+/** Số đo bộ chiêu trùm của một lượt soak bật `--boss` */
+export interface BossSoakContext {
+  /** Các chiêu trùm bắt buộc có ít nhất một lần thi triển */
+  requiredAbilities?: readonly string[];
+  /** Số lần thi triển theo id chiêu trùm, đếm từ tin `fx` `bossCast` */
+  abilityCastCounts: Record<string, number>;
+}
+
+/** Kết quả phần bộ chiêu trùm trong báo cáo (chỉ có khi soak chạy với `--boss`) */
+export interface BossSoakResult {
+  abilityCastCounts: Record<string, number>;
+  totalAbilityCasts: number;
+  requiredAbilities: string[];
+  missingRequired: string[];
 }
 
 /** Kết quả phần nội dung M7 trong báo cáo (chỉ có khi soak chạy với `--m7`) */
@@ -226,6 +244,7 @@ export interface SoakAnalysisResult {
   hongFilesCount?: number;
   currencyConservationPassed?: boolean;
   m7?: M7SoakResult;
+  boss?: BossSoakResult;
   thresholds: Required<SoakThresholds>;
 }
 
@@ -469,6 +488,27 @@ export function analyzeSoak(
     }
   }
 
+  // 14. Bộ chiêu trùm (chỉ khi bật --boss / BOSS_MOVES=on)
+  let boss: BossSoakResult | undefined;
+  if (extra.boss) {
+    const counts = extra.boss.abilityCastCounts;
+    const castOf = (id: string) => counts[id] ?? 0;
+    const required = extra.boss.requiredAbilities ?? [];
+    const missingRequired = required.filter((id) => castOf(id) <= 0);
+    const totalAbilityCasts = Object.values(counts).reduce((sum, n) => sum + n, 0);
+    boss = {
+      abilityCastCounts: counts,
+      totalAbilityCasts,
+      requiredAbilities: [...required],
+      missingRequired,
+    };
+    if (missingRequired.length > 0) {
+      reasons.push(
+        `Chế độ --boss: ${missingRequired.length}/${required.length} chiêu trùm không được thi triển lần nào: ${missingRequired.join(", ")}`,
+      );
+    }
+  }
+
   return {
     pass: reasons.length === 0,
     reasons,
@@ -503,6 +543,7 @@ export function analyzeSoak(
     hongFilesCount: extra.hongFilesCount,
     currencyConservationPassed: extra.currencyConservationPassed,
     m7,
+    boss,
     thresholds,
   };
 }
@@ -577,6 +618,22 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
       `  - Lượt thi triển chiêu:  ${m.totalSkillCasts} (máy chủ xác nhận qua fx cast)`,
       `  - Chiêu Nguyên Anh:      ${m.requiredSkillIds.length - m.missingRequired.length}/${m.requiredSkillIds.length} có lượt thi triển (yêu cầu: đủ)`,
       `  - Chiêu chưa thi triển:  ${m.notCast.length === 0 ? "(không có, cả game đều được dùng)" : m.notCast.join(", ")}`,
+      `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
+    );
+  }
+
+  if (res.boss) {
+    const b = res.boss;
+    const castLine = Object.entries(b.abilityCastCounts)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([id, n]) => `${id} ${n}`)
+      .join(", ");
+    lines.push(
+      "--------------------------------------------------------------------------------",
+      "BỘ CHIÊU TRÙM (BOSS_MOVES=on):",
+      `  - Tổng lượt thi triển:   ${b.totalAbilityCasts} (máy chủ xác nhận qua fx bossCast)`,
+      `  - Chiêu bắt buộc:        ${b.requiredAbilities.length - b.missingRequired.length}/${b.requiredAbilities.length} có lượt thi triển`,
       `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
     );
   }
