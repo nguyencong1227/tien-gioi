@@ -207,6 +207,35 @@ describe("bất biến cân bằng", () => {
     expect(blendedUplift([easy])).toBeCloseTo(u.uplift, 9);
   });
 
+  it("khoảng giữa hai lần bị chặn ~14,7 phút (hồi 8 + đi bộ ~6,7: 1200 px / 170 px/s / p giữa khoảng 3,5% / 50% thời gian đi bộ): ghim số, đổi hằng số là có chủ ý", () => {
+    // đạo hàm tay: 8 + (1200 / 170 / 0.035) / 0.5 / 60 = 14,72
+    expect(ambushIntervalMin()).toBeCloseTo(14.72, 1);
+  });
+
+  it("upliftOf: số cụ thể tính tay (đơn vị phút, trừ thời gian chiến đấu, mẫu số gồm cả trận)", () => {
+    const hunt = upliftOf(easy).huntRate; // tu vi / giây săn quái cùng bậc
+    // thắng 100%, thưởng = đúng 10 phút săn, trận 60 giây thật (1 phút): tương đương 10 - 1 = 9 phút
+    const win = upliftOf({
+      ...easy,
+      flee: { won: 1, lost: 0, timeout: 0, fled: 0 },
+      winExp: hunt * 600,
+      realSeconds: 60,
+    });
+    expect(win.expPerAmbush).toBeCloseTo(hunt * 600, 6);
+    expect(win.equivMinutes).toBeCloseTo(9, 6);
+    expect(win.uplift).toBeCloseTo(9 / (ambushIntervalMin() + 1), 9);
+    // bỏ chạy 100%, giá = 5 phút săn: LỖ 5 phút + 1 phút trận = -6 (giá bỏ chạy phải TRỪ, không cộng)
+    const fled = upliftOf({
+      ...easy,
+      flee: { won: 0, lost: 0, timeout: 0, fled: 1 },
+      fleeExp: hunt * 300,
+      realSeconds: 60,
+    });
+    expect(fled.expPerAmbush).toBeCloseTo(-hunt * 300, 6);
+    expect(fled.equivMinutes).toBeCloseTo(-6, 6);
+    expect(fled.uplift).toBeCloseTo(-6 / (ambushIntervalMin() + 1), 9);
+  });
+
   it("mục tiêu đặt đúng theo thiết kế mục 9 (90 / 80 / 60%, 30-70 giây, 20-40%)", () => {
     expect(ASSUME_AMBUSH.targets.winRate).toEqual({ normal: 0.9, elite: 0.8, leader: 0.6 });
     expect(ASSUME_AMBUSH.targets.seconds).toEqual({ min: 30, max: 70 });
