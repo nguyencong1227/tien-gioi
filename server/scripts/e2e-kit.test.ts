@@ -68,6 +68,34 @@ async function freeOne(): Promise<number> {
   return o.port;
 }
 
+/** Chiếm ĐÚNG cổng `port` trên `::` (như máy chủ thật nghe không chỉ định host); trả hàm đóng. */
+async function occupyExact(port: number): Promise<() => Promise<void>> {
+  const srv = net.createServer();
+  await new Promise<void>((res, rej) => {
+    srv.once("error", rej);
+    srv.listen(port, res);
+  });
+  return () => new Promise<void>((r) => srv.close(() => r()));
+}
+
+/**
+ * MÔ PHỎNG cướp cổng (#1273): lấy sẵn `n` cổng trống rồi CHIẾM HẾT chúng, đúng thứ CI thỉnh thoảng làm (tệp test song song / kết nối ra của hệ điều hành chiếm cổng trong khe hở giữa lúc
+ * `freeOne()` đóng và lúc `listen` thật). Trả các cổng đã bị cướp và hàm nhả. Cổng nào chiếm không được (bị cướp thật) thì lấy bộ mới.
+ */
+async function stolenPool(n: number): Promise<{ ports: number[]; release: () => Promise<void> }> {
+  for (let k = 0; k < 20; k++) {
+    const ports = await Promise.all(Array.from({ length: n }, () => freeOne()));
+    const closers: (() => Promise<void>)[] = [];
+    try {
+      for (const p of ports) closers.push(await occupyExact(p));
+      return { ports, release: async () => void (await Promise.all(closers.map((c) => c()))) };
+    } catch {
+      await Promise.all(closers.map((c) => c()));
+    }
+  }
+  throw new Error("không dựng được hồ cổng bị cướp sau 20 lần");
+}
+
 describe("e2e-kit: listenWithRetry", () => {
   it("cổng trống: nghe đúng cổng đó và trả về nó", async () => {
     // freeOne() trả cổng trống tại THỜI ĐIỂM đóng, nhưng khe hở trước listen cho tiến trình khác (CẢ bộ
@@ -91,21 +119,56 @@ describe("e2e-kit: listenWithRetry", () => {
 
   it("cổng NGẪU NHIÊN bận: thử lại bằng cổng mới và trả về cổng thật", async () => {
     const busy = await occupyPort();
-    // Hồ cổng trống: pick() xoay vòng qua các cổng thật trống, tránh một cổng bị cướp (free-bind dưới
-    // contention, #1016) làm hết lượt thử. listenWithRetry vẫn chỉ retry khi EADDRINUSE; trả về cổng thật
-    // đang nghe (không nhất thiết cổng đầu tiên được pick).
-    const pool = await Promise.all(Array.from({ length: 6 }, () => freeOne()));
-    let i = 0;
+    // `pick: () => 0`: hệ điều hành chọn cổng NGUYÊN TỬ lúc nghe, KHÔNG có khe hở "lấy cổng trống rồi mới nghe" để bị cướp (hồ lấy sẵn từng làm ca này chập chờn, #1273).
+    let picks = 0;
     const server = http.createServer();
     try {
       const got = await listenWithRetry(server, busy.port, {
         explicit: false,
-        pick: () => pool[i++],
+        pick: () => {
+          picks++;
+          return 0;
+        },
       });
-      expect(pool).toContain(got);
+      expect(picks).toBe(1); // cổng đầu bận -> ĐÚNG một lần xin cổng mới
+      expect(got).toBeGreaterThan(0);
+      expect(got).not.toBe(busy.port);
       expect((server.address() as net.AddressInfo).port).toBe(got);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
+      await busy.close();
+    }
+  });
+
+  it("MÔ PHỎNG cướp cổng (#1273): hồ cổng LẤY SẴN bị chiếm hết thì listenWithRetry reject EADDRINUSE (lỗi rõ, không treo): đây là cơ chế làm ca cũ đỏ trên CI", async () => {
+    const busy = await occupyPort();
+    const stolen = await stolenPool(5);
+    let i = 0;
+    const server = http.createServer();
+    try {
+      await expect(
+        listenWithRetry(server, busy.port, { explicit: false, pick: () => stolen.ports[i++]! }),
+      ).rejects.toMatchObject({ code: "EADDRINUSE" });
+      expect(i).toBe(5); // đã thử hết cả hồ trước khi bỏ cuộc
+    } finally {
+      await stolen.release();
+      await busy.close();
+    }
+  });
+
+  it("`pick: () => 0` SỐNG SÓT khi mọi cổng lấy sẵn bị cướp và trả cổng THẬT (khác 0, khớp address(), không phải cổng bị cướp)", async () => {
+    const busy = await occupyPort();
+    const stolen = await stolenPool(5);
+    const server = http.createServer();
+    try {
+      const got = await listenWithRetry(server, busy.port, { explicit: false, pick: () => 0 });
+      expect(got).toBeGreaterThan(0);
+      expect(got).not.toBe(busy.port);
+      expect(stolen.ports).not.toContain(got);
+      expect((server.address() as net.AddressInfo).port).toBe(got);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+      await stolen.release();
       await busy.close();
     }
   });
@@ -124,17 +187,15 @@ describe("e2e-kit: listenWithRetry", () => {
 
   it("net.Server + host (proxy TCP của E2E): nghe đúng địa chỉ, cổng bận thì thử cổng mới", async () => {
     const busy = await occupyPort(); // chiếm trên 127.0.0.1
-    // Hồ cổng trống tương tự ca "cổng NGẪU NHIÊN bận" (tránh free-bind bị cướp, #1016).
-    const pool = await Promise.all(Array.from({ length: 6 }, () => freeOne()));
-    let i = 0;
     const server = net.createServer();
     try {
       const got = await listenWithRetry(server, busy.port, {
         explicit: false,
-        pick: () => pool[i++],
+        pick: () => 0, // hệ điều hành chọn nguyên tử (không hồ lấy sẵn, #1273)
         host: "127.0.0.1",
       });
-      expect(pool).toContain(got);
+      expect(got).toBeGreaterThan(0);
+      expect(got).not.toBe(busy.port);
       const addr = server.address() as net.AddressInfo;
       expect(addr.port).toBe(got);
       expect(addr.address).toBe("127.0.0.1");
@@ -142,6 +203,22 @@ describe("e2e-kit: listenWithRetry", () => {
       await new Promise<void>((r) => server.close(() => r()));
       await busy.close();
     }
+  });
+
+  it("lỗi KHÁC EADDRINUSE (địa chỉ không phải của máy: EADDRNOTAVAIL) thì reject ngay, KHÔNG xin cổng mới", async () => {
+    let picks = 0;
+    const server = net.createServer();
+    await expect(
+      listenWithRetry(server, 38123, {
+        explicit: false,
+        host: "203.0.113.1", // TEST-NET-3: không phải địa chỉ của máy nào -> EADDRNOTAVAIL
+        pick: () => {
+          picks++;
+          return 0;
+        },
+      }),
+    ).rejects.toMatchObject({ code: "EADDRNOTAVAIL" });
+    expect(picks).toBe(0); // lỗi này không phải do cổng bận: thử cổng khác chỉ che lỗi thật
   });
 
   it("hết số lần thử: reject (không lặp vô hạn)", async () => {
