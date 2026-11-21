@@ -1,4 +1,4 @@
-# Hồ Sơ Ứng Viên Phát Hành (Dự Kiến v0.6.0)
+# Hồ Sơ Ứng Viên Phát Hành (Dự Kiến v0.5.3 / v0.6.0)
 
 > **Lưu ý:** Tài liệu này CHỈ phục vụ chuẩn bị bằng chứng và rà soát kỹ thuật trước phát hành cho người dùng và nhóm phát triển (Refs #1290). **KHÔNG** tự ý gắn thẻ git tag (`v*`), **KHÔNG** kích hoạt `release.yml`, **KHÔNG** tự động triển khai hay can thiệp vào môi trường production (`~/TT/tien-gioi-prod/`, cổng 2567).
 
@@ -6,99 +6,109 @@
 
 ## 1. Thông Tin Tổng Quan
 
-- **Mốc so sánh:** Thẻ phát hành `v0.5.2` (commit `79c6b40e`) $\rightarrow$ Đầu nhánh `main` hiện tại (commit `b007b456`).
-- **Khối lượng tích luỹ:** **346 commit** sau `v0.5.2`.
-- **Hợp đồng `shared/src`:** Thay đổi **21 tệp** (`+4.134` dòng, `-58` dòng), chủ yếu mở rộng khung chiêu thức, hợp đồng tài nguyên riêng, đấu trường solo và xã hội.
+- **Mốc so sánh:** Thẻ phát hành `v0.5.2` (commit `e4c1d717`, đối tượng thẻ `79c6b40e`) $\rightarrow$ Đầu nhánh `main` hiện tại (commit `b007b456`).
+- **Khối lượng tích luỹ:** **346 commit** (`git rev-list --count v0.5.2..origin/main`).
+- **Hợp đồng `shared/src`:** Thay đổi **21 tệp** (`+4.134` dòng, `-58` dòng), trong đó:
+  - Khoảng **2.000 dòng là kiểm thử** (`shared/src/*.test.ts`).
+  - Phần mã nguồn thực tế (+2.134 dòng) gồm: hệ thống bản đồ Tiled / autotile / bake / map-files (~1.060 dòng), hợp đồng gói tài nguyên riêng `private-pack.ts` (246 dòng), dữ liệu kẻ chặn đường `ambush-data.ts` (506 dòng), nhiệm vụ phụ Âm Sương Trạch `quests.ts` (+71 dòng), lịch thật trùm thế giới `social.ts` (+52 dòng), cùng các mở rộng nhỏ ở `map.ts` và `ambush.ts`.
+  - **Không có chiêu thức, vật phẩm, quái vật hay cảnh giới mới nào thêm từ v0.5.2:** `skills-*.ts` giữ nguyên 38 dòng `reqRealm`; `items.ts`, `game.ts`, `realms.ts` có `git diff` rỗng.
 - **Phiên bản giao thức (`shared/src/protocol.ts`):**
-  - `PROTOCOL_VERSION`: **`6`** (giữ nguyên từ `v0.5.2`, không đổi).
+  - `PROTOCOL_VERSION`: **`6`** (giữ nguyên từ `v0.5.2`).
   - `MIN_PROTOCOL_VERSION`: **`0`** (giữ nguyên, máy chủ tiếp tục chấp nhận client cũ).
-- **Trạng thái lưu trữ:** `server/src/{store,soul,sect-store,account-store}.ts` không đổi kiến trúc lưu trữ cốt lõi; các trường mới trong hồ sơ người chơi (`ambushDaily`, `ambushUntil`, `ambushReturnAt`, `SkillBook.mastery`) đều có bộ kẹp làm sạch (`sanitize`) tương thích ngược hoàn toàn.
+- **Trạng thái lưu trữ:** Khuôn tệp lưu trữ dữ liệu nhân vật, chân linh, tông môn, tài khoản và cơ sở dữ liệu PostgreSQL hoàn toàn **không đổi** từ `v0.5.2` (`git diff v0.5.2..origin/main -- server/src/store.ts server/src/soul.ts server/src/sect-store.ts server/src/account-store.ts server/src/pg` RỖNG).
 
 ---
 
 ## 2. Danh Mục Thay Đổi Theo Góc Nhìn
 
-### (a) Người chơi thấy gì (User-Facing Changes)
+### (a) Người chơi thấy gì (User-Facing Changes sau v0.5.2)
 
-1. **Bộ chiêu thức mới:**
-   - **6 chiêu hệ Kim & Thổ mới:** Thanh Vân Kiếm Khí (Kim, Trúc Cơ), Bàn Thạch Hộ Thể (Thổ, khiên, Trúc Cơ), Thu Thủy Kiếm Ảnh (Kim, Kim Đan), Liệt Địa Nhất Quyền (Thổ, tự tăng sát thương, Kim Đan), Phân Nhạc Trảm (Thổ, Kim Đan), Vạn Kiếm Quy Tông (Kim, 5 tia, Nguyên Anh, Địa phẩm).
-   - **Kinh quyển rơi từ quái:** Tỉ lệ rơi kiểm soát chặt chẽ (1% quái Trúc Cơ, 1,2% quái Kim Đan, 0,8% Phong Nha).
-   - **6 biểu tượng chiêu mới** trên atlas (`client/public/assets/atlas.png`).
-   - **Khung hình học chiêu thức mở rộng:** Hỗ trợ hiển thị hiệu ứng đạn bay (`pbolt`), tia sét lan (`chain`), vật thể bền (`zone`/`trap`/`totem`/`aura`), vận khí tụ lực (`windup`) và thanh luyện chiêu (`mastery`) theo phẩm Hoàng/Huyền/Địa/Thiên.
-2. **Cân bằng bản đồ cấp cao (Âm Sương Trạch & Hàn Vân Lĩnh):**
-   - Quái thường và tinh anh tăng Khí huyết x1,5, Tu vi x2; Hắc Giao tăng lên 6 con sinh cách nhau $\ge 700\text{ px}$.
-   - Tối đa 6 trùm sinh sẵn mỗi bản đồ.
-   - Nhịp độ tu luyện cảnh giới Kim Đan và Nguyên Anh rút ngắn còn ~4,2 giờ. Các boss và quái lớn yêu cầu tổ đội 2-4 người phối hợp chặt chẽ.
-3. **Bảng Xã hội (Shift + G) bật mặc định:**
-   - Người chơi có thể mở xem trực tiếp 4 bảng xếp hạng (Tu vi, Linh hồn, Tông môn, Thách đấu), Sổ Thành tựu & Danh hiệu, và Tab Sự kiện trùm thế giới.
-   - Danh hiệu hiển thị bên cạnh tên trên đầu nhân vật và trong các kênh chat (chung, đội `/p`, tông môn `/s`).
-4. **Cảnh báo an toàn trong hộp thoại Chặn đường:**
-   - Khi gặp chặn đường, hộp thoại chủ động kiểm tra túi đồ và hiển thị dòng nhắc cảnh báo: *"Túi không có đan hồi huyết: nên mang ít nhất 2"* hoặc *"Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2"* (nhắc nhở người chơi tránh chết thật oan uổng nếu chọn Chiến mà thiếu đan hồi phục).
-5. **Điều khoản sử dụng & Bản quyền mới (`terms.html`):**
-   - Liên kết điều khoản và chính sách được tích hợp tại màn hình đăng nhập và trong Cài đặt ("Giới thiệu và ghi công").
-6. **Tối ưu tải trang client:**
-   - Client được đóng gói với bộ nén `terser`, tối ưu dung lượng tải ban đầu nhanh hơn ~3,4%. Dữ liệu bản đồ được tách trần ngân sách độc lập (48 KB) giúp dung lượng mã chính giữ an toàn dưới ngân sách.
+1. **Chuyển đổi hệ thống bản đồ sang Tiled (S1 / S2 / S3a / S5):**
+   - Bốn bản đồ thường (`lac_ha`, `hac_phong`, `am_suong`, `han_van`) nay được chuyển thành tệp JSON tĩnh do máy chủ đọc trực tiếp và client nhận qua chunk `map-files-*.js`, thay vì sinh hoàn toàn theo seed lúc khởi tạo.
+   - `DEFAULT_MAP` toàn cục đã được gỡ bỏ khỏi mã nguồn; lưới tiếp cận va chạm `walk-reach` được dựng độc lập lúc tạo phòng.
+2. **Cơ chế phục hồi vị trí lưu rơi vào ô vật cản (#1219):**
+   - Nếu vị trí lưu của nhân vật rơi vào ô bị chặn (ví dụ do chỉnh sửa địa hình bản đồ), máy chủ sẽ tự động đặt nhân vật vào vị trí di chuyển hợp lệ gần nhất trong bán kính an toàn thay vì kéo giật lùi về trấn Lạc Hà.
+3. **Thêm 3 nhiệm vụ phụ tại Âm Sương Trạch (Kim Đan, #756):**
+   - 3 nhiệm vụ phụ mới (`shared/src/quests.ts` +71 dòng) được tiếp nhận từ các NPC tại Âm Sương Trạch, mở rộng nội dung trải nghiệm cho người chơi cảnh giới Kim Đan.
+4. **Điều khoản sử dụng & Bản quyền mới trong game (`terms.html`):**
+   - Bổ sung trang điều khoản pháp lý `terms.html` (chống sao chép, quy định dùng máy chủ, điều khoản tài khoản); tích hợp liên kết tại chân trang màn hình đăng nhập và trong bảng Cài đặt ("Giới thiệu và ghi công").
+5. **Cảnh báo an toàn trong hộp thoại Chặn đường (KHI BẬT AMBUSH):**
+   - Khi tính năng chặn đường được kích hoạt (`AMBUSH=on`), hộp thoại chủ động nhắc nhở: *"Túi không có đan hồi huyết / chỉ còn 1 đan: nên mang ít nhất 2"* (người chơi trên bản chạy thật hiện tại chưa thấy vì `AMBUSH` đang tắt).
+6. **Khung nạp Gói tài nguyên riêng (Client):**
+   - Tích hợp khối "Ghi công tài nguyên riêng" trong bảng Cài đặt (tự động hiển thị tên gói, giấy phép và liên kết tác giả khi có gói tài nguyên riêng được nạp; mặc định ẩn khi chưa cấu hình gói).
 
 ---
 
 ### (b) Vận hành cần làm gì khi nâng cấp (Ops & Environment Changes)
 
-Đối chiếu với `deploy/prod.sh` và `docs/TRIEN_KHAI.md`, trên môi trường chạy thật (`~/TT/tien-gioi-prod/`):
+Đối chiếu với `deploy/prod.sh`, `deploy/docker-compose.prod.yml` và `docs/TRIEN_KHAI.md`:
 
-1. **Cơ chế chống dùng ké & bảo vệ nguồn gốc (`ORIGIN_CHECK` & `ALLOWED_ORIGINS`):**
-   - `ORIGIN_CHECK`: Mặc định **BẬT** trong mã nguồn. Tự động kiểm tra tiêu đề `Origin` trên HTTP, WebSocket và `/matchmake/*`. Trả về lỗi 403 nếu đến từ nguồn lạ.
-   - `ALLOWED_ORIGINS`: Mặc định đã cấu hình sẵn nguồn công khai `https://tiengioi.hethongtm.site` và các nguồn trong `CORS_ORIGINS`.
-   - **Hành động vận hành:** **KHÔNG cần sửa `.env.production`** nếu máy chủ chạy với tên miền chính thức hiện tại. Nếu có nhu cầu mở thêm domain phụ hoặc trang vệ tinh thì mới cần bổ sung vào `ALLOWED_ORIGINS`.
-2. **Tính năng Gặp Chặn Đường (`AMBUSH` & `AMBUSH_MIN_POTIONS`):**
-   - Mặc định trong mã nguồn: **TẮT** (`AMBUSH=off`).
-   - **Hành động vận hành:** Giữ nguyên trạng thái TẮT cho tới khi người dùng duyệt 5 câu hỏi phát hành ở issue #1070. Khi người dùng đồng ý bật:
-     - Thêm `AMBUSH=on` vào `.env.production`.
-     - **Khuyến nghị bắt buộc:** Bổ sung `AMBUSH_MIN_POTIONS=2` (lọc bỏ người chơi mang dưới 2 đan hồi khí huyết để tránh chết thật do thiếu đan theo khuyến cáo của Dev A và số đo cân bằng).
-3. **Tính năng Trùm Thế Giới Theo Giờ (`WORLD_BOSS`):**
-   - Mặc định trong mã nguồn: **TẮT** (`WORLD_BOSS=off`) và lịch `WORLD_BOSS_SCHEDULE` đang rỗng.
-   - **Hành động vận hành:** Giữ nguyên TẮT. Khi Dev E hoàn tất nhập lịch dữ liệu và người dùng quyết định bật, thêm `WORLD_BOSS=on` vào `.env.production`.
-4. **Tính năng Thành Tựu & Cấp Bù Duyên (`ACHIEVEMENTS`):**
-   - Mặc định trong mã nguồn: **TẮT** (`ACHIEVEMENTS=off`).
-   - **Hành động vận hành:** Giữ nguyên TẮT. Việc bật `ACHIEVEMENTS=on` sẽ kích hoạt cấp bù Duyên vĩnh viễn cho toàn bộ người chơi cũ (tối đa 121 Duyên). Chỉ bật khi người dùng đã duyệt quyết định này.
-5. **Gói tài nguyên riêng (`ASSETS_PRIVATE_DIR`):**
-   - Mặc định: Rỗng (tính năng tắt, client tự lùi về hình thay thế an toàn).
-   - **Hành động vận hành:** Chỉ cấu hình khi người dùng đã tự tải gói tài nguyên hợp lệ vào `/mnt/data/assets-private/dist` và gắn mount volume read-only (`:ro`) vào container theo `docs/TRIEN_KHAI.md`.
-6. **Các tính năng mặc định BẬT khác:**
-   - Tông môn (`SECTS=on`), Bảng xếp hạng (`LEADERBOARD=on`): Đều đã ổn định và không cần can thiệp.
+1. **RỦI RO LỚN NHẤT — Chống dùng ké & Bảo vệ nguồn gốc (`ORIGIN_CHECK` & `CORS_ORIGINS`):**
+   - Tính năng mới hoàn toàn (`server/src/origin-guard.ts`), mặc định **BẬT** trong mã nguồn. Chặn mã lỗi 403 đối với HTTP, WebSocket và `/matchmake/*` nếu tiêu đề `Origin` không thuộc danh sách cho phép.
+   - `ALLOWED_ORIGINS` mặc định đã có `https://tiengioi.hethongtm.site`.
+   - **HÀNH ĐỘNG CẦN XÁC NHẬN:** Cần Dev A hoặc Người Dùng (người có quyền xem `.env.production` thật) xác nhận xem biến `CORS_ORIGINS` trên bản chạy thật đã khai báo `https://localhost` (cho app Android WebView) hay chưa. Nếu thiếu, người chơi truy cập qua app Android có nguy cơ bị từ chối kết nối 403!
+2. **Trùm Thế Giới Theo Giờ (`WORLD_BOSS`):**
+   - ĐÃ CÓ LỊCH THẬT 2 khung giờ trong `shared/src/social.ts` (12:00-12:30 và 20:00-20:30 UTC+7).
+   - **Mặc định đổi chiều:** Trên `v0.5.2`, mã nguồn mặc định BẬT (`WORLD_BOSS !== "off"`, nhưng lúc đó lịch rỗng nên trùm không sinh); trên `main`, mã nguồn mặc định **TẮT** (chỉ kích hoạt khi có cờ `WORLD_BOSS=on`).
+   - **Hành động:** Người có quyền kiểm tra `.env.production` thật: nếu đang có `WORLD_BOSS=on`, trùm thế giới sẽ xuất hiện thật vào 2 khung giờ trên ngay sau khi nâng cấp. Nếu chưa muốn kích hoạt, đảm bảo không đặt `WORLD_BOSS=on`.
+3. **Thành Tựu & Cấp Bù Duyên (`ACHIEVEMENTS`):**
+   - Mặc định mã nguồn: TẮT (`ACHIEVEMENTS=off`).
+   - Tuy nhiên, theo quyết định M3 mục 55-56, bản chạy thật có thể **ĐÃ ĐƯỢC BẬT**. Người vận hành cần kiểm tra `.env.production`: giữ nguyên cấu hình hiện tại của bản production, không tự ý tắt nếu đã bật.
+4. **Gặp Chặn Đường (`AMBUSH` & `AMBUSH_MIN_POTIONS`):**
+   - Mặc định: TẮT (`AMBUSH=off`). Giữ nguyên trạng thái TẮT chờ người dùng duyệt 5 câu hỏi phát hành ở issue #1070.
+   - Nếu người dùng quyết định bật: thêm `AMBUSH=on` và bắt buộc khuyến nghị kèm `AMBUSH_MIN_POTIONS=2`.
+5. **Cập nhật mẫu Docker Compose (`deploy/docker-compose.prod.yml`):**
+   - Tệp mẫu compose có thêm 4 dòng cấu hình biến `ASSETS_PRIVATE_DIR` và volume mount read-only `:ro` (`/mnt/data/assets-private/dist:/app/assets-private:ro`).
+   - Nếu muốn sử dụng gói tài nguyên riêng trong tương lai, người vận hành cần cập nhật nội dung này vào `~/TT/tien-gioi-prod/docker-compose.yml`.
 
 ---
 
 ### (c) Phân tích rủi ro & Phương án quay lui (Risk & Rollback Strategy)
 
-1. **Kiểm tra tính sẵn sàng của bản phát hành trước (`0.5.2`):**
-   - Đã kiểm tra trực tiếp qua `docker manifest inspect ghcr.io/nguyencong1227/tien-gioi:0.5.2`:
-     - Image manifest: `sha256:3fc14d1245cb1213f6cfb6f6ac86e793bfca916694115eb933bd29839c1cf2a1` (nền tảng `linux/amd64`).
-     - **Khẳng định:** Ảnh Docker của phiên bản `0.5.2` vẫn tồn tại nguyên vẹn trên GHCR, sẵn sàng kéo về phục vụ rollback tức thì nếu có sự cố.
-2. **Kịch bản và quy trình quay lui (Rollback):**
-   - Nếu bản nâng cấp gặp sự cố nghiêm trọng sau khi triển khai:
+1. **Khẳng định tính sẵn sàng của bản phát hành trước (`0.5.2`):**
+   - Đầu ra kiểm tra trực tiếp qua `docker manifest inspect ghcr.io/nguyencong1227/tien-gioi:0.5.2`:
+     ```json
+     {
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "manifests": [
+           {
+              "mediaType": "application/vnd.oci.image.manifest.v1+json",
+              "size": 2953,
+              "digest": "sha256:3fc14d1245cb1213f6cfb6f6ac86e793bfca916694115eb933bd29839c1cf2a1",
+              "platform": {
+                 "architecture": "amd64",
+                 "os": "linux"
+              }
+           }
+        ]
+     }
+     ```
+   - Ảnh Docker `0.5.2` vẫn tồn tại an toàn trên GHCR.
+2. **Quy trình quay lui (Rollback):**
+   - Khi phát sinh sự cố sau triển khai, sử dụng lệnh quay lui chuẩn của script vận hành:
      ```bash
      cd ~/TT/tien-gioi-prod
-     ./prod.sh up 0.5.2
-     # hoặc cập nhật TIEN_GIOI_TAG=0.5.2 và chạy docker compose up -d
+     ./prod.sh rollback
+     # hoặc: ./prod.sh up 0.5.2
      ```
-   - Thời gian gián đoạn dự kiến: Dưới 15 giây.
-3. **Khả năng tương thích dữ liệu khi lùi bản (Data Backward Compatibility):**
-   - Cấu trúc cơ sở dữ liệu PostgreSQL không có migration nào phá huỷ cột hay bảng cũ từ mốc `v0.5.2`.
-   - Các trường JSON mới trong hồ sơ người chơi (như `ambushDaily`, `ambushUntil`) sẽ được phiên bản `v0.5.2` bỏ qua một cách an toàn nhờ cơ chế `sanitizePlayer` tự lọc thuộc tính lạ.
-   - Không gây mất mát dữ liệu cốt lõi (Linh thạch, Tu vi, Cảnh giới, Túi đồ, Trang bị).
+3. **Tính tương thích dữ liệu khi lùi bản (Data Backward Compatibility):**
+   - **Thực nghiệm nâng cấp (Mục 2, Refs #1290):** Đã kiểm chứng nâng cấp thành công từ dữ liệu thật `v0.5.2` (30 bot, 30 chân linh, 2 tông môn) lên `main`: 30/30 bot đăng nhập thành công, `kiem-save` 100% sạch, 0 tệp `*.hong-*`, bảo toàn ví/tu vi/túi/chiêu.
+   - **Cơ sở cấu trúc:** Do khuôn tệp lưu không thêm trường mới nào từ `v0.5.2` (`git diff` rỗng ở `store.ts`, `soul.ts`, `sect-store.ts`, `account-store.ts`, `pg/`), việc lùi bản từ `main` về `v0.5.2` không làm bản cũ ghi đè hay làm mất các trường dữ liệu cốt lõi.
 
 ---
 
-### (d) Đề xuất số phiên bản (Version Number Recommendation)
+## 3. Đề Xuất Số Phiên Bản (Version Number Recommendation)
 
-Căn cứ vào `docs/TRIEN_KHAI.md` mục 10.1 (Quy tắc Semantic Versioning của Tiên Giới):
-- **Quy tắc:**
-  - Tăng `PATCH`: Chỉ dành cho sửa lỗi hiển thị, sửa logic nhiệm vụ, cân bằng nhỏ, không thay đổi hợp đồng `shared/`.
-  - Tăng `MINOR`: Bắt buộc khi có thay đổi hợp đồng `shared/`, mở rộng giao thức hoặc tính năng gameplay quy mô lớn.
-- **Thực tế tích luỹ:**
-  - `main` có **346 commit** mới so với `v0.5.2`.
-  - Hợp đồng `shared/src` thay đổi trên 21 tệp (+4.134 dòng): bổ sung toàn bộ khung chiêu thức dạng mới (hình học, vận khí, phẩm, luyện chiêu), hợp đồng chặn đường đấu trường solo (`ambush.ts`), hợp đồng tài nguyên riêng (`private-pack.ts`), hợp đồng xã hội (`social.ts`, `social-soul.ts`).
-  - Mặc dù `PROTOCOL_VERSION = 6` được giữ nguyên (đảm bảo tính tương thích ngược cho client hiện tại), nhưng khối lượng tính năng, cân bằng và mở rộng hợp đồng vượt xa phạm vi của một bản `PATCH`.
-- **Đề xuất:**
-  - **`v0.6.0`** (Không dùng `v0.5.3`).
-  - Đánh số `v0.6.0` phản ánh chính xác bước tiến lớn về tính năng (hạ tầng Chặn đường, Chiêu thức mở rộng, Khung tài nguyên riêng, Cân bằng Âm Sương - Hàn Vân, Xã hội bật mặc định) của dự án.
+Trích dẫn nguyên văn quy tắc đánh số phiên bản tại `docs/TRIEN_KHAI.md` mục 10.1:
+> - **Sửa lỗi / Tối ưu nhỏ (tăng `PATCH`):** Khi sửa lỗi hiển thị, sửa logic nhiệm vụ, cân bằng quái vật hoặc tối ưu hiệu năng mà **không** làm thay đổi cấu trúc gói tin `shared/` (ví dụ: `v0.1.0` -> `v0.1.1`).
+> - **Thay đổi giao thức / Hợp đồng `shared/` (tăng `MINOR`):** Bắt buộc phải tăng `MINOR` (ví dụ: `v0.1.0` -> `v0.2.0`), đồng thời tăng hằng số `PROTOCOL_VERSION` trong `shared/src/protocol.ts` (xem mục 2.5). Client quá cũ sẽ nhận lỗi 426 và hướng dẫn người chơi tải lại trang.
+
+### Đánh giá hai phương án:
+
+1. **Phương án A: `v0.5.3` (Theo nguyên văn quy tắc 10.1)**
+   - *Lập luận:* Hằng số `PROTOCOL_VERSION` giữ nguyên `6` (`shared/src/protocol.ts`), `MIN_PROTOCOL_VERSION` giữ nguyên `0`. Mọi thay đổi trong `shared/` (Tiled, private-pack, quests) đều được thiết kế tương thích ngược để client cũ không bị từ chối 426. Chiểu đúng câu chữ của mục 10.1, bản này không tăng `PROTOCOL_VERSION` nên thuộc diện `PATCH` (`v0.5.3`).
+2. **Phương án B: `v0.6.0` (Phán đoán theo quy mô kỹ thuật & tính năng)**
+   - *Lập luận:* Sau `v0.5.2` đã tích luỹ tới 346 commits. Hệ thống có bước chuyển đổi kiến trúc lớn (chuyển 4 bản đồ sang Tiled đọc từ tệp tĩnh, tích hợp lớp bảo vệ Origin Guard chống dùng ké, bổ sung hạ tầng gói tài nguyên riêng, tích hợp lịch thật trùm thế giới). Đánh số `v0.6.0` giúp đánh dấu rõ ràng mốc hoàn thành đợt nâng cấp Tiled và an toàn hệ thống.
+
+**Kết luận:** Đề xuất Người Dùng và Dev A cân nhắc lựa chọn giữa sự tuân thủ chặt chẽ định nghĩa 10.1 (`v0.5.3`) hoặc phản ánh quy mô cột mốc phát triển (`v0.6.0`).
