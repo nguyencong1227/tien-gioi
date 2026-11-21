@@ -1,6 +1,7 @@
 {
   "name": "@tien-gioi/shared",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.5.2",
   "type": "module",
   "main": "src/index.ts",

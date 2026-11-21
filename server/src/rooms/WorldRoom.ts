@@ -3,6 +3,7 @@
 import { performance } from "node:perf_hooks";
 import { StateView } from "@colyseus/schema";
 import { randomBytes } from "node:crypto";
+import type { IncomingHttpHeaders } from "node:http";
 import { Room, Client, ServerError, matchMaker, type RoomException, type Server } from "colyseus";
 import {
   TICK_MS,
@@ -188,6 +189,7 @@ import {
 } from "../systems/dungeon";
 import { applyRebirth, creditSoul } from "../systems/reincarnation";
 import { lenientRebirth } from "../systems/rebirth-choice";
+import { headersAllowed, type OriginPolicy } from "../origin-guard";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
@@ -267,6 +269,8 @@ export class WorldRoom extends Room<WorldState> {
    * trường (`server/src/protocol.ts`). Mặc định `MIN_PROTOCOL_VERSION` của `shared/` (0: nhận cả client chưa gửi `v`).
    */
   static minProtocol = MIN_PROTOCOL_VERSION;
+  /** Chính sách Origin (chống dùng ké, mục 59): `index.ts` đặt; null (test, bench) = không kiểm. */
+  static originPolicy: OriginPolicy | null = null;
   /**
    * Hệ số tu vi THỬ NGHIỆM theo đạo hiệu chuẩn hoá (`TEST_EXP_MULT`, QUYET_DINH_M3 mục 34, `server/src/test-exp.ts`); `index.ts` đặt từ môi trường.
    * Mặc định rỗng = tắt. Tra MỘT lần lúc vào phòng (`onJoin`), không đọc lại trong tick.
@@ -593,7 +597,10 @@ export class WorldRoom extends Room<WorldState> {
 
   // ---------------- Vào / ra ----------------
 
-  async onAuth(_client: Client, options: JoinOptions) {
+  async onAuth(_client: Client, options: JoinOptions, context?: { headers?: IncomingHttpHeaders }) {
+    // Chống dùng ké (mục 59): xin chỗ từ một trang LẠ (Origin có mặt mà không được phép) bị từ chối TRƯỚC mọi thứ khác. Không có Origin (bot, công cụ) thì qua.
+    if (WorldRoom.originPolicy && !headersAllowed(WorldRoom.originPolicy, context?.headers))
+      throw new ServerError(403, "origin_not_allowed");
     // Phiên bản trước mọi thứ khác (kể cả xác thực): client quá cũ nhận lời nhắn "hãy tải lại", không lộ gì về nhân vật nào
     if (isClientOutdated(options?.v, WorldRoom.minProtocol))
       throw new ServerError(JOIN_CLIENT_OUTDATED, clientOutdatedMessage(WorldRoom.minProtocol));
