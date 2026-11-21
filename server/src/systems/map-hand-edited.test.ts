@@ -49,13 +49,19 @@ describe("isHandEditedTiled", () => {
 });
 
 describe("bản đồ thật", () => {
-  it("HIỆN CHƯA bản đồ thường nào đánh dấu sửa tay (cả tệp soạn lẫn bản chạy logic): `map:bake` và test giống seed vẫn chạy cho cả bốn", () => {
-    for (const { id } of PROCEDURAL_MAPS)
-      for (const f of [`${id}.json`, `${id}.logic.json`])
-        expect(
-          isHandEditedTiled(JSON.parse(readFileSync(path.join(mapsDir, f), "utf8")) as TiledMap),
-          f,
-        ).toBe(false);
+  it("cờ NHẤT QUÁN giữa tệp soạn và bản chạy logic của từng bản đồ (đặt cờ ở tệp soạn mà quên `map:build` thì bản chạy thiếu cờ: `map:bake` sẽ ghi đè bản sửa tay)", () => {
+    for (const { id } of PROCEDURAL_MAPS) {
+      const full = isHandEditedTiled(
+        JSON.parse(readFileSync(path.join(mapsDir, `${id}.json`), "utf8")),
+      );
+      const logic = isHandEditedTiled(
+        JSON.parse(readFileSync(path.join(mapsDir, `${id}.logic.json`), "utf8")),
+      );
+      expect(
+        logic,
+        `${id}: ${id}.logic.json phải khớp cờ của ${id}.json (chạy npm run map:build -w server -- ${id})`,
+      ).toBe(full);
+    }
   });
 
   it("cờ đi từ tệp soạn sang bản chạy logic: `buildLogicRuntimeMap` giữ thuộc tính bản đồ", async () => {

@@ -54,7 +54,9 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
     expect(now).not.toBe(DEFAULT_MAP);
     expect(now.def.tiles).toBeDefined();
     expect(DEFAULT_MAP.def.tiles).toBeUndefined();
-    expect(Buffer.from(now.tiles).equals(Buffer.from(DEFAULT_MAP.tiles))).toBe(true);
+    // cùng từng byte với bản sinh theo seed, TRỪ khi Lạc Hà đã SỬA TAY (S6: khi đó khác nhau chính là lý do không được nhập `DEFAULT_MAP`)
+    if (!handEditedFile(DEFAULT_MAP_ID))
+      expect(Buffer.from(now.tiles).equals(Buffer.from(DEFAULT_MAP.tiles))).toBe(true);
     // các hàm tên cũ tra bản mới nhất mỗi lần gọi
     expect(tileAt(10, 10)).toBe(now.tileAt(10, 10));
     expect(dangerAt(40, 40)).toBe(now.dangerAt(40, 40));
