@@ -1488,7 +1488,7 @@ describe("bảo mật", () => {
     // Phòng vẫn phục vụ người khác
     b.room.send("chat", { text: "còn sống sau tin rác" });
     await waitFor(() => a.chat.find((m) => m.text === "còn sống sau tin rác"));
-  }, 20_000);
+  }, 40_000); // 8 đợt x 1,5 giây nghỉ ~12 giây khi máy rảnh; hạn 20 giây cũ chỉ dư 8 giây khi máy tải
 
   it("spam tin nhắn liên tục thì bị ngắt kết nối", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
