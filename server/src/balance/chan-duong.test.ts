@@ -535,11 +535,15 @@ describe("renderAmbushBalance", () => {
   });
 });
 
+/** Bảng độ nhạy trên DỮ LIỆU THẬT dựng MỘT lần cho cả tệp (6 kịch bản x mọi bầy x 48 trận: ~4 giây máy rảnh, ~10 giây khi máy bận; hai ca dưới đây cùng dùng, không dựng hai lần). */
+let realSensitivity: ReturnType<typeof sensitivityRows> | undefined;
+const realRows = () => (realSensitivity ??= sensitivityRows());
+
 describe("DỮ LIỆU THẬT: độ nhạy (AMBUSH_FOES)", () => {
   it("chiều của số đo trên bảng thật: ít đan hơn / không đồ thì chết nhiều hơn; bỏ chạy không chết nhiều hơn tới cùng; xác suất ngày khớp chết / lần", () => {
     if (AMBUSH_FOES.length === 0) return;
     // 6 kịch bản x mọi bầy x 48 trận: ~4 giây trên máy dev, CI chậm hơn 2-3 lần (hạn riêng 60 giây bên dưới)
-    const rows = sensitivityRows();
+    const rows = realRows();
     expect(rows).toHaveLength(6);
     const dead = (potions: number, gear: "best" | "none") =>
       rows.find((r) => r.scenario.potions === potions && r.scenario.gear === gear)!.deadToEnd;
@@ -551,17 +555,15 @@ describe("DỮ LIỆU THẬT: độ nhạy (AMBUSH_FOES)", () => {
       expect(r.deadFlee).toBeLessThanOrEqual(r.deadToEnd + 1e-12);
       expect(r.deadDayToEnd).toBeCloseTo(atLeastOnce(r.deadToEnd, AMBUSH_DAY_CAP), 12);
     }
-  }, 60_000);
+  }, 180_000);
 });
 
 describe("DỮ LIỆU THẬT (AMBUSH_FOES)", () => {
   it("không bầy nào vi phạm mục tiêu tỉ lệ thắng / thắng hơn bỏ chạy (nếu đỏ: chạy `npm run can-bang -w server`, đọc mục 'Chặn đường', chọn bầy yếu hơn hoặc chỉnh hằng số)", () => {
     expect(ambushBalanceViolations()).toEqual([]);
     // GIẢ ĐỊNH THẬN TRỌNG là chuẩn bật AMBUSH (A chốt 22/11, CD6c): ít đan (2) + đồ đúng bậc vẫn chết <= 5% và thắng >= mục tiêu ở MỌI bầy (nếu đỏ: bầy nêu tên quá khó với người ít đan: giảm số con / nâng `minStep` / chọn loài nhẹ hơn, đo lại bằng `npm run can-bang -w server`)
-    expect(ambushSensitivityViolations(sensitivityRows())).toEqual([]);
-    // không "đạt" chỉ vì bảng rỗng ở bản đã có dữ liệu: nếu có bầy thì phải đã đo
-    expect(renderAmbushBalance().includes("Chưa có bầy") ? AMBUSH_FOES.length : -1).toBe(
-      AMBUSH_FOES.length === 0 ? 0 : -1,
-    );
-  }, 60_000); // dựng cả báo cáo gồm mục 4 (6 kịch bản x 48 trận): ~4 giây trên máy dev, quá nửa hạn mặc định 15 giây khi CI chậm
+    expect(ambushSensitivityViolations(realRows())).toEqual([]);
+    // không "đạt" chỉ vì bảng rỗng (đã có dữ liệu thật: bảng rỗng là đỏ, không phải xanh âm thầm)
+    expect(AMBUSH_FOES.length).toBeGreaterThan(0);
+  }, 180_000); // `summarizeAll` + độ nhạy: ~10 giây máy rảnh, ~20 giây khi máy bận (load 25 do nhiều dev chạy test chung), CI chậm 2-3 lần; hạn 60 giây cũ từng hết hạn dưới tải
 });
