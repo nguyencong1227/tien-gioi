@@ -68,8 +68,11 @@ export interface WbEvent {
 export class WorldBossBook {
   /** Lịch đang dùng (rỗng = tính năng không chạy). */
   slots: readonly WorldBossSlot[];
-  /** `WORLD_BOSS=off` đặt `false`. */
-  enabled = true;
+  /**
+   * Mặc định TẮT: chỉ `index.ts` bật theo `WORLD_BOSS=on` (`worldBossOn`, `world-boss-config.ts`); test ca nào cần sự kiện thì tự đặt `true`. Mặc định BẬT từng an toàn khi lịch rỗng, nhưng từ khi lịch
+   * thật có khung giờ (12:00 / 21:00 UTC+7) mọi test dùng `Hub` mới + đồng hồ thật sẽ nhận báo trước / trùm thế giới lúc chạy trong các khung đó (chập chờn theo GIỜ TRONG NGÀY như #1125).
+   */
+  enabled = false;
   /** Sự kiện đang `live`, hoặc `null`. */
   current: WbEvent | null = null;
   private lastTickMs: number | null = null;
