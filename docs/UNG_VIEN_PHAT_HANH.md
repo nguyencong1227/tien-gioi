@@ -92,9 +92,19 @@
      ./prod.sh rollback
      # hoặc: ./prod.sh up 0.5.2
      ```
-3. **Tính tương thích dữ liệu khi lùi bản (Data Backward Compatibility):**
-   - **Thực nghiệm nâng cấp (Mục 2, Refs #1290):** Đã kiểm chứng nâng cấp thành công từ dữ liệu thật `v0.5.2` (30 bot, 30 chân linh, 2 tông môn) lên `main`: 30/30 bot đăng nhập thành công, `kiem-save` 100% sạch, 0 tệp `*.hong-*`, bảo toàn ví/tu vi/túi/chiêu.
-   - **Cơ sở cấu trúc:** Do khuôn tệp lưu không thêm trường mới nào từ `v0.5.2` (`git diff` rỗng ở `store.ts`, `soul.ts`, `sect-store.ts`, `account-store.ts`, `pg/`), việc lùi bản từ `main` về `v0.5.2` không làm bản cũ ghi đè hay làm mất các trường dữ liệu cốt lõi.
+3. **Tính tương thích dữ liệu khi nâng cấp và lùi bản (Upgrade & Rollback Compatibility):**
+   - **Thực nghiệm nâng cấp v0.5.2 -> main (Mục 2, Refs #1290):** Đã kiểm chứng độc lập trên dữ liệu thật sinh từ `v0.5.2` (30 bot, 30 chân linh, 2 tông môn) nạp trên `main`: 30/30 bot đăng nhập thành công, nạp và ghi lưu an toàn, `kiem-save` 100% sạch (30 nhân vật, 30 chân linh, 2 tông môn), 0 tệp `*.hong-*`, bảo toàn ví (10.971 = 10.971)/tu vi/túi/trang bị/chiêu thức.
+   - **Thực nghiệm lùi bản main -> v0.5.2 (Mục 2b, Refs #1290):** Khởi động máy chủ `v0.5.2` trên BẢN SAO dữ liệu đã được `main` ghi lại: 30/30 bot đăng nhập thành công vào `v0.5.2`, ghi lưu an toàn; công cụ `audit-saves.ts` của `v0.5.2` đạt 30/30 nhân vật sạch, 30/30 chân linh sạch, 2/2 tông môn sạch, 0 tệp `*.hong-*`; snapshot trước và sau khi lùi bản khớp 100%.
+   - **Cơ sở cấu trúc:** Do khuôn tệp lưu trữ không thêm trường mới nào từ `v0.5.2` (`git diff` rỗng ở `store.ts`, `soul.ts`, `sect-store.ts`, `account-store.ts`, `pg/`), việc lùi bản từ `main` về `v0.5.2` không làm bản cũ ghi đè hay làm mất các trường dữ liệu cốt lõi.
+   - **Công cụ tự động hoá:** Quy trình kiểm tra nâng cấp và lùi bản đã được tích hợp thành công cụ `npm run kiem-nang-cap -w server` (`server/scripts/kiem-nang-cap.ts`), tự động thực thi trên thư mục và cổng cách ly.
+
+4. **6 Giới hạn cần nhớ khi đọc số đo thực nghiệm:**
+   1. *Hiệu lực commit:* Kết quả thực nghiệm chỉ có hiệu lực với đúng đầu commit `b007b456`; khi nhánh `main` có commit mới phải chạy lại bằng `npm run kiem-nang-cap -w server`.
+   2. *Chân linh & Tông môn:* Thư mục `souls/` và `sects/` có thời gian sửa đổi (mtime) giữ nguyên mốc sao chép vì kịch bản đăng nhập ngắn chỉ đọc mà không ghi lại chúng (chưa có luân hồi hay giao dịch kho trong kịch bản).
+   3. *Origin Guard:* Thử nghiệm chạy với `ORIGIN_CHECK=off` nên lớp chặn Origin chưa được thử dưới tải đăng nhập thực tế.
+   4. *Backend lưu trữ:* Thử nghiệm thực hiện trên kho tệp JSON (`STORE=file`), không phải PostgreSQL (`STORE=pg`), mặc dù mã migration PG không đổi từ `v0.5.2`.
+   5. *Biến động tu vi:* Điểm tu vi không đổi ở cả 30 nhân vật do bot chỉ đả tọa ngắn 100-150ms.
+   6. *Bản chất bài test:* 30 bot đăng nhập trong 30 giây là bài kiểm tra tính tương thích nạp/lưu và cấu trúc dữ liệu hai chiều, KHÔNG PHẢI là bài thử tải dài (soak test).
 
 ---
 
