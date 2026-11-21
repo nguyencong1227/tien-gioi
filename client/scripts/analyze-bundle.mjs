@@ -299,6 +299,28 @@ export function splitCodeAndMapData(chunks, mapFilesLimitKb) {
 }
 
 /**
+ * Số liệu ngân sách của báo cáo (#1283): dư địa so với trần MÃ (`totalJsGzipKb`) chỉ tính chunk mã, dữ liệu bản đồ báo riêng. `CI` = gzip mức 9 theo KiB (như `check:budget`),
+ * `Vite` = gzip mức mặc định theo KB thập phân (như log của Vite).
+ * @param {Array<{ fileName: string, code: string }>} jsChunks
+ * @param {number} budgetMaxGzipKb trần tổng MÃ
+ * @param {number | undefined} mapFilesLimitKb trần riêng của dữ liệu bản đồ
+ */
+export function budgetFigures(jsChunks, budgetMaxGzipKb, mapFilesLimitKb) {
+  const { code, data } = splitCodeAndMapData(jsChunks, mapFilesLimitKb);
+  const gz9 = (list) => list.reduce((a, c) => a + zlib.gzipSync(c.code, { level: 9 }).length, 0);
+  const gzDefault = (list) => list.reduce((a, c) => a + zlib.gzipSync(c.code).length, 0);
+  const codeGzipKb = Number((gz9(code) / 1024).toFixed(2));
+  const viteCodeGzipKb = Number((gzDefault(code) / 1000).toFixed(2));
+  return {
+    codeGzipKb,
+    viteCodeGzipKb,
+    mapFilesGzipKb: Number((gz9(data) / 1024).toFixed(2)),
+    remainingBudgetKb: Number((budgetMaxGzipKb - codeGzipKb).toFixed(2)),
+    viteRemainingBudgetKb: Number((budgetMaxGzipKb - viteCodeGzipKb).toFixed(2)),
+  };
+}
+
+/**
  * Phân tích bundle client bằng cách gọi Vite build
  * @param {{ clientDir?: string, logLevel?: 'silent' | 'info' }} [options]
  * @returns {Promise<object>}
@@ -382,27 +404,13 @@ export async function analyzeClientBundle(options = {}) {
   }
 
   // Dữ liệu bản đồ có trần riêng (#1283): số dư địa so với trần MÃ chỉ tính chunk mã, đúng như `check:budget`
-  const { code: codeChunks, data: dataChunks } = splitCodeAndMapData(jsChunks, mapFilesLimitKb);
-  const codeGzipBytes = codeChunks.reduce(
-    (a, c) => a + zlib.gzipSync(c.code, { level: 9 }).length,
-    0,
-  );
-  const mapFilesGzipBytes = dataChunks.reduce(
-    (a, c) => a + zlib.gzipSync(c.code, { level: 9 }).length,
-    0,
-  );
-  const codeGzipDefaultBytes = codeChunks.reduce((a, c) => a + zlib.gzipSync(c.code).length, 0);
-  const codeGzipKb = Number((codeGzipBytes / 1024).toFixed(2));
-  const mapFilesGzipKb = Number((mapFilesGzipBytes / 1024).toFixed(2));
-
+  const { codeGzipKb, viteCodeGzipKb, mapFilesGzipKb, remainingBudgetKb, viteRemainingBudgetKb } =
+    budgetFigures(jsChunks, budgetMaxGzipKb, mapFilesLimitKb);
   const totalGzipKb = Number((gzipBytes / 1024).toFixed(2));
-  const remainingBudgetKb = Number((budgetMaxGzipKb - codeGzipKb).toFixed(2));
 
   // Kích thước hiển thị dạng thập phân (decimal KB) như Vite build log
   const viteRawKb = Number((rawBytes / 1000).toFixed(2));
   const viteGzipKb = Number((gzipDefaultBytes / 1000).toFixed(2));
-  const viteCodeGzipKb = Number((codeGzipDefaultBytes / 1000).toFixed(2));
-  const viteRemainingBudgetKb = Number((budgetMaxGzipKb - viteCodeGzipKb).toFixed(2));
 
   // Tính tiềm năng tiết kiệm khi tách các bảng UI
   let lazyCandidatesRawBytes = 0;

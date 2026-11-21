@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import zlib from "node:zlib";
 import {
   CATEGORY_DEFINITIONS,
   UI_PANEL_SECTIONS,
@@ -6,6 +7,7 @@ import {
   formatConsoleReport,
   formatMarkdownReport,
   splitCodeAndMapData,
+  budgetFigures,
 } from "./analyze-bundle.mjs";
 
 describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript)", () => {
@@ -182,6 +184,41 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
     }
     // không có chunk nào khớp: không ai bị miễn
     expect(splitCodeAndMapData([{ fileName: "assets/index-a.js" }], 48).data).toEqual([]);
+  });
+
+  it("budgetFigures (#1283): dư địa = trần MÃ - gzip chunk MÃ (KHÔNG trừ dữ liệu bản đồ); chưa khai báo trần riêng thì tính đủ mọi chunk", () => {
+    // mã giả ngẫu nhiên (LCG có hạt) để gzip không nén được gần hết
+    const noise = (n: number, seed: number) => {
+      let x = seed;
+      let out = "";
+      for (let i = 0; i < n; i++) {
+        x = (Math.imul(x, 1103515245) + 12345) >>> 0;
+        out += String.fromCharCode(97 + ((x >>> 16) % 26));
+      }
+      return out;
+    };
+    const code = noise(20 * 1024, 31);
+    const data = noise(30 * 1024, 37);
+    const chunks = [
+      { fileName: "assets/index-a.js", code },
+      { fileName: "assets/map-files-Zz9.js", code: data },
+    ];
+    const kib = (str: string) =>
+      Number((zlib.gzipSync(str, { level: 9 }).length / 1024).toFixed(2));
+    const kb = (str: string) => Number((zlib.gzipSync(str).length / 1000).toFixed(2));
+
+    const f = budgetFigures(chunks, 100, 48);
+    expect(f.codeGzipKb).toBe(kib(code));
+    expect(f.mapFilesGzipKb).toBe(kib(data));
+    expect(f.viteCodeGzipKb).toBe(kb(code));
+    expect(f.remainingBudgetKb).toBe(Number((100 - kib(code)).toFixed(2)));
+    expect(f.viteRemainingBudgetKb).toBe(Number((100 - kb(code)).toFixed(2)));
+
+    // chưa khai báo trần riêng: không miễn ai, số dư trừ cả hai chunk, dữ liệu bản đồ = 0
+    const none = budgetFigures(chunks, 100, undefined);
+    expect(none.mapFilesGzipKb).toBe(0);
+    expect(none.codeGzipKb).toBeCloseTo(kib(code) + kib(data), 1);
+    expect(f.remainingBudgetKb - none.remainingBudgetKb).toBeCloseTo(kib(data), 1);
   });
 
   it("báo cáo (#1283): dư địa tính trên MÃ và có dòng dữ liệu bản đồ; báo cáo cũ thiếu trường mới vẫn in được", () => {
