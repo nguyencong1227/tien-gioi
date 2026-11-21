@@ -1,6 +1,7 @@
 // Bản đồ sinh tất định từ seed: client và server sinh ra cùng một bản đồ,
 // nên không phải gửi dữ liệu bản đồ qua mạng.
 import { MONSTER_BY_ID, MONSTER_CAP, PLAYER_RADIUS } from "./game";
+import { mapDefFromTiled } from "./tiled";
 
 export const TILE = 32;
 export const MAP_W = 96;
@@ -197,6 +198,11 @@ export interface MapDef {
    * Bỏ trống thì dùng `MONSTER_CAP` (như Lạc Hà Trấn từ trước tới giờ).
    */
   readonly monsterCap?: Readonly<Record<string, number>>;
+  /**
+   * Ô DỰNG SẴN (loại ô `T`, đúng `w * h`, hàng trước cột sau) từ tệp Tiled (`mapDefFromTiled`, docs/THIET_KE_BAN_DO_TILED.md). Có thì `GameMap` dùng đúng các ô này
+   * (đã gồm trấn, đường, hang: tệp là nguồn duy nhất) và KHÔNG sinh theo `seed`; không có thì sinh theo `seed` như trước.
+   */
+  readonly tiles?: Uint8Array;
 }
 
 /**
@@ -237,7 +243,16 @@ export class GameMap {
     ] as const)
       if (!Number.isInteger(v))
         throw new Error(`MapDef ${def.id}: ${field} phải là số nguyên (${v})`);
-    this.tiles = generate(def);
+    if (def.tiles) {
+      if (def.tiles.length !== def.w * def.h)
+        throw new Error(
+          `MapDef ${def.id}: tiles có ${def.tiles.length} ô, cần ${def.w * def.h} (w * h)`,
+        );
+      for (let i = 0; i < def.tiles.length; i++)
+        if (def.tiles[i]! > T.Sand)
+          throw new Error(`MapDef ${def.id}: tiles[${i}] = ${def.tiles[i]} không phải loại ô T`);
+      this.tiles = Uint8Array.from(def.tiles); // chép: sửa mảng nguồn sau đó không làm đổi va chạm
+    } else this.tiles = generate(def);
     this.worldW = def.w * TILE;
     this.worldH = def.h * TILE;
     this.townPx = { x: def.town.cx * TILE, y: def.town.cy * TILE, r: def.town.r * TILE };
@@ -410,10 +425,12 @@ export const AM_SUONG_ID = "am_suong";
 export const HAN_VAN_ID = "han_van";
 
 /**
- * Danh sách bản đồ của game (docs/THIET_KE_NHIEU_BAN_DO.md). Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed:
- * cổng nằm ở đầu mút con đường đất, ô xung quanh đi lại được (test giữ). Đổi seed / kích thước thì phải đặt lại cổng.
+ * ĐỊNH NGHĨA SINH THEO `seed` của bốn bản đồ thường: nguồn gốc cũ, nay là "đồng hồ chuẩn" của test và đầu vào của công cụ `npm run map:bake -w server`
+ * (sinh ra `shared/maps/<id>.logic.json`). Trò chơi KHÔNG dựng bản đồ từ đây mà từ `MAPS` (đọc tệp); đấu trường chặn đường vẫn lấy `seed` / tên từ đây.
+ * Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed: cổng nằm ở đầu mút con đường đất, ô xung quanh đi lại được (test giữ). Đổi seed / kích thước thì phải đặt lại cổng.
+ * Khi một bản đồ đầu tiên được sửa TAY (lát cắt S6), nó ra khỏi danh sách này (tệp thành nguồn duy nhất) và test "đồng hồ chuẩn" của nó bị gỡ.
  */
-export const MAPS: readonly MapDef[] = [
+export const PROCEDURAL_MAPS: readonly MapDef[] = [
   {
     id: DEFAULT_MAP_ID,
     name: "Lạc Hà Trấn",
@@ -549,6 +566,15 @@ export const MAPS: readonly MapDef[] = [
   },
 ];
 
+/**
+ * Danh sách bản đồ thường của game (docs/THIET_KE_NHIEU_BAN_DO.md). Ban đầu là các định nghĩa sinh theo `seed` (`PROCEDURAL_MAPS`); `adoptTiledMaps` (bên dưới) thay từng mục bằng bản
+ * dựng từ TỆP Tiled (`shared/maps/<id>.logic.json`, docs/THIET_KE_BAN_DO_TILED.md mục 4a): cùng id / thứ tự, cùng ô / cổng / trấn từng byte (test `tiled-maps.test.ts`). SERVER nhận tệp lúc
+ * `defineRooms` (xem `shared/src/map-files.ts`); CLIENT chưa nhận (ở S2 vẫn sinh theo `seed`, KHÔNG nhập 4 tệp ~16 KB gzip vào gói KHỞI ĐỘNG đăng nhập: client sẽ nhận trong chunk game tải sau, S3).
+ * Mảng này được SỬA TẠI CHỖ bởi `adoptTiledMaps`: giữ tham chiếu `MAPS` thì thấy bản mới.
+ */
+const worldDefs: MapDef[] = [...PROCEDURAL_MAPS];
+export const MAPS: readonly MapDef[] = worldDefs;
+
 /** Id bản đồ bí cảnh đầu tiên (docs/THIET_KE_BI_CANH.md). */
 export const LINH_HU_MAP_ID = "bi_canh_linh_hu";
 
@@ -586,7 +612,7 @@ export function arenaMapIdOf(mapId: string): string {
  * Không có khu an toàn (xem `MapDef.kind`), không cổng, không quái sinh tự nhiên (`monsterCap` rỗng: kẻ chặn đường do server đặt). Người chơi vào ở phía nam
  * (`townPx`), kẻ địch phía bắc / giữa. `getMap` tra được (client và server cùng dựng ô từ `seed`); `defineRooms` chỉ đăng ký `MAPS` nên phòng do server mở (CD3).
  */
-export const ARENA_MAPS: readonly MapDef[] = MAPS.map((m) => ({
+export const ARENA_MAPS: readonly MapDef[] = PROCEDURAL_MAPS.map((m) => ({
   id: arenaMapIdOf(m.id),
   kind: "arena",
   arenaFor: m.id,
@@ -602,9 +628,10 @@ export const ARENA_MAPS: readonly MapDef[] = MAPS.map((m) => ({
   monsterCap: {},
 }));
 
-export const MAP_BY_ID: Readonly<Record<string, MapDef>> = Object.fromEntries(
+const mapById: Record<string, MapDef> = Object.fromEntries(
   [...MAPS, ...DUNGEON_MAPS, ...ARENA_MAPS].map((m) => [m.id, m]),
 );
+export const MAP_BY_ID: Readonly<Record<string, MapDef>> = mapById;
 
 /** Bản đồ `id` là đấu trường chặn đường? Id lạ / sai kiểu là `false`. */
 export function isArenaMap(id: unknown): boolean {
@@ -625,6 +652,26 @@ export function isDungeonMap(id: unknown): boolean {
 }
 
 const mapCache = new Map<string, GameMap>();
+
+/**
+ * Nhận TỆP Tiled cho các bản đồ thường: với mỗi `id` -> JSON, dựng `MapDef` bằng `mapDefFromTiled` (ném lỗi gom MỌI vi phạm nếu tệp sai, hoặc `id` không phải bản đồ thường / lệch id trong tệp)
+ * và thay bản định nghĩa cũ ở `MAPS` / `MAP_BY_ID`, bỏ `GameMap` đã nhớ của id đó (lần `getMap` sau dựng từ tệp). Gọi MỘT lần lúc khởi động, TRƯỚC khi ai dùng `getMap(id)` của các id này.
+ * Chưa gọi thì mọi thứ vẫn là bản sinh theo `seed` (cùng từng byte ở S2, nên gọi sớm hay muộn không đổi kết quả hiện nay; khi tệp bị sửa tay ở S6 thì PHẢI nhận trước khi dùng). Trả danh sách id đã nhận.
+ */
+export function adoptTiledMaps(sources: Readonly<Record<string, unknown>>): string[] {
+  const done: string[] = [];
+  for (const [id, src] of Object.entries(sources)) {
+    const idx = worldDefs.findIndex((d) => d.id === id);
+    if (idx < 0) throw new Error(`adoptTiledMaps: '${id}' không phải bản đồ thường`);
+    const def = mapDefFromTiled(src, TILE);
+    if (def.id !== id) throw new Error(`adoptTiledMaps: tệp của '${id}' khai id '${def.id}'`);
+    worldDefs[idx] = def;
+    mapById[id] = def;
+    mapCache.delete(id);
+    done.push(id);
+  }
+  return done;
+}
 
 /**
  * Lấy bản đồ theo id (sinh một lần rồi nhớ). Id lạ trả `undefined`: id có thể đến từ client / file lưu,

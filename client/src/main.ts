@@ -810,6 +810,14 @@ async function start(room: Room, mapId: string) {
         onRebirth: (choice) => {
           // script kiểm đọc đúng tin sẽ gửi (`engrave` vắng = giữ nguyên chiêu đã khắc)
           (window.__rebirthChoices ??= []).push(choice);
+          // `window.__limboRefuse` = lý do: giả lập máy chủ TỪ CHỐI (toast, vẫn ở Hoàng Tuyền) cho script kiểm (lỗi gấp mục 58)
+          // `window.__limboHold = true`: máy chủ IM LẶNG (không đầu thai, không toast): kiểm dòng "chưa phản hồi" sau hết giờ chờ
+          if ((window as unknown as { __limboHold?: unknown }).__limboHold === true) return;
+          const refuse = (window as unknown as { __limboRefuse?: unknown }).__limboRefuse;
+          if (typeof refuse === "string") {
+            ui.toast({ text: refuse, tone: "bad" });
+            return;
+          }
           ui.showReborn(mock.summary.kiep + 1);
         },
       });

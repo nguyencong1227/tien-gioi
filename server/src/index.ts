@@ -3,7 +3,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { defineRooms, ensureWorldBossRooms, WorldRoom } from "./rooms/WorldRoom";
 import { SectService } from "./sect-service";
@@ -15,6 +15,14 @@ import { testExpMultOf } from "./test-exp";
 import { LeaderboardService } from "./leaderboard";
 import { mountAuth } from "./auth-http";
 import { mountCors } from "./cors";
+import {
+  frameGuardMiddleware,
+  guardMatchmake,
+  lockMatchmakeCors,
+  originGuardMiddleware,
+  originPolicyOf,
+  wsVerifyClient,
+} from "./origin-guard";
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 import { applyStaticHeaders } from "./static-headers";
@@ -71,7 +79,19 @@ async function main() {
     lb.start();
   }
 
+  // Chống dùng ké / nhúng (mục 59): Origin lạ bị 403 ở HTTP, WebSocket và matchmaking; `frame-ancestors 'self'`. Gắn TRƯỚC mọi route.
+  const originPolicy = originPolicyOf(process.env);
+  for (const w of originPolicy.warnings) console.warn(`[CẢNH BÁO] ${w}`);
+  if (originPolicy.enabled)
+    console.log(
+      `Kiểm nguồn (Origin): nhận ${[...originPolicy.allowed].join(", ") || "(chỉ cùng nguồn)"}${originPolicy.allowLocal ? " + máy cục bộ" : ""} + cùng nguồn`,
+    );
+  WorldRoom.originPolicy = originPolicy;
+  lockMatchmakeCors(matchMaker.controller, originPolicy);
+
   const app = express();
+  app.use(frameGuardMiddleware);
+  app.use(originGuardMiddleware(originPolicy));
   // CORS theo danh sách cho phép (CORS_ORIGINS, mặc định TẮT) cho /health và /api/*: gắn TRƯỚC mountAuth (app đóng gói khác nguồn)
   const cors = mountCors(app, process.env);
   if (cors.enabled)
@@ -113,7 +133,10 @@ async function main() {
   }
 
   const server = http.createServer(app);
-  const gameServer = new Server({ transport: new WebSocketTransport({ server }) });
+  const gameServer = new Server({
+    transport: new WebSocketTransport({ server, verifyClient: wsVerifyClient(originPolicy) }),
+  });
+  guardMatchmake(gameServer as never, originPolicy); // `/matchmake/*` do Colyseus xử lý trước Express: chặn Origin lạ ở đây
   defineRooms(gameServer);
   // Tắt máy an toàn: Colyseus đóng phòng (lưu nhân vật) rồi mới đóng kết nối DB
   gameServer.onShutdown(() => {

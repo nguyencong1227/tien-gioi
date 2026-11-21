@@ -38,6 +38,7 @@ import {
   applyReturnGrace,
   AMBUSH_RETURN_WINDOW_MS,
   createAmbushRuntime,
+  isBotPlayer,
   onAmbushChoose,
   onAmbushSeen,
   pickAmbush,
@@ -132,6 +133,46 @@ describe("ambushBlocked: từng nhánh của mục 4.2 (không kích hoạt SAI 
     expect(ambushBlocked(s.w, s.sid)).toBe("protocol");
     s.c.proto = AMBUSH_MIN_PROTOCOL;
     expect(ambushBlocked(s.w, s.sid)).toBeNull();
+  });
+
+  it("bot: ở production (exemptBots: false, mặc định) người chơi đặt tên Bot VẪN bị chặn đường bình thường (chống lách luật)", () => {
+    const s = setup();
+    // createAmbushRuntime mặc định exemptBots: false
+    expect(s.w.ambush!.exemptBots).toBe(false);
+    s.p.name = "Bot 001";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+    s.p.name = "Bot Hoang";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+    s.p.name = "bot_vip_99";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+  });
+
+  it("bot: ở môi trường thử nghiệm (exemptBots: true) tài khoản bot mặc định bị bỏ qua, trừ khi AMBUSH_BOTS bật", () => {
+    const s = setup();
+    s.w.ambush!.exemptBots = true;
+    s.p.name = "Bot 001";
+    expect(ambushBlocked(s.w, s.sid)).toBe("bot");
+    s.p.name = "bot_u_042";
+    expect(ambushBlocked(s.w, s.sid)).toBe("bot");
+    // Khi bật ambushBots
+    s.w.ambush!.ambushBots = true;
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+    // Người chơi bình thường không bị coi là bot dù rt.ambushBots tắt
+    s.w.ambush!.ambushBots = false;
+    s.p.name = "Thanh Vân Tử";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+    s.p.name = "botanist";
+    expect(ambushBlocked(s.w, s.sid)).toBeNull();
+  });
+
+  it("isBotPlayer: nhận diện đúng tiền tố Bot hoặc bot_", () => {
+    expect(isBotPlayer("Bot 001")).toBe(true);
+    expect(isBotPlayer("bot 999")).toBe(true);
+    expect(isBotPlayer("bot_u_123")).toBe(true);
+    expect(isBotPlayer("  BOT_xyz  ")).toBe(true);
+    expect(isBotPlayer("botanist")).toBe(false);
+    expect(isBotPlayer("robot")).toBe(false);
+    expect(isBotPlayer("Thanh Vân Tử")).toBe(false);
   });
 
   it("run: phòng bí cảnh / đấu trường (World.runId !== null)", () => {

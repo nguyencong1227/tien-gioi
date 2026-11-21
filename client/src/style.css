@@ -99,6 +99,16 @@ body:has(#login:not([hidden])) {
   opacity: 0.75;
   font-style: italic;
 }
+#login .login-legal {
+  margin: 14px 0 0;
+  font-size: var(--fs-12, 12px);
+  line-height: 1.5;
+  opacity: 0.7;
+}
+#login .login-legal a {
+  color: inherit;
+  text-decoration: underline;
+}
 #login form {
   display: flex;
   flex-direction: column;
@@ -4753,6 +4763,24 @@ body.in-limbo #chat-log {
 
 .limbo-actions {
   margin-top: 18px;
+}
+
+/* Lý do đầu thai thất bại / phần bị bỏ / đang chờ: nằm NGAY trên nút, KHÔNG biến mất sau 3 giây như toast (lỗi gấp mục 58) */
+.limbo-rebirth-status {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: rgba(30, 41, 59, 0.85);
+  color: #e2e8f0;
+  font-size: var(--fs-14, 14px);
+  line-height: 1.45;
+}
+
+.limbo-rebirth-status.bad {
+  border-color: #b91c1c;
+  background: rgba(127, 29, 29, 0.55);
+  color: #fecaca;
 }
 
 .limbo-btn-rebirth {
