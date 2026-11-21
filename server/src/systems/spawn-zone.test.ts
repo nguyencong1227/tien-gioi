@@ -430,6 +430,50 @@ describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)",
     expect(boss).toMatch(/túi kín/);
   });
 
+  it("MỘT lần gọi, nhiều loài khác cỡ thân: mỗi loài loang theo cỡ thân RIÊNG (bộ nhớ đệm khoá theo cỡ, không dùng chung; ca của B, review #1214)", () => {
+    const gap = (t: Uint8Array) => {
+      ringOf(20, 20, 33, 33)(t);
+      t[20 * SIDE + 26] = T.Grass; // khe 1 ô: quái nhỏ lọt, trùm to không
+    };
+    const room = (monster: string) => zone(monster, 22, 22, 8, 8);
+    const cap = { lang: 5, thien_han_vuong: 1 };
+    // cả hai thứ tự: nếu loài sau dùng nhầm lần loang của loài trước thì một trong hai bị báo sai
+    for (const order of [
+      ["lang", "thien_han_vuong"],
+      ["thien_han_vuong", "lang"],
+    ]) {
+      const errs = spawnZoneViolations(mapWith(order.map(room), cap, gap)).join("\n");
+      expect(errs, order.join(",")).toMatch(
+        /\(thien_han_vuong\): \d+ chỗ đứng được nằm trong túi kín/,
+      );
+      expect(errs, order.join(",")).not.toMatch(/\(lang\): \d+ chỗ đứng được nằm trong túi kín/);
+    }
+  });
+
+  it("lời báo cho TRÙM nêu LÝ DO: nửa nhỏ do trấn cắt (ngoài vùng chính) khác với sát cây / đá; quái thường ở nửa nhỏ thì hợp lệ", () => {
+    const HANV = MONSTER_BY_ID.thien_han_vuong!;
+    const slot = { ...sampleWorldBossSchedule()[0]!, mapId: "thu_rong" };
+    const right = zone("thien_han_vuong", 70, 8, 8, 16); // nửa phải (nhỏ), ngoài đệm an toàn của trấn
+    const m = townSplitMap([right]);
+    expect(inMainRegion(m, HANV.radius * 0.8, 74 * TILE, 16 * TILE)).toBe(false); // tiền đề
+    const errs = spawnZoneViolations(m, [slot]).join("\n");
+    expect(errs).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    expect(errs).toMatch(/chỗ ngoài vùng chính của lưới quái cho trùm \(trấn có thể cắt bản đồ/);
+    // lý do CHÍNH là ngoài vùng chính (vài chỗ sát viền đá thật vẫn được kể riêng, nên không đòi vắng hẳn "sát cây / đá")
+    const outside = Number(/(\d+) chỗ ngoài vùng chính/.exec(errs)?.[1]);
+    const tight = Number(/(\d+) chỗ sát cây/.exec(errs)?.[1] ?? 0);
+    expect(outside).toBeGreaterThan(tight * 5);
+    // vùng sát đá (không do trấn): lý do là sát cây / đá, KHÔNG nhắc vùng chính
+    const near = spawnZoneViolations(
+      mapWith([zone("thien_han_vuong", 28, 30, 2, 4)], { lang: 5, thien_han_vuong: 1 }),
+    ).join("\n");
+    expect(near).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    expect(near).toMatch(/chỗ sát cây \/ đá/);
+    expect(near).not.toMatch(/ngoài vùng chính/);
+    // quái thường ở cùng nửa nhỏ: hợp lệ (không có phần "bị loại")
+    expect(spawnZoneViolations(townSplitMap([zone("lang", 70, 8, 8, 16)]))).toEqual([]);
+  });
+
   it("trùm: vùng sát đá (mọi chỗ trong 62 px quanh đá) không có chỗ `bossSpawnOk`; quái thường cùng vùng thì qua", () => {
     const z = (m: string) => zone(m, 28, 30, 2, 4); // sát khối đá 30..35 ở phía trái
     const cap = { lang: 5, thien_han_vuong: 1 };

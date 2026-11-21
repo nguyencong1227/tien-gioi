@@ -11,7 +11,7 @@ import {
   type GameMap,
   type WorldBossSlot,
 } from "@tien-gioi/shared";
-import { bossSpawnOkOn } from "./monsters";
+import { BOSS_SPAWN_MARGIN, bossSpawnOkOn } from "./monsters";
 import { NAV_CELL, navClassOf, squareFree } from "./nav";
 
 /** Loang (8 hướng, không cắt góc) trên lưới nút nửa ô cho thân cỡ `cls`; trả mặt nạ nút đã tới được từ nút gần (x, y) nhất. */
@@ -147,6 +147,8 @@ export function spawnZoneViolations(
     }
     let ok = 0;
     let isolated = 0;
+    let tight = 0; // trùm: chỗ sát cây / đá
+    let outsideMain = 0; // trùm: chỗ ngoài vùng chính của lưới quái
     const x1 = z.x + z.w;
     const y1 = z.y + z.h;
     for (let y = z.y + NAV_CELL / 2; y < y1; y += NAV_CELL)
@@ -158,9 +160,22 @@ export function spawnZoneViolations(
           continue;
         }
         if (!def.boss || bossSpawnOkOn(map, def, x, y)) ok++;
+        // Trùm: tách LÝ DO loại để người soạn biết sửa gì (B review #1214: "0 chỗ hợp lệ" không nói vì đá che hay vì trấn cắt bản đồ)
+        else if (!squareFree(map, x, y, def.radius + BOSS_SPAWN_MARGIN)) tight++;
+        else outsideMain++;
       }
-    if (ok < MIN_ZONE_SPOTS)
-      errs.push(`${at}: chỉ có ${ok} chỗ sinh hợp lệ (cần >= ${MIN_ZONE_SPOTS})`);
+    if (ok < MIN_ZONE_SPOTS) {
+      const why: string[] = [];
+      if (tight > 0)
+        why.push(`${tight} chỗ sát cây / đá (cách ô chặn dưới bán kính + ${BOSS_SPAWN_MARGIN} px)`);
+      if (outsideMain > 0)
+        why.push(
+          `${outsideMain} chỗ ngoài vùng chính của lưới quái cho trùm (trấn có thể cắt bản đồ làm đôi: vùng trùm phải ở nửa thế giới chứa vùng chính, luật mục 48)`,
+        );
+      errs.push(
+        `${at}: chỉ có ${ok} chỗ sinh hợp lệ (cần >= ${MIN_ZONE_SPOTS})${why.length > 0 ? `; bị loại: ${why.join("; ")}` : ""}`,
+      );
+    }
     if (isolated > 0)
       errs.push(
         `${at}: ${isolated} chỗ đứng được nằm trong túi kín (không tới được từ tâm trấn, kể cả đi qua khu an toàn, cho cỡ thân loài này)`,
