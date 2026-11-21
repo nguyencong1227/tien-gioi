@@ -15,7 +15,13 @@ import {
 } from "./trum-the-gioi";
 
 const base = sampleWorldBossSchedule()[0]!; // Thiên Hàn Vương, 30 phút
-const slot = (over: Partial<WorldBossSlot>): WorldBossSlot => ({ ...base, ...over });
+/** Quỹ thưởng đủ cho đội 10 người ~17,5 phút săn (bậc 18: ~396 tu vi / phút => 10 x 17,5 x 396 ~ 69.300) để các ca không đỏ vì thưởng; ca riêng bên dưới thử thưởng sai. */
+const REWARD = { exp: 70_000, coin: 50_000 };
+const slot = (over: Partial<WorldBossSlot>): WorldBossSlot => ({
+  ...base,
+  reward: REWARD,
+  ...over,
+});
 
 describe("perPlayerDps", () => {
   it("Thiên Hàn Vương: DPS thật mỗi người ~457 (đo từ trận đội nhỏ x uptime), Hắc Giao thấp hơn; loài không phải trùm có bộ chiêu thì null", () => {
@@ -71,6 +77,43 @@ describe("measureSlot", () => {
   });
 });
 
+describe("thưởng quy ra phút săn", () => {
+  it("săn tốt nhất ở bậc 18 ~396 tu vi / phút, bậc 15 ~536; thưởng một người = quỹ / số người / tu vi mỗi phút (số tính tay)", () => {
+    const han = measureSlot(slot({ hpMult: 35 }));
+    expect(han.huntExpPerMin).toBeGreaterThan(380);
+    expect(han.huntExpPerMin).toBeLessThan(415);
+    expect(han.expEquivMinutes[10]!).toBeCloseTo(70_000 / 10 / han.huntExpPerMin, 9);
+    expect(han.expEquivMinutes[10]!).toBeGreaterThan(16);
+    expect(han.expEquivMinutes[10]!).toBeLessThan(19);
+    expect(han.expEquivMinutes[20]!).toBeCloseTo(han.expEquivMinutes[10]! / 2, 9); // đông gấp đôi thì phần mỗi người nửa
+    expect(han.coinEquivMinutes[10]!).toBeCloseTo(50_000 / 10 / han.huntCoinPerMin, 9);
+    const giao = measureSlot(slot({ boss: "hac_giao", hpMult: 40 }));
+    expect(giao.huntExpPerMin).toBeGreaterThan(500);
+    expect(giao.huntExpPerMin).toBeLessThan(570);
+  });
+
+  it("quỹ quá nhỏ (khung mẫu 1000 tu vi) hoặc quá lớn bị bắt; trong khoảng 12-25 phút thì đạt", () => {
+    const tiny = worldBossBalanceViolations([
+      measureSlot(slot({ hpMult: 35, reward: { exp: 1000, coin: 200 } })),
+    ]).join("\n");
+    expect(tiny).toContain("thưởng tu vi của một người");
+    const huge = worldBossBalanceViolations([
+      measureSlot(slot({ hpMult: 35, reward: { exp: 400_000, coin: 50_000 } })),
+    ]).join("\n");
+    expect(huge).toContain("thưởng tu vi của một người");
+    expect(
+      worldBossBalanceViolations([
+        measureSlot(slot({ hpMult: 35, reward: { exp: 60_000, coin: 50_000 } })),
+      ]),
+    ).toEqual([]);
+    expect(
+      worldBossBalanceViolations([
+        measureSlot(slot({ hpMult: 35, reward: { exp: 95_000, coin: 50_000 } })),
+      ]),
+    ).toEqual([]);
+  });
+});
+
 describe("worldBossBalanceViolations", () => {
   it("máu gốc (quá dễ) vi phạm cả hai mục tiêu; x35 đạt; x200 (quá khó) bị bắt", () => {
     const easy = worldBossBalanceViolations([measureSlot(slot({ hpMult: undefined }))]).join("\n");
@@ -86,6 +129,8 @@ describe("worldBossBalanceViolations", () => {
     expect(ASSUME_WORLD_BOSS.minPlayers).toEqual({ min: 4, max: 8 });
     expect(ASSUME_WORLD_BOSS.fastestMinutes).toBe(3);
     expect(ASSUME_WORLD_BOSS.parties).toEqual([5, 20, 50]);
+    expect(ASSUME_WORLD_BOSS.typicalPlayers).toBe(10);
+    expect(ASSUME_WORLD_BOSS.rewardMinutes).toEqual({ min: 12, max: 25 });
   });
 });
 

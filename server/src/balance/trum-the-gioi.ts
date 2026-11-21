@@ -13,7 +13,8 @@ import {
   type WorldBossSlot,
 } from "@tien-gioi/shared";
 import { ASSUME_DUNGEON } from "./dungeon";
-import { ASSUME_BOSS, fightBossMoves } from "./trum";
+import { ASSUME_BOSS, bossStep, fightBossMoves } from "./trum";
+import { bestOption, expectedTotalCoin } from "./simulate";
 
 /** Giả định riêng của trùm thế giới. */
 export const ASSUME_WORLD_BOSS = {
@@ -27,6 +28,10 @@ export const ASSUME_WORLD_BOSS = {
   minPlayers: { min: 4, max: 8 },
   /** Mục tiêu: đội 50 người (cận lạc quan) không hạ nhanh hơn chừng này phút (sự kiện không biến thành trò 2 phút). */
   fastestMinutes: 3,
+  /** Số người đóng góp "điển hình" dùng quy giá trị thưởng (thưởng là MỘT quỹ chia theo tỉ lệ đóng góp: `WorldBossReward` ở 100%). */
+  typicalPlayers: 10,
+  /** Mục tiêu: phần thưởng tu vi của MỘT người trong đội điển hình đáng chừng này phút săn quái tốt nhất cùng bậc (bí cảnh: 15-20 phút, `ASSUME_DUNGEON.equivMinutes`). */
+  rewardMinutes: { min: 12, max: 25 },
 } as const;
 
 export interface WorldBossRow {
@@ -39,6 +44,12 @@ export interface WorldBossRow {
   dodgeMinutes: Record<number, number | null>;
   /** Số người ít nhất hạ được trong `durationMin` (né hoàn hảo); `null` nếu không đo được. */
   minPlayers: number | null;
+  /** Săn quái tốt nhất ở bậc đúng bậc của trùm: tu vi / phút và Linh thạch / phút (thang so thưởng). */
+  huntExpPerMin: number;
+  huntCoinPerMin: number;
+  /** Phút săn tương đương của phần thưởng MỘT người nhận khi quỹ chia đều cho `n` người (tu vi / Linh thạch). */
+  expEquivMinutes: Record<number, number>;
+  coinEquivMinutes: Record<number, number>;
   /** Mô hình "không né": tỉ lệ trận hạ được, phút thật trung bình (trận thắng), số người chết trung bình mỗi trận. */
   noDodge: Record<number, { winRate: number; minutes: number | null; deaths: number }>;
 }
@@ -97,7 +108,32 @@ export function measureSlot(slot: WorldBossSlot): WorldBossRow {
       deaths: deaths / ASSUME_WORLD_BOSS.runs,
     };
   }
-  return { slot, hp, dpsPerPlayer: dps, dodgeMinutes, minPlayers, noDodge };
+  const { realm, tier } = bossStep(def);
+  const opt = bestOption(realm, tier);
+  const huntExpPerMin = opt.rate * 60;
+  const huntCoinPerMin =
+    opt.source !== "đả tọa" && opt.secPerKill > 0
+      ? (expectedTotalCoin(opt.source) / opt.secPerKill) * 60
+      : 0;
+  const counts = [...new Set([...ASSUME_WORLD_BOSS.parties, ASSUME_WORLD_BOSS.typicalPlayers])];
+  const expEquivMinutes: Record<number, number> = {};
+  const coinEquivMinutes: Record<number, number> = {};
+  for (const n of counts) {
+    expEquivMinutes[n] = slot.reward.exp / n / huntExpPerMin;
+    coinEquivMinutes[n] = huntCoinPerMin > 0 ? slot.reward.coin / n / huntCoinPerMin : 0;
+  }
+  return {
+    slot,
+    hp,
+    dpsPerPlayer: dps,
+    dodgeMinutes,
+    minPlayers,
+    huntExpPerMin,
+    huntCoinPerMin,
+    expEquivMinutes,
+    coinEquivMinutes,
+    noDodge,
+  };
 }
 
 export function measureSchedule(
@@ -127,6 +163,12 @@ export function worldBossBalanceViolations(
       bad.push(
         `${at}: cần ít nhất ${r.minPlayers} người (né hoàn hảo) để hạ trong ${r.slot.durationMin} phút, mục tiêu ${min}-${max}`,
       );
+    const eq = r.expEquivMinutes[ASSUME_WORLD_BOSS.typicalPlayers]!;
+    const rm = ASSUME_WORLD_BOSS.rewardMinutes;
+    if (eq < rm.min || eq > rm.max)
+      bad.push(
+        `${at}: thưởng tu vi của một người trong đội ${ASSUME_WORLD_BOSS.typicalPlayers} người đáng ${eq.toFixed(1)} phút săn (mục tiêu ${rm.min}-${rm.max}); quỹ ${r.slot.reward.exp} tu vi, săn tốt nhất ${Math.round(r.huntExpPerMin)} tu vi / phút`,
+      );
     const fast = r.dodgeMinutes[Math.max(...ASSUME_WORLD_BOSS.parties)];
     if (fast !== null && fast < ASSUME_WORLD_BOSS.fastestMinutes)
       bad.push(
@@ -148,7 +190,7 @@ export function renderWorldBossBalance(
 ): string {
   const head = `## Trùm thế giới: máu nhân \`hpMult\` (M9.10 #1029, mục 59)
 
-> Phần này sinh từ \`server/src/balance/trum-the-gioi.ts\` (chạy bộ thực thi trùm thật \`fightBossMoves\`, máu = \`worldBossHpOf\`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x ${ASSUME_DUNGEON.bossUptime})) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội ${ASSUME_WORLD_BOSS.perPlayerParty} người hạ trùm ở máu gốc (${ASSUME_WORLD_BOSS.runs} hạt giống). Mục tiêu: số người tối thiểu hạ được trong thời lượng là ${ASSUME_WORLD_BOSS.minPlayers.min}-${ASSUME_WORLD_BOSS.minPlayers.max} (cộng đồng nhỏ vẫn hạ được, không một mình), đội ${Math.max(...ASSUME_WORLD_BOSS.parties)} người không dưới ${ASSUME_WORLD_BOSS.fastestMinutes} phút.
+> Phần này sinh từ \`server/src/balance/trum-the-gioi.ts\` (chạy bộ thực thi trùm thật \`fightBossMoves\`, máu = \`worldBossHpOf\`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x ${ASSUME_DUNGEON.bossUptime})) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội ${ASSUME_WORLD_BOSS.perPlayerParty} người hạ trùm ở máu gốc (${ASSUME_WORLD_BOSS.runs} hạt giống). Thưởng (\`WorldBossReward\` là MỘT quỹ chia theo tỉ lệ đóng góp) quy ra phút săn quái tốt nhất cùng bậc cho một người trong đội ${ASSUME_WORLD_BOSS.typicalPlayers} người (mục tiêu ${ASSUME_WORLD_BOSS.rewardMinutes.min}-${ASSUME_WORLD_BOSS.rewardMinutes.max}; bí cảnh 15-20). Mục tiêu: số người tối thiểu hạ được trong thời lượng là ${ASSUME_WORLD_BOSS.minPlayers.min}-${ASSUME_WORLD_BOSS.minPlayers.max} (cộng đồng nhỏ vẫn hạ được, không một mình), đội ${Math.max(...ASSUME_WORLD_BOSS.parties)} người không dưới ${ASSUME_WORLD_BOSS.fastestMinutes} phút.
 `;
   if (slots.length === 0)
     return `${head}
@@ -167,13 +209,13 @@ export function renderWorldBossBalance(
           return `${pct(x.winRate)}${x.minutes === null ? "" : ` ${f1(x.minutes)} ph`}, ${f1(x.deaths)} chết`;
         })
         .join(" / ");
-      return `| ${r.slot.id} | ${MONSTER_BY_ID[r.slot.boss]?.name ?? r.slot.boss} x${r.slot.hpMult ?? 1} (${f0(r.hp)} máu) | ${r.slot.mapId} | ${String(r.slot.hour).padStart(2, "0")}:${String(r.slot.minute).padStart(2, "0")} / ${r.slot.durationMin} ph | ${r.dpsPerPlayer === null ? "-" : f0(r.dpsPerPlayer)} | **${r.minPlayers ?? "-"}** | ${dodge} | ${nd} |`;
+      return `| ${r.slot.id} | ${MONSTER_BY_ID[r.slot.boss]?.name ?? r.slot.boss} x${r.slot.hpMult ?? 1} (${f0(r.hp)} máu) | ${r.slot.mapId} | ${String(r.slot.hour).padStart(2, "0")}:${String(r.slot.minute).padStart(2, "0")} / ${r.slot.durationMin} ph | ${r.dpsPerPlayer === null ? "-" : f0(r.dpsPerPlayer)} | **${r.minPlayers ?? "-"}** | ${f0(r.slot.reward.exp)} + ${f0(r.slot.reward.coin)} -> ${f1(r.expEquivMinutes[ASSUME_WORLD_BOSS.typicalPlayers]!)} / ${f1(r.coinEquivMinutes[ASSUME_WORLD_BOSS.typicalPlayers]!)} ph | ${dodge} | ${nd} |`;
     })
     .join("\n");
   const violations = worldBossBalanceViolations(rows);
   return `${head}
-| Khung | Trùm (máu thật) | Bản đồ | Giờ / thời lượng | DPS mỗi người | **Người tối thiểu** | Né hoàn hảo: ${parties.join(" / ")} người | Không né: ${parties.join(" / ")} người (thắng, thời gian thật, chết) |
-|---|---|---|---|--:|--:|---|---|
+| Khung | Trùm (máu thật) | Bản đồ | Giờ / thời lượng | DPS mỗi người | **Người tối thiểu** | Thưởng một người (đội ${ASSUME_WORLD_BOSS.typicalPlayers}): quỹ -> phút săn (tu vi / Linh thạch) | Né hoàn hảo: ${parties.join(" / ")} người | Không né: ${parties.join(" / ")} người (thắng, thời gian thật, chết) |
+|---|---|---|---|--:|--:|---|---|---|
 ${table}
 
 ${violations.length === 0 ? "**Không vi phạm mục tiêu nào.**" : `**VI PHẠM (${violations.length}):**\n\n${violations.map((v) => `- ${v}`).join("\n")}`}
