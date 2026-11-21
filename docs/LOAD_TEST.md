@@ -2105,23 +2105,30 @@ Theo thiết kế M9 Xã hội (`docs/PHAN_CONG_M9.md` mục 4 và mục 6):
   + Hiệu ứng báo trước (`fx` `warn` / `bossCast`): bị chặn theo số người, **không tăng theo số tick**.
 
 ### 39.2. Kết quả đo đạc thực tế (`perf.test.ts` - ca `world-boss-crowd`)
-Mô phỏng 100 người chơi Nguyên Anh tụ quanh trùm Thiên Hàn Vương (bán kính 60–140 px), đồng thời xả đòn tấn công mỗi tick trong 100 ticks (5.0 giây).
+Mô phỏng 100 người chơi Nguyên Anh tụ quanh trùm Thiên Hàn Vương (bán kính 60–140 px), đồng thời xả đòn tấn công mỗi tick trong 700 ticks (35 giây), trùm bật đầy đủ `bossMoves = true`, có vận chiêu (`bossCast`), cảnh báo trước (`warn`), 2 đợt chuyển giai đoạn ép máu 49% và 24% (`bossPhase`), triệu hồi Hàn Lang con (`bossSummon`), và gửi bảng đóng góp định kỳ 2s.
 
 | Chỉ số | Kết quả đo thực tế | Ngân sách | Đánh giá |
 |---|---:|---:|:---:|
-| **Thời gian tick trung bình (avgTick)** | **0.86 ms / tick** | < 10.0 ms | **ĐẠT XUẤT SẮC** |
-| **Thời gian tick p95** | **1.24 ms / tick** | < 10.0 ms | **ĐẠT** |
-| **Băng thông state patch TB mỗi client** | **148.5 byte / tick** | < 600 byte / tick | **ĐẠT XUẤT SẮC** |
-| **Tần suất gửi bảng đóng góp** | **~2 giây / lần** (3 đợt / 5s) | Mỗi 2s (không mỗi tick) | **ĐẠT** |
+| **Thời gian tick trung bình (avgTick)** | **0.28 ms / tick** | < 10.0 ms | **ĐẠT XUẤT SẮC** |
+| **Thời gian tick p95** | **1.00 ms / tick** | < 10.0 ms | **ĐẠT XUẤT SẮC** |
+| **Băng thông state patch TB mỗi client** | **13.3 byte / tick** (đỉnh 728 B lúc gửi bảng) | < 600 byte / tick | **ĐẠT XUẤT SẮC** |
+| **Tần suất gửi bảng đóng góp** | **~2 giây / lần** (17 đợt / 35s) | Mỗi 2s (không mỗi tick) | **ĐẠT** |
 | **Đỉnh Fx sinh ra mỗi tick (maxFxPerTick)**| **102 fx** | <= 400 fx (chặn theo số người) | **ĐẠT** |
+| **Khẳng định chống pass rỗng** | `slash >= 5000`, `warn >= 2`, `bossCast >= 2`, `bossPhase = 2`, `bossSummon >= 1` | Bộ chiêu chạy thật | **ĐẠT** |
 
 ### 39.3. Kịch bản thử tải Bot (`--world-boss` / `--wboss`)
 Mở rộng kịch bản `server/scripts/bots.ts`:
 - Thêm cờ `--world-boss` (hoặc `--wboss`): Bot tự động kích hoạt chế độ săn trùm thế giới, lắng nghe tin nhắn `worldBoss` (`SOCIAL_MSG.worldBoss`), tự động bật né đòn `--evade` trước các kỹ năng diện rộng của trùm.
 - Khi trùm thế giới xuất hiện (`phase === "live"`): Cự ly tìm kiếm mục tiêu của bot mở rộng tới 3500 px, ưu tiên tối đa quái trùm thế giới (`penalty = -5000`), giúp 100 bot khắp bản đồ dồn tụ về chân trùm để giao chiến.
-- Báo cáo đo lường theo dõi đầy đủ: số tin `worldBoss`, số lần nhận bảng đóng góp, số bot đạt ngưỡng nhận thưởng (>= 1.5% HP tối đa của trùm), và số lượng `fx` trùm thi triển.
+- Báo cáo đo lường theo dõi đầy đủ: số tin `worldBoss`, số lần nhận bảng đóng góp, số bot đạt ngưỡng nhận thưởng (>= 1.5% HP tối đa của trùm), và số lượng `fx` trùm thi triển (chỉ đếm các đòn đánh / báo trước diện rộng của trùm).
+- **Cách chạy thử thực tế:** Để bot săn trùm thế giới trên máy chủ dev:
+  ```bash
+  WORLD_BOSS=on BOSS_MOVES=on npm run dev
+  npm run bots -- --bots=100 --world-boss --duration=60
+  ```
+  *(Lưu ý: Sự kiện trùm thế giới diễn ra theo khung giờ lịch `WORLD_BOSS_SCHEDULE` tại 12:00 và 21:00 UTC+7; khi thử nghiệm ngoài giờ có thể chỉnh lịch tạm thời hoặc điều chỉnh mốc thời gian).*
 
 ### 39.4. Công cụ kiểm tra tính toàn vẹn `kiem-save` cho `Soul.social`
-- Mở rộng `server/scripts/audit-saves.ts` mục 11: Kiểm tra tính toàn vẹn dữ liệu xã hội `Soul.social` (`social.v === 1`, `pk.won/lost` hợp lệ trong trần, `counters` khóa hợp lệ theo `socialCounterMode` và không vượt trần `SOCIAL_COUNTER_CAP`, `ach` chuẩn định dạng ISO và không vượt 512 mục, `title` khớp `TITLE_ID_RE`).
-- Bổ sung bộ test và test đột biến có răng `server/scripts/audit-saves.test.ts` (109/109 tests PASS).
+- Mở rộng `server/scripts/audit-saves.ts` mục 11: Kiểm tra tính toàn vẹn dữ liệu xã hội `Soul.social` (`social.v === 1`, `pk.won/lost` hợp lệ trong trần, `counters` khóa hợp lệ theo `socialCounterMode` và không vượt trần `SOCIAL_COUNTER_CAP`, `ach` chuẩn định dạng ISO `[1, 40]` ký tự và không vượt 512 mục, `title` khớp `TITLE_ID_RE`).
+- Bổ sung bộ test và test đột biến có răng `server/scripts/audit-saves.test.ts` (109 tests PASS, bao phủ mọi nhánh kiểm tra trần, kiểu, số nguyên, độ dài chuỗi ISO).
 

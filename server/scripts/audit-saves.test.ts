@@ -33,6 +33,10 @@ import {
   SECT_LEVELS,
   SECT_SHOP,
   SKILLS_M7,
+  SOCIAL_ACH_MAX,
+  SOCIAL_COUNTER_CAP,
+  SOCIAL_COUNTER_KEYS_MAX,
+  SOCIAL_PK_CAP,
   sanitizeSkillBook,
 } from "@tien-gioi/shared";
 import {
@@ -819,26 +823,64 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
-    it("đột biến: nới lỏng kiểm tra Soul.social (bỏ kiểm tra socialCounterMode) thì test bắt buộc phát hiện", () => {
-      const mutantSocialData = JSON.stringify({
-        ...validSoul,
-        social: {
-          v: 1,
-          pk: { won: 0, lost: 0 },
-          counters: { khoá_đột_biến_sai: 10 },
-          ach: {},
-          title: null,
-        },
-      });
-      const errors = auditSoulSaveData(mutantSocialData, mutantSocialData.length);
-      expect(errors.some((e) => e.code === "invalid_soul_social_counter_key")).toBe(true);
-
-      // Nếu đột biến nới lỏng: không kiểm tra socialCounterMode
-      const relaxedCheck = (errs: typeof errors) =>
-        errs.filter((e) => e.code !== "invalid_soul_social_counter_key");
-      expect(relaxedCheck(errors).some((e) => e.code === "invalid_soul_social_counter_key")).toBe(
-        false,
-      );
+    it("Soul.social: MỖI nhánh kiểm còn lại có một ca đỏ riêng (trần, kiểu, số nguyên, độ dài, ISO)", () => {
+      const ok = { v: 1, pk: { won: 0, lost: 0 }, counters: {}, ach: {}, title: null };
+      const keys = (n: number) =>
+        Object.fromEntries(Array.from({ length: n }, (_, i) => [`boss:b${i}`, 1]));
+      const achs = (n: number) =>
+        Object.fromEntries(Array.from({ length: n }, (_, i) => [`a${i}`, "2026-11-20"]));
+      const cases: [string, unknown, string][] = [
+        [
+          "pk.won vượt trần",
+          { ...ok, pk: { won: SOCIAL_PK_CAP + 1, lost: 0 } },
+          "invalid_soul_social_pk_won",
+        ],
+        ["pk không phải đối tượng", { ...ok, pk: 5 }, "invalid_soul_social_pk"],
+        ["counters là mảng", { ...ok, counters: [] }, "invalid_soul_social_counters"],
+        ["ach là chuỗi", { ...ok, ach: "x" }, "invalid_soul_social_ach"],
+        [
+          "bộ đếm vượt trần giá trị",
+          { ...ok, counters: { kiep: SOCIAL_COUNTER_CAP + 1 } },
+          "invalid_soul_social_counter_val",
+        ],
+        [
+          "bộ đếm không nguyên",
+          { ...ok, counters: { kiep: 1.5 } },
+          "invalid_soul_social_counter_val",
+        ],
+        [
+          "thời điểm thành tựu dài 41 ký tự",
+          { ...ok, ach: { kiep_2: "x".repeat(41) } },
+          "invalid_soul_social_ach_date",
+        ],
+        [
+          "thời điểm thành tựu không phải ISO",
+          { ...ok, ach: { kiep_2: "abc" } },
+          "invalid_soul_social_ach_date",
+        ],
+        [
+          "quá số khoá bộ đếm",
+          { ...ok, counters: keys(SOCIAL_COUNTER_KEYS_MAX + 1) },
+          "social_counters_exceed_max",
+        ],
+        ["quá số thành tựu", { ...ok, ach: achs(SOCIAL_ACH_MAX + 1) }, "social_ach_exceed_max"],
+      ];
+      for (const [name, social, code] of cases) {
+        const raw = JSON.stringify({ ...validSoul, social });
+        expect(
+          auditSoulSaveData(raw, raw.length).map((e) => e.code),
+          name,
+        ).toContain(code);
+      }
+      // đúng ở biên thì KHÔNG lỗi (chặn trần dịch xuống một đơn vị)
+      const edge = {
+        ...ok,
+        pk: { won: SOCIAL_PK_CAP, lost: SOCIAL_PK_CAP },
+        counters: { ...keys(SOCIAL_COUNTER_KEYS_MAX - 1), kiep: SOCIAL_COUNTER_CAP },
+        ach: achs(SOCIAL_ACH_MAX),
+      };
+      const rawEdge = JSON.stringify({ ...validSoul, social: edge });
+      expect(auditSoulSaveData(rawEdge, rawEdge.length)).toEqual([]);
     });
 
     it("auditSavesDirectory kiểm tra thư mục souls/ và đối chiếu limbo", () => {

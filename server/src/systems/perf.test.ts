@@ -1262,13 +1262,15 @@ describe("vật thể bền của người chơi (mục 51, CT4 #1049)", () => {
 });
 
 describe("trùm thế giới theo giờ đông người (M9.14 #1033)", () => {
-  // Đo lúc viết (#1033): avgMs = 0.86 ms/t, p95Ms = 1.24 ms/t (< 10 ms); avgPatchBytes = 148.5 B/t (< 600 B/t);
-  // maxFxPerTick = 102 (<= 400). Máy rảnh chạy ~1 giây nhưng gán hạn 60 s để CI và máy tải nặng chạy an toàn (#1215).
+  // Đo ca 700 ticks = 35 s (#1033): avgMs = 0.28 ms/t, p95Ms = 1.00 ms/t (< 10 ms); avgPatchBytes = 13.3 B/t (< 600 B/t);
+  // maxPatchBytes = 728 B; maxFxPerTick = 102 (<= 400). Chạy ~330 ms máy rảnh nhưng gán hạn 60 s để CI và máy tải nặng an toàn (#1215).
   it("100 người dồn một phòng đánh trùm thế giới đang vận chiêu (world-boss-crowd): tick < 10 ms, byte / tick < 600 mỗi client, fx không bùng nổ", () => {
     const hub = new Hub();
     hub.worldBoss.slots = sampleWorldBossSchedule();
     hub.worldBoss.enabled = true;
     const { w, fx, worldBosses } = makeWorld(getMap("han_van")!, hub);
+    // Bản chạy thật bật `BOSS_MOVES=on`: KHÔNG bật thì trùm chỉ đánh thường (không báo trước, không chuyển giai đoạn, không gọi quái con) và ca này đo hụt
+    w.bossMoves = true;
 
     // 00:00 UTC+7 ngày 18/11/2026
     const DAY0 = Date.UTC(2026, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
@@ -1317,13 +1319,15 @@ describe("trùm thế giới theo giờ đông người (M9.14 #1033)", () => {
     for (const v of views) encoder.encodeView(v, 1, { offset: 1 });
     encoder.discardChanges();
 
-    // 100 ticks = 5.0 giây (trải qua nhiều chu kỳ vận chiêu trùm, đập đất, mưa băng, gửi bảng 2s)
-    const ticks = 100;
+    // 700 ticks = 35 giây: chiêu có hồi 8 giây nên 5 giây chỉ thấy MỘT lần báo trước; ép máu qua 50% / 25% để có cả hai lần chuyển giai đoạn (gầm, giáp, gọi Hàn Lang)
+    const ticks = 700;
     const durations: number[] = [];
     const bytesPerTick: number[] = [];
     let maxFxPerTick = 0;
 
     for (let t = 0; t < ticks; t++) {
+      if (t === 200) bossMon.hp = bossMon.maxHp * 0.49;
+      if (t === 450) bossMon.hp = bossMon.maxHp * 0.24;
       w.now += TICK_MS;
       const fx0 = fx.length;
 
@@ -1364,13 +1368,23 @@ describe("trùm thế giới theo giờ đông người (M9.14 #1033)", () => {
 
     const avgPatchBytes = bytesPerTick.reduce((a, b) => a + b, 0) / bytesPerTick.length;
     expect(avgPatchBytes).toBeLessThan(600); // Ngân sách patch < 600 byte/tick mỗi client
+    expect(avgPatchBytes).toBeLessThan(600); // Ngân sách patch < 600 byte/tick mỗi client
 
     // fx bị chặn theo số người (slash + boss cast / telegraph / warning), không bùng nổ theo số tick
     expect(maxFxPerTick).toBeLessThanOrEqual(100 * 4);
 
-    // Bảng đóng góp chỉ gửi định kỳ mỗi 2 giây (~2-3 đợt gửi cho 100 người trong 5 giây)
+    // CHỐNG PASS RỖNG: ca chỉ có nghĩa khi trùm THẬT SỰ dùng bộ chiêu (báo trước, vận chiêu, hai lần chuyển giai đoạn, gọi quái con)
+    const kinds = new Map<string, number>();
+    for (const m of fx) kinds.set(m.kind, (kinds.get(m.kind) ?? 0) + 1);
+    expect(kinds.get("slash") ?? 0).toBeGreaterThanOrEqual(100 * 50); // 100 người THẬT SỰ chém (đo: ~88 nhát mỗi người trong 35 giây)
+    expect(kinds.get("warn") ?? 0).toBeGreaterThanOrEqual(2);
+    expect(kinds.get("bossCast") ?? 0).toBeGreaterThanOrEqual(2);
+    expect(kinds.get("bossPhase") ?? 0).toBe(2);
+    expect(kinds.get("bossSummon") ?? 0).toBeGreaterThanOrEqual(1);
+
+    // Bảng đóng góp chỉ gửi định kỳ mỗi 2 giây: 35 giây ~ 17-18 đợt x 100 người; không gửi mỗi tick (700 x 100 = 70000)
     const boardMsgs = worldBosses.filter((m) => m.msg.phase === "live" && m.msg.top !== undefined);
-    expect(boardMsgs.length).toBeGreaterThanOrEqual(100 * 2);
-    expect(boardMsgs.length).toBeLessThanOrEqual(100 * 4); // Không gửi mỗi tick (100 * 100 = 10000)
+    expect(boardMsgs.length).toBeGreaterThanOrEqual(100 * 15);
+    expect(boardMsgs.length).toBeLessThanOrEqual(100 * 20);
   }, 60_000);
 });

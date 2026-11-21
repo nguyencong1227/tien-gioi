@@ -1263,10 +1263,15 @@ export function auditSoulSaveData(rawText: string, byteLength: number): AuditErr
               message: `id thành tựu không hợp lệ: ${show(k)}`,
             });
           }
-          if (typeof v !== "string" || v.length === 0 || v.length > 40) {
+          if (
+            typeof v !== "string" ||
+            v.length === 0 ||
+            v.length > 40 ||
+            Number.isNaN(Date.parse(v))
+          ) {
             errors.push({
               code: "invalid_soul_social_ach_date",
-              message: `Thời điểm đạt thành tựu ${show(k)} (${show(v)}) phải là chuỗi ISO [1, 40] ký tự`,
+              message: `Thời điểm đạt thành tựu ${show(k)} (${show(v)}) phải là chuỗi ISO [1, 40] ký tự hợp lệ`,
             });
           }
         }
