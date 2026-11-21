@@ -11,7 +11,7 @@ import {
   type TiledMap,
 } from "@tien-gioi/shared";
 import { adoptTiledMapFiles } from "@tien-gioi/shared/src/map-files";
-import { reachabilityViolations } from "./map-checks";
+import { reachabilityViolations, spawnZoneViolations } from "./map-checks";
 
 // Kiểm CHÍNH các tệp Tiled (server nhận tệp lúc defineRooms)
 beforeAll(() => {
@@ -100,5 +100,71 @@ describe("reachabilityViolations", () => {
         for (let x = cx - 1; x <= cx + 1; x++) set(x, y, T.Rock);
     });
     expect(reachabilityViolations(blocked).join("\n")).toMatch(/tâm trấn .* không đứng được/);
+  });
+});
+
+/** Bản đồ thật `id` + MỘT đối tượng `spawnZone` chèn vào tệp Tiled (đúng đường S6: người soạn thêm đối tượng vào tệp, `parseTiledMap` đọc, `GameMap` dựng). Khung tính theo ô. */
+function withZone(
+  id: string,
+  z: { tx: number; ty: number; tw: number; th: number; monster: string; max?: number },
+): GameMap {
+  const json: TiledMap = structuredClone(bakeTiledMap(getMap(id)!));
+  json.layers
+    .find((l) => l.name === "objects")!
+    .objects!.push({
+      id: 99,
+      name: "vung_thu",
+      class: "spawnZone",
+      x: z.tx * 16,
+      y: z.ty * 16,
+      width: z.tw * 16,
+      height: z.th * 16,
+      properties: [
+        { name: "monster", value: z.monster },
+        ...(z.max !== undefined ? [{ name: "max", value: z.max }] : []),
+      ],
+    });
+  return new GameMap(mapDefFromTiled(json, TILE));
+}
+
+/** Tâm ô (tx, ty) của ô cỏ đầu tiên mà khung `n x n` quanh nó toàn cỏ, cách trấn > 25 ô (quét tất định). */
+function openGrass(map: GameMap, n: number): { tx: number; ty: number } {
+  const t = map.def.town;
+  for (let ty = 2; ty < map.def.h - n - 2; ty++)
+    for (let tx = 2; tx < map.def.w - n - 2; tx++) {
+      if (Math.hypot(tx + n / 2 - t.cx, ty + n / 2 - t.cy) < 25 + n) continue;
+      let all = true;
+      for (let y = ty; y < ty + n && all; y++)
+        for (let x = tx; x < tx + n && all; x++) if (map.tileAt(x, y) !== T.Grass) all = false;
+      if (all) return { tx, ty };
+    }
+  throw new Error(`không có khoảng cỏ ${n} x ${n} ở ${map.def.id}`);
+}
+
+describe("spawnZoneViolations trên bản đồ thật (lưới an toàn cho S6)", () => {
+  for (const def of MAPS)
+    it(`${def.id} (bản đồ thật, lịch trùm thế giới thật): mọi vùng sinh khai trong tệp đều hợp lệ`, () => {
+      expect(spawnZoneViolations(getMap(def.id)!)).toEqual([]);
+    });
+
+  it("đường tệp: vùng chèn vào tệp Tiled của Lạc Hà được đọc và kiểm; đất cỏ thoáng hợp lệ, vùng đè TRẤN thì bị bắt", () => {
+    const base = getMap("lac_ha")!;
+    const g = openGrass(base, 6);
+    const ok = withZone("lac_ha", { ...g, tw: 6, th: 6, monster: "lang" });
+    expect(ok.spawnZones).toHaveLength(1); // tệp -> parse -> GameMap giữ vùng
+    expect(ok.spawnZonesOf("lang")).toHaveLength(1);
+    expect(spawnZoneViolations(ok)).toEqual([]);
+    const t = base.def.town;
+    const onTown = withZone("lac_ha", {
+      tx: t.cx - 2,
+      ty: t.cy - 2,
+      tw: 4,
+      th: 4,
+      monster: "lang",
+    });
+    expect(spawnZoneViolations(onTown).join("\n")).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    // loài không có ở bản đồ này (Lạc Hà không sinh Hắc Giao): báo
+    const wrong = withZone("lac_ha", { ...g, tw: 6, th: 6, monster: "hac_giao" });
+    expect(spawnZoneViolations(wrong).join("\n")).toMatch(/không có trong monsterCap/);
   });
 });
