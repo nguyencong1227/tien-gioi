@@ -169,3 +169,10 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 | 6 | Nhập tệp + ghi nguồn từng tệp | G (nhập liệu), B (kiểm) | `check:credits` |
 | 7 | Nhân vật / NPC / quái / trùm / vật phẩm / VFX / SFX từ gói đầy đủ | B + G + D / E | chỉ khi Q4 đồng ý và người dùng đặt gói vào máy |
 | 8 | Giai đoạn 2 (Tiled) và 3 (ngoại hình theo trang bị) | A + B + E / G | theo mục 62, quyết sau |
+
+## 10. Liên hệ với giai đoạn 2 (bản đồ Tiled, `docs/THIET_KE_BAN_DO_TILED.md`, PR #1201 / #1203)
+
+- **Cỡ ô đã chốt về kỹ thuật (B, 21/11/2026):** ảnh 16 px, phóng 2 lần nguyên số = `TILE` 32, MỘT ô logic = MỘT ô hình; client đặt `layer.setScale(TILE / tilewidth)`. Định dạng Tiled trung lập với cỡ ô (`parseTiledMap` lấy `tile / tilewidth`), nên người dùng chọn hướng nào ở mục 0 cũng không đổi định dạng. Hướng đồ hoạ vẫn chờ người dùng duyệt.
+- **Bước 1 ở mục 9 (nền ghép góc dựng ở client từ `tileAt`) là CẦU NỐI tạm:** chạy được ngay, không cần bản đồ Tiled, đo được ngân sách và ảnh trước / sau. Khi S3 / S4 của giai đoạn 2 xong, lớp hình bo góc được nướng sẵn vào `visual.json` (gói `map:<id>` của M7.15) và bộ ghép góc ở client được gỡ; bảng ô terrain đọc từ `tileset.tres` (56 ô, mục 2) là dữ liệu dùng chung cho cả hai.
+- **Số đo cho ngân sách (B đo bằng 4 bản đồ hiện có):** lớp logic `firstgid + T` tổng 104,6 KB raw / **11,6 KB gzip** (nhập tĩnh được); lớp hình có nhiều gid gzip 10-18 KB MỖI lớp mỗi bản đồ nên PHẢI đi qua gói tải theo nhu cầu, không vào gói khởi động (`startupGzipKb 220`).
+- **Yêu cầu cho lớp hình (chi tiết ở nhận xét của B trên #1201):** tileset NHÚNG (Phaser không đọc tileset ngoài), ĐÙN MÉP 1 px + `roundPixels` (zoom lẻ), MỘT ảnh tileset gộp (giữ `drawCalls`), tán cây ở lớp `over` chỉ phần trên thân và mờ khi người chơi ở dưới (tránh che màn chơi khi đánh quái trong rừng).
