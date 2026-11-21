@@ -5,7 +5,13 @@
 import { describe, expect, it } from "vitest";
 import { TICK_MS } from "@tien-gioi/shared";
 import { makeWorld, addPlayer } from "./test-helpers";
-import { MAX_INPUT_BACKLOG, STOP_KEEP_INPUTS, applyInputs, queueInput } from "./movement";
+import {
+  INPUT_SEQ_MAX,
+  MAX_INPUT_BACKLOG,
+  STOP_KEEP_INPUTS,
+  applyInputs,
+  queueInput,
+} from "./movement";
 import { tickWorld } from "./tick";
 
 interface Pkt {
@@ -245,5 +251,68 @@ describe("bỏ input CŨ NHẤT khi vượt backlog (applyInputs / queueInput)",
     }
     expect(total).toBe(0);
     expect(w.inputStats.dropped).toBe(0);
+  });
+});
+
+describe("cửa nhận input KHÔNG tin seq (#1263)", () => {
+  it("seq NaN / Infinity / âm / thập phân / quá 32 bit / sai kiểu bị BỎ: hàng đợi không đổi, lastSeq không lùi", () => {
+    const { w } = makeWorld();
+    const { p, c } = addPlayer(w, "a");
+    queueInput(w, "a", { seq: 7, dx: 1, dy: 0 });
+    expect(c.inputs).toHaveLength(1);
+    const bad: unknown[] = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      -1,
+      -0.5,
+      1.5,
+      0.1,
+      INPUT_SEQ_MAX + 1,
+      2 ** 40,
+      "7",
+      null,
+      undefined,
+      {},
+      [],
+      true,
+    ];
+    for (const seq of bad) {
+      queueInput(w, "a", { seq, dx: 1, dy: 0 } as never);
+      expect(c.inputs, String(seq)).toHaveLength(1);
+    }
+    applyInputs(w.map, p, c, TICK_MS);
+    expect(p.lastSeq).toBe(7);
+    // input hợp lệ SAU rác vẫn nhận: không có trạng thái hỏng
+    queueInput(w, "a", { seq: 8, dx: 1, dy: 0 });
+    expect(c.inputs.map((i) => i.seq)).toEqual([8]);
+  });
+
+  it("biên hợp lệ: seq 0 và INPUT_SEQ_MAX được nhận và lưu NGUYÊN (không bị `>>> 0` đổi)", () => {
+    const { w } = makeWorld();
+    const { c } = addPlayer(w, "a");
+    queueInput(w, "a", { seq: 0, dx: 1, dy: 0 });
+    queueInput(w, "a", { seq: INPUT_SEQ_MAX, dx: 1, dy: 0 });
+    expect(c.inputs.map((i) => i.seq)).toEqual([0, INPUT_SEQ_MAX]);
+  });
+
+  it("input thiếu / sai thân (không phải đối tượng, dx / dy không hữu hạn) vẫn bị bỏ như trước", () => {
+    const { w } = makeWorld();
+    const { c } = addPlayer(w, "a");
+    for (const m of [
+      undefined,
+      null,
+      5,
+      "x",
+      [],
+      { seq: 1 },
+      { seq: 1, dx: Number.NaN, dy: 0 },
+      { seq: 1, dx: 0, dy: Number.POSITIVE_INFINITY },
+      { seq: 1, dx: "1", dy: 0 },
+    ])
+      queueInput(w, "a", m as never);
+    expect(c.inputs).toHaveLength(0);
+    queueInput(w, "khong-co", { seq: 1, dx: 1, dy: 0 }); // không có người chơi: bỏ lặng lẽ
+    expect(c.inputs).toHaveLength(0);
   });
 });
