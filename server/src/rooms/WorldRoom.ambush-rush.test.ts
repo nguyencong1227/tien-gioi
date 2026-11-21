@@ -280,6 +280,24 @@ describe("WorldRoom ambush rush (CD10b, Issue #1281)", () => {
       "cả 20 đấu sĩ nhận ambushState trong đấu trường",
     );
 
+    // Khẳng định đúng 20 phòng Colyseus đấu trường đang hoạt động (matchMaker.query)
+    const activeRoomsBefore = await matchMaker.query({
+      name: roomNameOf(arenaMapIdOf(DEFAULT_MAP_ID)),
+    });
+    expect(activeRoomsBefore).toHaveLength(MAX_AMBUSH_ROOMS);
+
+    // 6b. GIỮA TRẬN: hồ sơ trên đĩa vẫn là CHỖ CŨ (bản đồ thường + toạ độ vé), cả khi chính phòng đấu trường tự lưu
+    // (`persist` trong đấu trường: sập máy / rớt mạng giữa trận thì lần sau đăng nhập ở chỗ cũ, không kẹt ở đấu trường).
+    // Chỉ kiểm hồ sơ SAU khi về thì bắt không được lỗi này vì lần lưu lúc về (`exitArenaRoom`) ghi đè hồ sơ giữa trận.
+    for (const t of arenaTargets) {
+      const sid = t.h.room.sessionId;
+      expect(await worldOf(t.h.room).onSaveNow?.(sid)).toBe(true);
+      const mid = await loadPlayer(t.h.name);
+      expect(mid?.mapId).toBe(DEFAULT_MAP_ID);
+      expect(Math.abs((mid?.x ?? 0) - t.h.origin!.x)).toBeLessThan(5);
+      expect(Math.abs((mid?.y ?? 0) - t.h.origin!.y)).toBeLessThan(5);
+    }
+
     // 7. Đo tick p95 lúc cả 20 phòng đấu trường cùng chạy
     await sleep(1500);
     const p95List = arenaTargets.map((t) => {
@@ -317,6 +335,12 @@ describe("WorldRoom ambush rush (CD10b, Issue #1281)", () => {
     // Chờ sổ vé dọn sạch về 0
     await waitFor(() => w.hub.ambushes.size === 0, 6000, "sổ vé dọn về 0 phòng");
     expect(w.hub.ambushes.size).toBe(0);
+
+    // Khẳng định toàn bộ phòng Colyseus đấu trường đã đóng hoàn toàn (matchMaker.query)
+    const activeRoomsAfter = await matchMaker.query({
+      name: roomNameOf(arenaMapIdOf(DEFAULT_MAP_ID)),
+    });
+    expect(activeRoomsAfter).toHaveLength(0);
 
     // 9. Kiểm tra hồ sơ lưu trên đĩa của cả 24 người
     // 4 người canceled: lưu hồ sơ và khẳng định ở nguyên bản đồ gốc, tiền/tu vi bảo toàn
