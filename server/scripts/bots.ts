@@ -147,6 +147,7 @@ interface CliArgs {
   duel: boolean;
   sect: boolean;
   skills: boolean;
+  skillOverride?: string;
   evade: boolean;
   boss: boolean;
   reflexMs: number;
@@ -187,6 +188,7 @@ function parseArgs(argv: string[]): CliArgs {
   let duel = false;
   let sect = false;
   let skills = false;
+  let skillOverride: string | undefined;
   let evade = false;
   let boss = false;
   let reflexMs = 400;
@@ -200,7 +202,13 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
     else if (arg === "--skills") skills = true;
-    else if (arg === "--evade") evade = true;
+    else if (arg.startsWith("--skill=")) {
+      const s = arg.slice(8).trim();
+      if (s) {
+        skillOverride = s;
+        skills = true;
+      }
+    } else if (arg === "--evade") evade = true;
     else if (arg === "--no-evade" || arg === "--evade=false") evade = false;
     else if (arg === "--boss" || arg === "--boss-hunt") {
       boss = true;
@@ -330,6 +338,7 @@ function parseArgs(argv: string[]): CliArgs {
     duel,
     sect,
     skills,
+    skillOverride,
     evade,
     boss,
     reflexMs,
@@ -396,7 +405,16 @@ export function decideSectM8Action(state: BotSectM8DecisionState): BotSectM8Deci
  * Mẫu sổ chiêu (SkillBook) hợp lệ theo từng cảnh giới cho bot thử tải (M7.10 #511).
  * Đảm bảo chiêu đã học và gắn vào các ô mở theo đúng luật của shared/skills.ts.
  */
-export function sampleSkillsForRealm(realm: number): SkillBook {
+export function sampleSkillsForRealm(realm: number, customSkillId?: string): SkillBook {
+  if (customSkillId) {
+    const def = skillOf(customSkillId);
+    if (def) {
+      return {
+        learned: { [def.id]: 1 },
+        slots: [def.id, "", "", ""],
+      };
+    }
+  }
   if (realm <= 0) {
     return { learned: {}, slots: ["", "", "", ""] };
   }
@@ -2087,6 +2105,7 @@ async function runLoadTest(
   duel = false,
   sect = false,
   skills = false,
+  skillOverride?: string,
   evade = false,
   boss = false,
   reflexMs = 400,
@@ -2267,14 +2286,20 @@ async function runLoadTest(
       joinOpts = { token: botToken, v: PROTOCOL_VERSION };
     } else {
       const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
-      const skillsSeed = skills ? sampleSkillsForRealm(realm) : undefined;
+      const customSkillDef = skillOverride ? skillOf(skillOverride) : undefined;
+      const botRealm = customSkillDef ? Math.max(realm, customSkillDef.reqRealm) : realm;
+      const botTier =
+        customSkillDef && customSkillDef.reqRealm === botRealm
+          ? Math.max(tier, customSkillDef.reqTier)
+          : tier;
+      const skillsSeed = skills ? sampleSkillsForRealm(botRealm, skillOverride) : undefined;
       seedBotSaveFile(
         name,
         secret,
         campX,
         campY,
-        duel ? 1 : dungeon ? 1 : die ? 1 : realm,
-        duel ? 4 : dungeon ? 8 : die ? 8 : tier,
+        duel ? 1 : dungeon ? 1 : die ? 1 : botRealm,
+        duel ? 4 : dungeon ? 8 : die ? 8 : botTier,
         currentMap.def.id,
         lifeSeed,
         sect ? 5000 : undefined,
@@ -4249,6 +4274,7 @@ async function main() {
           args.duel,
           args.sect,
           args.skills,
+          args.skillOverride,
           args.evade,
           args.boss,
           args.reflexMs,
