@@ -418,6 +418,18 @@ describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)",
     expect(spawnZoneViolations(mapWith([room], { lang: 5 }, gap))).toEqual([]);
   });
 
+  it("liên thông theo CỠ THÂN của loài: khe 1 ô cho quái nhỏ lọt nhưng trùm to không lọt thì phòng là túi kín với TRÙM", () => {
+    const gap = (t: Uint8Array) => {
+      ringOf(20, 20, 33, 33)(t);
+      t[20 * SIDE + 26] = T.Grass; // khe rộng 1 ô (32 px) trên vòng đá
+    };
+    const room = (monster: string) => zone(monster, 22, 22, 8, 8);
+    const cap = { lang: 5, thien_han_vuong: 1 };
+    expect(spawnZoneViolations(mapWith([room("lang")], cap, gap))).toEqual([]);
+    const boss = spawnZoneViolations(mapWith([room("thien_han_vuong")], cap, gap)).join("\n");
+    expect(boss).toMatch(/túi kín/);
+  });
+
   it("trùm: vùng sát đá (mọi chỗ trong 62 px quanh đá) không có chỗ `bossSpawnOk`; quái thường cùng vùng thì qua", () => {
     const z = (m: string) => zone(m, 28, 30, 2, 4); // sát khối đá 30..35 ở phía trái
     const cap = { lang: 5, thien_han_vuong: 1 };
