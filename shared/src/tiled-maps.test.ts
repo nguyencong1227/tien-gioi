@@ -25,6 +25,12 @@ import { tiledViolations, type TiledMap } from "./tiled";
 import { TILED_MAP_FILES, adoptTiledMapFiles } from "./map-files";
 
 const mapsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../maps");
+/** Tệp của `id` có đánh dấu sửa tay (`handEdited` = true) không: đọc thẳng thuộc tính bản đồ của JSON. */
+const handEditedFile = (id: string): boolean => {
+  const props = (TILED_MAP_FILES[id] as { properties?: { name?: string; value?: unknown }[] })
+    ?.properties;
+  return !!props?.some((p) => p.name === "handEdited" && p.value === true);
+};
 const readText = (id: string) => readFileSync(path.join(mapsDir, `${id}.logic.json`), "utf8");
 
 // Server nhận tệp lúc `defineRooms`; client (S2) chưa nhận nên vẫn sinh theo seed. Ở đây nhận để kiểm CHÍNH các tệp.
@@ -70,6 +76,16 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
   });
 
   for (const def of PROCEDURAL_MAPS) {
+    // Bản đồ SỬA TAY (S6): thuộc tính bản đồ `handEdited` = true (cùng tên với `server/src/systems/map-hand-edited.ts`): tệp là nguồn duy nhất, không còn bằng bản sinh theo seed
+    if (handEditedFile(def.id)) {
+      describe(`${def.id} (SỬA TAY: tệp là nguồn duy nhất, không so với seed)`, () => {
+        it("tệp hợp lệ theo tiledViolations; getMap thấy bản dựng từ tệp (có ô dựng sẵn)", () => {
+          expect(tiledViolations(TILED_MAP_FILES[def.id])).toEqual([]);
+          expect(getMap(def.id)!.def.tiles).toBeDefined();
+        });
+      });
+      continue;
+    }
     describe(def.id, () => {
       const file = getMap(def.id)!;
       const seed = new GameMap(def);
