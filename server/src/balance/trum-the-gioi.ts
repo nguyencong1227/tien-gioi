@@ -13,7 +13,7 @@ import {
   type WorldBossSlot,
 } from "@tien-gioi/shared";
 import { ASSUME_DUNGEON } from "./dungeon";
-import { ASSUME_BOSS, bossStep, fightBossMoves } from "./trum";
+import { ASSUME_BOSS, fightBossMoves } from "./trum";
 
 /** Giả định riêng của trùm thế giới. */
 export const ASSUME_WORLD_BOSS = {
