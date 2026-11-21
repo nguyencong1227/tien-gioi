@@ -484,12 +484,8 @@ describe("nhắc túi đan dưới nút Chiến (< 2 Hồi Huyết Đan; số đ
   });
 
   it("ambushPotionNote: 0 và 1 đan có lời nhắc kèm SỐ đan thật; từ 2 đan trở lên, hoặc không biết số đan: rỗng (không nói điều chưa chắc)", () => {
-    expect(ambushPotionNote(0)).toBe(
-      "Túi không có Hồi Huyết Đan: nên có ít nhất 2 trước khi chiến.",
-    );
-    expect(ambushPotionNote(1)).toBe(
-      "Túi chỉ còn 1 Hồi Huyết Đan: nên có ít nhất 2 trước khi chiến.",
-    );
+    expect(ambushPotionNote(0)).toBe("Túi không có Hồi Huyết Đan: nên mang ít nhất 2.");
+    expect(ambushPotionNote(1)).toBe("Túi chỉ còn 1 Hồi Huyết Đan: nên mang ít nhất 2.");
     expect(ambushPotionNote(AMBUSH_POTION_MIN)).toBe("");
     expect(ambushPotionNote(99)).toBe("");
     expect(ambushPotionNote(undefined)).toBe("");

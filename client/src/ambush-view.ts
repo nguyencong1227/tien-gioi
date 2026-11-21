@@ -87,7 +87,7 @@ export function ambushPotionNote(potions: number | undefined): string {
   const n = Math.max(0, Math.floor(potions));
   if (n >= AMBUSH_POTION_MIN) return "";
   const have = n === 0 ? "Túi không có Hồi Huyết Đan" : `Túi chỉ còn ${n} Hồi Huyết Đan`;
-  return `${have}: nên có ít nhất ${AMBUSH_POTION_MIN} trước khi chiến.`;
+  return `${have}: nên mang ít nhất ${AMBUSH_POTION_MIN}.`;
 }
 
 /** Mức nào phải hiện nhãn NGUY HIỂM (mục 53: tinh anh, cầm đầu; mức thường thì không). */

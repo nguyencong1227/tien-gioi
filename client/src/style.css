@@ -8451,6 +8451,7 @@ body.ui-hidden
 /* nhắc túi đan (< 2 Hồi Huyết Đan): màu hổ phách, nhẹ hơn dòng "chết thật"; rỗng thì ẩn (cùng luật :empty) */
 .ambush-potion-note {
   margin-top: 2px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: #ffd479;
 }
@@ -8498,6 +8499,10 @@ body.ui-hidden
   }
   .ambush-or {
     margin-top: 2px;
+  }
+  /* có dòng nhắc đan (thêm một dòng) thì bỏ nhãn "hoặc bỏ chạy, mất:": hai nút đã ghi "Bỏ chạy: trả ..." nên không mất thông tin, và ba nút vẫn không phải cuộn */
+  .ambush-modal.has-potion-note .ambush-or {
+    display: none;
   }
 }
 

@@ -727,6 +727,8 @@ function renderAmbush(): void {
   setTextIfChanged(document.getElementById("ambush-foe"), v.foe);
   setTextIfChanged(document.getElementById("ambush-death-note"), v.deathNote); // mục 53: dòng cố định dưới nút Chiến
   setTextIfChanged(document.getElementById("ambush-potion-note"), v.potionNote); // túi < 2 Hồi Huyết Đan: nhắc (rỗng thì ẩn)
+  // màn ngang thấp: có dòng nhắc đan thì nhãn "hoặc bỏ chạy, mất:" nhường chỗ (CSS `.has-potion-note`) để cả ba nút vẫn hiện, không phải cuộn
+  document.getElementById("ambush-modal")?.classList.toggle("has-potion-note", v.potionNote !== "");
   const danger = document.getElementById("ambush-danger");
   if (danger && danger.hidden === v.danger) danger.hidden = !v.danger; // mức tinh anh / cầm đầu: nhãn NGUY HIỂM
   setTextIfChanged(document.getElementById("ambush-scene"), v.scene);
