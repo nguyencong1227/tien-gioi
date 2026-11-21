@@ -10,9 +10,12 @@ import {
 } from "@tien-gioi/shared";
 import {
   AMBUSH_DEATH_NOTE,
+  AMBUSH_POTION_ID,
+  AMBUSH_POTION_MIN,
   AMBUSH_RETRY_MS,
   ambushChoiceForKey,
   ambushDialogView,
+  ambushPotionNote,
   ambushEndToast,
   ambushEndView,
   ambushMarkSeen,
@@ -23,6 +26,7 @@ import {
   openAmbush,
   parseAmbushEnd,
   parseAmbushOffer,
+  potionCountOf,
 } from "./ambush-view";
 
 const T0 = 10_000;
@@ -453,5 +457,80 @@ describe("MỤC 53: dòng 'Bị hạ trong trận là chết thật.' dưới n�
     const v = ambushDialogView(open(), ARMED);
     expect(v.buttons[1].aria).not.toContain("chết thật");
     expect(v.buttons[2].aria).not.toContain("chết thật");
+  });
+});
+
+describe("nhắc túi đan dưới nút Chiến (< 2 Hồi Huyết Đan; số đo #1252 / #1254)", () => {
+  it("hằng số: loại đan là Hồi Huyết Đan có thật trong bảng vật phẩm; mức tối thiểu 2 (đo: 2 đan chết 0 %, 1 đan kẻ cầm đầu bậc 11 vẫn chết 71 %)", () => {
+    expect(ITEMS.some((i) => i.id === AMBUSH_POTION_ID)).toBe(true);
+    expect(AMBUSH_POTION_MIN).toBe(2);
+  });
+
+  it("potionCountOf: cộng MỌI ô Hồi Huyết Đan; bỏ ô trống, vật phẩm khác, số lượng không hợp lệ; làm tròn xuống", () => {
+    expect(potionCountOf([])).toBe(0);
+    expect(potionCountOf([null, undefined])).toBe(0);
+    expect(potionCountOf([{ itemId: AMBUSH_POTION_ID, qty: 3 }])).toBe(3);
+    expect(
+      potionCountOf([
+        { itemId: AMBUSH_POTION_ID, qty: 3 },
+        null,
+        { itemId: "hoi_linh_dan", qty: 9 }, // đan khác không tính
+        { itemId: AMBUSH_POTION_ID, qty: 4 }, // hai ô cộng lại
+      ]),
+    ).toBe(7);
+    expect(potionCountOf([{ itemId: AMBUSH_POTION_ID, qty: 2.9 }])).toBe(2);
+    for (const qty of [0, -3, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(potionCountOf([{ itemId: AMBUSH_POTION_ID, qty }]), String(qty)).toBe(0);
+  });
+
+  it("ambushPotionNote: 0 và 1 đan có lời nhắc kèm SỐ đan thật; từ 2 đan trở lên, hoặc không biết số đan: rỗng (không nói điều chưa chắc)", () => {
+    expect(ambushPotionNote(0)).toBe(
+      "Túi không có Hồi Huyết Đan: nên có ít nhất 2 trước khi chiến.",
+    );
+    expect(ambushPotionNote(1)).toBe(
+      "Túi chỉ còn 1 Hồi Huyết Đan: nên có ít nhất 2 trước khi chiến.",
+    );
+    expect(ambushPotionNote(AMBUSH_POTION_MIN)).toBe("");
+    expect(ambushPotionNote(99)).toBe("");
+    expect(ambushPotionNote(undefined)).toBe("");
+    expect(ambushPotionNote(Number.NaN)).toBe("");
+    expect(ambushPotionNote(1.9)).toContain("còn 1 "); // làm tròn xuống
+    expect(ambushPotionNote(-4)).toContain("không có"); // số âm coi như 0
+  });
+
+  it("view: không truyền số đan thì y như cũ (không dòng nhắc, câu đọc và aria không đổi)", () => {
+    const d = open();
+    const v = ambushDialogView(d, ARMED);
+    expect(v.potionNote).toBe("");
+    expect(v.announce).not.toContain("Hồi Huyết Đan");
+    expect(v.buttons[0].aria).not.toContain("Hồi Huyết Đan");
+    expect(ambushDialogView(d, ARMED, 5)).toEqual(v); // đủ đan: giống hệt
+  });
+
+  it("view: thiếu đan thì có dòng nhắc, nằm trong câu đọc của hộp thoại và aria của nút Chiến; dòng 'chết thật' vẫn luôn có; nút KHÔNG bị khoá", () => {
+    const base = ambushDialogView(open(), ARMED);
+    for (const have of [0, 1]) {
+      const v = ambushDialogView(open(), ARMED, have);
+      expect(v.potionNote, `${have} đan`).toBe(ambushPotionNote(have));
+      expect(v.potionNote).not.toBe("");
+      expect(v.announce).toContain(v.potionNote);
+      expect(v.buttons[0].aria).toContain(v.potionNote);
+      expect(v.deathNote).toBe(AMBUSH_DEATH_NOTE);
+      // chỉ là LỜI NHẮC: trạng thái nút giữ nguyên
+      expect(v.buttons.map((b) => b.enabled)).toEqual(base.buttons.map((b) => b.enabled));
+      // bỏ chạy không nhắc đan (bỏ chạy là cách tránh)
+      expect(v.buttons[1].aria).not.toContain("Hồi Huyết Đan");
+      expect(v.buttons[2].aria).not.toContain("Hồi Huyết Đan");
+    }
+  });
+
+  it("view: dòng nhắc đan hiện ở MỌI mức và mọi trạng thái (đang khoá, đã gửi, hết giờ cục bộ)", () => {
+    for (const tier of ["normal", "elite", "leader"] as const) {
+      const d = openAmbush(null, sampleAmbushOffer(tier), T0).dialog;
+      for (const at of [T0, ARMED, ARMED + AMBUSH_OFFER_MS])
+        expect(ambushDialogView(d, at, 0).potionNote, `${tier} @${at - T0}`).not.toBe("");
+      const sent = chooseAmbush(d, "fight", ARMED).dialog;
+      expect(ambushDialogView(sent, ARMED + 10, 0).potionNote, `${tier} đã gửi`).not.toBe("");
+    }
   });
 });

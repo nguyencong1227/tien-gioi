@@ -8448,6 +8448,12 @@ body.ui-hidden
 .ambush-death-note:empty {
   display: none;
 }
+/* nhắc túi đan (< 2 Hồi Huyết Đan): màu hổ phách, nhẹ hơn dòng "chết thật"; rỗng thì ẩn (cùng luật :empty) */
+.ambush-potion-note {
+  margin-top: 2px;
+  font-weight: 600;
+  color: #ffd479;
+}
 .ambush-or {
   margin: 6px 0 0;
   font-size: var(--fs-11);
