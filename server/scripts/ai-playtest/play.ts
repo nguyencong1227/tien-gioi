@@ -27,6 +27,7 @@ import {
   type Viewport,
   type Finding,
 } from "./manifest";
+import { driftFinding, stallFinding, closedFailFinding, ioErrorsBlockOk } from "./detect";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
@@ -290,13 +291,7 @@ async function detectDrift(tab: PlayTab, windowMs = 300, threshold = 1.5): Promi
     x: number;
     y: number;
   };
-  const dist = Math.hypot(b.x - a.x, b.y - a.y);
-  if (dist > threshold)
-    return {
-      kind: "drift",
-      detail: `pred trôi ${dist.toFixed(1)}px trong ${windowMs}ms sau khi nhả phím`,
-    };
-  return null;
+  return driftFinding(a.x, a.y, b.x, b.y, threshold, `trong ${windowMs}ms sau khi nhả phím`);
 }
 
 /** Bảng có còn thấy thật không (shown(): tồn tại, không hidden, checkVisibility, có kích thước). */
@@ -365,8 +360,8 @@ const STEPS: StepDef[] = [
       await tab.press(KEY.escape);
       await sleep(300);
       const stillOpen = await tab.ev(modalShown("inv-modal"));
-      if (stillOpen)
-        findings.push({ kind: "closed-fail", detail: "Bảng túi đồ KHÔNG đóng sau Esc" });
+      const f = closedFailFinding(stillOpen);
+      if (f) findings.push(f);
       return findings;
     },
   },
@@ -479,12 +474,9 @@ async function runStep(
 
     consoleErrors.push(...tab.errors);
     networkErrors.push(...tab.networkErrors);
-    if (consoleErrors.length || networkErrors.length) ok = false;
-    if (metrics.fps.min >= 900)
-      findings.push({
-        kind: "stall",
-        detail: `FPS rAF = ${metrics.fps.min} (khung đóng băng, có thể stall)`,
-      });
+    if (ioErrorsBlockOk(consoleErrors, networkErrors)) ok = false;
+    const stall = stallFinding(metrics.fps.min);
+    if (stall) findings.push(stall);
     ok = ok && actionFindings.length === 0;
     fps = metrics;
     return {
