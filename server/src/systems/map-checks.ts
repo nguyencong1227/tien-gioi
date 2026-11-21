@@ -12,7 +12,7 @@ import {
   type WorldBossSlot,
 } from "@tien-gioi/shared";
 import { BOSS_SPAWN_MARGIN, bossSpawnOkOn } from "./monsters";
-import { NAV_CELL, navClassOf, squareFree } from "./nav";
+import { NAV_CELL, inMainRegion, navClassOf, squareFree } from "./nav";
 
 /** Loang (8 hướng, không cắt góc) trên lưới nút nửa ô cho thân cỡ `cls`; trả mặt nạ nút đã tới được từ nút gần (x, y) nhất. */
 function flood(
@@ -160,9 +160,12 @@ export function spawnZoneViolations(
           continue;
         }
         if (!def.boss || bossSpawnOkOn(map, def, x, y)) ok++;
-        // Trùm: tách LÝ DO loại để người soạn biết sửa gì (B review #1214: "0 chỗ hợp lệ" không nói vì đá che hay vì trấn cắt bản đồ)
-        else if (!squareFree(map, x, y, def.radius + BOSS_SPAWN_MARGIN)) tight++;
-        else outsideMain++;
+        // Trùm: tách LÝ DO loại để người soạn biết sửa gì (B review #1214: "0 chỗ hợp lệ" không nói vì đá che hay vì trấn cắt bản đồ).
+        // Hai lý do ĐỘC LẬP (một chỗ có thể dính cả hai): vùng trùm ở nửa nhỏ lại nhiều cây mà chỉ báo "sát cây" thì người soạn dọn cây xong mới gặp lỗi vùng chính (B đo ở review #1218).
+        else {
+          if (!squareFree(map, x, y, def.radius + BOSS_SPAWN_MARGIN)) tight++;
+          if (!inMainRegion(map, def.radius * 0.8, x, y)) outsideMain++;
+        }
       }
     if (ok < MIN_ZONE_SPOTS) {
       const why: string[] = [];
@@ -170,7 +173,7 @@ export function spawnZoneViolations(
         why.push(`${tight} chỗ sát cây / đá (cách ô chặn dưới bán kính + ${BOSS_SPAWN_MARGIN} px)`);
       if (outsideMain > 0)
         why.push(
-          `${outsideMain} chỗ ngoài vùng chính của lưới quái cho trùm (trấn có thể cắt bản đồ làm đôi: vùng trùm phải ở nửa thế giới chứa vùng chính, luật mục 48)`,
+          `${outsideMain} chỗ ngoài vùng chính của lưới quái cho trùm (trấn có thể cắt bản đồ làm đôi: vùng trùm phải ở nửa thế giới chứa vùng chính, luật mục 48; một chỗ có thể thuộc cả hai nhóm)`,
         );
       errs.push(
         `${at}: chỉ có ${ok} chỗ sinh hợp lệ (cần >= ${MIN_ZONE_SPOTS})${why.length > 0 ? `; bị loại: ${why.join("; ")}` : ""}`,
