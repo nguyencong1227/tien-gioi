@@ -1,7 +1,13 @@
 // Mô phỏng cân bằng chặn đường (CD6 #1066, `chan-duong.ts`). Dữ liệu thật `AMBUSH_FOES` có thể còn rỗng: các ca dưới đây dùng bầy MẪU dựng tay (loài thật, bầy giả) để chứng minh
 // công cụ ĐO ĐÚNG; riêng ca cuối khoá DỮ LIỆU THẬT (rỗng thì hiển nhiên đạt, E / G thêm bầy thì phải đạt mục tiêu).
 import { describe, expect, it } from "vitest";
-import { AMBUSH_FLEE_CHANNEL_MS, AMBUSH_FOES, type AmbushFoeGroup } from "@tien-gioi/shared";
+import {
+  AMBUSH_FLEE_CHANNEL_MS,
+  AMBUSH_FOES,
+  AMBUSH_HUNT_EXP_PER_MIN,
+  ambushRewardExp,
+  type AmbushFoeGroup,
+} from "@tien-gioi/shared";
 import {
   ASSUME_AMBUSH,
   ambushBalanceViolations,
@@ -16,6 +22,8 @@ import {
   upliftOf,
   type AmbushFight,
   type GroupSummary,
+  huntExpPerMinTable,
+  upliftByRealm,
 } from "./chan-duong";
 
 const group = (
@@ -45,7 +53,7 @@ describe("fightAmbush: chạy đấu trường thật", () => {
   it("bầy dễ: người chơi thắng, thưởng THẬT của payRewards (tu vi + Linh thạch > 0)", () => {
     const f = fightAmbush(EASY, { step: EASY.minStep, seed: 1 });
     expect(f.result).toBe("won");
-    expect(f.exp).toBe(30); // 2 Hôi Lang x 10 tu vi x ARENA_REWARD_MULT.normal (1,5)
+    expect(f.exp).toBe(192); // CD6b: 4 phút săn (mức thường) x 48 tu vi / phút ở bậc 1; KHÔNG theo số con trong bầy
     expect(f.coin).toBeGreaterThan(0);
     expect(f.seconds).toBeGreaterThan(1);
   });
@@ -130,7 +138,7 @@ describe("summarizeGroup / realmRows", () => {
     expect(sum(s.flee)).toBeCloseTo(1, 9);
     expect(s.toEnd.won).toBe(1);
     expect(s.toEnd.lost).toBe(0);
-    expect(s.winExp).toBe(30);
+    expect(s.winExp).toBe(192);
     expect(s.fleeExp).toBeGreaterThan(0);
     expect(s.fleeCoin).toBeGreaterThan(0);
   });
@@ -185,13 +193,46 @@ describe("bất biến cân bằng", () => {
   });
 
   it("thưởng tu vi không hơn giá bỏ chạy là CẢNH BÁO (bỏ chạy đắt hơn cả thưởng), KHÔNG phải vi phạm: thắng +R luôn hơn bỏ chạy -P", () => {
+    const priceWarn = (s: GroupSummary) =>
+      ambushBalanceWarnings([s]).filter((w) => w.includes("bỏ chạy đắt hơn"));
     const dear: GroupSummary = { ...easy, winExp: easy.fleeExp, realSeconds: 45 };
     expect(ambushBalanceViolations([dear])).toEqual([]);
-    expect(ambushBalanceWarnings([dear]).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
+    expect(priceWarn(dear).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
     const cheap: GroupSummary = { ...easy, winExp: easy.fleeExp + 1, realSeconds: 45 };
-    expect(ambushBalanceWarnings([cheap])).toEqual([]);
+    expect(priceWarn(cheap)).toEqual([]);
     const none: GroupSummary = { ...easy, winExp: 0, realSeconds: 45 }; // chưa có thưởng thắng nào đo được: không cảnh báo giá
-    expect(ambushBalanceWarnings([none])).toEqual([]);
+    expect(priceWarn(none)).toEqual([]);
+  });
+
+  it("DỮ LIỆU THẬT (CD6b): ở mọi bậc giá bỏ chạy giữa trận NHỎ hơn thưởng thắng thấp nhất: không bầy nào bị cảnh báo 'bỏ chạy đắt hơn cả thưởng'", () => {
+    const sums = AMBUSH_FOES.map((g) => ({
+      ...summarizeGroup(g, 1),
+    }));
+    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("bỏ chạy đắt hơn"));
+    expect(dear).toEqual([]);
+  });
+
+  it("tăng tu vi / phút ngoài mục tiêu 20-40% của một CẢNH GIỚI là cảnh báo; trong khung thì không", () => {
+    const base = summarizeGroup(EASY, 1);
+    const hunt = upliftOf(base).huntRate;
+    const withUplift = (u: number): GroupSummary => {
+      const equiv = u * (ambushIntervalMin() + 1) + 1; // trận 60 giây: trừ 1 phút, mẫu số cộng 1 phút
+      return {
+        ...base,
+        flee: { won: 1, lost: 0, timeout: 0, fled: 0 },
+        winExp: equiv * hunt * 60,
+        realSeconds: 60,
+      };
+    };
+    const upWarn = (s: GroupSummary) =>
+      ambushBalanceWarnings([s]).filter((w) => w.includes("tu vi / phút tăng"));
+    expect(upliftOf(withUplift(0.3)).uplift).toBeCloseTo(0.3, 9);
+    expect(upWarn(withUplift(0.3))).toEqual([]);
+    expect(upWarn(withUplift(0.2))).toEqual([]);
+    expect(upWarn(withUplift(0.4))).toEqual([]);
+    expect(upWarn(withUplift(0.1)).join("\n")).toContain("Luyện Khí");
+    expect(upWarn(withUplift(0.1)).join("\n")).toContain("10%");
+    expect(upWarn(withUplift(0.6)).join("\n")).toContain("60%");
   });
 
   it("thời gian trận ngoài khung chỉ là CẢNH BÁO, không phải vi phạm", () => {
@@ -243,6 +284,46 @@ describe("bất biến cân bằng", () => {
     expect(ASSUME_AMBUSH.targets.winRate).toEqual({ normal: 0.9, elite: 0.8, leader: 0.6 });
     expect(ASSUME_AMBUSH.targets.seconds).toEqual({ min: 30, max: 70 });
     expect(ASSUME_AMBUSH.targets.uplift).toEqual({ min: 0.2, max: 0.4 });
+  });
+});
+
+describe("CD6b: bảng tu vi / phút săn và thưởng theo phút", () => {
+  it("AMBUSH_HUNT_EXP_PER_MIN của shared/ KHỚP bản sinh từ bestOption (nếu đỏ: đổi số liệu quái / đồ làm lệch; dán bảng mới ở thông báo vào shared/src/ambush.ts)", () => {
+    const fresh = huntExpPerMinTable();
+    expect([...AMBUSH_HUNT_EXP_PER_MIN], `bảng đúng hiện nay:\n[${fresh.join(", ")}]`).toEqual(
+      fresh,
+    );
+  });
+  it("huntExpPerMinTable: mỗi bậc là tu vi / phút (= bestOption x 60, làm tròn), bậc cao hơn Luyện Khí săn nhanh hơn Phàm Nhân", () => {
+    const t = huntExpPerMinTable(4);
+    expect(t).toHaveLength(4);
+    for (const v of t) expect(v).toBeGreaterThan(0);
+    expect(t[3]).toBeGreaterThan(t[0]);
+  });
+  it("thưởng tu vi KHÔNG phụ thuộc số con trong bầy (bầy đã được chọn để trận 30-70 giây): 1 con và 2 con cùng thưởng", () => {
+    const one = fightAmbush(group("mot_con", 1, "normal", [{ kind: "lang", count: 1 }]), {
+      step: 1,
+      seed: 1,
+    });
+    const two = fightAmbush(EASY, { step: 1, seed: 1 });
+    expect(one.result).toBe("won");
+    expect(two.result).toBe("won");
+    expect(one.exp).toBe(two.exp);
+    expect(one.exp).toBe(ambushRewardExp(1, "normal"));
+  });
+  it("thưởng tu vi theo MỨC: tinh anh hơn thường, cầm đầu hơn tinh anh (cùng bậc)", () => {
+    expect(ambushRewardExp(10, "elite")).toBeGreaterThan(ambushRewardExp(10, "normal"));
+    expect(ambushRewardExp(10, "leader")).toBeGreaterThan(ambushRewardExp(10, "elite"));
+  });
+  it("upliftByRealm: nhóm theo cảnh giới của minStep; mức không có bầy thì thiếu; trộn đúng bằng blendedUplift của riêng cảnh giới đó", () => {
+    const luyenKhi = summarizeGroup(EASY, 1); // bậc 1
+    const trucCo = summarizeGroup(group("truc_co", 10, "normal", [{ kind: "ho", count: 1 }]), 1);
+    const rows = upliftByRealm([luyenKhi, trucCo]);
+    expect(rows.map((r) => r.realm)).toEqual([1, 2]);
+    expect(rows[0].blended).toBeCloseTo(upliftOf(luyenKhi).uplift, 9);
+    expect(rows[1].blended).toBeCloseTo(upliftOf(trucCo).uplift, 9);
+    expect(Object.keys(rows[0].byTier)).toEqual(["normal"]);
+    expect(upliftByRealm([])).toEqual([]);
   });
 });
 

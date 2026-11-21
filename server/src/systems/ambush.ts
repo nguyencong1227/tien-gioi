@@ -245,10 +245,7 @@ export function ambushPause(w: World, c: PlayerCtrl, ms: number): void {
 
 /** Cả hai giá của người này ở thời điểm `stage`, đọc từ nhân vật THẬT (không bao giờ từ client). */
 export function ambushPriceOf(p: Player, c: PlayerCtrl, stage: AmbushPriceStage): AmbushPrice {
-  return ambushPrice(
-    { barSize: p.expMax, expInBar: p.exp, step: stepOf(p.realm, p.tier), wallet: c.coin },
-    stage,
-  );
+  return ambushPrice({ expInBar: p.exp, step: stepOf(p.realm, p.tier), wallet: c.coin }, stage);
 }
 
 // ---------- Điều kiện ----------
