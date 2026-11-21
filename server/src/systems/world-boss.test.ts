@@ -19,6 +19,7 @@ import { dealMonsterDamage } from "./combat";
 import { navKindsOf, topUpMonsters } from "./monsters";
 import { placeMonster } from "./monster-place";
 import { tickWorldBoss, worldBossStatus } from "./world-boss";
+import { measureSyncStepMs } from "../perf/bench";
 
 /** 00:00 giờ máy chủ (UTC+7) của ngày 18/11/2026, theo ms của đồng hồ. */
 const DAY0 = Date.UTC(2026, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
@@ -553,10 +554,11 @@ describe("world-boss: hiệu năng", () => {
     const TICKS = 200; // 10 giây
     for (let t = 0; t < TICKS; t++) {
       han.w.now = at(12, 0, 2) + t * 50;
-      const t0 = performance.now();
-      for (const id of ids) dealMonsterDamage(han.w, b.id, b.m, id, 1000, false); // mỗi người một đòn mỗi tick: nặng hơn thật nhiều
-      tickWorldBoss(han.w);
-      const dt = performance.now() - t0;
+      // CPU của chính luồng, không đồng hồ tường (#1215)
+      const dt = measureSyncStepMs(() => {
+        for (const id of ids) dealMonsterDamage(han.w, b.id, b.m, id, 1000, false); // mỗi người một đòn mỗi tick: nặng hơn thật nhiều
+        tickWorldBoss(han.w);
+      });
       total += dt;
       if (dt > 10) slow++;
     }
