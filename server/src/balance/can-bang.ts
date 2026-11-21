@@ -23,6 +23,7 @@ import { renderSearchCheck } from "./search-check";
 import { renderNguyenAnhSau } from "./nguyen-anh-kinh-te";
 import { renderOwnerGearSensitivity } from "./do-o-rieng";
 import { renderTinhAnh } from "./tinh-anh";
+import { renderAmbush, avgWalkSecBetweenAmbush } from "./ambush-sim";
 import { renderBotHuntSection } from "./bot-hunt";
 import { renderSectEconomy } from "./tong-mon";
 import { renderBossBalance } from "./trum";
@@ -57,6 +58,8 @@ const kimDanTruocSection = renderKimDan(
   ) as KimDanReport,
 );
 const rows = simulate();
+// Đi bộ trung bình tới lúc bị chặn (giây) — cho mô phỏng chặn đường (CD6, #1066)
+const ambushWalkSec = avgWalkSecBetweenAmbush(180); // ~180 px/s đi bộ thường
 const fmt = (m: number) => {
   const totalMin = Math.round(m);
   const h = Math.floor(totalMin / 60);
@@ -471,6 +474,8 @@ ${renderNguyenAnhSau()}
 ${renderOwnerGearSensitivity()}
 ${renderTinhAnh()}
 ${renderBotHuntSection()}
+
+${renderAmbush(ambushWalkSec)}
 
 ${renderSectEconomy()}
 

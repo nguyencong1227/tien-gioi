@@ -821,6 +821,27 @@ Giữ nguyên vì: (1) tinh anh là mini-trùm — sao vàng + vầng cam dướ
    - **Ghi nhận:** Bộ hệ số tinh anh (x2.5 khí huyết, x1.5 công, xác suất 4%) của M7.3 là số đo thực nghiệm; rủi ro Độc Tước tinh anh solo chết 100% đã được **người dùng chốt GIỮ NGUYÊN** (QUYET_DINH_M3 mục 22.2, 16/11/2026): tinh anh là mini-trùm nhìn rõ (sao vàng + vầng cam), chạy về trấn là thoát, gợi ý "nên đi đội" trong game (`client/src/elite.ts`, PR #750) thay vì hạ số; xem lại nếu số liệu chơi thật cho thấy người chơi bỏ Hàn Vân vì sợ Độc Tước (chi tiết ở mục "Tinh anh").
 
 
+## Chặn đường (CD6, #1066)
+
+Mô phỏng cân bằng gặp chặn đường (docs/THIET_KE_CHAN_DUONG.md mục 9): người chơi TRUNG BÌNH (đồ chuẩn bậc cuối mỗi cảnh giới) CHỌN CHIẾN. Trận là một **đấu trường** (như bí cảnh): đứng yên chém, quái trúng 80% đòn (CẬN TRÊN), người chơi dùng Hồi Huyết Đan (hồi 40% máu, 8 s/lần, mang 3 viên). Kẻ địch là MÔ HÌNH TỔNG QUÁT theo mức (chưa phụ thuộc `AMBUSH_FOES` — nội dung E/G): con quái cứng nhất hợp cảnh giới (loại world-boss máu khổng lồ) làm gốc, nhân hệ số (`normal` 2 con; `elite` x2.5 máu/x1.5 công; `leader` cầm đầu x4 máu + 1 lính — ĐỀ XUẤT).
+
+| Cảnh giới | Quái gốc | Thắng thường / tinh anh / cầm đầu | Trận (s) thường / T.A / C.đầu | Tu vi/phút có đi bộ so thường (T/T.A/C.đầu) |
+|---|---|---:|---:|---:|
+| Phàm Nhân | Hôi Lang | 0% / 0% / 0% | 10.4 / 13.0 / 23.3 | 0.59 / 1.17 / 2.59 |
+| Luyện Khí | Hắc Hổ | 100% / 100% / 0% | 7.8 / 9.7 / 17.5 | 0.53 / 1.05 / 2.35 |
+| Trúc Cơ | Xích Mãng | 0% / 0% / 0% | 28.5 / 35.6 / 64.1 | 11.97 / 23.19 / 48.05 |
+| Kim Đan | Độc Thiềm | 0% / 0% / 0% | 14.7 / 18.3 / 33.0 | 1.50 / 2.96 / 6.45 |
+| Nguyên Anh | Độc Tước | 0% / 0% / 0% | 16.0 / 20.0 / 36.0 | 12.17 / 23.87 / 51.75 |
+
+**Trung bình các cảnh giới:** thắng 20% / 20% / 0% (mục tiêu >= 90 / 80 / 60%); trận 15.5 / 19.3 / 34.8 s (mục tiêu 30-70 s); tu vi/phút có đi bộ so săn thường 5.35 / 10.45 / 22.24 x (mục tiêu 1.2-1.4, KHÔNG hơn bí cảnh).
+
+**Số lần chặn đường / giờ:** trần do hồi 8 phút ~5 lần/giờ (nếu liên tục); thực tế bị trần 12/ngày (~2/giờ trong phiên 6 giờ); đi bộ trung bình ~190 s giữa hai lần. Chặn đường là CƠ HỘI bổ sung (quy tảo), KHÔNG phải cách cày chính — hợp với hồi + trần ngày.
+
+**Giá bỏ chạy so với thưởng (mục 9):** thắng luôn LỢI hơn bỏ chạy (thắng +60 tu vi; bỏ chạy mất ~2 tu vi — chỉ ~3% thưởng); bỏ chạy lỗ NHỎ hơn thua (thua = chết thật, mất kiếp — nặng hơn nhiều). Hệ số thưởng (tu vi x6/12/28, Linh thạch x2/3/5 — ĐỀ XUẤT) chốt lại ở PR hằng số riêng sau khi duyệt mô phỏng.
+
+**Đề xuất hằng số chốt (chuyển `shared/src/ambush.ts` ở PR riêng):** `AMBUSH_EXP_REWARD_MULT`, `AMBUSH_COIN_REWARD_MULT`, hệ số kẻ địch `leader`. `AMBUSH_TIER_WEIGHTS` (70/25/5), `AMBUSH_COOLDOWN_MS` (8p), `AMBUSH_DAY_CAP` (12), `AMBUSH_ROLL_P_*` giữ nguyên — mô phỏng cho thấy đủ.
+
+
 ## Tông môn có chiều sâu trên BẢNG THẬT (M8.7, #844)
 
 > Phần này sinh từ `server/src/balance/tong-mon.ts`, tính SỐNG từ `SECT_LEVELS`, `SECT_QUEST_CH`, `SECT_SHOP` (28 món) và hàm giá của `shared/src/currency.ts`; phân tích bằng giấy (số trong thiết kế) ở `docs/M8_TONG_MON_MO_PHONG.md`.
