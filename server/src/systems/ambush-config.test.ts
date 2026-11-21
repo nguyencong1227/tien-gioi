@@ -1,6 +1,13 @@
 // Cờ AMBUSH và AMBUSH_BOTS (mục 52, CD9 #1069): mặc định TẮT, giá trị lạ coi là TẮT và có cảnh báo; bật thì có dòng log. Cùng khuôn `boss-config.test.ts`.
 import { describe, expect, it } from "vitest";
-import { ambushBotsOn, ambushNotice, ambushOn, ambushWarnings } from "./ambush-config";
+import {
+  AMBUSH_MIN_POTIONS_MAX,
+  ambushBotsOn,
+  ambushMinPotions,
+  ambushNotice,
+  ambushOn,
+  ambushWarnings,
+} from "./ambush-config";
 import { startupWarnings } from "../startup";
 
 describe("AMBUSH (gặp chặn đường)", () => {
@@ -59,6 +66,45 @@ describe("AMBUSH (gặp chặn đường)", () => {
     expect(wb[0]).toContain("AMBUSH_BOTS='bat_len'");
     expect(startupWarnings({ AMBUSH_BOTS: "bat_len" } as NodeJS.ProcessEnv).join("\n")).toContain(
       "AMBUSH_BOTS='bat_len'",
+    );
+  });
+});
+
+describe("AMBUSH_MIN_POTIONS (CD6c): số Hồi Huyết Đan tối thiểu để bị chặn", () => {
+  it("mặc định (không đặt / rỗng) là 0: không đòi, không cảnh báo, dòng log không nhắc", () => {
+    for (const env of [{}, { AMBUSH_MIN_POTIONS: "" }, { AMBUSH_MIN_POTIONS: "  " }]) {
+      expect(ambushMinPotions(env)).toBe(0);
+      expect(ambushWarnings(env)).toEqual([]);
+    }
+    expect(ambushNotice({ AMBUSH: "on" })).not.toContain("AMBUSH_MIN_POTIONS");
+  });
+
+  it("số nguyên 0..8 (có khoảng trắng) được nhận; log khi BẬT nêu ngưỡng nếu > 0", () => {
+    for (let n = 0; n <= AMBUSH_MIN_POTIONS_MAX; n++) {
+      const env = { AMBUSH: "on", AMBUSH_MIN_POTIONS: ` ${n} ` };
+      expect(ambushMinPotions(env), String(n)).toBe(n);
+      expect(ambushWarnings(env)).toEqual([]);
+    }
+    expect(ambushNotice({ AMBUSH: "on", AMBUSH_MIN_POTIONS: "2" })).toContain(
+      "dưới 2 Hồi Huyết Đan",
+    );
+    expect(ambushNotice({ AMBUSH: "on", AMBUSH_MIN_POTIONS: "0" })).not.toContain("Hồi Huyết Đan");
+    // tắt AMBUSH thì không có dòng log nào dù đặt núm này
+    expect(ambushNotice({ AMBUSH_MIN_POTIONS: "2" })).toBeNull();
+  });
+
+  it("giá trị lạ / âm / thập phân / quá trần coi là 0 (KHÔNG chặn ngầm) và có cảnh báo", () => {
+    for (const v of ["-1", "2.5", "abc", "9", "100", "1e1", "0x2", "on"]) {
+      expect(ambushMinPotions({ AMBUSH_MIN_POTIONS: v }), v).toBe(0);
+      const w = ambushWarnings({ AMBUSH_MIN_POTIONS: v });
+      expect(w, v).toHaveLength(1);
+      expect(w[0]).toContain(`AMBUSH_MIN_POTIONS='${v}'`);
+    }
+  });
+
+  it("đi vào startupWarnings của máy chủ", () => {
+    expect(startupWarnings({ AMBUSH_MIN_POTIONS: "xyz" }).join("\n")).toContain(
+      "AMBUSH_MIN_POTIONS='xyz'",
     );
   });
 });

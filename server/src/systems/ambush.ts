@@ -73,6 +73,7 @@ export type AmbushBlock =
   | "travel" // đang chuyển phòng / còn hồi qua cổng
   | "duel" // đang thách đấu PK
   | "hp" // khí huyết dưới ngưỡng
+  | "potion" // túi có ít Hồi Huyết Đan hơn `AmbushRuntime.minPotions` (AMBUSH_MIN_POTIONS)
   | "combat" // đang giao chiến
   | "party_combat" // đồng đội gần đó đang giao chiến
   | "boss" // trùm đang nhắm / ở gần
@@ -136,11 +137,22 @@ export interface AmbushRuntime {
   exemptBots?: boolean;
   /** Cho phép tài khoản bot gặp chặn đường? Mặc định false (mục 52, CD9 #1069). */
   ambushBots?: boolean;
+  /** Số Hồi Huyết Đan tối thiểu trong túi để bị chặn (`AMBUSH_MIN_POTIONS`, CD6c): ít hơn thì KHÔNG chặn. Mặc định 0 / vắng = không đòi. */
+  minPotions?: number;
   /**
    * CD3 gắn vào: dựng đấu trường solo cho lựa chọn `fight`. Trả `true` nếu ĐÃ nhận việc (từ đây CD3 lo kết cục + `ambushEnd`); `false` (đầy phòng, lỗi) thì huỷ lặng lẽ không phạt.
    * Không có móc: huỷ lặng lẽ.
    */
   startFight?: (w: World, sid: string, offer: AmbushOfferCtrl) => boolean;
+}
+
+/** Số Hồi Huyết Đan trong túi (cộng mọi ô; số lượng rác coi là 0). Đây là loại đan mà mô phỏng cân bằng chặn đường giả định (`ASSUME_DUNGEON.potions`). */
+export function potionCount(c: PlayerCtrl): number {
+  let n = 0;
+  for (const slot of c.inv)
+    if (slot && slot.itemId === "hoi_huyet_dan" && Number.isFinite(slot.qty) && slot.qty > 0)
+      n += slot.qty;
+  return n;
 }
 
 /** Nhận dạng tài khoản bot của kịch bản thử tải (`bots.ts`): tiền tố `Bot ` hoặc `bot_`. */
@@ -301,6 +313,8 @@ export function ambushBlocked(w: World, sid: string): AmbushBlock | null {
   if (c.ambush?.offer) return "offer";
   if (w.map.inSafe(p.x, p.y)) return "safe";
   if (p.maxHp > 0 && (p.hp / p.maxHp) * 100 < AMBUSH_MIN_HP_PCT) return "hp";
+  if (rt.minPotions !== undefined && rt.minPotions > 0 && potionCount(c) < rt.minPotions)
+    return "potion";
   if (fighting(w, sid, c)) return "combat";
   if (partyFighting(w, sid, p)) return "party_combat";
   if (bossNear(w, p)) return "boss";
