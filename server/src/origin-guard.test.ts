@@ -15,6 +15,7 @@ import {
   guardMatchmake,
   isOriginAllowed,
   lockMatchmakeCors,
+  matchmakeCorsHeaders,
   originGuardMiddleware,
   originPolicyOf,
   wsVerifyClient,
@@ -114,11 +115,35 @@ describe("originPolicyOf / isOriginAllowed (thuần)", () => {
       controller.getCorsHeaders({
         headers: origin ? { origin, host: HOST } : { host: HOST },
       } as never);
+    // nguồn được phép PHẢI có Allow-Credentials: true (colyseus.js luôn gọi với credentials: 'include'; thiếu thì client khác nguồn không vào được phòng)
     expect(get(DEFAULT_PUBLIC_ORIGIN)).toEqual({
       "Access-Control-Allow-Origin": DEFAULT_PUBLIC_ORIGIN,
+      "Access-Control-Allow-Credentials": "true",
     });
     expect(get(EVIL)).toEqual({});
     expect(get()).toEqual({});
+  });
+
+  it("matchmakeCorsHeaders: MỌI loại nguồn được phép (công khai, CORS_ORIGINS, cùng Host, máy cục bộ ngoài production) có ACAO = đúng nguồn (không '*') + ACAC 'true'; nguồn lạ không có gì", () => {
+    const check = (env: NodeJS.ProcessEnv, origin: string, host: string) => {
+      const headers = matchmakeCorsHeaders(originPolicyOf(env))({ headers: { origin, host } });
+      expect(headers["Access-Control-Allow-Origin"]).toBe(origin);
+      expect(headers["Access-Control-Allow-Origin"]).not.toBe("*");
+      expect(headers["Access-Control-Allow-Credentials"]).toBe("true");
+    };
+    check(PROD, DEFAULT_PUBLIC_ORIGIN, HOST);
+    check({ ...PROD, CORS_ORIGINS: "https://localhost" }, "https://localhost", HOST); // app Android đóng gói
+    check(PROD, "http://tunnel.example.org:8080", "tunnel.example.org:8080"); // cùng Host (sau proxy đổi tên miền)
+    check({}, "http://localhost:5183", "localhost:2577"); // Vite dev -> máy chủ dev (khác cổng = khác nguồn)
+    // lạ: không tiêu đề nào (kể cả ACAC)
+    expect(
+      matchmakeCorsHeaders(originPolicyOf(PROD))({ headers: { origin: EVIL, host: HOST } }),
+    ).toEqual({});
+    expect(
+      matchmakeCorsHeaders(originPolicyOf(PROD))({
+        headers: { origin: "http://localhost:5183", host: HOST }, // production KHÔNG nhận máy cục bộ lạ
+      }),
+    ).toEqual({});
   });
 });
 
@@ -203,6 +228,7 @@ describe("kiểm Origin qua máy chủ Colyseus + Express THẬT (production)", 
     expect(ok.body.error).toBeUndefined();
     expect(ok.body.room).toBeDefined();
     expect(ok.res.headers.get("access-control-allow-origin")).toBe(DEFAULT_PUBLIC_ORIGIN); // phản chiếu ĐÚNG nguồn, không '*'
+    expect(ok.res.headers.get("access-control-allow-credentials")).toBe("true"); // colyseus.js gọi với credentials: 'include' (khác nguồn cần cái này)
 
     const bot = await matchmake(undefined);
     expect(bot.body.error).toBeUndefined();

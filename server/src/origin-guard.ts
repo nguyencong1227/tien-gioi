@@ -132,12 +132,20 @@ export function wsVerifyClient(policy: OriginPolicy) {
   };
 }
 
-/** Thay `matchMaker.controller.getCorsHeaders` của Colyseus: nguồn được phép thì phản chiếu đúng nguồn đó; lạ thì KHÔNG trả tiêu đề CORS (trình duyệt tự chặn). */
+/**
+ * Thay `matchMaker.controller.getCorsHeaders` của Colyseus: nguồn được phép thì phản chiếu đúng nguồn đó KÈM `Allow-Credentials: true`; lạ thì KHÔNG trả tiêu đề CORS
+ * (trình duyệt tự chặn).
+ * Vì sao phải có `Allow-Credentials`: colyseus.js 0.16 LUÔN gọi `/matchmake/*` với `credentials: 'include'`; trình duyệt chặn phản hồi KHÁC NGUỒN có credentials nếu thiếu
+ * `Allow-Credentials: true` (và `Allow-Origin` không được là `*`). Thiếu thì client khác nguồn với máy chủ (Vite dev 5183 -> 2577; app Android `https://localhost`) không vào được phòng.
+ * Web production cùng nguồn không có CORS nên không lộ lỗi này (B bắt được ở #1189).
+ */
 export function matchmakeCorsHeaders(policy: OriginPolicy) {
   return (req: { headers?: IncomingHttpHeaders }): Record<string, string> => {
     const origin = req.headers?.origin;
     if (typeof origin !== "string" || origin === "") return {};
-    return headersAllowed(policy, req.headers) ? { "Access-Control-Allow-Origin": origin } : {};
+    return headersAllowed(policy, req.headers)
+      ? { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true" }
+      : {};
   };
 }
 
@@ -160,7 +168,7 @@ export interface MatchmakeController {
 
 /**
  * Colyseus mặc định trả `Access-Control-Allow-Origin: *` + `Allow-Credentials: true` cho `/matchmake/*` (mọi trang lạ gọi được xin chỗ). Bỏ hai tiêu đề mặc định đó
- * và chỉ phản chiếu nguồn được phép. Yêu cầu từ máy không phải trình duyệt vẫn được xử lý; phần chặn thật cho chúng là `WorldRoom.onAuth` (kiểm `Origin` có mặt).
+ * và chỉ phản chiếu nguồn được phép (`matchmakeCorsHeaders` trả lại `Allow-Credentials: true` riêng cho nguồn được phép). Yêu cầu từ máy không phải trình duyệt vẫn được xử lý; phần chặn thật cho chúng là `WorldRoom.onAuth` (kiểm `Origin` có mặt).
  */
 export function lockMatchmakeCors(controller: MatchmakeController, policy: OriginPolicy) {
   if (!policy.enabled) return;
