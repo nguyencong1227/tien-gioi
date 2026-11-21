@@ -349,6 +349,8 @@ import {
 import { $, buttonShown, fmt, hexColor, onPress, readPref, writePref } from "./ui-util";
 import { applyMapCard, mapCardUrl } from "./map-card";
 import { NpcPortraitSlot } from "./npc-portrait";
+import { packs } from "./gfx/packs";
+import { renderPrivateCredits } from "./private-credits";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
@@ -5604,6 +5606,13 @@ export const ui = {
     $("btn-settings").classList.toggle("active", settingsModalOpen);
     $("btn-settings").setAttribute("aria-expanded", String(settingsModalOpen));
     if (settingsModalOpen) {
+      // Ghi công gói riêng (mục 63): danh sách phản ánh gói đang dùng LÚC MỞ; không có gói thì khối ẩn
+      renderPrivateCredits(
+        $("set-credit-private"),
+        $("set-credit-private-list"),
+        packs().privateCredits(),
+        document,
+      );
       modalStack.push("settings-modal", $("btn-settings"));
       focusModal($("settings-modal"));
     } else {
