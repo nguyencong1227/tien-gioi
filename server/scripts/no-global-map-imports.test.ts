@@ -18,6 +18,8 @@ const FORBIDDEN_MAP_SYMBOLS = new Set([
   "MAP_H",
   "MAP_TILES",
   "MAP_SEED",
+  // `DEFAULT_MAP` dựng một lần lúc nạp module (bản sinh theo seed): sau khi server nhận tệp Tiled (`adoptTiledMaps`) nó KHÁC `getMap(DEFAULT_MAP_ID)`; dùng `getMap(DEFAULT_MAP_ID)!`
+  "DEFAULT_MAP",
   "tileAt",
   "isBlockedPx",
   "circleBlocked",
@@ -163,7 +165,7 @@ describe("chặn quay lại dùng hằng bản đồ toàn cục (#123 Bước 0
       const found = findForbiddenMapImports(badCode);
       expect(found).toContain("inTown");
       expect(found).toContain("circleBlocked");
-      expect(found).not.toContain("DEFAULT_MAP");
+      expect(found).toContain("DEFAULT_MAP"); // bản dựng một lần lúc nạp module: lỗi thời sau khi nhận tệp Tiled, dùng getMap(DEFAULT_MAP_ID)
     });
 
     it("đột biến 5: bắt export * from module shared", () => {

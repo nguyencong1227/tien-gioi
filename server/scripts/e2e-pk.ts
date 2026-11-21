@@ -26,7 +26,7 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import WebSocket from "ws";
-import { DEFAULT_MAP, DEFAULT_MAP_ID, roomNameOf } from "@tien-gioi/shared";
+import { DEFAULT_MAP_ID, roomNameOf, getMap } from "@tien-gioi/shared";
 import { shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -280,8 +280,8 @@ async function main() {
       world.mctrl.clear();
       for (const sid of sids.values()) world.ctrl.get(sid).lastHitAt = 0;
     };
-    pa.x = DEFAULT_MAP.townPx.x + DEFAULT_MAP.townPx.r + 500;
-    pa.y = pb.y = DEFAULT_MAP.townPx.y;
+    pa.x = getMap(DEFAULT_MAP_ID)!.townPx.x + getMap(DEFAULT_MAP_ID)!.townPx.r + 500;
+    pa.y = pb.y = getMap(DEFAULT_MAP_ID)!.townPx.y;
     pb.x = pa.x + 45;
     calm();
     for (const tab of tabs) {

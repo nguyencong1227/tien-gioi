@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { DEFAULT_MAP, DEFAULT_MAP_ID, roomNameOf, type WorldBossSlot } from "@tien-gioi/shared";
+import { DEFAULT_MAP_ID, roomNameOf, type WorldBossSlot, getMap } from "@tien-gioi/shared";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -190,8 +190,8 @@ async function main() {
       [B.name, 40],
     ] as const) {
       const p = playerOf(n);
-      p.x = DEFAULT_MAP.townPx.x + dx;
-      p.y = DEFAULT_MAP.townPx.y + 60;
+      p.x = getMap(DEFAULT_MAP_ID)!.townPx.x + dx;
+      p.y = getMap(DEFAULT_MAP_ID)!.townPx.y + 60;
     }
     out("  ✓ [1/8] Hai người đăng nhập bằng form thật, đứng trong trấn Lạc Hà");
 
