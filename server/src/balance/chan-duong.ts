@@ -384,8 +384,9 @@ export function blendedUplift(sums: readonly GroupSummary[]): number | null {
 // ---------- Bất biến ----------
 
 /**
- * Chỗ vi phạm mục tiêu thiết kế (rỗng = đạt). Chặn phát hành AMBUSH (mục 59): tỉ lệ thắng "tới cùng" của từng bầy >= `targets.winRate[mức]`; thắng PHẢI hơn bỏ chạy
- * (thưởng tu vi của trận thắng > giá bỏ chạy giữa trận bằng tu vi). Thời gian trận và tu vi / phút chỉ ĐO (báo ở tài liệu, `⚠️`), không chặn: do D / A chốt hằng số.
+ * Chỗ vi phạm mục tiêu thiết kế (rỗng = đạt). Chặn phát hành AMBUSH (mục 59): tỉ lệ thắng "tới cùng" của từng bầy >= `targets.winRate[mức]` (thua = chết thật). Thời gian trận, giá bỏ chạy
+ * so với thưởng và tu vi / phút chỉ ĐO (báo ở tài liệu, `⚠️`), không chặn: do D / A chốt hằng số ở CD6b. (Bản đầu coi "thưởng tu vi > giá bỏ chạy" là bất biến; sai: thắng +R luôn hơn
+ * bỏ chạy -P dù R < P, nên đó là cảnh báo về độ đắt của giá bỏ chạy, không phải lỗi dữ liệu bầy.)
  */
 export function ambushBalanceViolations(sums: readonly GroupSummary[] = summarizeAll()): string[] {
   const bad: string[] = [];
@@ -396,20 +397,28 @@ export function ambushBalanceViolations(sums: readonly GroupSummary[] = summariz
       bad.push(
         `${at}: thắng ${(s.toEnd.won * 100).toFixed(0)}% < ${(need * 100).toFixed(0)}% (chết ${(s.toEnd.lost * 100).toFixed(0)}%)`,
       );
-    if (s.winExp > 0 && s.winExp <= s.fleeExp)
-      bad.push(`${at}: thưởng tu vi ${s.winExp} không hơn giá bỏ chạy ${s.fleeExp}`);
   }
   return bad;
 }
 
-/** Cảnh báo (không chặn): thời gian trận ngoài khung. */
+/**
+ * Cảnh báo (không chặn): (1) thời gian trận ngoài khung; (2) giá bỏ chạy bằng tu vi (`AMBUSH_EXP_PRICE_PCT` x thanh tu vi của cảnh giới) KHÔNG nhỏ hơn thưởng tu vi của trận thắng:
+ * bỏ chạy đắt hơn cả thưởng, người chơi bị dồn vào "Chiến" dù đang yếu (CD6b chốt giá / hệ số thưởng).
+ */
 export function ambushBalanceWarnings(sums: readonly GroupSummary[]): string[] {
   const { min, max } = ASSUME_AMBUSH.targets.seconds;
-  return sums
-    .filter((s) => s.realSeconds < min || s.realSeconds > max)
-    .map(
-      (s) => `bầy ${s.group.id}: trận ${s.realSeconds.toFixed(0)} giây (khung ${min}-${max} giây)`,
-    );
+  const out: string[] = [];
+  for (const s of sums) {
+    if (s.realSeconds < min || s.realSeconds > max)
+      out.push(
+        `bầy ${s.group.id}: trận ${s.realSeconds.toFixed(0)} giây (khung ${min}-${max} giây)`,
+      );
+    if (s.winExp > 0 && s.winExp <= s.fleeExp)
+      out.push(
+        `bầy ${s.group.id}: thưởng tu vi ${f0(s.winExp)} không hơn giá bỏ chạy ${f0(s.fleeExp)} (bỏ chạy đắt hơn cả thưởng thắng)`,
+      );
+  }
+  return out;
 }
 
 // ---------- Báo cáo Markdown cho docs/CAN_BANG.md ----------
@@ -471,6 +480,6 @@ ${groupTable}
 
 Khoảng giữa hai lần bị chặn ước tính ${f1(ambushIntervalMin())} phút (hồi tối thiểu ${AMBUSH_COOLDOWN_MS / 60000} phút + quãng đi bộ tới lần tung trúng kế, ${pct(ASSUME_AMBUSH.walkShare)} thời gian đi bộ). Tu vi / phút tăng thêm so với chỉ săn quái, trộn theo \`AMBUSH_TIER_WEIGHTS\` (${AMBUSH_TIERS.map((t) => `${TIER_VI[t]} ${AMBUSH_TIER_WEIGHTS[t]}`).join(" / ")}): **${blended === null ? "-" : pct(blended)}** (mục tiêu ${pct(ASSUME_AMBUSH.targets.uplift.min)}-${pct(ASSUME_AMBUSH.targets.uplift.max)}, không hơn bí cảnh). Chưa tính đồ rơi và sách chiêu (chưa có: \`AMBUSH_LOOT\`).
 
-${violations.length === 0 ? `**Không vi phạm bất biến nào** (mọi bầy thắng >= ${AMBUSH_TIERS.map((t) => `${pct(ASSUME_AMBUSH.targets.winRate[t])} ${TIER_VI[t]}`).join(" / ")}, thắng luôn hơn bỏ chạy).` : `**VI PHẠM (${violations.length}):**\n\n${violations.map((v) => `- ${v}`).join("\n")}`}
+${violations.length === 0 ? `**Không vi phạm bất biến nào** (mọi bầy thắng >= ${AMBUSH_TIERS.map((t) => `${pct(ASSUME_AMBUSH.targets.winRate[t])} ${TIER_VI[t]}`).join(" / ")}, giá bỏ chạy và thời gian trận xem cảnh báo bên dưới).` : `**VI PHẠM (${violations.length}):**\n\n${violations.map((v) => `- ${v}`).join("\n")}`}
 ${warnings.length === 0 ? "" : `\nCảnh báo (không chặn):\n\n${warnings.map((v) => `- ${v}`).join("\n")}\n`}`;
 }
