@@ -116,6 +116,42 @@ describe("world-boss: báo trước + sinh trùm", () => {
     expect(live[0].msg.endsInMs).toBeGreaterThan(29 * MIN);
   });
 
+  it("hpMult: trùm sinh với máu = máu loài x hệ số (state, sổ sự kiện, bản sao của loài); bảng MONSTERS dùng chung KHÔNG bị sửa; không hpMult thì đúng máu loài", () => {
+    const base = sampleWorldBossSchedule()[0]!;
+    const hpBefore = HAN.hp;
+    const big = setup([{ ...base, hpMult: 20 }]);
+    addPlayer(big.han.w, "A");
+    run([big.han.w, big.lac.w], at(11, 59), at(12, 0, 5), 500);
+    const b = bossOf(big.han.w)!;
+    expect(b.m.maxHp).toBe(hpBefore * 20);
+    expect(b.m.hp).toBe(hpBefore * 20);
+    expect(b.mc.def.hp).toBe(hpBefore * 20);
+    expect(b.mc.def.atk).toBe(HAN.atk); // chỉ máu đổi: đòn đánh giữ nguyên
+    expect(big.hub.worldBoss.current!.maxHp).toBe(hpBefore * 20); // ngưỡng 1,5% máu tính trên máu THẬT
+    expect(HAN.hp).toBe(hpBefore); // bản sao: loài gốc nguyên vẹn
+    expect(MONSTER_BY_ID.thien_han_vuong.hp).toBe(hpBefore);
+
+    const plain = setup([base]);
+    addPlayer(plain.han.w, "A");
+    run([plain.han.w, plain.lac.w], at(11, 59), at(12, 0, 5), 500);
+    const p = bossOf(plain.han.w)!;
+    expect(p.m.maxHp).toBe(hpBefore);
+    expect(p.mc.def).toBe(HAN); // không hpMult: đúng đối tượng loài gốc như trước
+    expect(plain.hub.worldBoss.current!.maxHp).toBe(hpBefore);
+  });
+
+  it("hpMult: ngưỡng thưởng 1,5% máu tối đa tính theo máu NHÂN (sát thương bằng 1,5% máu loài chưa đủ khi hpMult 20)", () => {
+    const base = sampleWorldBossSchedule()[0]!;
+    const { han, lac, hub } = setup([{ ...base, hpMult: 20 }]);
+    addPlayer(han.w, "A");
+    run([han.w, lac.w], at(11, 59), at(12, 0, 5), 500);
+    const dmg = Math.round(HAN.hp * 0.015) + 1; // hơn 1,5% máu LOÀI nhưng chỉ ~0,075% máu thật
+    hit(han.w, "A", dmg);
+    expect(hub.worldBoss.ranking(hub.worldBoss.current!).length).toBe(0);
+    hit(han.w, "A", Math.round(HAN.hp * 20 * 0.015)); // đủ 1,5% máu thật
+    expect(hub.worldBoss.ranking(hub.worldBoss.current!).length).toBe(1);
+  });
+
   it("khung giờ 00:00-00:09: báo trước 10 / 5 / 1 phút rơi vào cuối NGÀY HÔM TRƯỚC (23:55...) vẫn phát đủ, mỗi mốc MỘT lần, qua nửa đêm không phát đôi, trùm sinh đúng 00:05", () => {
     const slot: WorldBossSlot = {
       ...sampleWorldBossSchedule()[0]!,
