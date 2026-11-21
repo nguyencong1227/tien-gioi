@@ -203,16 +203,23 @@ describe(`Cửa hàng tông môn — bảng THẬT SECT_SHOP (${SECT_SHOP.length
         byBelow[below] = buyer;
       }
       const before = lastHall(buyer.H)?.me?.contrib;
+      // CÁC MÓN CÙNG minLevel DÙNG CHUNG NGƯỜI MUA → phải đợi toast RIÊNG của món này (chỉ số `nToastBefore`), KHÔNG phải toast cũ của món trước
+      const nToastBefore = buyer.H.toasts.length;
       buyer.H.room.send(SECT_MSG.shopBuy, { itemId: e.itemId, qty: 1 });
-      // Từ chối vì "chưa đủ cấp"
+      // Chờ một toast MỚI về tới, rồi khẳng định ĐÚNG là tin khoá cấp (nit A: waitFor `.some(===lockedMsg)` trước đây chạm toast cũ -> báo giả dương)
       await waitFor(
-        () => buyer.H.toasts.some((t) => t === lockedMsg),
+        () => buyer.H.toasts.length > nToastBefore,
         4000,
-        `${e.itemId}: toast khoá cấp`,
+        `${e.itemId}: toast khoá cấp về tới`,
       );
+      expect(buyer.H.toasts[nToastBefore], `${e.itemId}: toast mới là khoá cấp`).toBe(lockedMsg);
       // contrib KHÔNG đổi, túi KHÔNG có món
       expect(lastHall(buyer.H)?.me?.contrib, `${e.itemId}: contrib giữ nguyên`).toBe(before);
       expect(bagCount(buyer.H, e.itemId), `${e.itemId}: túi không đổi`).toBe(0);
+      // NGUOI CHOI THAY: hang của món này trong sectHall hiện khoá `level` (nit A: kiểm cả MÀN HÌNH, không chỉ kết quả mua).
+      // `sectShopLock` CHỈ cấp dữ liệu hiển thị này (lỗi mua thật do `svc.shopBuy` tự kiểm riêng) -> mutation bỏ kiểm cấp trong `sectShopLock` sẽ làm dòng dưới ĐỎ.
+      const row = lastHall(buyer.H)?.shop.find((r) => r.itemId === e.itemId);
+      expect(row?.locked, `${e.itemId}: sectHall hiện khoá cấp (player-side)`).toBe("level");
       // Đĩa: contrib giữ nguyên, buys KHÔNG ghi (khớp theo soulKey: name giữ hoa thường, soulKey thường — cleanName KHÔNG thường hoá)
       const m = sectDataOf(buyer.sectId).members.find((x: any) => x.soulKey === buyer.soulKey);
       expect(m.contrib, `${e.itemId}: contrib đĩa`).toBe(before);
