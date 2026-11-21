@@ -174,15 +174,12 @@ export function fightAmbush(g: AmbushFoeGroup, o: AmbushFightOptions): AmbushFig
       if (near) slash(w, sid, Math.atan2(near.y - p.y, near.x - p.x));
       tickWorld(w, TICK_MS);
       if (fleeAt === null && p.hp < p.maxHp * ASSUME_AMBUSH.fleeBelow) fleeAt = seconds;
-      // `a.end` đặt ĐỒNG BỘ lúc kết thúc (tin `ambushEnd` chỉ đi sau lần lưu bất đồng bộ nên không dùng `h.ambushEnds` ở đây)
+      // `a.end` đặt ĐỒNG BỘ lúc kết thúc, kể cả khi người chơi bị hạ (tin `ambushEnd` chỉ đi sau lần lưu bất đồng bộ nên không dùng `h.ambushEnds` ở đây);
+      // test "bầy khó: bị hạ" khoá việc đấu trường báo chết qua `a.end`
       const end = a.end;
       if (end) {
         result = end.result === "won" ? "won" : end.result === "lost" ? "lost" : "timeout";
         if (end.rewards) rewards = end.rewards;
-        break;
-      }
-      if (p.dead) {
-        result = "lost";
         break;
       }
     }

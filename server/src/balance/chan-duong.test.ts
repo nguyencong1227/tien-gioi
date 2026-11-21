@@ -128,6 +128,13 @@ describe("summarizeGroup / realmRows", () => {
     expect(s.fleeCoin).toBeGreaterThan(0);
   });
 
+  it("thời gian THẬT = giây mô phỏng / uptime của mức (người thật né nên đánh chậm hơn)", () => {
+    const f = fightAmbush(EASY, { step: EASY.minStep, seed: 1 });
+    const s = summarizeGroup(EASY, 1);
+    expect(s.realSeconds).toBeCloseTo(f.seconds / ASSUME_AMBUSH.uptime.normal, 9);
+    expect(s.realSeconds).toBeGreaterThan(f.seconds);
+  });
+
   it("bầy khó: tới cùng chết gần hết; biết bỏ chạy thì chết ÍT HƠN hẳn (thoát được) nhưng không về 0 do đòn dồn", () => {
     const s = summarizeGroup(HARD, 8);
     expect(s.toEnd.lost).toBeGreaterThan(0.9);
