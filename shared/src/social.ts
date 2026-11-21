@@ -265,9 +265,37 @@ export function worldBossHpOf(slot: Pick<WorldBossSlot, "boss" | "hpMult">): num
 }
 
 /**
- * Lịch trùm thế giới. RỖNG cho tới khi E có dữ liệu thật (M9.10): máy chủ không lập lịch khi rỗng (và `WORLD_BOSS=off`). Dữ liệu thử nghiệm: `sampleWorldBossSchedule()`.
+ * Lịch trùm thế giới (M9.10, A soạn vì E nghẽn ở CD5; số do `server/src/balance/trum-the-gioi.ts` đo, cổng `worldBossBalanceViolations` khoá ở `trum-the-gioi.test.ts`). Máy chủ chỉ chạy khi `WORLD_BOSS=on` (mặc định TẮT, `systems/world-boss-config.ts`) VÀ lịch không rỗng. Dữ liệu thử nghiệm: `sampleWorldBossSchedule()`.
  */
-export const WORLD_BOSS_SCHEDULE: readonly WorldBossSlot[] = [];
+export const WORLD_BOSS_SCHEDULE: readonly WorldBossSlot[] = [
+  // Hàn Vân Lĩnh (Nguyên Anh), 12:00: Thiên Hàn Vương nhân máu x38 (4,67 triệu). `can-bang` mục "Trùm thế giới": người tối thiểu hạ được trong 30 phút = 6 (né hoàn hảo; 5 người ~34 phút = không kịp),
+  // 20 người ~8,6 phút, 50 người ~3,4 phút (cận 3 phút của mục tiêu: x35 chỉ 3,1 phút nên chọn x38 cho dư biên). Quỹ thưởng chia theo tỉ lệ đóng góp: một người trong đội 10 người nhận ~17,4 phút
+  // săn quái tốt nhất bậc 18 (396 tu vi / phút) bằng tu vi và ~17,3 phút bằng Linh thạch (295 / phút); top 3 đóng góp thêm 3 Thượng Hồi Huyết Đan.
+  {
+    id: "han_van_trua",
+    hour: 12,
+    minute: 0,
+    boss: "thien_han_vuong",
+    mapId: "han_van",
+    hpMult: 38,
+    durationMin: 30,
+    announceMin: [10, 5, 1],
+    reward: { exp: 69_000, coin: 51_000, top: { itemId: "thuong_hoi_huyet_dan", count: 3 } },
+  },
+  // Âm Sương Trạch (Kim Đan), 21:00: Hắc Giao nhân máu x40 (3 triệu): tối thiểu 6 người, 20 người ~8,6 phút, 50 người ~3,4 phút; quỹ ~17,5 phút săn bậc 15 (536 tu vi / phút) cho một người trong đội 10
+  // người (tu vi) và ~17,6 phút (Linh thạch 279 / phút); top 3 thêm 1 Dưỡng Anh Đan (+12% xác suất đột phá Kim Đan -> Nguyên Anh).
+  {
+    id: "am_suong_toi",
+    hour: 21,
+    minute: 0,
+    boss: "hac_giao",
+    mapId: "am_suong",
+    hpMult: 40,
+    durationMin: 30,
+    announceMin: [10, 5, 1],
+    reward: { exp: 94_000, coin: 49_000, top: { itemId: "duong_anh_dan", count: 1 } },
+  },
+];
 
 /** Mẫu 2 khung giờ (12:00 và 21:00) dùng loài trùm có sẵn, cho test và giao diện thử; KHÔNG phải dữ liệu thật. */
 export function sampleWorldBossSchedule(): WorldBossSlot[] {

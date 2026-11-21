@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   INVENTORY_SLOTS,
   MONSTER_BY_ID,
+  WORLD_BOSS_SCHEDULE,
   WORLD_BOSS_TZ_OFFSET_MS,
   getMap,
   sampleWorldBossSchedule,
@@ -31,6 +32,7 @@ const HAN = MONSTER_BY_ID.thien_han_vuong;
 function setup(slots: WorldBossSlot[] = sampleWorldBossSchedule()) {
   const hub = new Hub();
   hub.worldBoss.slots = slots;
+  hub.worldBoss.enabled = true; // mặc định của sổ là TẮT (chỉ index.ts bật theo WORLD_BOSS=on): ca nào cần sự kiện thì tự bật
   const han = makeWorld(getMap("han_van")!, hub);
   const lac = makeWorld(undefined, hub);
   return { hub, han, lac };
@@ -67,18 +69,27 @@ function hit(w: World, sid: string, dmg: number) {
 const soulOf = (sid: string) => legacyIdentity(sid).soulKey;
 
 describe("world-boss: lịch rỗng / tắt", () => {
-  it("không có lịch (mặc định) hoặc WORLD_BOSS=off thì không làm gì và trả `none`", () => {
+  it("sổ MẶC ĐỊNH tắt dù đã có lịch thật; lịch rỗng hoặc WORLD_BOSS tắt thì không làm gì và trả `none`", () => {
     const hub = new Hub();
     const a = makeWorld(getMap("han_van")!, hub);
     addPlayer(a.w, "A");
-    expect(hub.worldBoss.slots.length).toBe(0); // dữ liệu thật của E chưa có
+    // lịch thật có khung 12:00 / 21:00 nhưng sổ mới dựng KHÔNG chạy (opt-in): test dùng Hub mới + đồng hồ thật không bao giờ dính báo trước / trùm theo giờ trong ngày
+    expect(hub.worldBoss.slots).toBe(WORLD_BOSS_SCHEDULE);
+    expect(hub.worldBoss.slots.length).toBeGreaterThan(0);
+    expect(hub.worldBoss.enabled).toBe(false);
+    expect(hub.worldBoss.active).toBe(false);
+    run([a.w], at(11, 59), at(12, 1));
+    expect(a.sys).toEqual([]);
+    expect(a.w.wbossId).toBeNull();
+    hub.worldBoss.enabled = true;
+    hub.worldBoss.slots = []; // bật mà lịch rỗng
     expect(hub.worldBoss.active).toBe(false);
     run([a.w], at(11, 59), at(12, 1));
     expect(a.sys).toEqual([]);
     expect(a.worldBosses).toEqual([]);
     expect(worldBossStatus(a.w, "A").phase).toBe("none");
     hub.worldBoss.slots = sampleWorldBossSchedule();
-    hub.worldBoss.enabled = false;
+    hub.worldBoss.enabled = false; // lịch có nhưng cờ tắt (WORLD_BOSS không đặt / off)
     run([a.w], at(11, 59), at(12, 1));
     expect(a.worldBosses).toEqual([]);
     expect(a.w.wbossId).toBeNull();
@@ -176,6 +187,7 @@ describe("world-boss: báo trước + sinh trùm", () => {
     const def = MONSTER_BY_ID.hac_giao!;
     for (let i = 0; i < 20; i++) {
       const hub = new Hub();
+      hub.worldBoss.enabled = true; // mặc định của sổ là TẮT
       hub.worldBoss.slots = sampleWorldBossSchedule();
       const am = makeWorld(getMap("am_suong")!, hub);
       addPlayer(am.w, "A");

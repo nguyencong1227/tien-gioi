@@ -57,9 +57,27 @@ const at7 = (y: number, mo: number, d: number, h = 0, mi = 0) =>
   Date.UTC(y, mo - 1, d, h, mi) - WORLD_BOSS_TZ_OFFSET_MS;
 
 describe("dữ liệu thật đã vào phải qua luật kiểm", () => {
-  it("lịch trùm thế giới (rỗng tới khi E có dữ liệu), thành tựu, danh hiệu", () => {
+  it("lịch trùm thế giới (hai khung 12:00 Hàn Vân + 21:00 Âm Sương), thành tựu, danh hiệu", () => {
     expect(worldBossViolations()).toEqual([]);
-    expect(WORLD_BOSS_SCHEDULE.length).toBe(0); // KHUNG: E thêm ở M9.10 (bộ thực thi không lập lịch khi rỗng)
+    // A soạn (M9.10): số do `server/src/balance/trum-the-gioi.ts` đo, cổng ở `trum-the-gioi.test.ts`; đổi lịch là đổi có chủ ý
+    expect(
+      WORLD_BOSS_SCHEDULE.map((s) => [
+        s.id,
+        s.boss,
+        s.mapId,
+        s.hour,
+        s.minute,
+        s.hpMult,
+        s.durationMin,
+      ]),
+    ).toEqual([
+      ["han_van_trua", "thien_han_vuong", "han_van", 12, 0, 38, 30],
+      ["am_suong_toi", "hac_giao", "am_suong", 21, 0, 40, 30],
+    ]);
+    for (const s of WORLD_BOSS_SCHEDULE) {
+      expect(worldBossHpOf(s)).toBeGreaterThan(MONSTER_BY_ID[s.boss]!.hp * 30); // nhân máu thật (trùm đội cân cho 1-2 phút)
+      expect(s.announceMin).toEqual([10, 5, 1]);
+    }
     expect(achievementViolations()).toEqual([]);
     expect(titleViolations()).toEqual([]);
     expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(4);

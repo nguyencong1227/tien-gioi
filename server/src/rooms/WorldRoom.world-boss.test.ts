@@ -50,6 +50,9 @@ beforeAll(async () => {
   server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   mod.defineRooms(server);
   PORT = await listenWithRetry(server);
+  // Lịch THẬT có khung 12:00 / 21:00 và sổ mặc định TẮT: tệp này tự bật sổ và dùng lịch RỖNG cho tới khi từng ca đặt khung của nó (afterEach đưa về rỗng)
+  WorldRoomCls.hub.worldBoss.slots = [];
+  WorldRoomCls.hub.worldBoss.enabled = true;
 });
 afterEach(async () => {
   vi.useRealTimers();
