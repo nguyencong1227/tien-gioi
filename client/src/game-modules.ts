@@ -5,6 +5,8 @@
  * gói khởi động chỉ còn phần giao diện (màn đăng nhập, HUD DOM, mạng, âm thanh...). Chunk game được tải SẴN lúc rảnh khi người chơi còn ở màn đăng nhập (`prefetchGameModulesWhenIdle`),
  * nên bấm Vào gần như không phải chờ; nếu họ vào ngay (đã có token) thì `start()` chờ cùng một lời hứa, không tải hai lần.
  *
+ * Cùng lúc chunk game còn NHẬN TỆP BẢN ĐỒ (`adoptTiledMapFiles`, S3a): client dựng bản đồ từ đúng tệp máy chủ dùng, xong TRƯỚC khi ai nhận được `GameModules` (nên trước `new WorldScene` / `getMap` ở `main.ts`).
+ *
  * Quy tắc cho mã trong gói khởi động: KHÔNG `import` tĩnh `phaser` hay `./scenes/WorldScene` (chỉ `import type`), nếu không Rollup kéo cả chúng về gói khởi động và
  * `check:budget` (`startupGzipKb`) đỏ. `game-modules.test.ts` canh điều này.
  */
@@ -22,6 +24,11 @@ export interface GameModules {
 export interface GameImporters {
   phaser: () => Promise<unknown>;
   scene: () => Promise<{ WorldScene: typeof WorldSceneClass }>;
+  /**
+   * Tệp bản đồ Tiled (S3a, `docs/THIET_KE_BAN_DO_TILED.md` mục 4a): module có `adoptTiledMapFiles`. Nhận TRƯỚC khi lời hứa nạp chunk game xong, tức trước mọi lần dựng `WorldScene` / `getMap`
+   * sau màn đăng nhập, để client dựng bản đồ từ ĐÚNG tệp máy chủ đang dùng (không sinh theo `seed`: từ S6 tệp sửa tay khác `seed`). KHÔNG nhập tĩnh: bốn tệp ~14 KB gzip sẽ vào gói khởi động.
+   */
+  mapFiles: () => Promise<{ adoptTiledMapFiles: () => string[] }>;
 }
 
 export interface GameLoader {
@@ -37,11 +44,17 @@ export function createGameLoader(imp: GameImporters): GameLoader {
   let loading: Promise<GameModules> | null = null;
   const load = (): Promise<GameModules> => {
     if (!loading) {
-      const p = Promise.all([imp.phaser(), imp.scene()]).then(([phaser, scene]): GameModules => ({
-        // Phaser là gói UMD (`export =`): bản dựng của Vite đưa vào `default`, TypeScript lại kiểu nó như chính không gian tên; nhận cả hai
-        Phaser: (phaser as { default?: PhaserApi }).default ?? (phaser as PhaserApi),
-        WorldScene: scene.WorldScene,
-      }));
+      const p = Promise.all([imp.phaser(), imp.scene(), imp.mapFiles()]).then(
+        ([phaser, scene, files]): GameModules => {
+          // Nhận tệp bản đồ NGAY khi cả ba chunk đã về và TRƯỚC khi ai nhận được `GameModules` (chạy một lần cho mỗi lần tải thành công; lỗi tải thì lần gọi sau thử lại cả ba)
+          files.adoptTiledMapFiles();
+          return {
+            // Phaser là gói UMD (`export =`): bản dựng của Vite đưa vào `default`, TypeScript lại kiểu nó như chính không gian tên; nhận cả hai
+            Phaser: (phaser as { default?: PhaserApi }).default ?? (phaser as PhaserApi),
+            WorldScene: scene.WorldScene,
+          };
+        },
+      );
       loading = p;
       p.catch(() => {
         if (loading === p) loading = null;
@@ -55,6 +68,7 @@ export function createGameLoader(imp: GameImporters): GameLoader {
 const loader = createGameLoader({
   phaser: () => import("phaser"),
   scene: () => import("./scenes/WorldScene"),
+  mapFiles: () => import("@tien-gioi/shared/src/map-files"),
 });
 export const loadGameModules = loader.load;
 export const prefetchGameModules = loader.prefetch;
