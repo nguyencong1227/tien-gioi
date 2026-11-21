@@ -38,6 +38,9 @@ const only = (process.env.E2E_ONLY ?? "")
   .filter((n) => n > 0);
 const wanted = (n: number) => only.length === 0 || only.includes(n);
 
+/** Tu vi đặt cho nhân vật ở các ca thử GIÁ tu vi. Giá tính bằng PHÚT SĂN của bậc (CD6b: 2 phút hộp thoại / 3 phút giữa trận; bậc 0 = 30 tu vi / phút => 60 / 90) và bị kẹp theo tu vi đang có, nên phải >= giá giữa trận (90) thì hai giá mới khác nhau và chưa bị kẹp hết. */
+const EXP_FOR_PRICES = 200;
+
 /** Bầy duy nhất của kịch bản: MỘT Hôi Lang (cấp 1) cho người bậc 0-3 ở Lạc Hà (tiêm vào `world.ambush.foes`). */
 const GROUP: AmbushFoeGroup = {
   id: "e2e_hoi_lang",
@@ -589,7 +592,7 @@ async function main() {
       const NAME = nameOf("Ba");
       const s0 = await prepare(NAME, secretOf(NAME));
       changeCoin(s0.world, s0.sid, 5000);
-      s0.p.exp = 60; // giá tu vi tính theo tu vi đang có: nhân vật mới (0) thì giá 0, không so được hộp thoại với giữa trận
+      s0.p.exp = EXP_FOR_PRICES; // giá tu vi bị KẸP theo tu vi đang có: nhân vật mới (0) thì giá 0, không so được hộp thoại với giữa trận
       const coin0 = Number(s0.ctrl.coin);
       await walkIntoAmbush();
       const offerPrice = s0.a.offer!.price as { exp: number; coin: { price: number } };
@@ -692,7 +695,7 @@ async function main() {
       const NAME = nameOf("NamA");
       const s0 = await prepare(NAME, secretOf(NAME));
       changeCoin(s0.world, s0.sid, 500);
-      s0.p.exp = 60;
+      s0.p.exp = EXP_FOR_PRICES;
       await walkIntoAmbush();
       const offer = s0.a.offer!;
       const id0 = offer.id as string;
@@ -729,7 +732,7 @@ async function main() {
       WorldRoom.reconnectGraceS = 2; // proxy chặn kết nối mới nên client không nối lại được trong hạn này
       const NAME_B = nameOf("NamB");
       const b0 = await prepare(NAME_B, secretOf(NAME_B));
-      b0.p.exp = 60;
+      b0.p.exp = EXP_FOR_PRICES;
       await walkIntoAmbush();
       const expB0 = Number(b0.p.exp);
       const priceB = Math.min(Number(b0.a.offer!.price.exp), Math.floor(expB0));
@@ -784,7 +787,7 @@ async function main() {
       const NAME_D = nameOf("NamD");
       const d0 = await prepare(NAME_D, secretOf(NAME_D));
       changeCoin(d0.world, d0.sid, 500);
-      d0.p.exp = 60;
+      d0.p.exp = EXP_FOR_PRICES;
       await walkIntoAmbush();
       const d1 = await fightIntoArena(d0.roomId);
       const expD0 = Number(d1.p.exp);

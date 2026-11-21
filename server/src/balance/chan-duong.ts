@@ -8,9 +8,12 @@
 //  - "đánh tới cùng": không bao giờ bỏ chạy (cận trên tỉ lệ chết);
 //  - "biết bỏ chạy": khi khí huyết < `fleeBelow` thì bấm Bỏ chạy, phải VẬN `AMBUSH_FLEE_CHANNEL_MS` (không bất khả xâm phạm, vẫn đánh / uống đan); sống qua giây vận thì thoát (trả giá), thắng
 //    trước đó thì thắng, gục trong lúc vận thì chết. Suy ra từ vết khí huyết của trận "tới cùng" (hai cách giống hệt nhau tới hết giây vận) nên không tốn thêm trận.
-// Dùng `Math.random` có hạt giống như `dungeon.ts` nên kết quả cố định. Số liệu bầy là của E / G (CD5), số thưởng / giá là TẠM (`ARENA_REWARD_MULT`, `AMBUSH_*`): ở đây chỉ ĐO và báo vi phạm.
+// Dùng `Math.random` có hạt giống như `dungeon.ts` nên kết quả cố định. Số liệu bầy là của E / G (CD5). Giá và thưởng TU VI tính bằng PHÚT SĂN của bậc (`AMBUSH_EXP_PRICE_MIN`, `AMBUSH_REWARD_MIN`, bảng `AMBUSH_HUNT_EXP_PER_MIN` sinh từ `bestOption`: CD6b); thưởng Linh thạch vẫn TẠM (`ARENA_REWARD_MULT`): ở đây ĐO và báo vi phạm.
 import {
   AMBUSH_COOLDOWN_MS,
+  AMBUSH_EXP_PRICE_MIN,
+  AMBUSH_HUNT_EXP_PER_MIN,
+  AMBUSH_REWARD_MIN,
   AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_FOES,
   AMBUSH_ROLL_P_MAX,
@@ -261,7 +264,6 @@ export function summarizeGroup(g: AmbushFoeGroup, runs: number = ASSUME_AMBUSH.r
   const bar = expToNext(realm, tier);
   const price = ambushPrice(
     {
-      barSize: bar,
       expInBar: bar * ASSUME_AMBUSH.expInBarShare,
       step: stepOf(realm, tier),
       wallet: Number.MAX_SAFE_INTEGER,
@@ -367,6 +369,16 @@ export function upliftOf(s: GroupSummary): UpliftRow {
   };
 }
 
+/** Tu vi / phút của người săn quái tốt nhất ở từng bậc 0..`steps - 1` (làm tròn), SINH từ `bestOption`: bản gốc của `AMBUSH_HUNT_EXP_PER_MIN` ở `shared/` (`chan-duong.test.ts` buộc hai bên khớp). */
+export function huntExpPerMinTable(steps: number = AMBUSH_HUNT_EXP_PER_MIN.length): number[] {
+  const out: number[] = [];
+  for (let step = 0; step < steps; step++) {
+    const { realm, tier } = realmTierOfStep(step);
+    out.push(Math.round(bestOption(realm, tier).rate * 60));
+  }
+  return out;
+}
+
 /** Tu vi / phút kỳ vọng của MỘT lần chặn đường ở bậc `step` trộn theo `AMBUSH_TIER_WEIGHTS` trên các bầy có mặt (mức không có bầy thì bỏ khỏi phép trộn). */
 export function blendedUplift(sums: readonly GroupSummary[]): number | null {
   let w = 0;
@@ -379,6 +391,30 @@ export function blendedUplift(sums: readonly GroupSummary[]): number | null {
     acc += AMBUSH_TIER_WEIGHTS[tier] * u;
   }
   return w > 0 ? acc / w : null;
+}
+
+export interface RealmUplift {
+  realm: number;
+  /** Tăng tu vi / phút trộn theo `AMBUSH_TIER_WEIGHTS` trên các bầy của cảnh giới này; `null` nếu cảnh giới không có bầy nào. */
+  blended: number | null;
+  /** Từng mức (trung bình các bầy); mức không có bầy thì thiếu. */
+  byTier: Partial<Record<AmbushTier, number>>;
+}
+
+/** Tăng tu vi / phút theo CẢNH GIỚI của `minStep` (đổi hệ số thưởng chung không chỉnh đều được vì tu vi / phút săn lệch nhau tới 18 lần giữa các bậc: phải nhìn từng cảnh giới). */
+export function upliftByRealm(sums: readonly GroupSummary[]): RealmUplift[] {
+  const out: RealmUplift[] = [];
+  for (let realm = 0; realm < REALMS.length; realm++) {
+    const of = sums.filter((s) => realmTierOfStep(s.step).realm === realm);
+    if (of.length === 0) continue;
+    const byTier: Partial<Record<AmbushTier, number>> = {};
+    for (const tier of AMBUSH_TIERS) {
+      const t = of.filter((s) => s.group.tier === tier);
+      if (t.length > 0) byTier[tier] = t.reduce((a, s) => a + upliftOf(s).uplift, 0) / t.length;
+    }
+    out.push({ realm, blended: blendedUplift(of), byTier });
+  }
+  return out;
 }
 
 // ---------- Bất biến ----------
@@ -402,8 +438,8 @@ export function ambushBalanceViolations(sums: readonly GroupSummary[] = summariz
 }
 
 /**
- * Cảnh báo (không chặn): (1) thời gian trận ngoài khung; (2) giá bỏ chạy bằng tu vi (`AMBUSH_EXP_PRICE_PCT` x thanh tu vi của cảnh giới) KHÔNG nhỏ hơn thưởng tu vi của trận thắng:
- * bỏ chạy đắt hơn cả thưởng, người chơi bị dồn vào "Chiến" dù đang yếu (CD6b chốt giá / hệ số thưởng).
+ * Cảnh báo (không chặn): (1) thời gian trận ngoài khung; (2) giá bỏ chạy bằng tu vi (`AMBUSH_EXP_PRICE_MIN` phút săn) KHÔNG nhỏ hơn thưởng tu vi của trận thắng (bỏ chạy đắt hơn cả thưởng,
+ * người chơi bị dồn vào "Chiến" dù đang yếu); (3) tăng tu vi / phút TRỘN của một cảnh giới ngoài `targets.uplift` (đo bằng ít trận nên sát biên thì nhiễu: xem lại bằng nhiều trận hơn).
  */
 export function ambushBalanceWarnings(sums: readonly GroupSummary[]): string[] {
   const { min, max } = ASSUME_AMBUSH.targets.seconds;
@@ -416,6 +452,13 @@ export function ambushBalanceWarnings(sums: readonly GroupSummary[]): string[] {
     if (s.winExp > 0 && s.winExp <= s.fleeExp)
       out.push(
         `bầy ${s.group.id}: thưởng tu vi ${f0(s.winExp)} không hơn giá bỏ chạy ${f0(s.fleeExp)} (bỏ chạy đắt hơn cả thưởng thắng)`,
+      );
+  }
+  const { min: lo, max: hi } = ASSUME_AMBUSH.targets.uplift;
+  for (const r of upliftByRealm(sums)) {
+    if (r.blended !== null && (r.blended < lo - 1e-9 || r.blended > hi + 1e-9))
+      out.push(
+        `cảnh giới ${REALMS[r.realm].name}: tu vi / phút tăng ${(r.blended * 100).toFixed(0)}% ngoài mục tiêu ${(lo * 100).toFixed(0)}-${(hi * 100).toFixed(0)}%`,
       );
   }
   return out;
@@ -459,6 +502,16 @@ export function renderAmbushBalance(foes: readonly AmbushFoeGroup[] = AMBUSH_FOE
     })
     .join("\n");
   const blended = blendedUplift(sums);
+  const upliftTable = upliftByRealm(sums)
+    .map((r) => {
+      const c = (t: AmbushTier) => (r.byTier[t] === undefined ? "-" : pct(r.byTier[t]));
+      return `| ${REALMS[r.realm].name} | ${c("normal")} | ${c("elite")} | ${c("leader")} | **${r.blended === null ? "-" : pct(r.blended)}** |`;
+    })
+    .join("\n");
+  const priceText = `${AMBUSH_EXP_PRICE_MIN.offer} phút (hộp thoại) / ${AMBUSH_EXP_PRICE_MIN.mid} phút (giữa trận)`;
+  const rewardText = AMBUSH_TIERS.map((t) => `${TIER_VI[t]} ${AMBUSH_REWARD_MIN[t]} phút`).join(
+    " / ",
+  );
   const violations = ambushBalanceViolations(sums);
   const warnings = ambushBalanceWarnings(sums);
   return `${head}
@@ -470,7 +523,7 @@ ${realmTable}
 
 ### 2. Từng bầy (ở bậc \`minStep\`)
 
-"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi + Linh thạch MỖI trận thắng (\`ARENA_REWARD_MULT\` TẠM); giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang ${ASSUME_AMBUSH.expInBarShare * 100}% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
+"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi (\`ambushRewardExp\`: phút săn của bậc x mức, CD6b) + Linh thạch (\`ARENA_REWARD_MULT\` TẠM) MỖI trận thắng; giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang ${ASSUME_AMBUSH.expInBarShare * 100}% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
 
 | Bầy | Bản đồ | Bậc | Mức | Kẻ địch | Thắng / chết / hết giờ | Thắng / thoát / chết | Trận thật | Thưởng thắng | Giá bỏ chạy | Tương đương |
 |---|---|--:|---|---|---|---|--:|---|---|--:|
@@ -479,6 +532,14 @@ ${groupTable}
 ### 3. Tu vi / phút so với săn quái
 
 Khoảng giữa hai lần bị chặn ước tính ${f1(ambushIntervalMin())} phút (hồi tối thiểu ${AMBUSH_COOLDOWN_MS / 60000} phút + quãng đi bộ tới lần tung trúng kế, ${pct(ASSUME_AMBUSH.walkShare)} thời gian đi bộ). Tu vi / phút tăng thêm so với chỉ săn quái, trộn theo \`AMBUSH_TIER_WEIGHTS\` (${AMBUSH_TIERS.map((t) => `${TIER_VI[t]} ${AMBUSH_TIER_WEIGHTS[t]}`).join(" / ")}): **${blended === null ? "-" : pct(blended)}** (mục tiêu ${pct(ASSUME_AMBUSH.targets.uplift.min)}-${pct(ASSUME_AMBUSH.targets.uplift.max)}, không hơn bí cảnh). Chưa tính đồ rơi và sách chiêu (chưa có: \`AMBUSH_LOOT\`).
+
+Theo từng cảnh giới (thưởng và giá tính bằng phút săn của bậc, nên các hàng gần nhau; lệch nhiều là do bầy / tỉ lệ thắng của cảnh giới đó):
+
+| Cảnh giới | Thường | Tinh anh | Kẻ cầm đầu | **Trộn** |
+|---|--:|--:|--:|--:|
+${upliftTable}
+
+Giá bỏ chạy bằng tu vi: ${priceText}; thưởng tu vi thắng: ${rewardText} (phút săn của bậc người chơi; bảng tu vi / phút săn \`AMBUSH_HUNT_EXP_PER_MIN\` sinh từ mô phỏng). Giá bị kẹp bởi tu vi đang có trong thanh (không bao giờ rớt cảnh giới).
 
 ${violations.length === 0 ? `**Không vi phạm bất biến nào** (mọi bầy thắng >= ${AMBUSH_TIERS.map((t) => `${pct(ASSUME_AMBUSH.targets.winRate[t])} ${TIER_VI[t]}`).join(" / ")}, giá bỏ chạy và thời gian trận xem cảnh báo bên dưới).` : `**VI PHẠM (${violations.length}):**\n\n${violations.map((v) => `- ${v}`).join("\n")}`}
 ${warnings.length === 0 ? "" : `\nCảnh báo (không chặn):\n\n${warnings.map((v) => `- ${v}`).join("\n")}\n`}`;
