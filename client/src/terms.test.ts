@@ -13,6 +13,9 @@ export function validateTermsHtml(html: string): string[] {
   if (!/Bản quyền thuộc chủ dự án/.test(html)) errors.push("thiếu câu 'Bản quyền thuộc chủ dự án'");
   if (!/không được sao chép/i.test(html)) errors.push("thiếu 'không được sao chép'");
   if (!/phân phối/i.test(html)) errors.push("thiếu 'phân phối'");
+  if (!/LICENSE/.test(html)) errors.push("thiếu dẫn chiếu tệp LICENSE");
+  if (!/máy chủ của Tiên Giới từ trang web hoặc ứng dụng không do chủ dự án vận hành/.test(html))
+    errors.push("thiếu điều cấm dùng máy chủ từ trang / ứng dụng lạ");
   if (!/href="notices\.html"/.test(html)) errors.push("thiếu liên kết tới notices.html");
   if (!/href="privacy\.html"/.test(html)) errors.push("thiếu liên kết tới privacy.html");
   if (/\[[^\]]*(người dùng điền|điền)[^\]]*\]/i.test(html)) errors.push("còn chỗ trống chưa điền");
@@ -53,6 +56,10 @@ describe("client/public/terms.html", () => {
     expect(validateTermsHtml(html.replaceAll("không được sao chép", "được chia sẻ"))).not.toEqual(
       [],
     );
+    expect(validateTermsHtml(html.replace("<code>LICENSE</code>", "giấy phép"))).not.toEqual([]);
+    expect(
+      validateTermsHtml(html.replace("không do chủ dự án vận hành", "do ai đó vận hành")),
+    ).not.toEqual([]);
     expect(validateTermsHtml(html.replace('href="notices.html"', 'href="x.html"'))).not.toEqual([]);
     expect(validateTermsHtml(html.replace('href="privacy.html"', 'href="x.html"'))).not.toEqual([]);
     expect(validateTermsHtml(html.replace(/ rel="noopener noreferrer"/, ""))).not.toEqual([]);
