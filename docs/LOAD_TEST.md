@@ -2132,3 +2132,65 @@ Mở rộng kịch bản `server/scripts/bots.ts`:
 - Mở rộng `server/scripts/audit-saves.ts` mục 11: Kiểm tra tính toàn vẹn dữ liệu xã hội `Soul.social` (`social.v === 1`, `pk.won/lost` hợp lệ trong trần, `counters` khóa hợp lệ theo `socialCounterMode` và không vượt trần `SOCIAL_COUNTER_CAP`, `ach` chuẩn định dạng ISO `[1, 40]` ký tự và không vượt 512 mục, `title` khớp `TITLE_ID_RE`).
 - Bổ sung bộ test và test đột biến có răng `server/scripts/audit-saves.test.ts` (109 tests PASS, bao phủ mọi nhánh kiểm tra trần, kiểu, số nguyên, độ dài chuỗi ISO).
 
+## 40. Thử tải dài (Soak Test) 10 phút Chặn đường 100 bot: Không rò phòng đấu trường, bộ nhớ và tick (CD10, Issue #1276, Refs #1070)
+
+### 40.1. Bối cảnh & Yêu cầu nghiệm thu CD10
+Theo đặc tả thiết kế Gặp chặn đường (`docs/THIET_KE_CHAN_DUONG.md` mục 11-12, PR #1060, Issue #1070):
+- Tính năng Chặn đường (`AMBUSH`) tạo các phòng đấu trường solo tạm thời (`arena_lac_ha`, `MAX_AMBUSH_ROOMS = 20`) khi người chơi chọn Chiến.
+- Trong phòng đấu trường có kẻ địch (`AMBUSH_FOES`), đồng hồ đếm ngược 120s, vé (`AmbushTicket`), cơ chế bỏ chạy giữa trận (vận 1s), và đưa về chỗ cũ khi kết thúc (`World.onArenaExit`).
+- Trước khi Dev A đề xuất bật `AMBUSH=on` cho bản phát hành thật (CD10), cần chứng minh dưới tải thật 10 phút với 100 bot đi hoang liên tục:
+  1. **Không rò rỉ phòng đấu trường:** Số phòng đấu trường đang mở phải về 0 sau khi dừng bot (`finalActiveArenaRooms === 0`).
+  2. **Không vượt trần đấu trường:** Số phòng đấu trường mở đồng thời không được vượt `MAX_AMBUSH_ROOMS` (20 phòng).
+  3. **Bộ nhớ ổn định:** Dốc VmRSS nửa sau (OLS) <= 1.0 MB/phút, mức tăng sau warmup <= 50 MB.
+  4. **Hiệu năng nhịp tick:** Tick p95 phòng tệ nhất <= 10.0 ms, overruns = 0.
+  5. **Toàn vẹn dữ liệu:** `kiem-save` 0 lỗi dữ liệu, hồ sơ không lưu bản đồ đấu trường, bảo toàn Linh thạch ĐẠT.
+
+### 40.2. Lệnh thực hiện
+Chạy trên máy chủ độc lập qua cổng cách ly ngẫu nhiên:
+```bash
+npm run soak -w server -- --bots=100 --minutes=10 --ambush
+```
+(Máy chủ con tự động chạy với `AMBUSH=on` và `AMBUSH_BOTS=on`).
+
+### 40.3. Kết quả đo đạc thực tế (Lượt chạy 10 phút ngày 22/11/2026)
+- **Tệp mẫu nhật ký:** `server/soak-2026-11-21T20-23-53-797Z.json`
+- **Thời lượng:** 10.0 phút (600 giây, 60 mẫu lấy mỗi 10 giây).
+- **Số bot:** 100 khởi tạo -> 100 kết thúc (tỉ lệ rớt: 0%).
+
+| Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Ngân sách | Đánh giá |
+|---|---|---:|---:|:---:|
+| **Phòng đấu trường** | **Số phòng cuối cùng khi dừng** | **0 phòng** | = 0 | **ĐẠT** |
+| | **Số phòng tối đa đồng thời** | **3 phòng** | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
+| | Lượt qua cổng vào / ra đấu trường | 5 lượt vào `arena_lac_ha`, 4 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
+| **Chặn đường** | Số lần bot bị chặn đường | **7 lần** | > 0 | **ĐẠT** |
+| | Lựa chọn hộp thoại | Chiến: 4 \| Bỏ chạy: 3 (Linh thạch: 0, Tu vi: 3) | Phân nhánh tự động | **ĐẠT** |
+| | Thoát giữa trận (vận 1s) | 1 lần | - | **ĐẠT** |
+| | Kết quả trận đấu | Thắng: 0, Thua: 0, Chạy thoát: 2, Hết giờ: 4, Rớt: 0, Huỷ: 0 | - | **ĐẠT** |
+| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 149.22 MB | - | - |
+| | VmRSS sau warmup (5.0m) | 153.36 MB | - | - |
+| | VmRSS kết thúc | 155.42 MB | - | - |
+| | Tăng sau warmup | **+2.06 MB** | <= 50.0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0.258 MB / phút** | <= 1.00 MB / phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 2.74 ms, Max 3.35 ms** | <= 10.0 ms | **ĐẠT** |
+| | Tick overruns (> 50 ms) | **0** | 0 | **ĐẠT** |
+| | CPU luồng chính / tick | TB 3.25 ms / tick | - | **ĐẠT** |
+| | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi max 0.0s, Lỗi 0 | - | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | 23.1 ms | <= 100 ms | **ĐẠT** |
+| **Băng thông WebSocket** | Nhận trung bình | 238 B / tick | <= 600 B / tick | **ĐẠT** |
+| | Phân vị p95 | 334 B / tick | - | **ĐẠT** |
+| | Băng thông nhận TB / bot | 4.66 KB/s | - | **ĐẠT** |
+| **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 | **ĐẠT** |
+| | Lỗi gọi `/metrics` | 0 | 0 | **ĐẠT** |
+| | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
+| | Tệp hỏng (`*.hong-*`) | 0 | 0 | **ĐẠT** |
+| | Bảo toàn Linh thạch | ĐẠT (Trần 10.201, Thực tế 9.499, Lệch ví: 0) | ĐẠT | **ĐẠT** |
+
+### 40.4. Nhận xét & Giới hạn
+- Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục chứng minh:
+  - **Không rò rỉ phòng đấu trường:** Số phòng đấu trường solo về đúng 0 khi dừng bot.
+  - **Không rò rỉ bộ nhớ:** Dốc VmRSS OLS nửa sau `+0.258 MB/phút` (nằm trong ngưỡng <= 1.0 MB/phút).
+  - **Nhịp tick và hiệu năng:** Tick p95 trung bình 2.74 ms (max 3.35 ms <= 10.0 ms), 0 overruns.
+  - **Toàn vẹn dữ liệu:** `kiem-save` 100 nhân vật / 100 chân linh báo 0 lỗi, bảo toàn Linh thạch lệch ví 0.
+- **Giới hạn số đo:**
+  - 100 bot phân bổ đi hoang ghi nhận 7 lần bị chặn đường, số phòng đấu trường đồng thời đạt đỉnh 3/20 phòng (chưa chạm trần `MAX_AMBUSH_ROOMS = 20` do thiết kế thời gian hồi chiêu chặn đường giữa các lần là 8 phút). Vì vậy, kết quả này chứng minh việc dọn dẹp phòng sạch sẽ khi kết thúc và hệ thống vận hành không rò rỉ phòng / bộ nhớ / lưu trữ, nhưng chưa đo được thực tế trường hợp chặn đường bị từ chối khi vượt trần 20 phòng (nhánh này đã được bảo vệ độc lập bởi bộ unit test).
+

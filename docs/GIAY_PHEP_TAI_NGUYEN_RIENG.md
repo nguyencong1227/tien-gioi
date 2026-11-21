@@ -3,15 +3,17 @@
 > Mục 63: gói miễn phí nhưng cấm phân phối lại chỉ được dùng khi **giấy phép từng gói đã được kiểm trên trang chính thức** và ghi ở đây (gói, link, điều khoản trích, ngày kiểm); gói nào **cấm thương mại hoặc điều khoản không rõ thì KHÔNG dùng**. Thiết kế cơ chế: `docs/THIET_KE_GOI_TAI_NGUYEN_RIENG.md`; quy tắc Asset nguồn 4 ở `AGENTS.md`.
 >
 > **Ngày kiểm: 22/11/2026.** Người đọc trang: Dev A (qua tác tử đọc trang công khai, KHÔNG tải gói, KHÔNG đăng nhập; Dev G, người được giao, không hoạt động từ 17/11). Các trích dẫn bên dưới do tác tử đọc và A chép lại, **CHƯA có người kiểm lại bằng mắt trên trang**: người dùng (hoặc dev nào rảnh) mở link và đối chiếu từng câu trích TRƯỚC KHI tải gói. Đây là bản đọc điều khoản chứ không phải tư vấn pháp lý; trang itch.io có thể đổi nên kiểm lại ngày kiểm khi tải.
+>
+> **Kiểm chéo (B, 22/11/2026 ~02:40, đọc độc lập cả bốn trang itch.io, chỉ đọc): 15/15 trích dẫn KHỚP với trang.** Vẫn là máy đọc, chưa phải mắt người dùng: người dùng đối chiếu link trước khi tải gói là bước còn lại.
 
 ## Tóm tắt và khuyến nghị
 
-| Gói | Thương mại | Ghi công | Cấm phân phối lại | Sửa / ghép | Khuyến nghị |
-|---|---|---|---|---|---|
-| A. Cainos Pixel Art Top Down - Basic | Có | Không bắt buộc | Có (`redistribute` / `resell`) | Có | **Dùng được** |
-| B. Pixel Frog Tiny Swords | Có | Không bắt buộc | Có, KÈM `repackage` ('even if the files are modified') | Có | **Dùng được CÓ ĐIỀU KIỆN** (xem rủi ro 1) |
-| C. Kenmi Cute Fantasy RPG, bản FREE | **KHÔNG (chỉ phi thương mại)** | **Bắt buộc** | Có | Có | **KHÔNG DÙNG** (cấm thương mại: quy tắc mục 63). Bản Premium (trả tiền) cho thương mại: người dùng tự mua nếu muốn |
-| D. Daniel Diggle Sunnyside World, bản Free | Có | Không bắt buộc | Có (cấm `repackage and resell`; cho phân phối trong hướng dẫn kèm link) | Có | **Dùng được** (lưu ý cấm huấn luyện AI) |
+| Gói | Thương mại | Ghi công | Cấm phân phối lại | Sửa / ghép | Khuyến nghị | Ô gốc (theo trang) |
+|---|---|---|---|---|---|---|
+| A. Cainos Pixel Art Top Down - Basic | Có | Không bắt buộc | Có (`redistribute` / `resell`) | Có | **Dùng được** | 32 px |
+| B. Pixel Frog Tiny Swords | Có | Không bắt buộc | Có, KÈM `repackage` ('even if the files are modified') | Có | **Dùng được CÓ ĐIỀU KIỆN** (xem rủi ro 1) | 64 px |
+| C. Kenmi Cute Fantasy RPG, bản FREE | **KHÔNG (chỉ phi thương mại)** | **Bắt buộc** | Có | Có | **KHÔNG DÙNG** (cấm thương mại: quy tắc mục 63). Bản Premium (trả tiền) cho thương mại: người dùng tự mua nếu muốn | 16 px |
+| D. Daniel Diggle Sunnyside World, bản Free | Có | Không bắt buộc | Có (cấm `repackage and resell`; cho phân phối trong hướng dẫn kèm link) | Có | **Dùng được** (lưu ý cấm huấn luyện AI) | 16 px |
 
 ## Chi tiết từng gói
 
@@ -52,7 +54,7 @@
 2. **'Thương mại' của Tiên Giới:** chưa có doanh thu hay quảng cáo (A chưa thấy), nhưng gói C bản Free cấm cả dự án có thu tiền gián tiếp. Theo quy tắc mục 63 ('gói cấm thương mại thì KHÔNG dùng') gói C bản Free bị loại; nếu người dùng chắc Tiên Giới LUÔN phi thương mại và chấp nhận ghi công bắt buộc thì có thể đảo lại, nhưng đó là quyết định của người dùng, không phải của agent.
 3. **Ghi công:** không gói nào bắt buộc (A, B, D); vẫn nên ghi (màn Ghi công hiện `title` + `url` + `license` của mỗi gói đang dùng: `PrivatePack.url` / `license`). Gói C Free bắt buộc ghi 'Kenmi'.
 4. **Bản quyền tệp:** tệp gốc VÀ tệp đã chỉnh / ghép KHÔNG vào git (AGENTS.md nguồn 4); lưu ở `/mnt/data/assets-private/` kèm `SOURCES.md` (tên, link, giấy phép trích, ngày tải, SHA-256 zip).
-5. **Tải về:** do người dùng tự tải trên itch.io ('Name your own price'), agent KHÔNG tự tải. Tải xong ghi `SOURCES.md` rồi đóng gói bằng `npm run assets-private:manifest -w server -- <dist> --title id=Tên --url id=https://... --license id="..."`.
+5. **Tải về:** do người dùng tự tải trên itch.io ('Name your own price'), agent KHÔNG tự tải. Tải xong ghi `SOURCES.md` rồi đóng gói bằng `npm run assets-private:manifest -w server -- <dist> --title id=Tên --url id=https://... --license id="..."`. Công cụ in `BỎ QUA <tệp>: <lý do>` cho tệp tên sai luật (gói itch.io hay có khoảng trắng: 'Tile Set.png' sẽ KHÔNG được phục vụ: đổi tên chỉ gồm chữ / số / . _ - rồi chạy lại); thêm `--strict` để thoát 1 và KHÔNG ghi manifest khi có tệp bị bỏ qua; đóng gói lại thì KHỞI ĐỘNG LẠI máy chủ (manifest và `Content-Length` nạp một lần).
 
 ## Việc còn lại
 - Người dùng chọn gói (khuyến nghị bắt đầu với A hoặc D: giấy phép rõ nhất) và mở link đối chiếu trích dẫn.
