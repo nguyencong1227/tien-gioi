@@ -2,6 +2,8 @@
 // Đánh giá: rò rỉ bộ nhớ (VmRSS, dốc hồi quy tuyến tính OLS), số đo vận hành thật từ /metrics (tick p95 phòng tệ nhất,
 // hàng đợi ghi, độ trễ vòng lặp), băng thông WebSocket mỗi client, log server và toàn vẹn dữ liệu.
 
+import { MAX_AMBUSH_ROOMS } from "@tien-gioi/shared";
+
 export type ServerLogCategory = "error" | "monitorAlert" | "startupWarning" | "info";
 
 /**
@@ -79,6 +81,8 @@ export interface SoakSample {
   sampleErrors: number;
   /** Cờ báo gọi /metrics thất bại hoặc không trả về HTTP 200 */
   metricsFetchFailed?: boolean;
+  /** Số phòng đấu trường chặn đường đang mở (lấy từ /metrics) */
+  activeArenaRooms?: number;
 }
 
 export interface SoakThresholds {
@@ -102,6 +106,8 @@ export interface SoakThresholds {
   maxWritesOldestAgeMs?: number;
   /** Độ trễ vòng lặp p99 tối đa (ms). Mặc định 100 ms */
   maxLoopLagP99Ms?: number;
+  /** Số phòng đấu trường chặn đường tối đa đồng thời. Mặc định MAX_AMBUSH_ROOMS (20) */
+  maxArenaRooms?: number;
 }
 
 export interface LinearRegressionResult {
@@ -180,6 +186,31 @@ export interface ExtraSoakContext {
   m7?: M7SoakContext;
   /** Chỉ có khi soak chạy với `--boss` (bộ chiêu trùm nhiều chiêu BOSS_MOVES=on) */
   boss?: BossSoakContext;
+  /** Chỉ có khi soak chạy với `--ambush` (chặn đường AMBUSH=on + AMBUSH_BOTS=on) */
+  ambush?: AmbushSoakContext;
+}
+
+/** Số đo thử tải chặn đường của một lượt soak bật `--ambush` (CD10, #1070, #1276) */
+export interface AmbushSoakContext {
+  offersTotal: number;
+  fightTotal: number;
+  fleeCoinTotal: number;
+  fleeExpTotal: number;
+  midFleeTotal: number;
+  wonTotal: number;
+  lostTotal: number;
+  fledTotal: number;
+  timeoutTotal: number;
+  droppedTotal: number;
+  canceledTotal: number;
+  maxActiveArenaRooms: number;
+  finalActiveArenaRooms: number;
+}
+
+/** Kết quả phần thử tải chặn đường trong báo cáo (chỉ có khi soak chạy với `--ambush`) */
+export interface AmbushSoakResult extends AmbushSoakContext {
+  passed: boolean;
+  reasons: string[];
 }
 
 /** Số đo bộ chiêu trùm của một lượt soak bật `--boss` */
@@ -245,6 +276,7 @@ export interface SoakAnalysisResult {
   currencyConservationPassed?: boolean;
   m7?: M7SoakResult;
   boss?: BossSoakResult;
+  ambush?: AmbushSoakResult;
   thresholds: Required<SoakThresholds>;
 }
 
@@ -272,6 +304,7 @@ export function analyzeSoak(
     maxDropRatio: customThresholds.maxDropRatio ?? 0.05,
     maxWritesOldestAgeMs: customThresholds.maxWritesOldestAgeMs ?? 30000,
     maxLoopLagP99Ms: customThresholds.maxLoopLagP99Ms ?? 100,
+    maxArenaRooms: customThresholds.maxArenaRooms ?? MAX_AMBUSH_ROOMS,
   };
 
   if (samples.length === 0) {
@@ -509,6 +542,35 @@ export function analyzeSoak(
     }
   }
 
+  // 15. Chặn đường (chỉ khi bật --ambush / AMBUSH=on)
+  let ambush: AmbushSoakResult | undefined;
+  if (extra.ambush) {
+    const a = extra.ambush;
+    const ambushReasons: string[] = [];
+    const maxAllowed = thresholds.maxArenaRooms ?? MAX_AMBUSH_ROOMS;
+    if (a.maxActiveArenaRooms > maxAllowed) {
+      ambushReasons.push(
+        `Số phòng đấu trường chặn đường vượt trần: ${a.maxActiveArenaRooms} > ${maxAllowed}`,
+      );
+    }
+    if (a.finalActiveArenaRooms > 0) {
+      ambushReasons.push(
+        `Rò rỉ phòng đấu trường chặn đường sau khi dừng: còn ${a.finalActiveArenaRooms} phòng (yêu cầu về 0)`,
+      );
+    }
+    if (a.offersTotal <= 0) {
+      ambushReasons.push("Chế độ --ambush: không có lượt gặp chặn đường nào (offersTotal = 0)");
+    }
+    ambush = {
+      ...a,
+      passed: ambushReasons.length === 0,
+      reasons: ambushReasons,
+    };
+    if (ambushReasons.length > 0) {
+      reasons.push(...ambushReasons);
+    }
+  }
+
   return {
     pass: reasons.length === 0,
     reasons,
@@ -544,6 +606,7 @@ export function analyzeSoak(
     currencyConservationPassed: extra.currencyConservationPassed,
     m7,
     boss,
+    ambush,
     thresholds,
   };
 }
@@ -635,6 +698,19 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
       `  - Tổng lượt thi triển:   ${b.totalAbilityCasts} (máy chủ xác nhận qua fx bossCast)`,
       `  - Chiêu bắt buộc:        ${b.requiredAbilities.length - b.missingRequired.length}/${b.requiredAbilities.length} có lượt thi triển`,
       `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
+    );
+  }
+
+  if (res.ambush) {
+    const a = res.ambush;
+    lines.push(
+      "--------------------------------------------------------------------------------",
+      "CHẶN ĐƯỜNG (AMBUSH=on):",
+      `  - Số lần bị chặn:       ${a.offersTotal} lần`,
+      `  - Lựa chọn hộp thoại:   Chiến: ${a.fightTotal} | Bỏ chạy: ${a.fleeCoinTotal + a.fleeExpTotal} (Linh thạch: ${a.fleeCoinTotal}, Tu vi: ${a.fleeExpTotal})`,
+      `  - Thoát giữa trận:      ${a.midFleeTotal} lần`,
+      `  - Kết quả đấu trường:   Thắng: ${a.wonTotal} | Thua: ${a.lostTotal} | Chạy thoát: ${a.fledTotal} | Hết giờ: ${a.timeoutTotal} | Rớt: ${a.droppedTotal} | Huỷ: ${a.canceledTotal}`,
+      `  - Phòng đấu trường:     Tối đa đồng thời: ${a.maxActiveArenaRooms}/${res.thresholds.maxArenaRooms ?? MAX_AMBUSH_ROOMS} | Cuối cùng: ${a.finalActiveArenaRooms} (yêu cầu: 0)`,
     );
   }
   lines.push("================================================================================");

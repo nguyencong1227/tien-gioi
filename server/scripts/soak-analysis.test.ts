@@ -411,6 +411,116 @@ describe("analyzeSoak", () => {
     });
   });
 
+  describe("Chế độ thử tải Chặn đường (--ambush, CD10 #1070, #1276)", () => {
+    const samples = generateSamples(60, 10, () => 90);
+
+    it("vắng extra.ambush thì không có kết quả ambush và bảng không in khối CHẶN ĐƯỜNG", () => {
+      const res = analyzeSoak(samples, {}, {});
+      expect(res.ambush).toBeUndefined();
+      expect(formatSoakTable(res)).not.toContain("CHẶN ĐƯỜNG");
+    });
+
+    it("ĐẠT khi bot gặp chặn đường, phòng đấu trường không vượt MAX_AMBUSH_ROOMS và về 0 sau khi dừng", () => {
+      const ambushCtx = {
+        offersTotal: 45,
+        fightTotal: 25,
+        fleeCoinTotal: 10,
+        fleeExpTotal: 10,
+        midFleeTotal: 3,
+        wonTotal: 18,
+        lostTotal: 4,
+        fledTotal: 3,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 8,
+        finalActiveArenaRooms: 0,
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(true);
+      expect(res.ambush?.passed).toBe(true);
+      expect(res.ambush?.offersTotal).toBe(45);
+      expect(res.ambush?.maxActiveArenaRooms).toBe(8);
+      expect(res.ambush?.finalActiveArenaRooms).toBe(0);
+
+      const table = formatSoakTable(res);
+      expect(table).toContain("CHẶN ĐƯỜNG (AMBUSH=on):");
+      expect(table).toContain("Số lần bị chặn:       45 lần");
+      expect(table).toContain("Chiến: 25 | Bỏ chạy: 20 (Linh thạch: 10, Tu vi: 10)");
+      expect(table).toContain("Thoát giữa trận:      3 lần");
+      expect(table).toContain("Thắng: 18 | Thua: 4 | Chạy thoát: 3 | Hết giờ: 0");
+      expect(table).toContain("Tối đa đồng thời: 8/20 | Cuối cùng: 0 (yêu cầu: 0)");
+    });
+
+    it("KHÔNG ĐẠT khi rò rỉ phòng đấu trường sau khi dừng (finalActiveArenaRooms > 0)", () => {
+      const ambushCtx = {
+        offersTotal: 45,
+        fightTotal: 25,
+        fleeCoinTotal: 10,
+        fleeExpTotal: 10,
+        midFleeTotal: 0,
+        wonTotal: 15,
+        lostTotal: 5,
+        fledTotal: 2,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 6,
+        finalActiveArenaRooms: 2, // rò 2 phòng
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(false);
+      expect(res.ambush?.passed).toBe(false);
+      expect(
+        res.reasons.some((r) => r.includes("Rò rỉ phòng đấu trường") && r.includes("còn 2")),
+      ).toBe(true);
+    });
+
+    it("KHÔNG ĐẠT khi số phòng đấu trường vượt trần MAX_AMBUSH_ROOMS (maxActiveArenaRooms > 20)", () => {
+      const ambushCtx = {
+        offersTotal: 100,
+        fightTotal: 60,
+        fleeCoinTotal: 20,
+        fleeExpTotal: 20,
+        midFleeTotal: 0,
+        wonTotal: 40,
+        lostTotal: 10,
+        fledTotal: 10,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 22, // vượt 20
+        finalActiveArenaRooms: 0,
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(false);
+      expect(res.ambush?.passed).toBe(false);
+      expect(res.reasons.some((r) => r.includes("vượt trần: 22 > 20"))).toBe(true);
+    });
+
+    it("KHÔNG ĐẠT khi bật --ambush nhưng không có lượt chặn nào (offersTotal = 0)", () => {
+      const ambushCtx = {
+        offersTotal: 0,
+        fightTotal: 0,
+        fleeCoinTotal: 0,
+        fleeExpTotal: 0,
+        midFleeTotal: 0,
+        wonTotal: 0,
+        lostTotal: 0,
+        fledTotal: 0,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 0,
+        finalActiveArenaRooms: 0,
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(false);
+      expect(res.ambush?.passed).toBe(false);
+      expect(res.reasons.some((r) => r.includes("offersTotal = 0"))).toBe(true);
+    });
+  });
+
   it("formatSoakTable hiển thị đầy đủ các trường và số đo từ /metrics", () => {
     const samples = generateSamples(60, 10, () => 90);
     const res = analyzeSoak(samples, {}, { serverLogErrors: 0, monitorAlerts: 0 });
