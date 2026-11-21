@@ -95,10 +95,10 @@
    - **Thực nghiệm nâng cấp v0.5.2 -> main (Mục 2, Refs #1290, comment 7070961872):** Đã kiểm chứng độc lập trên dữ liệu thật sinh từ `v0.5.2` (30 bot, 30 chân linh, 2 tông môn) nạp trên `main`: 30/30 bot đăng nhập thành công, nạp và ghi lưu an toàn, `kiem-save` 100% sạch (30 nhân vật, 30 chân linh, 2 tông môn), 0 tệp `*.hong-*`, bảo toàn ví (10.971 = 10.971)/tu vi/túi/trang bị/chiêu thức.
    - **Thực nghiệm lùi bản main -> v0.5.2 (Mục 2b, Refs #1290, comment 7071033214):** Khởi động máy chủ `v0.5.2` trên BẢN SAO dữ liệu đã được `main` ghi lại: 30/30 bot đăng nhập thành công vào `v0.5.2`, ghi lưu an toàn; công cụ `audit-saves.ts` của `v0.5.2` đạt 30/30 nhân vật sạch, 30/30 chân linh sạch, 2/2 tông môn sạch, 0 tệp `*.hong-*`; snapshot trước và sau khi lùi bản khớp 100%.
    - **Cơ sở cấu trúc:** Do khuôn tệp lưu trữ không thêm trường mới nào từ `v0.5.2` (`git diff` rỗng ở `store.ts`, `soul.ts`, `sect-store.ts`, `account-store.ts`, `pg/`), việc lùi bản từ `main` về `v0.5.2` không làm bản cũ ghi đè hay làm mất các trường dữ liệu cốt lõi.
-   - **Công cụ tự động hoá:** Quy trình kiểm tra nâng cấp và lùi bản đã được tích hợp thành công cụ `npm run kiem-nang-cap -w server` (`server/scripts/kiem-nang-cap.ts`), tự động thực thi trên thư mục và cổng cách ly.
+   - **Tự động hoá:** Quy trình kiểm tra nâng cấp và lùi bản đã được thực nghiệm thành công hai chiều trên môi trường và cổng cách ly (ghi nhận tại comment 7070961872 và 7071033214 trên issue #1290); việc đóng gói thành script kiểm thử tự động độc lập sẽ được đưa vào PR riêng.
 
 4. **6 Giới hạn cần nhớ khi đọc số đo thực nghiệm:**
-   1. *Hiệu lực commit:* Kết quả thực nghiệm chỉ có hiệu lực với đúng đầu commit `b007b456`; khi nhánh `main` có commit mới phải chạy lại bằng `npm run kiem-nang-cap -w server`.
+   1. *Hiệu lực commit:* Kết quả thực nghiệm chỉ có hiệu lực với đúng đầu commit `b007b456`; khi nhánh `main` có commit mới phải thực hiện lại quy trình kiểm tra nâng cấp.
    2. *Chân linh & Tông môn:* Thư mục `souls/` và `sects/` có thời gian sửa đổi (mtime) giữ nguyên mốc sao chép vì kịch bản đăng nhập ngắn chỉ đọc mà không ghi lại chúng (chưa có luân hồi hay giao dịch kho trong kịch bản).
    3. *Origin Guard:* Thử nghiệm chạy với `ORIGIN_CHECK=off` nên lớp chặn Origin chưa được thử dưới tải đăng nhập thực tế.
    4. *Backend lưu trữ:* Thử nghiệm thực hiện trên kho tệp JSON (`STORE=file`), không phải PostgreSQL (`STORE=pg`), mặc dù mã migration PG không đổi từ `v0.5.2`.
@@ -120,4 +120,4 @@ Trích dẫn nguyên văn quy tắc đánh số phiên bản tại `docs/TRIEN_K
 2. **Phương án B: `v0.6.0` (Phán đoán theo quy mô kỹ thuật & tính năng)**
    - *Lập luận:* Sau `v0.5.2` đã tích luỹ tới 346 commits. Hệ thống có bước chuyển đổi kiến trúc lớn (chuyển 4 bản đồ sang Tiled đọc từ tệp tĩnh, tích hợp lớp bảo vệ Origin Guard chống dùng ké, bổ sung hạ tầng gói tài nguyên riêng, tích hợp lịch thật trùm thế giới). Đánh số `v0.6.0` giúp đánh dấu rõ ràng mốc hoàn thành đợt nâng cấp Tiled và an toàn hệ thống.
 
-**Kết luận:** Đề xuất Người Dùng và Dev A cân nhắc lựa chọn giữa sự tuân thủ chặt chẽ định nghĩa 10.1 (`v0.5.3`) hoặc phản ánh quy mô cột mốc phát triển (`v0.6.0`).
+**Kết luận:** Đề xuất Người Dùng cân nhắc lựa chọn giữa sự tuân thủ chặt chẽ định nghĩa 10.1 (`v0.5.3`) hoặc phản ánh quy mô cột mốc phát triển (`v0.6.0`).
