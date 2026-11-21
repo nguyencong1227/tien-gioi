@@ -751,6 +751,9 @@ export class WorldRoom extends Room<WorldState> {
     // Phòng bí cảnh: luôn xuất hiện ở cổng vào (toạ độ trong file là của Lạc Hà, vô nghĩa ở đây)
     const inRun = this.world.runId !== null || this.world.arena !== null;
     const spot = inRun ? safeSpot(this.world.map) : safeSpot(this.world.map, save.x, save.y);
+    // Vị trí đã lưu không dùng được (bản đồ đổi, hồ sơ rơi vào tường): ghi nhật ký kiểm toán (không có dữ liệu cá nhân: chỉ bản đồ, khoảng dời, về đâu)
+    if (spot.moved)
+      audit("map.relocate", { map: this.mapId, dist: spot.moved.dist, to: spot.moved.to });
     p.x = spot.x;
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
