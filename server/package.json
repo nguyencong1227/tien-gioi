@@ -53,7 +53,8 @@
     "khoi-phuc-thu": "tsx scripts/verify-restore.ts",
     "soak": "tsx scripts/soak.ts",
     "thong-ke-tien-do": "tsx scripts/thong-ke-tien-do.ts",
-    "do-test-chap-chon": "tsx scripts/do-test-chap-chon.ts"
+    "do-test-chap-chon": "tsx scripts/do-test-chap-chon.ts",
+    "ai-playtest": "tsx scripts/ai-playtest/play.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",
