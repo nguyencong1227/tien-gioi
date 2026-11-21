@@ -10,7 +10,7 @@ import {
   type TiledMap,
   type TiledTileset,
 } from "@tien-gioi/shared";
-import { reachabilityViolations } from "./map-checks";
+import { reachabilityViolations, spawnZoneViolations } from "./map-checks";
 
 export const FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
 export const FLIPPED_VERTICALLY_FLAG = 0x40000000;
@@ -194,6 +194,10 @@ export function checkTiledMapComplete(
       const gameMap = new GameMap(mapDef);
       const reachErrs = reachabilityViolations(gameMap);
       errs.push(...reachErrs);
+      if (gameMap.spawnZones.length > 0) {
+        const zoneErrs = spawnZoneViolations(gameMap);
+        errs.push(...zoneErrs);
+      }
     } catch (e) {
       errs.push(`${label}: lỗi khi dựng GameMap để kiểm tra liên thông: ${(e as Error).message}`);
     }

@@ -184,5 +184,27 @@ describe("map-visual-checks", () => {
         result.errors.some((e) => e.includes("ô (15, 20) có gid 9999 không thuộc tileset")),
       ).toBe(true);
     });
+
+    it("test: spawnZone không hợp lệ (loài lạ) bị bắt bởi checkTiledMapComplete", () => {
+      const rawText = readFileSync(path.join(mapsDir, "lac_ha.logic.json"), "utf8");
+      const mapObj: TiledMap = JSON.parse(rawText);
+      const objLayer = mapObj.layers.find((l) => l.name === "objects") as any;
+      objLayer.objects.push({
+        id: 99,
+        name: "bad_zone",
+        class: "spawnZone",
+        x: 320,
+        y: 320,
+        width: 64,
+        height: 64,
+        properties: [{ name: "monster", value: "loai_khong_ton_tai" }],
+      });
+      const result = checkTiledMapComplete(mapObj, { label: "lac_ha_spawn" });
+      expect(
+        result.errors.some(
+          (e) => e.includes("loại quái không tồn tại") || e.includes("loai_khong_ton_tai"),
+        ),
+      ).toBe(true);
+    });
   });
 });
