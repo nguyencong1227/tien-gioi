@@ -12,6 +12,9 @@ import {
   type TiledTileset,
 } from "@tien-gioi/shared";
 import { neighborMaskClamped, resolveAutotile, toTileGid } from "@tien-gioi/shared/src/autotile";
+import { resolveTreeCanopies, type TreeCanopyMode } from "./map-art-rules";
+
+export * from "./map-art-rules";
 
 /** GID cơ sở cho tileset nhúng 'world' */
 export const TILES_WORLD_FIRSTGID = 10;
@@ -64,6 +67,11 @@ export interface BuiltVisualLayers {
   tileset: TiledTileset;
 }
 
+export interface BuildVisualOptions {
+  /** Chế độ xếp tán cây (mặc định 'legacy' tương thích hoàn toàn bản Tiled S4) */
+  treeCanopyMode?: TreeCanopyMode;
+}
+
 /**
  * Sinh 3 lớp hình (ground, decor, over) từ ma trận ô logic theo luật autotile Wang blob 47 ô.
  * Hàm thuần tất định: cùng input luôn cho cùng output.
@@ -72,11 +80,14 @@ export function buildVisualLayersFromLogic(
   tiles: Uint8Array,
   width: number,
   height: number,
+  options: BuildVisualOptions = {},
 ): BuiltVisualLayers {
   const size = width * height;
   const groundData = new Array<number>(size).fill(GID_GRASS);
   const decorData = new Array<number>(size).fill(0); // 0 = trong suốt
   const overData = new Array<number>(size).fill(0); // 0 = trong suốt
+  const canopyMode = options.treeCanopyMode ?? "legacy";
+  const canopyMask = resolveTreeCanopies(tiles, width, height, canopyMode);
 
   // Helper lấy ô logic có kẹp mép
   const tileAt = (x: number, y: number): number => {
@@ -157,8 +168,8 @@ export function buildVisualLayersFromLogic(
       }
 
       // 3. LỚP PHỦ TRÊN ĐẦU (over)
-      // Tán cây phủ trên đầu nhân vật: nếu ô bên dưới (x, y + 1) là Tree, ô (x, y) nhận tán cây
-      if (y + 1 < height && tiles[(y + 1) * width + x] === T.Tree) {
+      // Tán cây phủ trên đầu nhân vật sinh từ hàm quy hoạch resolveTreeCanopies duy nhất
+      if (canopyMask[idx] === 1) {
         overData[idx] = GID_TREE_CANOPY;
       }
     }
