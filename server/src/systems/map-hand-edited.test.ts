@@ -1,4 +1,4 @@
-// Cờ bản đồ sửa tay (S6): `isHandEditedTiled`, và hiện CHƯA bản đồ thật nào sửa tay (nên `map:bake --check` và test "giống seed" vẫn chạy cho cả bốn).
+// Cờ bản đồ sửa tay (S6): `isHandEditedTiled`, và cờ phải NHẤT QUÁN giữa tệp soạn và bản chạy logic của từng bản đồ thật (đúng ở mọi trạng thái, kể cả khi đã có bản đồ sửa tay).
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
