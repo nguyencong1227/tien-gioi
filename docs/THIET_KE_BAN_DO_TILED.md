@@ -40,12 +40,13 @@ Tiled JSON (`.tmj` xuất JSON; lưu `.json`), `orientation: "orthogonal"`, `inf
 **Lớp ô (tilelayer)**
 | Tên lớp | Dùng cho | Ai đọc |
 |---|---|---|
-| `logic` | loại ô `T` (mỗi ô một số 0-7, bằng giá trị enum `T`; tileset logic `logic.tsx` có đúng 8 ô để sửa tay bằng Tiled thấy màu) | server + client (va chạm, dự đoán, bản đồ nhỏ) |
+| `logic` | loại ô `T`: mỗi ô là `firstgid + T` của tileset tên `logic` (8 ô theo thứ tự enum `T`, để sửa tay bằng Tiled thấy màu; Tiled dùng 0 cho ô TRỐNG nên `firstgid` >= 1 và 0 / cờ lật không hợp lệ) | server + client (va chạm, dự đoán, bản đồ nhỏ) |
 | `ground`, `decor`, `over` | hình: nền (đã bo góc), trang trí, phủ trên đầu nhân vật | CHỈ client |
 
 **Lớp đối tượng (objectgroup)** `objects`; mỗi đối tượng có `type` + thuộc tính:
-- `town` (hình tròn / điểm + `r` ô): khu an toàn (`MapDef.town`).
-- `portal`: `id`, `name`, `toMap`, `toPortal`, `r`, `safeR`, `spawnX`, `spawnY` (px thế giới; `x`, `y` của đối tượng là tâm cổng).
+- **Mọi** đối tượng `town` / `lair` / `portal` PHẢI là đối tượng ĐIỂM (`point: true`): Tiled ghi `x, y` của elip / chữ nhật là GÓC TRÊN TRÁI của khung nên coi là tâm sẽ đặt lệch im lặng; `tiledViolations` từ chối elip / chữ nhật (hình elip / chữ nhật chỉ dành cho `spawnZone` ở S5).
+- `town` (điểm đặt trong ô tâm + thuộc tính `r` tính bằng Ô): khu an toàn (`MapDef.town`). `lair` cùng quy ước.
+- `portal` (đối tượng ĐIỂM đặt ở tâm cổng): `id`, `name`, `toMap`, `toPortal`, `r`, `safeR`, `spawnX`, `spawnY`. MỌI toạ độ / bán kính của đối tượng tính bằng px CỦA TỆP (`tilewidth`); `parseTiledMap` nhân `TILE / tilewidth` ra px thế giới, nên tệp tự nhất quán khi mở bằng Tiled.
 - `lair` (bí cảnh / hang cố định, nếu có).
 - (lát cắt 5, tuỳ chọn) `spawnZone`: `monster` (id), `max`, hình chữ nhật / elip: nơi quái / trùm sinh thay cho cách sinh ngầm theo `dangerAt`.
 
@@ -65,8 +66,8 @@ Chạy trong test (mọi tệp `shared/maps/*.json`) và `npm run check:content`
 
 | # | Việc | Ai | Hành vi đổi? |
 |---|---|---|---|
-| S1 | `shared/src/tiled.ts`: kiểu `TiledMap`, `parseTiledMap(json)` -> dữ liệu dựng `GameMap`, `tiledViolations`; `MapDef.tiled?` (tuỳ chọn); `GameMap` dựng từ tệp khi có `tiled`, từ `generate(def)` khi không. Test với mẫu nhỏ + đột biến mỗi luật mục 5. | A | Không (không bản đồ nào dùng) |
-| S2 | CÔNG CỤ `npm run map:bake`: xuất bốn bản đồ hiện có (sinh theo `seed`) ra `shared/maps/*.json` (lớp `logic` = `tiles` hiện tại; `ground` = chép từ `logic` qua bảng ô -> hình tạm; đối tượng cổng / trấn / hang). Chuyển `MAPS` sang đọc tệp. Test SO TỪNG BYTE: `GameMap` từ tệp == `GameMap` sinh theo `seed` (`tiles`, `portals`, `townPx`, `lairPx`, `dangerAt` mẫu, `monsterCap`) cho cả 4 bản đồ. `generate` còn lại cho `dungeon` / `arena` và làm "đồng hồ chuẩn" của test. | A (công cụ có thể nhờ C) | KHÔNG: byte giống hệt |
+| S1 | `shared/src/tiled.ts`: kiểu `TiledMap`, `tiledViolations` (cấu trúc, lớp logic, đối tượng: mục 5.1, 5.2 phần khai báo, 5.3 phần khai báo, 5.6 phần khai báo), `parseTiledMap(json, tile)`, `mapDefFromTiled`; `MapDef.tiles?` (ô dựng sẵn) để `GameMap` dựng từ tệp mà KHÔNG import ngược (tránh vòng import) và vẫn chạy mọi kiểm cũ (`checkPortals`, `checkLair`, `checkMonsterCap`). Test với mẫu nhỏ + đột biến mỗi luật + BỐN bản đồ thật đi vòng qua tệp (bản thu nhỏ của S2). | A | Không (không bản đồ nào dùng) |
+| S2 | CÔNG CỤ `npm run map:bake` (thêm kiểm LIÊN THÔNG mục 5.4 + cổng hai chiều giữa các bản đồ mục 5.2 trên dữ liệu thật; bản đồ nào không qua thì BÁO cho A, không tự sửa bản đồ): xuất bốn bản đồ hiện có (sinh theo `seed`) ra `shared/maps/*.json` (lớp `logic` = `tiles` hiện tại; `ground` = chép từ `logic` qua bảng ô -> hình tạm; đối tượng cổng / trấn / hang). Chuyển `MAPS` sang đọc tệp. Test SO TỪNG BYTE: `GameMap` từ tệp == `GameMap` sinh theo `seed` (`tiles`, `portals`, `townPx`, `lairPx`, `dangerAt` mẫu, `monsterCap`) cho cả 4 bản đồ. `generate` còn lại cho `dungeon` / `arena` và làm "đồng hồ chuẩn" của test. | A (công cụ có thể nhờ C) | KHÔNG: byte giống hệt |
 | S3 | Client vẽ từ lớp hình của JSON (`tilemapTiledJSON`, nạp THEO BẢN ĐỒ bằng `import.meta.glob` lazy để giữ `startupGzipKb`), khi tệp có lớp hình; chưa có thì giữ cách vẽ cũ. Cờ đồ hoạ để quay lại. | B (sau #1196 hướng đồ hoạ + S2) | Chỉ hình |
 | S4 | CÔNG CỤ `map:build` (sinh lớp hình bo góc từ lớp `logic` bằng terrain set / Wang blob 47 ô định nghĩa trong tileset), `map:check` (chạy `tiledViolations`), `map:show` (ASCII + PNG xem trước để AI / người nhìn). Agent chỉ sửa lớp `logic` + `objects` rồi chạy `map:build`. | C (công cụ), A review | Chỉ hình |
 | S5 | `spawnZone`: server dùng vùng sinh dữ liệu khi có (`monsters.ts`, `world-boss.ts`), quay về cách cũ khi bản đồ không khai; kiểm mục 5.4-5.5. | A | Có (từng bản đồ một, mục 7) |

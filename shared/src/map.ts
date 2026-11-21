@@ -197,6 +197,11 @@ export interface MapDef {
    * Bỏ trống thì dùng `MONSTER_CAP` (như Lạc Hà Trấn từ trước tới giờ).
    */
   readonly monsterCap?: Readonly<Record<string, number>>;
+  /**
+   * Ô DỰNG SẴN (loại ô `T`, đúng `w * h`, hàng trước cột sau) từ tệp Tiled (`mapDefFromTiled`, docs/THIET_KE_BAN_DO_TILED.md). Có thì `GameMap` dùng đúng các ô này
+   * (đã gồm trấn, đường, hang: tệp là nguồn duy nhất) và KHÔNG sinh theo `seed`; không có thì sinh theo `seed` như trước.
+   */
+  readonly tiles?: Uint8Array;
 }
 
 /**
@@ -237,7 +242,16 @@ export class GameMap {
     ] as const)
       if (!Number.isInteger(v))
         throw new Error(`MapDef ${def.id}: ${field} phải là số nguyên (${v})`);
-    this.tiles = generate(def);
+    if (def.tiles) {
+      if (def.tiles.length !== def.w * def.h)
+        throw new Error(
+          `MapDef ${def.id}: tiles có ${def.tiles.length} ô, cần ${def.w * def.h} (w * h)`,
+        );
+      for (let i = 0; i < def.tiles.length; i++)
+        if (def.tiles[i]! > T.Sand)
+          throw new Error(`MapDef ${def.id}: tiles[${i}] = ${def.tiles[i]} không phải loại ô T`);
+      this.tiles = Uint8Array.from(def.tiles); // chép: sửa mảng nguồn sau đó không làm đổi va chạm
+    } else this.tiles = generate(def);
     this.worldW = def.w * TILE;
     this.worldH = def.h * TILE;
     this.townPx = { x: def.town.cx * TILE, y: def.town.cy * TILE, r: def.town.r * TILE };

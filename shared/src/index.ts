@@ -1,5 +1,6 @@
 export * from "./realms";
 export * from "./map";
+export * from "./tiled";
 export * from "./game";
 export * from "./items";
 export * from "./skills";
