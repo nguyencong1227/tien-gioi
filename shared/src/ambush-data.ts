@@ -184,8 +184,125 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
     source: "/content/encounters/treo_thuong/truy_na.yaml#ev.tt_truy_na_yeu_vuong",
   },
 ];
-/** Bảng kẻ chặn đường thật (G / D nhập; rỗng ở khung). */
-export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [];
+/**
+ * Bảng kẻ chặn đường THẬT (CD5b #1065 — D nhập). Nguồn: THỰC ĐƠN đo thử ở issue #1065 comment 7063756247 (A, đo ngày 21/11 bằng công cụ PR #1233: 6 trận/ô, bầy một loài,
+ * người đúng bậc `minStep` đồ tốt nhất, chỉ đánh thường + tiến sát, không né). Mỗi (bản đồ, mức) >= 1 bầy; `minStep..maxStep` HẸP. Đạt: thường >= 90%, tinh anh >= 80%, cầm đầu >= 60%
+ * (test `chan-duong.test.ts`). Số bậc là `minStep` NHỎ NHẤT đạt; từ bậc đó trở lên đều đạt. Kẻ cầm đầu chỉ `mang` (Xích Mãng) hạ nổi một mình.
+ */
+export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [
+  // === LẠC HÀ (Vân Mộng Sơn): Luyện Khí / Trúc Cơ ===
+  {
+    id: "lac_ha_normal_lang_bay",
+    name: "Bầy Hôi Lang phục kích",
+    mapId: "lac_ha",
+    minStep: 1,
+    maxStep: 2,
+    tier: "normal",
+    foes: [{ kind: "lang", count: 2 }], // thực đơn: lang x2 từ bậc 1
+  },
+  {
+    id: "lac_ha_elite_lang_tru",
+    name: "Hôi Lang đầu lĩnh tinh anh",
+    mapId: "lac_ha",
+    minStep: 8,
+    maxStep: 9,
+    tier: "elite",
+    foes: [{ kind: "lang", count: 3 }], // thực đơn: lang x3 từ bậc 8
+  },
+  {
+    id: "lac_ha_leader_xich_manh",
+    name: "Xích Mãng chặn đèo",
+    mapId: "lac_ha",
+    minStep: 11,
+    maxStep: 12,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }], // thực đơn: mang từ bậc 11 (thắng 100%, ~28 s)
+  },
+  // === HẮC PHONG (Hắc Phong Cốc): Trúc Cơ / Kim Đan ===
+  {
+    id: "hac_phong_normal_hac_ho",
+    name: "Hắc Hổ phục kích",
+    mapId: "hac_phong",
+    minStep: 7,
+    maxStep: 8,
+    tier: "normal",
+    foes: [{ kind: "ho", count: 3 }], // thực đơn: ho x3 từ bậc 7
+  },
+  {
+    id: "hac_phong_elite_hac_ho",
+    name: "Hắc Hổ tinh anh cặp đôi",
+    mapId: "hac_phong",
+    minStep: 13,
+    maxStep: 14,
+    tier: "elite",
+    foes: [{ kind: "ho", count: 2 }], // thực đơn: ho x2 từ bậc 13
+  },
+  {
+    id: "hac_phong_leader_xich_manh",
+    name: "Xích Mãng thủ ải băng",
+    mapId: "hac_phong",
+    minStep: 11,
+    maxStep: 12,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }],
+  },
+  // === ÂM SƯƠNG (Âm Sương Trạch): Kim Đan ===
+  {
+    id: "am_suong_normal_suong_ho",
+    name: "Sương Hồ phục kích",
+    mapId: "am_suong",
+    minStep: 13,
+    maxStep: 14,
+    tier: "normal",
+    foes: [{ kind: "suong_ho", count: 1 }], // thực đơn: suong_ho x1 từ bậc 13
+  },
+  {
+    id: "am_suong_elite_hac_ho",
+    name: "Hắc Hổ tinh anh Âm Sương",
+    mapId: "am_suong",
+    minStep: 13,
+    maxStep: 14,
+    tier: "elite",
+    foes: [{ kind: "ho", count: 2 }], // thực đơn: cảnh cao có tinh anh dùng loài cấp thấp (ho)
+  },
+  {
+    id: "am_suong_leader_xich_manh",
+    name: "Xích Mãng Âm Sương",
+    mapId: "am_suong",
+    minStep: 13,
+    maxStep: 14,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }],
+  },
+  // === HÀN VÂN (Hàn Vân Lĩnh): Nguyên Anh ===
+  {
+    id: "han_van_normal_han_lang",
+    name: "Hàn Lang phục kích",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 17,
+    tier: "normal",
+    foes: [{ kind: "han_lang", count: 1 }], // thực đơn: han_lang x1 từ bậc 16
+  },
+  {
+    id: "han_van_elite_thach_quy",
+    name: "Thạch Quy tinh anh Hàn Vân",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 17,
+    tier: "elite",
+    foes: [{ kind: "thach_quy", count: 1 }], // thực đơn: thach_quy x1 từ bậc 16
+  },
+  {
+    id: "han_van_leader_xich_manh",
+    name: "Xích Mãng Hàn Vân",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 17,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }],
+  },
+];
 
 const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const ID_RE = /^[a-z][a-z0-9_]{0,47}$/;
