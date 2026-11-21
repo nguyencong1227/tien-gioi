@@ -8,10 +8,12 @@ import {
   TILE,
   bakeTiledMap,
   getMap,
+  MAPS,
   mapDefFromTiled,
   type TiledMap,
 } from "@tien-gioi/shared";
 import { RELOCATE_MAX_PX, nearestFreeSpot, safeSpot } from "./movement";
+import { inMainRegion } from "./nav";
 
 const map = getMap(DEFAULT_MAP_ID)!;
 const blocked = (m: GameMap, x: number, y: number) => m.circleBlocked(x, y, PLAYER_RADIUS);
@@ -45,16 +47,56 @@ describe("nearestFreeSpot / safeSpot: vị trí lưu rơi vào ô chặn", () =>
     expect(Number.isInteger(s.x) && Number.isInteger(s.y)).toBe(true);
   });
 
-  it("GẦN NHẤT thật: không có điểm lưới 8 px nào thoáng gần hơn kết quả quá một nửa bước lấy mẫu", () => {
+  it("GẦN NHẤT thật: không có điểm lưới 8 px thoáng VÀ nối với thế giới mở nào gần hơn kết quả quá một nửa bước lấy mẫu", () => {
     const w = wallSpot();
     const s = nearestFreeSpot(map, w.x, w.y)!;
     const d = Math.hypot(s.x - w.x, s.y - w.y);
     let best = Infinity;
     for (let y = w.y - 6 * TILE; y <= w.y + 6 * TILE; y += 8)
       for (let x = w.x - 6 * TILE; x <= w.x + 6 * TILE; x += 8)
-        if (!blocked(map, x, y)) best = Math.min(best, Math.hypot(x - w.x, y - w.y));
+        if (!blocked(map, x, y) && inMainRegion(map, PLAYER_RADIUS, x, y))
+          best = Math.min(best, Math.hypot(x - w.x, y - w.y));
     expect(d).toBeLessThanOrEqual(best + TILE / 4 + 0.5); // lấy mẫu nửa ô (16 px) thô hơn lưới 8 px: sai lệch tối đa nửa bước
+    expect(inMainRegion(map, PLAYER_RADIUS, s.x, s.y)).toBe(true);
   });
+
+  it("TÚI KÍN gần hơn vùng mở: KHÔNG chọn túi (người chơi sẽ kẹt), chọn chỗ nối với thế giới", () => {
+    const g = pocketWorld();
+    // vị trí lưu ở ô đá (24, 22) sát túi kín 2 x 2 ô (22..23, 22..23); đất mở bắt đầu từ ô 30
+    const x = 24.5 * TILE;
+    const y = 22.5 * TILE;
+    expect(blocked(g, x, y)).toBe(true);
+    // túi có chỗ đứng thật (nếu không thì test này vô nghĩa)
+    expect(blocked(g, 23 * TILE, 23 * TILE)).toBe(false);
+    expect(inMainRegion(g, PLAYER_RADIUS, 23 * TILE, 23 * TILE)).toBe(false);
+    const s = safeSpot(g, x, y);
+    expect(s.moved?.to).toBe("near");
+    const inPocket = s.x > 22 * TILE && s.x < 24 * TILE && s.y > 22 * TILE && s.y < 24 * TILE;
+    expect(inPocket).toBe(false);
+    expect(inMainRegion(g, PLAYER_RADIUS, s.x, s.y)).toBe(true);
+    expect(blocked(g, s.x, s.y)).toBe(false);
+  });
+
+  it("ORACLE độc lập trên bốn bản đồ thật: MỌI vị trí lưu rơi vào ô chặn (mẫu mỗi ô thứ 7, nội thất lẫn viền) đều được đưa tới chỗ ĐI BỘ TỚI ĐƯỢC từ trấn", () => {
+    for (const def of MAPS) {
+      const m = getMap(def.id)!;
+      const reach = walkableFromTown(m);
+      let tested = 0;
+      let k = 0;
+      for (let ty = 0; ty < def.h; ty++)
+        for (let tx = 0; tx < def.w; tx++) {
+          const x = tx * TILE + TILE / 2;
+          const y = ty * TILE + TILE / 2;
+          if (!blocked(m, x, y) || k++ % 7 !== 0) continue;
+          const s = safeSpot(m, x, y);
+          tested++;
+          expect(reach(s.x, s.y), `${def.id} ô (${tx},${ty}) -> (${s.x},${s.y})`).toBe(true);
+          expect(blocked(m, s.x, s.y)).toBe(false);
+          if (s.moved?.to === "near") expect(s.moved.dist).toBeLessThanOrEqual(RELOCATE_MAX_PX);
+        }
+      expect(tested, def.id).toBeGreaterThan(100);
+    }
+  }, 60_000);
 
   it("không có chỗ trong tầm (khối đá rộng) hoặc ngoài bản đồ: về TRẤN, `moved.to = town`", () => {
     const g = rockWorld();
@@ -114,4 +156,77 @@ function rockWorld(): GameMap {
   town.properties = [{ name: "r", value: 3 }];
   json.properties = json.properties!.filter((p) => p.name !== "monsterCap");
   return new GameMap(mapDefFromTiled(json, TILE));
+}
+
+/**
+ * Bản đồ thử 64 x 64: cỏ, viền đá, một khối đá 10 x 10 ô ở (20..29, 20..29) có TÚI KÍN 2 x 2 ô ở (22..23, 22..23) hoàn toàn bao bằng đá; trấn ở (10, 10). Vùng mở (vùng chính) là phần còn lại.
+ */
+function pocketWorld(): GameMap {
+  const side = 64;
+  const t = new Uint8Array(side * side).fill(T.Grass);
+  for (let i = 0; i < side; i++) {
+    t[i] = T.Rock;
+    t[(side - 1) * side + i] = T.Rock;
+    t[i * side] = T.Rock;
+    t[i * side + side - 1] = T.Rock;
+  }
+  for (let y = 20; y < 30; y++) for (let x = 20; x < 30; x++) t[y * side + x] = T.Rock;
+  for (let y = 22; y < 24; y++) for (let x = 22; x < 24; x++) t[y * side + x] = T.Grass;
+  return new GameMap({
+    id: "thu_tui",
+    name: "Thử Túi",
+    seed: 1,
+    w: side,
+    h: side,
+    town: { cx: 10, cy: 10, r: 3 },
+    monsterCap: { tho: 1 },
+    tiles: t,
+  });
+}
+
+/**
+ * ORACLE ĐỘC LẬP với mã của `safeSpot` (không dùng `nav.ts`): loang từ tâm trấn trên lưới 8 px, hai nút kề nhau nối được khi CẢ HAI và điểm giữa đều không chạm ô chặn theo thân người chơi
+ * (`circleBlocked`). Trả hàm: điểm bất kỳ có nút lưới gần nhất (trong nửa bước) đã loang tới không.
+ */
+function walkableFromTown(m: GameMap): (x: number, y: number) => boolean {
+  const step = 8;
+  const cols = Math.floor(m.worldW / step) + 1;
+  const rows = Math.floor(m.worldH / step) + 1;
+  const free = (i: number, j: number) => !m.circleBlocked(i * step, j * step, PLAYER_RADIUS);
+  const seen = new Uint8Array(cols * rows);
+  const si = Math.round(m.townPx.x / step);
+  const sj = Math.round(m.townPx.y / step);
+  const queue: number[] = [sj * cols + si];
+  seen[sj * cols + si] = 1;
+  for (let head = 0; head < queue.length; head++) {
+    const k = queue[head]!;
+    const i = k % cols;
+    const j = (k - i) / cols;
+    for (const [di, dj] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const ni = i + di;
+      const nj = j + dj;
+      if (ni < 0 || nj < 0 || ni >= cols || nj >= rows || seen[nj * cols + ni]) continue;
+      const mx = ((i + ni) * step) / 2;
+      const my = ((j + nj) * step) / 2;
+      if (!free(ni, nj) || m.circleBlocked(mx, my, PLAYER_RADIUS)) continue;
+      seen[nj * cols + ni] = 1;
+      queue.push(nj * cols + ni);
+    }
+  }
+  return (x, y) => {
+    const i = Math.round(x / step);
+    const j = Math.round(y / step);
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (ni >= 0 && nj >= 0 && ni < cols && nj < rows && seen[nj * cols + ni]) return true;
+      }
+    return false;
+  };
 }
