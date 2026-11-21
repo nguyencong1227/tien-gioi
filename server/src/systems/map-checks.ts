@@ -41,7 +41,8 @@ function flood(
         if (ni < 0 || nj < 0 || ni >= cols || nj >= rows) continue;
         const nk = nj * cols + ni;
         if (reach[nk] || !free[nk]) continue;
-        // không cắt góc: đi chéo cần cả hai ô kề thẳng đều thông
+        // không cắt góc: đi chéo cần cả hai ô kề thẳng đều thông. PHÒNG THỦ: với thân người (nửa cạnh 12 px, bước lưới 16 px) và ô đá thẳng hàng lưới, hai nút chéo thông luôn kéo theo
+        // hai nút kề thông (A đã thử: bỏ luật này, bốn bản đồ thật và mọi ca đột biến cho cùng kết quả, nên không có test khoá được nó); giữ cho khớp luật của `nav.ts` và cho cỡ thân khác.
         if (di && dj && (!free[cj * cols + ni] || !free[nj * cols + ci])) continue;
         reach[nk] = 1;
         queue[tail++] = nk;
