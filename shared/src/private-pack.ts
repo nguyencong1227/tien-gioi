@@ -9,8 +9,11 @@
 export const PRIVATE_PACK_URL_PREFIX = "/assets-private/";
 /** URL của danh mục gói. */
 export const PRIVATE_PACK_MANIFEST_URL = `${PRIVATE_PACK_URL_PREFIX}manifest.json`;
-/** Phiên bản định dạng manifest hiện tại. */
-export const PRIVATE_PACK_MANIFEST_VERSION = 1;
+/** Số ký tự đầu của sha256 làm `?v=` (12 hex, CÙNG ĐỘ DÀI với `/packs/` của client: Service Worker nhận cache bất biến theo đúng độ dài này). */
+export const PRIVATE_PACK_VERSION_HEX = 12;
+/** Độ dài tối đa của `url` (chỉ `https:`) và `license` trong một gói (hiện ở màn Ghi công). */
+export const PRIVATE_PACK_URL_MAX_LEN = 200;
+export const PRIVATE_PACK_LICENSE_MAX_LEN = 80;
 /** Số gói tối đa trong một manifest. */
 export const PRIVATE_PACK_MAX_PACKS = 32;
 /** Tổng số tệp tối đa trong một manifest (cộng mọi gói). */
@@ -33,12 +36,16 @@ export const PRIVATE_PACK_MIME: Readonly<Record<PrivatePackExtension, string>> =
   ogg: "audio/ogg",
 };
 
+/**
+ * Tệp trong gói: CÙNG hình dạng với `PackFile` của client (`client/src/gfx/packs.ts`: `{ path, bytes, sha256 }`) để gói riêng đi qua đúng bộ nạp `ensurePack` sẵn có
+ * (idempotent, không bao giờ ném lỗi, hết giờ vẫn tải tiếp, thử lại tối đa 3 lần) thay vì dựng bộ nạp thứ hai (B, review #1259).
+ */
 export interface PrivatePackFile {
   /** Đường dẫn TƯƠNG ĐỐI trong gói, vd `atlas.png` hoặc `tiles/ground.webp` (không `..`, không `/` đầu). */
   path: string;
   /** Số byte đúng của tệp (máy chủ so với `stat` lúc khởi động). */
   bytes: number;
-  /** SHA-256 của tệp, 64 ký tự hex thường (công cụ `assets-private:check` so với đĩa; client dùng 8 ký tự đầu làm `?v=`). */
+  /** SHA-256 của tệp, 64 ký tự hex thường (công cụ `assets-private:check` so với đĩa; client dùng 12 ký tự đầu làm `?v=`). */
   sha256: string;
 }
 
@@ -47,13 +54,25 @@ export interface PrivatePack {
   id: string;
   /** Tên hiển thị ở màn Ghi công (2-80 ký tự, không xuống dòng / điều khiển). */
   title: string;
+  /** Trang chính thức của gói (CHỈ `https:`, <= 200 ký tự, không khoảng trắng / điều khiển): màn Ghi công hiện bằng `textContent` + `rel="noopener"`. Tuỳ chọn. */
+  url?: string;
+  /** Giấy phép tóm tắt (<= 80 ký tự, không điều khiển, không khoảng trắng đầu / cuối), vd "Miễn phí, được dùng trong game, cấm phân phối lại". Tuỳ chọn. */
+  license?: string;
   files: PrivatePackFile[];
 }
 
+/**
+ * Manifest: `{ packs }`, CÙNG dạng gốc với `PackManifest` của client (không có trường `version` song song: đổi hợp đồng thì đổi `shared/` + `PROTOCOL_VERSION` như mọi hợp đồng khác;
+ * client làm sạch bằng cùng luật với `sanitizeManifest` + `privatePackViolations`).
+ */
 export interface PrivatePackManifest {
-  version: typeof PRIVATE_PACK_MANIFEST_VERSION;
   packs: PrivatePack[];
 }
+
+/** Manifest RỖNG: thứ máy chủ trả (200) khi gói tắt / manifest hỏng, để client không thấy 404 đỏ ở DevTools mỗi lần vào game (B, review #1259). */
+export const PRIVATE_PACK_EMPTY_MANIFEST: Readonly<PrivatePackManifest> = Object.freeze({
+  packs: [],
+});
 
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const SEG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -85,6 +104,21 @@ export function isSafePrivatePackPath(path: unknown): path is string {
   return privatePackExtension(path) !== undefined;
 }
 
+/** `url` của gói an toàn không? CHỈ `https:` (không `javascript:` / `data:` / `http:`), <= 200 ký tự, không khoảng trắng / điều khiển / `<` `>` `"` `\\`, có tên miền; phân tích được bằng `URL`. Thuần. */
+export function isSafePrivatePackUrl(url: unknown): url is string {
+  if (typeof url !== "string" || url.length < 12 || url.length > PRIVATE_PACK_URL_MAX_LEN)
+    return false;
+  if (!url.startsWith("https://") || /[\s<>"'\\]/.test(url) || CONTROL_RE.test(url)) return false;
+  try {
+    const u = new URL(url);
+    return (
+      u.protocol === "https:" && u.hostname.includes(".") && u.username === "" && u.password === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Kiểm một manifest (thường đọc từ JSON, nên nhận `unknown`): rỗng = hợp lệ. Chỉ nhận ĐÚNG các trường của hợp đồng (trường lạ là lỗi: không để nhét đường dẫn qua trường khác).
  * Mã gói duy nhất, đường dẫn duy nhất trong gói (không phân biệt hoa thường: ổ đĩa không phân biệt hoa thường sẽ nhầm), số tệp / gói / dung lượng trong trần. Thuần.
@@ -93,10 +127,7 @@ export function privatePackViolations(m: unknown): string[] {
   const bad: string[] = [];
   if (!isRecord(m)) return ["manifest không phải đối tượng"];
   for (const k of Object.keys(m))
-    if (k !== "version" && k !== "packs")
-      bad.push(`trường lạ ở manifest: ${JSON.stringify(k).slice(0, 40)}`);
-  if (m.version !== PRIVATE_PACK_MANIFEST_VERSION)
-    bad.push(`version phải là ${PRIVATE_PACK_MANIFEST_VERSION}`);
+    if (k !== "packs") bad.push(`trường lạ ở manifest: ${JSON.stringify(k).slice(0, 40)}`);
   if (!Array.isArray(m.packs)) return [...bad, "packs phải là mảng"];
   if (m.packs.length > PRIVATE_PACK_MAX_PACKS)
     bad.push(`quá ${PRIVATE_PACK_MAX_PACKS} gói (${m.packs.length})`);
@@ -106,7 +137,7 @@ export function privatePackViolations(m: unknown): string[] {
     const at = `gói #${i}`;
     if (!isRecord(p)) return void bad.push(`${at}: không phải đối tượng`);
     for (const k of Object.keys(p))
-      if (k !== "id" && k !== "title" && k !== "files")
+      if (k !== "id" && k !== "title" && k !== "url" && k !== "license" && k !== "files")
         bad.push(`${at}: trường lạ ${JSON.stringify(k).slice(0, 40)}`);
     const id = p.id;
     if (typeof id !== "string" || !ID_RE.test(id)) bad.push(`${at}: id sai dạng`);
@@ -122,6 +153,22 @@ export function privatePackViolations(m: unknown): string[] {
       title.trim() !== title
     )
       bad.push(`${name}: title phải 2-80 ký tự, không điều khiển, không khoảng trắng đầu / cuối`);
+    if (p.url !== undefined && !isSafePrivatePackUrl(p.url))
+      bad.push(
+        `${name}: url phải là https:, <= ${PRIVATE_PACK_URL_MAX_LEN} ký tự, không khoảng trắng / điều khiển`,
+      );
+    const lic = p.license;
+    if (
+      lic !== undefined &&
+      (typeof lic !== "string" ||
+        lic.length < 1 ||
+        lic.length > PRIVATE_PACK_LICENSE_MAX_LEN ||
+        CONTROL_RE.test(lic) ||
+        lic.trim() !== lic)
+    )
+      bad.push(
+        `${name}: license phải 1-${PRIVATE_PACK_LICENSE_MAX_LEN} ký tự, không điều khiển, không khoảng trắng đầu / cuối`,
+      );
     if (!Array.isArray(p.files)) return void bad.push(`${name}: files phải là mảng`);
     const seen = new Set<string>();
     p.files.forEach((f: unknown, j: number) => {
@@ -158,19 +205,25 @@ export function privatePackKey(packId: string, path: string): string {
 }
 
 /**
- * URL của một tệp trong gói: `/assets-private/<gói>/<đường dẫn>`, kèm `?v=<8 hex đầu của sha256>` nếu có hash hợp lệ (máy chủ coi tệp có `?v=` đúng hash là bất biến / cache dài).
+ * URL của một tệp trong gói: `/assets-private/<gói>/<đường dẫn>`, kèm `?v=<12 hex đầu của sha256>` nếu có hash hợp lệ (máy chủ coi tệp có `?v=` đúng hash là bất biến / cache dài).
  * Mã gói hoặc đường dẫn không an toàn thì ném lỗi (lập trình sai, không phải dữ liệu người chơi). Thuần.
  */
 export function privatePackUrl(packId: string, path: string, sha256?: string): string {
   if (!ID_RE.test(packId)) throw new Error(`mã gói không hợp lệ: ${packId}`);
   if (!isSafePrivatePackPath(path)) throw new Error(`đường dẫn gói không an toàn: ${path}`);
-  const v = sha256 !== undefined && SHA_RE.test(sha256) ? `?v=${sha256.slice(0, 8)}` : "";
+  const v =
+    sha256 !== undefined && SHA_RE.test(sha256)
+      ? `?v=${sha256.slice(0, PRIVATE_PACK_VERSION_HEX)}`
+      : "";
   return `${PRIVATE_PACK_URL_PREFIX}${packId}/${path}${v}`;
 }
 
-/** `?v=` có khớp 8 hex đầu của `sha256` (hợp lệ) không (máy chủ dùng để quyết `immutable`). Giá trị rác / thiếu -> `false`. Thuần. */
+/** `?v=` có khớp 12 hex đầu của `sha256` (hợp lệ) không (máy chủ dùng để quyết `immutable`). Giá trị rác / thiếu -> `false`. Thuần. */
 export function privatePackVersionMatches(v: unknown, sha256: string): boolean {
   return (
-    typeof v === "string" && /^[0-9a-f]{8}$/.test(v) && SHA_RE.test(sha256) && sha256.startsWith(v)
+    typeof v === "string" &&
+    new RegExp(`^[0-9a-f]{${PRIVATE_PACK_VERSION_HEX}}$`).test(v) &&
+    SHA_RE.test(sha256) &&
+    sha256.startsWith(v)
   );
 }
