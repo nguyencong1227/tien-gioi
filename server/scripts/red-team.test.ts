@@ -50,8 +50,10 @@ describe("Red Team Server Messages (#252)", () => {
     // 4. Cơ chế chống spam
     expect(summary.rateLimitKicked).toBe(true);
 
-    // 5. Hiệu năng & bộ nhớ (ngưỡng chặt < 30 MB)
+    // 5. Hiệu năng & bộ nhớ (ngưỡng chặt < 30 MB). Bộ nhớ đo bằng heap của CHÍNH luồng chạy bài (`heapDeltaMb`), KHÔNG bằng RSS cả tiến trình (`rssDeltaMb`):
+    // vitest chạy `pool: "threads"` nên RSS cộng cả ~20 tệp test khác chạy song song (A đo 171 MB lúc chạy cả bộ, #1215) trong khi bài này chỉ tăng ~7-14 MB heap.
     expect(summary.payloadLatencyAvgMs).toBeLessThan(50);
-    expect(summary.rssDeltaMb).toBeLessThan(30);
+    expect(Number.isFinite(summary.heapDeltaMb)).toBe(true);
+    expect(summary.heapDeltaMb).toBeLessThan(30);
   }, 90_000);
 });
