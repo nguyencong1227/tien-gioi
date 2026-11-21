@@ -2,8 +2,8 @@
 // Hợp đồng giữa client (vẽ nền bo góc, Phase 1 / S3) và server công cụ (`map:build`, S4 #1207).
 //
 // Mô hình: 8 hướng hàng xóm (3x3 Wang minimal / Godot terrain peering bits).
-// 2^8 = 256 tổ hợp mặt nạ hàng xóm được ánh xạ tất định về 47 ô Wang blob chuẩn
-// thuộc khối 11 cột x 7 hàng của tileset_floor (Ninja Adventure CC0).
+// 2^8 = 256 tổ hợp mặt nạ hàng xóm được ánh xạ tất định về 47 trạng thái Wang blob chuẩn
+// (tương ứng với 49 ô địa hình đích trong khối 11 cột x 7 hàng của tileset_floor, Ninja Adventure CC0).
 
 /**
  * 8 hướng hàng xóm theo thứ tự bitmask:
@@ -47,33 +47,52 @@ export interface AutotileCoord {
 }
 
 /**
+ * Chuẩn hoá mặt nạ 8 hướng theo quy tắc Wang Blob 47 ô (3x3 minimal):
+ * Một bit góc (TopLeft, TopRight, BottomLeft, BottomRight) CHỈ có hiệu lực
+ * khi CẢ HAI cạnh kề trực giao tương ứng đều là địa hình đích (bật = 1).
+ * Nếu thiếu một trong hai cạnh kề, góc chéo đó không thể nối liền với ô tâm
+ * và được chuẩn hoá về 0 để tránh chọn sai ô biên (chống rách mép / lộ khe).
+ */
+export function canonicalMask(mask: number): number {
+  const m = mask & 0xff;
+  const has = (i: number) => (m >> i) & 1;
+  // 4 cạnh trực giao: Top (bit 1), Left (bit 3), Right (bit 4), Bottom (bit 6)
+  let c = m & 0b01011010;
+  if (has(0) && has(1) && has(3)) c |= 1; // TopLeft cần Top + Left
+  if (has(2) && has(1) && has(4)) c |= 4; // TopRight cần Top + Right
+  if (has(5) && has(6) && has(3)) c |= 32; // BottomLeft cần Bottom + Left
+  if (has(7) && has(6) && has(4)) c |= 128; // BottomRight cần Bottom + Right
+  return c;
+}
+
+/**
  * Bảng tra 256 tổ hợp hàng xóm -> toạ độ ô [col, row] trong khối 11 cột của tileset.
- * Ánh xạ tất định, khớp 100% với thuật toán chọn ô tương đồng cực đại (best-score peering match)
- * từ định nghĩa terrain của Godot tileset.tres (Ninja Adventure).
+ * Mỗi mục thứ `m` (0..255) được chuẩn hoá sẵn theo `canonicalMask(m)`, khớp 100%
+ * với 47 trạng thái Wang blob chuẩn từ định nghĩa terrain của Godot tileset.tres (Ninja Adventure).
  */
 export const WANG_BLOB_LUT: readonly (readonly [col: number, row: number])[] = [
   [3, 3],
   [3, 3],
   [3, 2],
-  [2, 2],
+  [3, 2],
   [3, 3],
   [3, 3],
-  [0, 2],
-  [0, 2],
+  [3, 2],
+  [3, 2],
   [2, 3],
-  [2, 2],
+  [2, 3],
   [7, 3],
   [2, 2],
   [2, 3],
-  [1, 2],
-  [6, 3],
-  [1, 2], // 0..15
+  [2, 3],
+  [7, 3],
+  [2, 2], // 0..15
   [0, 3],
   [0, 3],
   [4, 3],
   [4, 3],
-  [0, 2],
-  [0, 2],
+  [0, 3],
+  [0, 3],
   [0, 2],
   [0, 2],
   [1, 3],
@@ -81,41 +100,41 @@ export const WANG_BLOB_LUT: readonly (readonly [col: number, row: number])[] = [
   [8, 3],
   [5, 3],
   [1, 3],
-  [1, 2],
+  [1, 3],
   [6, 3],
   [1, 2], // 16..31
   [3, 3],
   [3, 3],
   [3, 2],
-  [2, 1],
+  [3, 2],
   [3, 3],
   [3, 3],
-  [0, 2],
-  [2, 1],
-  [2, 0],
-  [2, 0],
-  [7, 2],
-  [2, 1],
-  [2, 0],
-  [2, 0],
-  [9, 1],
-  [2, 1], // 32..47
+  [3, 2],
+  [3, 2],
+  [2, 3],
+  [2, 3],
+  [7, 3],
+  [2, 2],
+  [2, 3],
+  [2, 3],
+  [7, 3],
+  [2, 2], // 32..47
   [0, 3],
   [0, 3],
   [4, 3],
   [4, 3],
+  [0, 3],
+  [0, 3],
   [0, 2],
-  [5, 1],
   [0, 2],
-  [5, 1],
-  [5, 0],
-  [5, 0],
-  [10, 2],
+  [1, 3],
+  [1, 3],
+  [8, 3],
   [5, 3],
-  [5, 0],
-  [5, 1],
-  [9, 1],
-  [5, 1], // 48..63
+  [1, 3],
+  [1, 3],
+  [6, 3],
+  [1, 2], // 48..63
   [3, 0],
   [3, 0],
   [3, 1],
@@ -130,12 +149,12 @@ export const WANG_BLOB_LUT: readonly (readonly [col: number, row: number])[] = [
   [7, 1],
   [7, 0],
   [7, 0],
-  [9, 3],
+  [7, 4],
   [7, 1], // 64..79
   [4, 0],
   [4, 0],
   [4, 4],
-  [10, 3],
+  [4, 4],
   [4, 0],
   [4, 0],
   [4, 1],
@@ -145,125 +164,125 @@ export const WANG_BLOB_LUT: readonly (readonly [col: number, row: number])[] = [
   [8, 4],
   [10, 3],
   [8, 0],
-  [8, 1],
+  [8, 0],
   [9, 3],
   [8, 1], // 80..95
-  [2, 0],
-  [2, 0],
+  [3, 0],
+  [3, 0],
   [3, 1],
-  [2, 1],
-  [2, 0],
-  [2, 0],
   [3, 1],
-  [2, 1],
+  [3, 0],
+  [3, 0],
+  [3, 1],
+  [3, 1],
   [2, 0],
   [2, 0],
   [7, 2],
   [2, 1],
   [2, 0],
   [2, 0],
-  [9, 1],
+  [7, 2],
   [2, 1], // 96..111
   [4, 0],
   [4, 0],
-  [10, 2],
-  [5, 4],
+  [4, 4],
+  [4, 4],
   [4, 0],
-  [5, 1],
+  [4, 0],
   [4, 1],
-  [5, 1],
+  [4, 1],
   [5, 0],
   [5, 0],
   [10, 2],
   [5, 4],
   [5, 0],
-  [5, 1],
+  [5, 0],
   [9, 1],
   [5, 1], // 112..127
   [3, 3],
   [3, 3],
   [3, 2],
-  [2, 2],
-  [3, 3],
-  [3, 3],
-  [0, 1],
-  [0, 1],
-  [2, 3],
-  [2, 2],
-  [7, 3],
-  [2, 2],
-  [2, 3],
-  [6, 1],
-  [6, 3],
-  [6, 1], // 128..143
-  [0, 0],
-  [0, 0],
-  [4, 2],
-  [9, 0],
-  [0, 0],
-  [0, 0],
-  [0, 1],
-  [0, 1],
-  [6, 0],
-  [6, 0],
-  [9, 2],
-  [9, 0],
-  [6, 0],
-  [6, 1],
-  [6, 3],
-  [6, 1], // 144..159
+  [3, 2],
   [3, 3],
   [3, 3],
   [3, 2],
-  [2, 1],
+  [3, 2],
+  [2, 3],
+  [2, 3],
+  [7, 3],
+  [2, 2],
+  [2, 3],
+  [2, 3],
+  [7, 3],
+  [2, 2], // 128..143
+  [0, 3],
+  [0, 3],
+  [4, 3],
+  [4, 3],
+  [0, 3],
+  [0, 3],
+  [0, 2],
+  [0, 2],
+  [1, 3],
+  [1, 3],
+  [8, 3],
+  [5, 3],
+  [1, 3],
+  [1, 3],
+  [6, 3],
+  [1, 2], // 144..159
   [3, 3],
-  [1, 1],
-  [0, 1],
-  [1, 1],
-  [1, 0],
-  [1, 0],
-  [7, 2],
-  [2, 1],
-  [1, 0],
-  [1, 1],
-  [6, 2],
-  [1, 1], // 160..175
-  [0, 0],
-  [0, 0],
-  [4, 2],
-  [5, 2],
-  [0, 0],
-  [1, 1],
-  [0, 1],
-  [1, 1],
-  [1, 0],
-  [1, 0],
-  [8, 2],
-  [5, 2],
-  [1, 0],
-  [1, 1],
-  [6, 2],
-  [1, 1], // 176..191
-  [0, 0],
-  [0, 0],
+  [3, 3],
+  [3, 2],
+  [3, 2],
+  [3, 3],
+  [3, 3],
+  [3, 2],
+  [3, 2],
+  [2, 3],
+  [2, 3],
+  [7, 3],
+  [2, 2],
+  [2, 3],
+  [2, 3],
+  [7, 3],
+  [2, 2], // 160..175
+  [0, 3],
+  [0, 3],
+  [4, 3],
+  [4, 3],
+  [0, 3],
+  [0, 3],
+  [0, 2],
+  [0, 2],
+  [1, 3],
+  [1, 3],
+  [8, 3],
+  [5, 3],
+  [1, 3],
+  [1, 3],
+  [6, 3],
+  [1, 2], // 176..191
+  [3, 0],
+  [3, 0],
   [3, 1],
-  [9, 0],
-  [0, 0],
-  [0, 0],
-  [0, 1],
-  [0, 1],
-  [6, 0],
-  [6, 0],
-  [9, 2],
-  [9, 0],
-  [6, 0],
-  [6, 1],
-  [6, 4],
-  [6, 1], // 192..207
+  [3, 1],
+  [3, 0],
+  [3, 0],
+  [3, 1],
+  [3, 1],
+  [7, 0],
+  [7, 0],
+  [7, 4],
+  [7, 1],
+  [7, 0],
+  [7, 0],
+  [7, 4],
+  [7, 1], // 192..207
   [0, 0],
   [0, 0],
   [4, 2],
-  [9, 0],
+  [4, 2],
   [0, 0],
   [0, 0],
   [0, 1],
@@ -273,47 +292,47 @@ export const WANG_BLOB_LUT: readonly (readonly [col: number, row: number])[] = [
   [9, 2],
   [9, 0],
   [6, 0],
-  [6, 1],
+  [6, 0],
   [6, 4],
   [6, 1], // 208..223
-  [0, 0],
-  [0, 0],
+  [3, 0],
+  [3, 0],
   [3, 1],
-  [2, 1],
-  [0, 0],
-  [1, 1],
-  [0, 1],
-  [1, 1],
-  [1, 0],
-  [1, 0],
+  [3, 1],
+  [3, 0],
+  [3, 0],
+  [3, 1],
+  [3, 1],
+  [2, 0],
+  [2, 0],
   [7, 2],
   [2, 1],
-  [1, 0],
-  [1, 1],
-  [6, 2],
-  [1, 1], // 224..239
+  [2, 0],
+  [2, 0],
+  [7, 2],
+  [2, 1], // 224..239
   [0, 0],
   [0, 0],
   [4, 2],
-  [5, 2],
+  [4, 2],
   [0, 0],
-  [1, 1],
+  [0, 0],
   [0, 1],
-  [1, 1],
+  [0, 1],
   [1, 0],
   [1, 0],
   [8, 2],
   [5, 2],
   [1, 0],
-  [1, 1],
+  [1, 0],
   [6, 2],
   [1, 1], // 240..255
 ] as const;
 
 /** Tra cứu toạ độ ô bo góc từ mặt nạ 8 bit hàng xóm (0..255) */
 export function resolveAutotile(mask: number): AutotileCoord {
-  const m = Math.max(0, Math.min(255, mask & 0xff));
-  const entry = WANG_BLOB_LUT[m]!;
+  const c = canonicalMask(mask);
+  const entry = WANG_BLOB_LUT[c]!;
   return { col: entry[0], row: entry[1] };
 }
 
@@ -363,6 +382,10 @@ export function neighborMaskClamped(
 
 /**
  * Ghép góc một ma trận boolean / nhị phân thành mảng toạ độ ô cục bộ.
+ * CHÚ Ý: Hàm này CHỈ sinh ô cho các vị trí là địa hình đích (49 ô tâm `dirt` / đất / nước).
+ * Các vị trí trả về `null` là ô không thuộc địa hình đích; nền cỏ (hoặc địa hình nền bên dưới)
+ * do nơi gọi tự vẽ hoặc xử lý ở lớp nền cơ sở.
+ *
  * @param w Chiều rộng lưới
  * @param h Chiều cao lưới
  * @param isTarget Hàm kiểm tra ô (x, y) có phải địa hình cần bo góc không
