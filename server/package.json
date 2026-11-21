@@ -19,6 +19,8 @@
     "e2e:tai-khoan": "tsx scripts/e2e-account.ts",
     "e2e:bi-canh": "tsx scripts/e2e-bi-canh.ts",
     "e2e:chan-duong": "tsx scripts/e2e-chan-duong.ts",
+    "assets-private:manifest": "tsx scripts/assets-private.ts manifest",
+    "assets-private:check": "tsx scripts/assets-private.ts check",
     "e2e:pk": "tsx scripts/e2e-pk.ts",
     "e2e:tong-mon": "tsx scripts/e2e-tong-mon.ts",
     "e2e:xa-hoi": "tsx scripts/e2e-xa-hoi.ts",
