@@ -58,6 +58,16 @@ function build(map: GameMap): Mask | null {
   return { cols, rows, seen };
 }
 
+/** Dựng sẵn mặt nạ của `map` (một lần; lần gọi sau không làm gì): gọi lúc tạo phòng (cạnh `warmMonsterNav`) để lần vào phòng ĐẦU TIÊN không trả ~15-25 ms trong `onJoin`. */
+export function warmWalkReach(map: GameMap): void {
+  if (!cache.has(map)) cache.set(map, build(map));
+}
+
+/** Mặt nạ của `map` đã dựng chưa (test). */
+export function isWalkReachWarm(map: GameMap): boolean {
+  return cache.has(map);
+}
+
 /** (x, y) có đi bộ tới được từ tâm trấn không (nút lưới đã loang tới trong ±1 nút quanh điểm). Bản đồ không kiểm được thì luôn `true`. */
 export function reachableFromTown(map: GameMap, x: number, y: number): boolean {
   let m = cache.get(map);
