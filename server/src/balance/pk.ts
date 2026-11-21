@@ -3,7 +3,7 @@
 // (`slash`) liên tục mỗi lần hồi chiêu cho tới khi trận kết thúc: sát thương, bạo kích, đếm ngược, `tickDuels` đều là mã server
 // thật. Ca "liên tục": đứng cạnh nhau, không né, không đan, không đả tọa (trong trận bị khoá). Người chơi thật không đánh 100% thời
 // gian nên trận thật dài hơn. `Math.random` có hạt giống (ghi đè trong lúc chạy, trả lại sau) để kết quả cố định, như bench.
-import { DEFAULT_MAP, REALMS, TICK_MS, stepOf } from "@tien-gioi/shared";
+import { DEFAULT_MAP_ID, REALMS, TICK_MS, getMap, stepOf } from "@tien-gioi/shared";
 import { Hub } from "../hub";
 import { slash } from "../systems/combat";
 import { duelAnswer, duelChallenge, tickDuels } from "../systems/duel";
@@ -48,7 +48,7 @@ export function duelOnce(a: Level, b: Level, seed = 1): DuelOutcome {
   const saved = Math.random;
   Math.random = seeded(seed);
   try {
-    const { w, duelEnds } = makeWorld(DEFAULT_MAP, new Hub());
+    const { w, duelEnds } = makeWorld(getMap(DEFAULT_MAP_ID)!, new Hub());
     const pa = addPlayer(w, "Aa", a.realm, a.tier);
     const pb = addPlayer(w, "Bb", b.realm, b.tier);
     for (const [r, l] of [

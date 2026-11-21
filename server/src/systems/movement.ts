@@ -1,7 +1,15 @@
 // Di chuyển của người chơi: nhận input, áp từng bước TICK_MS, chọn chỗ đứng an toàn.
-import { TICK_MS, PLAYER_RADIUS, statsFor, type GameMap, type InputMsg } from "@tien-gioi/shared";
+import {
+  TICK_MS,
+  TILE,
+  PLAYER_RADIUS,
+  statsFor,
+  type GameMap,
+  type InputMsg,
+} from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import { rand, quantAngle, type World, type PlayerCtrl } from "../world";
+import { inMainRegion } from "./nav";
 
 /**
  * BACKLOG tối đa còn lại SAU khi đã dùng hết ngân sách bước của tick (mục 41 QUYET_DINH_M3, "trôi như liệt phím"): 5 input = 0,25 giây. Mạng nhà đứng rồi xả dồn
@@ -152,17 +160,86 @@ export function savePos(map: GameMap, x: number, y: number): { x: number; y: num
   return best ?? { x: rx, y: ry };
 }
 
-/** Vị trí đã lưu nếu còn hợp lệ, không thì một điểm ngẫu nhiên trong Lạc Hà Trấn. */
-export function safeSpot(map: GameMap, x?: number, y?: number) {
+/** Bán kính tìm chỗ đứng gần nhất quanh vị trí đã lưu bị chặn (px): 24 ô. Xa hơn thì về trấn (bản đồ đổi hẳn, vị trí cũ vô nghĩa). */
+export const RELOCATE_MAX_PX = 24 * TILE;
+/** Bước lấy mẫu khi tìm chỗ đứng gần nhất (px): nửa ô, là số nguyên để toạ độ lưu vẫn nguyên. */
+const RELOCATE_STEP = TILE / 2;
+
+/**
+ * Chỗ đứng KHÔNG bị chặn và NỐI với thế giới mở (vùng chính, `inMainRegion`) GẦN (x, y) nhất trong `RELOCATE_MAX_PX` (lấy mẫu mỗi nửa ô, chọn khoảng cách nhỏ nhất; hoà thì lấy điểm quét trước: hàng trên, cột trái). `null` nếu không có.
+ * Dùng khi bản đồ đổi (docs/THIET_KE_BAN_DO_TILED.md mục 7.2) hoặc hồ sơ lưu rơi vào tường: người đang săn ở xa không bị kéo về trấn. Chỉ chạy lúc vào phòng với vị trí hỏng (hiếm).
+ */
+export function nearestFreeSpot(
+  map: GameMap,
+  x: number,
+  y: number,
+): { x: number; y: number } | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const r = RELOCATE_MAX_PX;
+  const x0 = Math.max(0, Math.ceil((x - r) / RELOCATE_STEP) * RELOCATE_STEP);
+  const x1 = Math.min(map.worldW, Math.floor((x + r) / RELOCATE_STEP) * RELOCATE_STEP);
+  const y0 = Math.max(0, Math.ceil((y - r) / RELOCATE_STEP) * RELOCATE_STEP);
+  const y1 = Math.min(map.worldH, Math.floor((y + r) / RELOCATE_STEP) * RELOCATE_STEP);
+  let best: { x: number; y: number } | null = null;
+  let bestD = r * r;
+  for (let cy = y0; cy <= y1; cy += RELOCATE_STEP)
+    for (let cx = x0; cx <= x1; cx += RELOCATE_STEP) {
+      const d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+      if (d >= bestD) continue;
+      if (map.circleBlocked(cx, cy, PLAYER_RADIUS)) continue;
+      // Chỉ nhận chỗ NỐI với thế giới mở (vùng chính của cỡ thân người chơi): "gần nhất" mà nằm trong túi kín thì người chơi KHÔNG đi ra được và game không có lệnh gỡ kẹt (B đo ở review #1213:
+      // 12-22 % ô chặn dời vào túi kín nếu bỏ kiểm này). Chỉ gọi khi điểm sẽ thành `best` (đã qua `d < bestD`) nên rất ít lần.
+      if (!inMainRegion(map, PLAYER_RADIUS, cx, cy)) continue;
+      bestD = d;
+      best = { x: cx, y: cy };
+    }
+  return best;
+}
+
+/** Cách `safeSpot` đã dời người khỏi vị trí đã lưu (chỉ có khi người gọi đưa vị trí mà vị trí đó không dùng được). */
+export interface SpotMoved {
+  /** Khoảng cách tới vị trí cũ (px, làm tròn) */
+  dist: number;
+  /** `near`: tới chỗ đứng gần nhất; `town`: không có chỗ nào trong tầm nên về trấn */
+  to: "near" | "town";
+}
+
+/**
+ * Vị trí đã lưu nếu còn hợp lệ; không thì chỗ đứng GẦN nhất (`nearestFreeSpot`); không có thì một điểm ngẫu nhiên trong trấn. Khi phải dời, kết quả kèm `moved` (để ghi nhật ký kiểm toán `map.relocate`).
+ * Không đưa vị trí (bí cảnh, hồi sinh) thì luôn là điểm ngẫu nhiên trong trấn.
+ */
+export function safeSpot(
+  map: GameMap,
+  x?: number,
+  y?: number,
+): { x: number; y: number; moved?: SpotMoved } {
   const town = map.townPx;
-  if (typeof x === "number" && typeof y === "number" && !map.circleBlocked(x, y, PLAYER_RADIUS))
-    return { x, y };
-  for (let i = 0; i < 50; i++) {
+  const hasCoords = typeof x === "number" && typeof y === "number";
+  // Toạ độ không hữu hạn (NaN / Infinity từ hồ sơ hỏng) KHÔNG dùng được: so sánh với NaN không bao giờ "chặn" nên trước đây NaN lọt qua như vị trí hợp lệ
+  const finite = hasCoords && Number.isFinite(x) && Number.isFinite(y);
+  if (finite && !map.circleBlocked(x as number, y as number, PLAYER_RADIUS))
+    return { x: x as number, y: y as number };
+  if (finite) {
+    const near = nearestFreeSpot(map, x as number, y as number);
+    if (near)
+      return {
+        ...near,
+        moved: {
+          dist: Math.round(Math.hypot(near.x - (x as number), near.y - (y as number))),
+          to: "near",
+        },
+      };
+  }
+  let spot: { x: number; y: number } | null = null;
+  for (let i = 0; i < 50 && !spot; i++) {
     const a = rand(0, Math.PI * 2),
       r = rand(0, town.r * 0.6);
     const sx = town.x + Math.cos(a) * r,
       sy = town.y + Math.sin(a) * r;
-    if (!map.circleBlocked(sx, sy, PLAYER_RADIUS)) return { x: sx, y: sy };
+    if (!map.circleBlocked(sx, sy, PLAYER_RADIUS)) spot = { x: sx, y: sy };
   }
-  return { x: town.x, y: town.y };
+  spot ??= { x: town.x, y: town.y };
+  if (!hasCoords) return spot;
+  const dist = finite ? Math.round(Math.hypot(spot.x - (x as number), spot.y - (y as number))) : -1;
+  return { ...spot, moved: { dist, to: "town" } };
 }

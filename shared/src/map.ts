@@ -688,36 +688,42 @@ export function getMap(id: unknown): GameMap | undefined {
   return m;
 }
 
-/** Bản đồ mặc định (Lạc Hà Trấn). */
+/**
+ * Bản đồ mặc định (Lạc Hà Trấn) DỰNG MỘT LẦN lúc nạp module (từ `seed`). SAU `adoptTiledMaps` (server nhận tệp ở `defineRooms`) `getMap(DEFAULT_MAP_ID)` là bản dựng từ TỆP và KHÁC đối tượng này
+ * (cùng từng byte ở S2, nhưng khi tệp Lạc Hà bị sửa tay ở S6 thì `DEFAULT_MAP` là bản CŨ). Vì vậy mã nguồn server / client KHÔNG được nhập `DEFAULT_MAP` (test `no-global-map-imports` canh):
+ * dùng `getMap(DEFAULT_MAP_ID)!` (hoặc `world.map` / `scene.map`). Chỉ còn cho các test cũ và cho tên cũ bên dưới.
+ * @deprecated dùng `getMap(DEFAULT_MAP_ID)!`.
+ */
 export const DEFAULT_MAP: GameMap = getMap(DEFAULT_MAP_ID)!;
 
-// ---- Tên cũ: trỏ tới bản đồ mặc định, giữ để chuyển dần sang `GameMap` (#123), không đổi hành vi ----
+// ---- Tên cũ: trỏ tới bản đồ mặc định, giữ để chuyển dần sang `GameMap` (#123). Các HÀM tra `getMap(DEFAULT_MAP_ID)` mỗi lần gọi (theo bản đã nhận tệp); `MAP_TILES` là ảnh chụp lúc nạp module ----
 
+/** @deprecated ảnh chụp lúc nạp module (bản sinh theo seed): dùng `getMap(DEFAULT_MAP_ID)!.tiles`. */
 export const MAP_TILES = DEFAULT_MAP.tiles;
 
 export function tileAt(tx: number, ty: number): T {
-  return DEFAULT_MAP.tileAt(tx, ty);
+  return getMap(DEFAULT_MAP_ID)!.tileAt(tx, ty);
 }
 
 export function isBlockedPx(x: number, y: number): boolean {
-  return DEFAULT_MAP.isBlockedPx(x, y);
+  return getMap(DEFAULT_MAP_ID)!.isBlockedPx(x, y);
 }
 
 /** Kiểm tra hình tròn bán kính r có chạm ô chặn không. */
 export function circleBlocked(x: number, y: number, r: number): boolean {
-  return DEFAULT_MAP.circleBlocked(x, y, r);
+  return getMap(DEFAULT_MAP_ID)!.circleBlocked(x, y, r);
 }
 
 /** Di chuyển có trượt theo tường (tách trục X/Y). Dùng chung client và server. */
 export function moveWithCollision(x: number, y: number, dx: number, dy: number, r: number) {
-  return DEFAULT_MAP.moveWithCollision(x, y, dx, dy, r);
+  return getMap(DEFAULT_MAP_ID)!.moveWithCollision(x, y, dx, dy, r);
 }
 
 export function inTown(x: number, y: number, pad = 0): boolean {
-  return DEFAULT_MAP.inTown(x, y, pad);
+  return getMap(DEFAULT_MAP_ID)!.inTown(x, y, pad);
 }
 
 /** Độ nguy hiểm theo khoảng cách tới trấn: 0..1 */
 export function dangerAt(x: number, y: number): number {
-  return DEFAULT_MAP.dangerAt(x, y);
+  return getMap(DEFAULT_MAP_ID)!.dangerAt(x, y);
 }

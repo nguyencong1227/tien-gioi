@@ -15,7 +15,6 @@ import {
   AMBUSH_ARM_MS,
   AMBUSH_MSG,
   AUTH_API,
-  DEFAULT_MAP,
   DUEL_COOLDOWN_MS,
   DUEL_MSG,
   DUEL_RANGE,
@@ -87,6 +86,7 @@ import {
   type TravelMsg,
   type TravelToMsg,
   type WalletMsg,
+  DEFAULT_MAP_ID,
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
@@ -176,7 +176,7 @@ function parseArgs(argv: string[]): CliArgs {
   let flapDelay: [number, number] = [1, 5];
   let storm = false;
   let leak = false;
-  let map = DEFAULT_MAP.def.id;
+  let map = getMap(DEFAULT_MAP_ID)!.def.id;
   let travel = false;
   let die = false;
   let account = false;
@@ -284,7 +284,7 @@ function parseArgs(argv: string[]): CliArgs {
 
   if (!getMap(map)) {
     console.warn(
-      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${DEFAULT_MAP.def.id}".`,
+      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${getMap(DEFAULT_MAP_ID)!.def.id}".`,
     );
   }
 
@@ -456,7 +456,7 @@ export function seedBotSaveFile(
   y: number,
   realm: number,
   tier: number,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
   life?: { playMs: number; kills: number; bossKills: number },
   coinOverride?: number,
   dataDirOverride?: string,
@@ -1185,9 +1185,9 @@ async function runIdleZeroBotTest(
   url: string,
   port: number,
   keepSaves: boolean,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
 ): Promise<IdleZeroBotMetrics> {
-  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
+  const currentMap = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   console.log(
     `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}, bản đồ=${currentMap.def.name}) ===`,
   );
@@ -2077,7 +2077,7 @@ async function runLoadTest(
   flapDelay: [number, number] = [1, 5],
   storm = false,
   leak = false,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
   travel = false,
   die = false,
   account = false,
@@ -2092,7 +2092,7 @@ async function runLoadTest(
   reflexMs = 400,
   ambush = false,
 ): Promise<LoadTestMetrics> {
-  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
+  const currentMap = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
   const shopSuffix = shop ? ", mua bán shop" : "";
   const flapSuffix = flap > 0 ? `, flap=${flap}` : "";
@@ -2112,7 +2112,7 @@ async function runLoadTest(
   const evadeSuffix = evade ? ", né đòn (--evade)" : "";
   const bossSuffix = boss ? `, săn trùm (--boss, reflex=${reflexMs}ms)` : "";
   const mapSuffix =
-    currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
+    currentMap.def.id !== getMap(DEFAULT_MAP_ID)!.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
       ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
@@ -2292,7 +2292,7 @@ async function runLoadTest(
 
     const handleBotTravel = async (bot: BotState, msg: TravelToMsg) => {
       try {
-        const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
+        const nextMap = getMap(msg.mapId) ?? getMap(DEFAULT_MAP_ID)!;
         const targetClient = new Client(url);
         const nextOpts = bot.token
           ? { token: bot.token, v: PROTOCOL_VERSION }

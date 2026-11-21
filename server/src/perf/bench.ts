@@ -12,7 +12,7 @@ import {
   REALMS,
   SKILLS,
   TICK_MS,
-  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
   getMap,
   type GameMap,
 } from "@tien-gioi/shared";
@@ -110,7 +110,7 @@ export function runBench(
   seconds: number,
   seed = 1,
   mode: BenchMode = "hunt",
-  map: GameMap = DEFAULT_MAP,
+  map: GameMap = getMap(DEFAULT_MAP_ID)!,
 ): BenchResult {
   const realRandom = Math.random;
   Math.random = seeded(seed);
@@ -391,7 +391,7 @@ export function runMultiMapBench(
   Math.random = seeded(seed);
   try {
     const rooms = roomsConfig.map((cfg, rIdx) => {
-      const map = getMap(cfg.mapId) ?? DEFAULT_MAP;
+      const map = getMap(cfg.mapId) ?? getMap(DEFAULT_MAP_ID)!;
       const players = cfg.players;
       const mode = cfg.mode ?? "hunt";
       let evBroadcast = 0;
@@ -674,8 +674,8 @@ if (process.argv[1]?.endsWith("bench.ts")) {
   const seconds = arg("seconds", 60);
   const mode: BenchMode = process.argv.includes("--crowd") ? "crowd" : "hunt";
   const mapArg = process.argv.find((a) => a.startsWith("--map="));
-  const targetMapId = mapArg ? mapArg.slice(6) : DEFAULT_MAP.def.id;
-  const targetMap = getMap(targetMapId) ?? DEFAULT_MAP;
+  const targetMapId = mapArg ? mapArg.slice(6) : DEFAULT_MAP_ID;
+  const targetMap = getMap(targetMapId) ?? getMap(DEFAULT_MAP_ID)!;
   const isMulti = process.argv.includes("--multi");
 
   const jsonArg = process.argv.find((a) => a === "--json" || a.startsWith("--json="));

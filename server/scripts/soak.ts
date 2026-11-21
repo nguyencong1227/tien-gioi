@@ -27,7 +27,6 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { Client, type Room } from "colyseus.js";
 import {
-  DEFAULT_MAP,
   DUEL_COOLDOWN_MS,
   DUEL_MSG,
   DUEL_RANGE,
@@ -59,6 +58,7 @@ import {
   type SkillsMsg,
   type TravelToMsg,
   type WalletMsg,
+  DEFAULT_MAP_ID,
 } from "@tien-gioi/shared";
 import { auditSavesDirectory } from "./audit-saves";
 import { assertNotProd } from "./assert-not-prod";
@@ -338,10 +338,10 @@ const SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"];
  */
 function startMapOf(role: BotRole, index: number): GameMap {
   // Bot Nguyên Anh (chỉ có khi bật --m7) săn ở Hàn Vân Lĩnh: khớp `mapId` của kế hoạch (soak-plan.ts)
-  if (role === "na") return getMap(HAN_VAN_ID) ?? DEFAULT_MAP;
-  if (role !== "travel") return DEFAULT_MAP;
+  if (role === "na") return getMap(HAN_VAN_ID) ?? getMap(DEFAULT_MAP_ID)!;
+  if (role !== "travel") return getMap(DEFAULT_MAP_ID)!;
   const targetId = SOAK_MAP_IDS[index % SOAK_MAP_IDS.length];
-  return getMap(targetId) ?? DEFAULT_MAP;
+  return getMap(targetId) ?? getMap(DEFAULT_MAP_ID)!;
 }
 
 interface BotState extends SkillCaster {
@@ -510,13 +510,17 @@ export async function main(): Promise<number> {
     const initialCoin = role === "sect" && (i - 1) % 3 === 0 ? 5000 : 100;
     initialTotalCoin += initialCoin;
 
-    let cx = DEFAULT_MAP.townPx.x;
-    let cy = DEFAULT_MAP.townPx.y;
+    let cx = getMap(DEFAULT_MAP_ID)!.townPx.x;
+    let cy = getMap(DEFAULT_MAP_ID)!.townPx.y;
 
     if (role === "hunt") {
       const angle = (i / countHunt) * Math.PI * 2;
-      cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * (DEFAULT_MAP.townPx.r + 150);
-      cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * (DEFAULT_MAP.townPx.r + 150);
+      cx =
+        getMap(DEFAULT_MAP_ID)!.townPx.x +
+        Math.cos(angle) * (getMap(DEFAULT_MAP_ID)!.townPx.r + 150);
+      cy =
+        getMap(DEFAULT_MAP_ID)!.townPx.y +
+        Math.sin(angle) * (getMap(DEFAULT_MAP_ID)!.townPx.r + 150);
     } else if (role === "na") {
       // Bot Nguyên Anh rải đều quanh trạm Hàn Vân Lĩnh, ba lớp bán kính: ngoài vùng an toàn nhưng chưa vào sâu vùng quái mạnh
       const hv = startMapOf(role, i);
@@ -527,29 +531,37 @@ export async function main(): Promise<number> {
       cy = hv.townPx.y + Math.sin(angle) * r;
     } else if (role === "crowd") {
       const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * (DEFAULT_MAP.townPx.r - 30);
-      cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * r;
-      cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * r;
+      const r = Math.random() * (getMap(DEFAULT_MAP_ID)!.townPx.r - 30);
+      cx = getMap(DEFAULT_MAP_ID)!.townPx.x + Math.cos(angle) * r;
+      cy = getMap(DEFAULT_MAP_ID)!.townPx.y + Math.sin(angle) * r;
     } else if (role === "travel") {
       // Sát cổng chuyển cảnh của bản đồ xuất phát (chọn xen kẽ các cổng nếu bản đồ có nhiều cổng; M7.10 #511)
       const startMap = startMapOf(role, i);
       const portalIdx = Math.floor(i / SOAK_MAP_IDS.length) % startMap.portals.length;
       const portal = startMap.portals[portalIdx] ?? startMap.portals.at(-1);
-      cx = portal ? portal.spawn.x : DEFAULT_MAP.townPx.x;
-      cy = portal ? portal.spawn.y : DEFAULT_MAP.townPx.y;
+      cx = portal ? portal.spawn.x : getMap(DEFAULT_MAP_ID)!.townPx.x;
+      cy = portal ? portal.spawn.y : getMap(DEFAULT_MAP_ID)!.townPx.y;
     } else if (role === "dungeon") {
       cx = NPC_BY_ID.thu_mon.x + (Math.random() - 0.5) * 30;
       cy = NPC_BY_ID.thu_mon.y + (Math.random() - 0.5) * 30;
     } else if (role === "duel") {
       const pairIdx = Math.floor((i - 1) / 2);
       const angle = (pairIdx / Math.max(1, countDuel / 2)) * Math.PI * 2;
-      cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * (DEFAULT_MAP.townPx.r + 80);
-      cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * (DEFAULT_MAP.townPx.r + 80);
+      cx =
+        getMap(DEFAULT_MAP_ID)!.townPx.x +
+        Math.cos(angle) * (getMap(DEFAULT_MAP_ID)!.townPx.r + 80);
+      cy =
+        getMap(DEFAULT_MAP_ID)!.townPx.y +
+        Math.sin(angle) * (getMap(DEFAULT_MAP_ID)!.townPx.r + 80);
     } else if (role === "sect") {
       const grpIdx = Math.floor((i - 1) / 3);
       const angle = (grpIdx / Math.max(1, countSect / 3)) * Math.PI * 2;
-      cx = DEFAULT_MAP.townPx.x + Math.cos(angle) * (DEFAULT_MAP.townPx.r + 100);
-      cy = DEFAULT_MAP.townPx.y + Math.sin(angle) * (DEFAULT_MAP.townPx.r + 100);
+      cx =
+        getMap(DEFAULT_MAP_ID)!.townPx.x +
+        Math.cos(angle) * (getMap(DEFAULT_MAP_ID)!.townPx.r + 100);
+      cy =
+        getMap(DEFAULT_MAP_ID)!.townPx.y +
+        Math.sin(angle) * (getMap(DEFAULT_MAP_ID)!.townPx.r + 100);
     }
 
     const startMap = startMapOf(role, i);
@@ -719,7 +731,7 @@ export async function main(): Promise<number> {
     room.onMessage("travelTo", (msg: TravelToMsg) => {
       void (async () => {
         try {
-          const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
+          const nextMap = getMap(msg.mapId) ?? getMap(DEFAULT_MAP_ID)!;
           const targetClient = new Client(wsUrl);
           const nextOpts = {
             name: b.name,
@@ -830,8 +842,8 @@ export async function main(): Promise<number> {
     });
 
     const initPos = initialPositions.get(i) ?? {
-      x: DEFAULT_MAP.townPx.x,
-      y: DEFAULT_MAP.townPx.y,
+      x: getMap(DEFAULT_MAP_ID)!.townPx.x,
+      y: getMap(DEFAULT_MAP_ID)!.townPx.y,
     };
     const b: BotState = {
       index: i,
