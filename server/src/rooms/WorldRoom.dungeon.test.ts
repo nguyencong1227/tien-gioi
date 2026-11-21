@@ -590,6 +590,8 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-11-21T05:00:00Z"));
+    // CHỨNG KIẾN ghim đang hoạt động (A đề nghị ở review #1228): bỏ `useFakeTimers` / `setSystemTime` thì dòng này ĐỎ, không để chập chờn quanh nửa đêm quay lại âm thầm
+    expect(new Date().toISOString().slice(0, 13)).toBe("2026-11-21T05");
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -685,6 +687,8 @@ describe("gục trong bí cảnh: không mất kiếp (quyết định 11/11)", 
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-11-21T05:00:00Z"));
+    // CHỨNG KIẾN ghim đang hoạt động (A đề nghị ở review #1228): bỏ `useFakeTimers` / `setSystemTime` thì dòng này ĐỎ, không để chập chờn quanh nửa đêm quay lại âm thầm
+    expect(new Date().toISOString().slice(0, 13)).toBe("2026-11-21T05");
   });
   afterEach(() => {
     vi.useRealTimers();

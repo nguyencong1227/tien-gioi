@@ -1992,26 +1992,43 @@ npm run build -w client
 npm run e2e:chieu-vo-sac -w server
 ```
 
-## 37. Thử tải dài 10 phút v0.4.0 với bộ chiêu trùm (`BOSS_MOVES=on`) và Tông môn (`SECTS=on`) (M4 3.5, Issue #1001)
+## 37. E2E thật Gặp chặn đường (CD11, #1230; `npm run e2e:chan-duong -w server`)
+Điều kiện của CD10 (#1070: "npm test + E2E + bench") trước khi bật `AMBUSH` ở bản chạy thật. Cùng khung `server/scripts/e2e-kit.ts` (`Tab`, `shown`, `listenWithRetry`): server Colyseus thật trong tiến trình (thư mục dữ liệu tạm, KHÔNG ghi `server/data/players`, KHÔNG cổng 2567), proxy TCP giữa Chrome và server (như `e2e-noi-lai.ts`), MỘT tab Chrome headless điều khiển bằng CDP, phím thật (D đi, Enter = Chiến, J đánh). Mỗi ca một nhân vật mới.
+
+**Tất định, không sửa mã trò chơi:** `AMBUSH=on` đặt trước khi dựng phòng; sau khi phòng có người, kịch bản tiêm vào `world.ambush` (`AmbushRuntime` vốn dành cho việc tiêm): `random = () => 0` (luôn trúng xúc xắc) và MỘT bầy `lang` nhỏ (bảng thật `AMBUSH_FOES` còn rỗng, CD5b). Kích hoạt: dịch nhân vật tới chỗ đi bộ ngoài trấn XA TRÙM NHẤT (`ambushBlocked` nhánh "boss" chặn khi trùm sống trong 900 px; kiểm lại tại chỗ, thử lại tối đa 4 lần vì quái / trùm lang thang) rồi đặt quãng đã đi sát một bước chân (`AMBUSH_STRIDE_PX`), cho CLIENT THẬT giữ phím D để máy chủ tự cộng quãng đi thật.
+
+Các ca (đều qua giao diện thật; mỗi ca kèm kiểm trạng thái phía máy chủ):
+1. **Chiến, thắng:** hộp thoại (tên kẻ chặn, văn mẫu, ba nút có giá, đếm ngược, dòng "chết thật") -> Enter -> đấu trường (HUD, đồng hồ, nút Bỏ chạy) -> hạ kẻ địch bằng đòn của client thật -> thẻ "Chiến thắng" + thưởng -> về ĐÚNG chỗ cũ (lệch 0 px), bảo hộ, ví / tu vi tăng, `ambushDaily.n = 1`.
+2. **Bỏ chạy ở hộp thoại bằng Linh thạch:** ví giảm ĐÚNG giá hiện trên nút (client không gửi số), đi tiếp được, hồi đã đặt.
+3. **Bỏ chạy giữa trận:** giá Linh thạch GẤP ĐÔI hộp thoại, tấm xác nhận hiện đúng giá, máy chủ VẬN 1 giây (ví chưa đổi trong lúc vận), trừ đúng giá, về chỗ cũ.
+4. **Thua = chết thật (mục 53):** Hoàng Tuyền ở PHÒNG GỐC, `limbo.coinAtDeath` = ví trước trận, kết cục `{ result: "lost", died: true }` không có `paid` (không trừ thêm giá).
+5. **Rớt mạng (proxy chặn kết nối mới):** (a) lúc hộp thoại: đồng hồ ĐÓNG BĂNG (còn 9501 -> 9501 ms sau 800 ms), nối lại còn nguyên cùng hộp thoại; (b) quá hạn chờ lúc hộp thoại: trả giá hộp thoại bằng tu vi, hồ sơ lưu đúng; (c) giữa trận: đồng hồ trận đóng băng, nối lại còn nguyên; (d) quá hạn giữa trận: trả giá bằng tu vi.
+6. **Hồ sơ + console:** hồ sơ ca 1 trên đĩa (`ambushDaily`, `ambushUntil`, bản đồ gốc); không lỗi console / cảnh báo mất tin (Tab gom `errors` suốt kịch bản).
+
+**Số đo (B, 21/11/2026):** một lượt đầy đủ ~50 giây; 10 / 10 lượt liền ĐẠT. Đột biến phía máy chủ (cây sạch sau mỗi lần), kịch bản ĐỎ ở đúng ca: trừ giá Linh thạch sai +1 (ca 2), về sai chỗ +200 px (ca 1), bỏ bảo hộ sau khi về (ca 1), gục trong đấu trường không chết thật (ca 4), hộp thoại không đóng băng khi rớt mạng (ca 5a), đồng hồ trận không đóng băng (ca 5c), rớt quá hạn lúc hộp thoại không trừ tu vi (ca 5b). `E2E_ONLY=1,3` chạy riêng các ca (dev). Cần `npm run build` và google-chrome.
+
+
+
+## 38. Thử tải dài 10 phút v0.4.0 với bộ chiêu trùm (`BOSS_MOVES=on`) và Tông môn (`SECTS=on`) (M4 3.5, Issue #1001)
 
 Bài đo thử tải dài 10 phút (600 giây) trên phiên bản v0.4.0 đánh giá tính ổn định của máy chủ thật dưới áp lực của 100 bot đồng thời trên cả 4 bản đồ (`lac_ha`, `hac_phong`, `am_suong`, `han_van`), kết hợp bí cảnh `linh_hu`, đấu trường PK và tông môn (`SECTS=on`), cùng bộ chiêu trùm thế giới nhiều giai đoạn (`BOSS_MOVES=on`, Xích Mãng tại Hắc Phong Cốc) và hệ thống sổ chiêu M7 (`--m7`).
 
-### 37.1. Cấu hình & Lệnh chạy
+### 38.1. Cấu hình & Lệnh chạy
 - **Lệnh thực thi:**
   ```bash
   npm run soak -w server -- --bots=100 --minutes=10 --boss --m7 --sect
   ```
 - **Quy mô:** 100 bot kết nối qua WebSocket thật, cổng cách ly ngẫu nhiên.
 - **Phân bổ kịch bản:**
-  - Săn quái hoang dã & săn trùm: 24 bot (trong đó 15 bot rải đều 15 điểm an toàn `BOSS_HUNTER_SPOTS` tại vùng nguy hiểm cao Hắc Phong Cốc để giao chiến Xích Mãng).
+  - Săn quái hoang dã & săn trùm: 24 bot (trong đó 15 bot rải đều 15 điểm an toàn `BOSS_HUNTER_SPOTS` tại vùng nguy hiểm cao Hắc Phong Cốc để giao chiến Xích Mãng; cờ `--boss` bật chế độ bot tập trung đánh trùm và thả diều; `BOSS_MOVES=on` là cờ mặc định của máy chủ).
   - Trấn / Cửa hàng Dược Đồng: 16 bot.
   - Chuyển cảnh liên bản đồ qua cổng: 8 bot (qua lại giữa Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân).
-  - Bí cảnh Linh Hồ Động: 12 bot (3 đội 4 người).
+  - Bí cảnh Linh Hồ Động (`LINH_HU_ID`): 12 bot (3 đội 4 người).
   - PK thách đấu: 8 bot (4 cặp giao tranh ngoài trấn).
-  - Tông môn: 12 bot (4 tông môn, Tông chủ và Đệ tử nạp/rút kho và chat `/s`).
+  - Tông môn: 12 bot (4 tông môn, Tông chủ và Đệ tử nạp/rút kho và chat `/s`; cờ `--sect` ghi nhận tương tác tông môn; `SECTS=on` kích hoạt lưu trữ tông môn).
   - Nguyên Anh săn tại Hàn Vân Lĩnh: 20 bot (thi triển toàn bộ 6 chiêu thức Nguyên Anh).
 
-### 37.2. Kết quả đo đạc thực tế (PASS)
+### 38.2. Kết quả đo đạc thực tế (PASS)
 
 | Hạng mục đo lường | Số liệu thực tế v0.4.0 | Ngưỡng yêu cầu | Kết luận |
 |---|---:|---:|:---:|
@@ -2035,17 +2052,18 @@ Bài đo thử tải dài 10 phút (600 giây) trên phiên bản v0.4.0 đánh 
 | **Tệp hỏng cách ly (`*.hong-*`)** | **0** | 0 | **ĐẠT** |
 | **Bảo toàn tiền tệ (Linh thạch)** | Ban đầu 29600 + Thả 7112 - Tiêu 21453 = Trần 36712 \| Thực tế: 19569 (Lệch ví: 0) | Thực tế <= Trần | **ĐẠT** |
 
-### 37.3. Nội dung M7 & Bộ chiêu trùm (`BOSS_MOVES=on`)
+### 38.3. Nội dung M7 & Bộ chiêu trùm (`BOSS_MOVES=on`)
 - **Nội dung M7 (Sổ chiêu & Nguyên Anh):**
   - Bot theo cảnh giới ban đầu: Luyện Khí 56, Trúc Cơ 4, Kim Đan 20, Nguyên Anh 20.
   - Tổng lượt thi triển chiêu thức xác nhận qua `fx cast`: **621 lượt**.
-  - Toàn bộ **6/6 chiêu Nguyên Anh** đều được thi triển đầy đủ:
+  - Toàn bộ **6/6 chiêu Nguyên Anh đợt 2** đều được thi triển đầy đủ:
     - `me_tung_bo`: 118
     - `kim_chung_trao`: 94
     - `han_quang_tien`: 57
     - `van_thach_tran`: 56
     - `bang_hoa_loan`: 49
     - `van_hanh_bo`: 49
+  - **12 chiêu còn lại trong tập 18 chiêu mẫu của bot** (`sampleSkillsForRealm` rải từ Luyện Khí -> Kim Đan) đều có lượt dùng thực tế:
     - `bich_thuy_hoi_xuan`: 42
     - `thanh_tung_phi_cham`: 24
     - `cuu_cung_khon_sat`: 21
@@ -2058,7 +2076,7 @@ Bài đo thử tải dài 10 phút (600 giây) trên phiên bản v0.4.0 đánh 
     - `bon_thach_quyen`: 9
     - `hoa_van_kiem`: 9
     - `ung_trao`: 3
-  - **18/18 chiêu thức toàn game** đều có lượt dùng thực tế, không có chiêu thức nào bị bỏ sót.
+  - Ghi chú: Game hiện có tổng cộng 53 chiêu học được (`LEARNABLE_SKILLS`) + 2 chiêu nền (`slash`, `meditate`); bài đo soak sử dụng tập 18 chiêu mẫu được gán tự động cho bot theo cảnh giới.
 - **Bộ chiêu trùm Xích Mãng (`BOSS_MOVES=on`):**
   - Tổng lượt thi triển chiêu thức trùm xác nhận qua `fx bossCast`: **19 lượt**.
   - Đầy đủ **4/4 chiêu thức bắt buộc** theo thiết kế nhiều giai đoạn:

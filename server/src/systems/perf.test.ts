@@ -470,10 +470,13 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     for (const h of heroes) h.c.ambush!.offer!.seen = true; // người thật đã xác nhận: giữ hộp thoại mở suốt phép đo
     const ticks: number[] = [];
     for (let t = 0; t < 100; t++) {
-      const t0 = performance.now();
-      w.now += TICK_MS;
-      tickWorld(w, TICK_MS);
-      ticks.push(performance.now() - t0);
+      // CPU của luồng này (không đồng hồ tường): máy tải nặng / pool threads của vitest không làm tick "chậm" giả (#1215)
+      ticks.push(
+        measureSyncStepMs(() => {
+          w.now += TICK_MS;
+          tickWorld(w, TICK_MS);
+        }),
+      );
     }
     const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
     expect(avg).toBeLessThan(10);
@@ -520,12 +523,14 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     const ticks: number[] = [];
     const rounds = 200; // 10 giây
     for (let t = 0; t < rounds; t++) {
-      const t0 = performance.now();
-      for (const h of rooms) {
-        h.w.now += TICK_MS;
-        tickWorld(h.w, TICK_MS);
-      }
-      ticks.push(performance.now() - t0);
+      ticks.push(
+        measureSyncStepMs(() => {
+          for (const h of rooms) {
+            h.w.now += TICK_MS;
+            tickWorld(h.w, TICK_MS);
+          }
+        }),
+      );
     }
     const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
     expect(avg).toBeLessThan(10); // tổng cả 20 phòng trong MỘT vòng tick (mỗi phòng thật chạy trong timer riêng, đây là chặn trên nghiêm hơn thực tế)

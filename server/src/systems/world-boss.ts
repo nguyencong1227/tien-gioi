@@ -13,6 +13,7 @@ import {
   WORLD_BOSS_TOP_N,
   expMultOf,
   getMap,
+  worldBossHpOf,
   worldBossAnnouncements,
   worldBossNoneMsg,
   type MonsterKind,
@@ -83,8 +84,12 @@ function findSpot(w: World, def: MonsterKind): { x: number; y: number } | null {
 
 /** Sinh trùm thế giới ở `w` cho sự kiện `ev`. Trả `false` nếu không tìm được chỗ (sự kiện bị huỷ). */
 function spawnBoss(w: World, ev: WbEvent): boolean {
-  const def = MONSTER_BY_ID[ev.slot.boss];
-  if (!def) return false;
+  const kind = MONSTER_BY_ID[ev.slot.boss];
+  if (!kind) return false;
+  // Máu THẬT = máu loài x `hpMult` của khung giờ (`worldBossHpOf`, `shared/`): bộ chiêu `BOSSES` cân cho đội 3-4 người hạ trong 1-2 phút, sự kiện 30 phút cần nhiều máu hơn.
+  // Chỉ bản SAO của loài đổi máu (đòn đánh, chiêu, giai đoạn giữ nguyên; bảng `MONSTERS` dùng chung không bị sửa); không có `hpMult` thì dùng đúng loài gốc như trước.
+  const hp = worldBossHpOf(ev.slot);
+  const def: MonsterKind = hp === kind.hp ? kind : { ...kind, hp };
   const spot = findSpot(w, def);
   if (!spot) return false;
   const id = placeMonster(w, def, spot.x, spot.y);

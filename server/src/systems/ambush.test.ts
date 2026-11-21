@@ -994,7 +994,7 @@ describe("số đo: giá đọc từ nhân vật THẬT", () => {
   it("ambushPriceOf theo thanh tu vi, bậc và ví của người chơi", () => {
     const s = setup();
     const price = ambushPriceOf(s.p, s.c, "offer");
-    expect(price.exp).toBe(Math.min(Math.floor(1000 * 0.05), 400));
+    expect(price.exp).toBe(108); // bậc 3: 2 phút săn x 54 tu vi / phút (< 400 tu vi đang có trong thanh)
     expect(price.coin.enough).toBe(true);
     s.c.coin = 0;
     expect(ambushPriceOf(s.p, s.c, "offer").coin.enough).toBe(false);

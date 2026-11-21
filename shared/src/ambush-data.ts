@@ -183,11 +183,372 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
     tiers: ["leader"],
     source: "/content/encounters/treo_thuong/truy_na.yaml#ev.tt_truy_na_yeu_vuong",
   },
+  // === ÂM SƯƠNG (Âm Sương Trạch): đầm lầy, sương tanh, hồ nước lạnh, âm khí — Kim Đan / Nguyên Anh ===
+  {
+    id: "am_suong_xa_quat_dam_lay",
+    text: "Đầm lầy Âm Sương Trạch sủi bọt, mùi tanh nồng tới nhức đầu. Dưới gốc cây đổ có một lỗ hang trơn nhẫy vảy rắn lột, sâu không thấy đáy. Con đại xà đen cuộn trong đó mở mắt, đuôi quật nước tanh vào mặt ngươi.",
+    mapIds: ["am_suong"],
+    tiers: ["normal"],
+    source: "/content/encounters/hang.yaml#ev.hang_xa_quat",
+  },
+  {
+    id: "am_suong_gioi_am_o_vach",
+    text: "Đêm nào vách cuối Âm Sương Trạch cũng có tiếng gõ ba tiếng, đều như tay người. Sáng ra, rêu quanh khe đá đóng một lớp sương trắng, sờ vào lạnh buốt. Đêm nay, bàn tay từ trong khe đã thò ra ngoài.",
+    mapIds: ["am_suong"],
+    tiers: ["normal"],
+    source: "/content/encounters/noi_chon.yaml#ev.dp_am_khi_vach_sau",
+  },
+  {
+    id: "am_suong_suong_tanh_tren_ho",
+    text: "Sương trên mặt hồ Âm Sương Trạch dày lên, tanh mùi bùn. Nước dưới chân ngươi rút đi một khoảng rồi dâng ngược: con thủy quái đang bò lên bờ, thẳng về phía ngươi.",
+    mapIds: ["am_suong"],
+    tiers: ["normal"],
+    source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_ho_suong_tanh",
+  },
+  {
+    id: "am_suong_van_thi_giu_dam",
+    text: "Yêu thú ở Âm Sương Trạch đã chết từ lâu mà vẫn đi lại. Hang ổ của chúng bốc mùi xác, cửa hang phủ một lớp sương xám không bay. Từng bước chân nặng nề dẫm lên xương cốt, hướng thẳng về phía linh khí đang tới.",
+    mapIds: ["am_suong"],
+    tiers: ["elite"],
+    source: "/content/encounters/hang.yaml#ev.van_thi_quat",
+  },
+  {
+    id: "am_suong_am_khi_phai_ac",
+    text: "Trời chưa tối mà Âm Sương Trạch đã lạnh buốt. Giữa đống xương cốt người xưa, một bóng tà vật lững thững đi lại, như vẫn canh giữ chốn này. Nó quay đầu, hốc mắt tối om nhìn thẳng vào người ngươi.",
+    mapIds: ["am_suong"],
+    tiers: ["elite"],
+    source: "/content/encounters/noi_chon.yaml#ev.phe_tich_am_khi",
+  },
+  {
+    id: "am_suong_ban_tay_duoi_ho",
+    text: "Nửa đêm có tiếng khóc rấm rứt dưới mặt hồ Âm Sương Trạch. Một bàn tay trắng bệch nắm lấy cổ chân ngươi, lạnh như đá: vong hồn bị linh khí hút tới, muốn kéo người sống xuống làm bạn.",
+    mapIds: ["am_suong"],
+    tiers: ["elite"],
+    source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_ho_thuy_quy",
+  },
+  {
+    id: "am_suong_xac_nguoi_trong_bang",
+    text: "Tảng băng sau lưng ngươi nứt một tiếng. Bên trong có người chết cóng từ thuở nào, mắt vẫn mở. Linh khí ngươi tỏa ra đã đánh thức nó: xác ướp đang cựa mình phá băng, tay với về phía ngươi.",
+    mapIds: ["am_suong"],
+    tiers: ["elite"],
+    source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_bang_xac_trong_bang",
+  },
+  {
+    id: "am_suong_ho_giao_co_giu",
+    text: "Quanh hồ Âm Sương Trạch cắm sáu lá cờ đen, nước lạnh dần từ đáy lên. Một toán thợ săn chờ giao long dưới hồ thức dậy để giết lấy gân, thiếu một người giữ mắt trận. Thấy ngươi, gã đầu lĩnh mỉm cười: vào giúp rồi đừng muốn ra.",
+    mapIds: ["am_suong"],
+    tiers: ["leader"],
+    source: "/content/encounters/hoang_da/ho_nuoc.yaml#ev.hd_ho_giao_thuc_day",
+  },
+  {
+    id: "am_suong_sao_huyet_yeu_vuong",
+    text: "Tận cùng Âm Sương Trạch là hang ổ của yêu vương. Miệng hang đen ngòm, xương trắng rải tới tận lối xuống. Nó nằm giữa đống hài cốt, vảy sẫm ánh hàn quang, chờ kẻ dám bước vào đòi lại lãnh địa.",
+    mapIds: ["am_suong"],
+    tiers: ["leader"],
+    source: "/content/encounters/noi_chon.yaml#ev.diet_sao_huyet",
+  },
+  // === HÀN VÂN (Hàn Vân Lĩnh): băng nguyên, bão tuyết, khe núi, đại yêu — Kim Đan / Nguyên Anh ===
+  {
+    id: "han_van_bao_tuyet_tim_hoi",
+    text: "Giữa băng nguyên Hàn Vân Lĩnh, ngươi vận công nóng như đống lửa. Tuyết quanh tan thành vũng, và một con bạch hổ tuyết lần theo hơi ấm ấy tới, lông trắng lẫn vào bão tuyết, vuốt đã giương.",
+    mapIds: ["han_van"],
+    tiers: ["normal"],
+    source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_bang_tim_hoi_am",
+  },
+  {
+    id: "han_van_hang_tru_bao_tuyet",
+    text: "Bão tuyết trên Hàn Vân Lĩnh nổi, trắng xóa không thấy đường. Ngươi chui vào một hang đá thì đụng phải lớp lông ấm: một con thú ngủ đông vừa mở mắt, hơi thở lạnh phả vào mặt.",
+    mapIds: ["han_van"],
+    tiers: ["normal"],
+    source: "/content/encounters/bien_co/duong.yaml#ev.dc_hang_tru_bao_tuyet",
+  },
+  {
+    id: "han_van_thu_giu_bao",
+    text: "Đêm qua sấm khô không mưa, sáng ra vách đá trên Hàn Vân Lĩnh nứt toác, hơi lạnh buốt tràn ra. Trong khe là một ổ thú: con quái nằm cuộn quanh món bảo vật, lông dựng như kim, sẵn sàng lao tới.",
+    mapIds: ["han_van"],
+    tiers: ["normal"],
+    source: "/content/encounters/bien_co/di_tuong.yaml#ev.bc_dt_o_thu_giu_bao",
+  },
+  {
+    id: "han_van_thu_pha_linh_dien",
+    text: "Luống linh điền sau vách Hàn Vân Lĩnh bị cày lật, rễ cây vương khắp lối. Dưới gốc cây đang chín, một con thú dữ gặm dở, mõm dính đầy đất, ngẩng lên nhìn ngươi bằng đôi mắt đỏ.",
+    mapIds: ["han_van"],
+    tiers: ["normal"],
+    source: "/content/encounters/noi_chon.yaml#ev.dp_thu_pha_linh_dien",
+  },
+  {
+    id: "han_van_khe_nui_hu_goi_bay",
+    text: "Tuyết trên Hàn Vân Lĩnh giẫm nát thành đường mòn, dẫn vào một khe núi. Gió thổi ra từ trong khe mang theo mùi thịt đông và tiếng hú gọi bầy. Bầy sói trắng lần lượt bước ra từ sau tảng băng.",
+    mapIds: ["han_van"],
+    tiers: ["elite"],
+    source: "/content/encounters/hang.yaml#ev.hang_lang_oa",
+  },
+  {
+    id: "han_van_hang_co_chu",
+    text: "Cái hang ngươi ghé vào trú chân trên Hàn Vân Lĩnh khô ráo, kín gió, sâu trong có ổ xương. Chưa kịp yên chỗ, chủ của nó đã về: một con cự thú chắn kín cửa hang, gầm vang vách đá, hơi thở đóng băng không khí.",
+    mapIds: ["han_van"],
+    tiers: ["elite"],
+    source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_son_chu_hang",
+  },
+  {
+    id: "han_van_bay_yeu_vien_dan",
+    text: "Ngươi dừng chân giữa Hàn Vân Lĩnh thì quanh người đã kín mắt xanh mắt đỏ. Bầy yêu nhỏ bị linh khí kéo tới, còn con đầu đàn đứng sau cùng, chờ chúng cắn trước khi nó ra tay.",
+    mapIds: ["han_van"],
+    tiers: ["elite"],
+    source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_yv_bay_nho",
+  },
+  {
+    id: "han_van_dai_yeu_thuc_giac",
+    text: "Vách núi Hàn Vân Lĩnh thở, mỗi nhịp dài bằng mười lần ngươi hít vào. Khe đá hé ra, trong bóng tối hiện một con mắt. Đại yêu nằm sau vách bao năm không ai biết vừa thức, đang tự hỏi ngươi là gì.",
+    mapIds: ["han_van"],
+    tiers: ["leader"],
+    source: "/content/encounters/hoang_da/son_mach.yaml#ev.hd_son_dai_yeu_thuc_giac",
+  },
+  {
+    id: "han_van_lanh_tho_co_chu",
+    text: "Quanh Hàn Vân Lĩnh không một tiếng chim, thú nhỏ cũng tuyệt tích. Dấu vết của một con rất lớn in khắp nơi, mùi tanh còn mới: nơi này có chủ. Xương thú chất thành đống trước cửa động tối om, hơi thở nặng nề phả ra từ trong đó.",
+    mapIds: ["han_van"],
+    tiers: ["leader"],
+    source: "/content/encounters/hoang_da/chu_o.yaml#ev.chu_o_lanh_tho",
+  },
 ];
-/** Bảng kẻ chặn đường thật (G / D nhập; rỗng ở khung). */
-export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [];
+/**
+ * Bảng kẻ chặn đường thật (CD5b #1065; A nhập vì D / E / G chưa kịp, chọn từ THỰC ĐƠN do `server/src/balance/chan-duong.ts` đo: người chơi đúng bậc `minStep` mặc đồ tốt nhất chỉ đánh thường, thắng
+ * >= 90% (thường) / 80% (tinh anh) / 60% (cầm đầu); thiết kế `docs/THIET_KE_CHAN_DUONG.md` mục 9). Mọi bầy đều YẾU hơn trần cấp `AMBUSH_FOE_LEVEL_CAP` (bị hạ = chết thật, mục 53) và khoảng `minStep..maxStep`
+ * hẹp (`payRewards` chưa giảm tu vi theo chênh bậc). Tinh anh Kim Đan / Nguyên Anh dùng loài cấp THẤP (`lang`, `ho`) vì loài cùng cấp tinh anh không đạt 80% ở bậc nào (Thạch Quy tinh anh đạt từ bậc 16 nhưng một trận ~99 giây thật, sát hạn 120 giây: bỏ); kẻ cầm đầu là Xích Mãng (`mang`, trùm
+ * duy nhất đạt 60% một mình, từ bậc 11). Lạc Hà chưa có cảnh cầm đầu nên chưa có bầy cầm đầu. CHỌN LOÀI THEO CẢNH: văn mẫu (bản đồ, mức) chọn theo `mapIds` + `tiers`, không ghép theo loài nên đôi chỗ loài
+ * không khớp chữ trong cảnh (B nhắc ở review #1240): D / E tinh chỉnh ghép loài - cảnh sau, miễn qua `ambushViolations` + `chan-duong.test.ts`.
+ */
+export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [
+  // === LẠC HÀ (Vân Mộng Sơn): Phàm Nhân / Luyện Khí / đầu Trúc Cơ ===
+  {
+    id: "lac_ha_soi_le",
+    name: "Sói Hoang Lẻ",
+    mapId: "lac_ha",
+    minStep: 0,
+    maxStep: 2,
+    tier: "normal",
+    foes: [{ kind: "lang", count: 1 }],
+  },
+  {
+    id: "lac_ha_soi_bay",
+    name: "Bầy Sói Hoang",
+    mapId: "lac_ha",
+    minStep: 1,
+    maxStep: 3,
+    tier: "normal",
+    foes: [{ kind: "lang", count: 2 }],
+  },
+  {
+    id: "lac_ha_soi_dan",
+    name: "Đàn Sói Đói",
+    mapId: "lac_ha",
+    minStep: 3,
+    maxStep: 6,
+    tier: "normal",
+    foes: [{ kind: "lang", count: 3 }],
+  },
+  {
+    id: "lac_ha_ho_le",
+    name: "Hắc Hổ Lang Thang",
+    mapId: "lac_ha",
+    minStep: 5,
+    maxStep: 7,
+    tier: "normal",
+    foes: [{ kind: "ho", count: 1 }],
+  },
+  {
+    id: "lac_ha_ho_doi",
+    name: "Đôi Hắc Hổ",
+    mapId: "lac_ha",
+    minStep: 8,
+    maxStep: 11,
+    tier: "normal",
+    foes: [{ kind: "ho", count: 2 }],
+  },
+  {
+    id: "lac_ha_soi_tinh_anh",
+    name: "Sói Đầu Đàn",
+    mapId: "lac_ha",
+    minStep: 4,
+    maxStep: 6,
+    tier: "elite",
+    foes: [{ kind: "lang", count: 1 }],
+  },
+  {
+    id: "lac_ha_soi_tinh_anh_doi",
+    name: "Đôi Sói Đầu Đàn",
+    mapId: "lac_ha",
+    minStep: 8,
+    maxStep: 11,
+    tier: "elite",
+    foes: [{ kind: "lang", count: 2 }],
+  },
+  // === HẮC PHONG (Hắc Phong Cốc): Trúc Cơ / Kim Đan ===
+  {
+    id: "hac_phong_ho_doi",
+    name: "Đôi Hắc Hổ Đói",
+    mapId: "hac_phong",
+    minStep: 10,
+    maxStep: 12,
+    tier: "normal",
+    foes: [{ kind: "ho", count: 2 }],
+  },
+  {
+    id: "hac_phong_ho_ba",
+    name: "Ba Hắc Hổ Săn Mồi",
+    mapId: "hac_phong",
+    minStep: 11,
+    maxStep: 12,
+    tier: "normal",
+    foes: [{ kind: "ho", count: 3 }],
+  },
+  {
+    id: "hac_phong_quy_chan",
+    name: "Thạch Quy Chắn Lối",
+    mapId: "hac_phong",
+    minStep: 13,
+    maxStep: 15,
+    tier: "normal",
+    foes: [{ kind: "thach_quy", count: 1 }],
+  },
+  {
+    id: "hac_phong_ho_tinh_anh",
+    name: "Hắc Hổ Chúa",
+    mapId: "hac_phong",
+    minStep: 11,
+    maxStep: 12,
+    tier: "elite",
+    foes: [{ kind: "ho", count: 1 }],
+  },
+  {
+    id: "hac_phong_ho_tinh_anh_doi",
+    name: "Đôi Hắc Hổ Chúa",
+    mapId: "hac_phong",
+    minStep: 14,
+    maxStep: 15,
+    tier: "elite",
+    foes: [{ kind: "ho", count: 2 }],
+  },
+  {
+    id: "hac_phong_yeu_vuong",
+    name: "Xích Mãng Yêu Vương",
+    mapId: "hac_phong",
+    minStep: 11,
+    maxStep: 12,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }],
+  },
+  // === ÂM SƯƠNG (Âm Sương Trạch): Kim Đan / Nguyên Anh ===
+  {
+    id: "am_suong_ho_suong",
+    name: "Sương Hồ Lẻ Bầy",
+    mapId: "am_suong",
+    minStep: 13,
+    maxStep: 15,
+    tier: "normal",
+    foes: [{ kind: "suong_ho", count: 1 }],
+  },
+  {
+    id: "am_suong_quy_doi",
+    name: "Đôi Thạch Quy Đầm Lầy",
+    mapId: "am_suong",
+    minStep: 13,
+    maxStep: 15,
+    tier: "normal",
+    foes: [{ kind: "thach_quy", count: 2 }],
+  },
+  {
+    id: "am_suong_thiem_doc",
+    name: "Độc Thiềm Đầm Lầy",
+    mapId: "am_suong",
+    minStep: 15,
+    maxStep: 18,
+    tier: "normal",
+    foes: [{ kind: "doc_thiem", count: 1 }],
+  },
+  {
+    id: "am_suong_ho_tinh_anh",
+    name: "Đôi Hắc Hổ Lạc Đàn",
+    mapId: "am_suong",
+    minStep: 14,
+    maxStep: 17,
+    tier: "elite",
+    foes: [{ kind: "ho", count: 2 }],
+  },
+  {
+    id: "am_suong_yeu_vuong",
+    name: "Xích Mãng Hồ Sâu",
+    mapId: "am_suong",
+    minStep: 13,
+    maxStep: 15,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }],
+  },
+  // === HÀN VÂN (Hàn Vân Lĩnh): Nguyên Anh ===
+  {
+    id: "han_van_lang_le",
+    name: "Hàn Lang Lẻ Bầy",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 18,
+    tier: "normal",
+    foes: [{ kind: "han_lang", count: 1 }],
+  },
+  {
+    id: "han_van_lang_doi",
+    name: "Đôi Hàn Lang",
+    mapId: "han_van",
+    minStep: 18,
+    maxStep: 18,
+    tier: "normal",
+    foes: [{ kind: "han_lang", count: 2 }],
+  },
+  {
+    id: "han_van_tuong_xuong",
+    name: "Cốt Tượng Băng Giá",
+    mapId: "han_van",
+    minStep: 17,
+    maxStep: 18,
+    tier: "normal",
+    foes: [{ kind: "cot_tuong", count: 1 }],
+  },
+  {
+    id: "han_van_nha_gio",
+    name: "Phong Nha Bão Tuyết",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 18,
+    tier: "normal",
+    foes: [{ kind: "phong_nha", count: 1 }],
+  },
+  {
+    id: "han_van_soi_tuyet",
+    name: "Bầy Sói Trắng",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 18,
+    tier: "elite",
+    foes: [{ kind: "lang", count: 3 }],
+  },
+  {
+    id: "han_van_yeu_vuong",
+    name: "Xích Mãng Băng Nguyên",
+    mapId: "han_van",
+    minStep: 16,
+    maxStep: 18,
+    tier: "leader",
+    foes: [{ kind: "mang", count: 1 }],
+  },
+];
 
 const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+/**
+ * Chặn đường chỉ kích hoạt khi người chơi ĐI BỘ thật (`systems/ambush.ts`; đứng yên / dịch chuyển không tính), nên văn mẫu không được viết như người chơi đang NGỒI / vừa thiền
+ * ("thẳng về chỗ ngươi ngồi", "ngươi mở mắt", "quanh chỗ ngồi"): nhiều cảnh lấy từ sự kiện BẾ QUAN của nguồn nên dễ lọt (B bắt 3 cảnh ở review #1240). Chỉ bắt dạng nói về NGƯƠI / chỗ ngồi
+ * của ngươi; kẻ địch "ngồi" / "mở mắt" (ngôi thứ ba) vẫn hợp lệ.
+ */
+const SITTING_RE = /(?:ngươi|chỗ)\s+(?:ngồi|mở mắt|nhập định|đả tọa|bế quan)|chỗ ngồi/iu;
 const ID_RE = /^[a-z][a-z0-9_]{0,47}$/;
 const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 const MAP_IDS: ReadonlySet<string> = new Set(MAPS.map((m) => m.id));
@@ -223,6 +584,10 @@ export function ambushViolations(
       bad.push(`${at}: text phải 20-600 ký tự`);
     else {
       if (CJK_RE.test(s.text)) bad.push(`${at}: text có chữ Hán / chữ lạ`);
+      if (SITTING_RE.test(s.text))
+        bad.push(
+          `${at}: text viết như người chơi đang NGỒI / vừa thiền (chặn đường chỉ kích hoạt khi ĐI BỘ): đổi sang "đi tới / dừng chân / ghé vào"`,
+        );
       for (const m of s.text.matchAll(/\{([^}]*)\}/g))
         if (!(AMBUSH_SCENE_VARS as readonly string[]).includes(m[1]))
           bad.push(`${at}: biến {${m[1]}} không được phép`);

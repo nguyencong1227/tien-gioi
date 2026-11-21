@@ -257,6 +257,7 @@ describe("spawnZone: trùm", () => {
   /** Chạy bộ lập lịch qua 12:00 ở bản đồ tự dựng `thu_vung` (lịch mẫu, trùm Thiên Hàn Vương); `pre` đặt quái trước khi tới giờ. */
   function runNoon(z: SpawnZoneDef, pre?: (w: ReturnType<typeof makeWorld>["w"]) => void) {
     const hub = new Hub();
+    hub.worldBoss.enabled = true; // mặc định của sổ là TẮT
     hub.worldBoss.slots = [{ ...sampleWorldBossSchedule()[0]!, mapId: "thu_vung" }];
     const { w } = makeWorld(mapWith([z], { lang: 4 }), hub);
     pre?.(w);
