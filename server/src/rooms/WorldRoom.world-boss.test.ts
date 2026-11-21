@@ -71,15 +71,19 @@ async function waitFor<T>(
   ms = 4000,
   what = "điều kiện",
 ): Promise<T> {
-  const end = Date.now() + ms;
+  // Sàn hạn chờ (#1215): 4 giây / 100-200 vòng là mức máy rảnh; máy tải cao / cả bộ `npm test` làm tick của máy chủ tới muộn. Chờ theo ĐIỀU KIỆN nên nâng sàn không làm test chậm đi khi điều kiện tới đúng hạn.
+  const end = Date.now() + Math.max(ms, WAIT_FLOOR_MS);
+  let left = Math.max(budget, WAIT_FLOOR_ROUNDS);
   for (;;) {
     const v = fn();
     if (v) return v;
     // `Date` có thể đang bị giả (đứng yên): đếm thời gian chờ theo số vòng thay vì đồng hồ
-    if (--budget <= 0 || (!fake && Date.now() > end)) throw new Error(`Hết thời gian chờ ${what}`);
+    if (--left <= 0 || (!fake && Date.now() > end)) throw new Error(`Hết thời gian chờ ${what}`);
     await sleep(20);
   }
 }
+const WAIT_FLOOR_MS = 12_000;
+const WAIT_FLOOR_ROUNDS = 600; // ~12 giây với nhịp 20 ms
 let budget = 0;
 let fake = false;
 const serverRoom = (room: Room) =>
