@@ -154,6 +154,21 @@ describe("ambushViolations: cảnh", () => {
     ])
       expect(ambushViolations([scene({ text })], []).join("\n")).toMatch(/NGỒI/);
   });
+  it("CHỐT CÁI GIÁ: 'chỗ ngồi' TRẦN (không kèm NGƯƠI) KHÔNG bị bắt; 'chỗ ngồi của ngươi' vẫn bị bắt", () => {
+    // cái giá đã chấp nhận (A + B, #1242): 'chỗ ngồi' trần không nói tới ngươi -> LỌT (khoá hành vi có chủ ý)
+    for (const text of [
+      "Quanh chỗ ngồi đã kín mắt xanh mắt đỏ, bầy yêu vây từ lúc nào chẳng hay.",
+      "Chỗ nhập định của hắn yên tĩnh giữa rừng, sương sớm đọng trên lá.",
+    ])
+      expect(ambushViolations([scene({ text })], []), text).toEqual([]);
+    // ngôi hai kèm 'ngươi' vẫn bị bắt (đối chiếu)
+    expect(
+      ambushViolations(
+        [scene({ text: "Quanh chỗ ngồi của ngươi đã kín mắt xanh mắt đỏ." })],
+        [],
+      ).join("\n"),
+    ).toMatch(/NGỒI/);
+  });
   it("bắt id trùng", () => {
     expect(ambushViolations([scene(), scene()], []).join("\n")).toMatch(/trùng id/);
   });

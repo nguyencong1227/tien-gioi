@@ -547,6 +547,8 @@ const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=H
  * Chặn đường chỉ kích hoạt khi người chơi ĐI BỘ thật (`systems/ambush.ts`; đứng yên / dịch chuyển không tính), nên văn mẫu không được viết như người chơi đang NGỒI / vừa thiền
  * ("thẳng về chỗ ngươi ngồi", "ngươi mở mắt", "quanh chỗ ngồi của ngươi"): nhiều cảnh lấy từ sự kiện BẾ QUAN của nguồn nên dễ lọt (B bắt 3 cảnh ở review #1240). Chỉ bắt dạng nói về NGƯƠI:
  * "ngươi ngồi / mở mắt / ..." hoặc "chỗ ngươi ngồi / chỗ ngồi của ngươi"; kẻ địch "ngồi / mở mắt" (ngôi thứ ba) và "chỗ ngồi của hắn" vẫn hợp lệ (B, #1242).
+ * CHỐT CÁI GIÁ (chấp nhận, B #1242 ghi nhận 1+2): "chỗ ngồi" TRẦN không kèm NGƯƠI ("quanh chỗ ngồi đã kín mắt"), "chỗ nhập định / đả tọa / bế quan" trần, và lưới mỏng với
+ * "đang ngồi" / "khoanh chân ngồi" / "tọa thiền" — TẤT CẢ đều LỌT. Người nới luật sau đừng tưởng đã bắt hết; muốn bắt thêm thì kèm ca KHÔNG-bắt ngôi thứ ba (đột biến).
  */
 const SITTING_RE =
   /(?:ngươi|chỗ\s+(?:của\s+)?ngươi)\s+(?:ngồi|mở mắt|nhập định|đả tọa|bế quan)|chỗ\s+ngồi\s+(?:của\s+)?ngươi/iu;
