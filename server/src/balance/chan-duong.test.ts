@@ -15,7 +15,7 @@ import {
   ambushBalanceViolations,
   ambushBalanceWarnings,
   ambushIntervalMin,
-  ambushSensitivityWarnings,
+  ambushSensitivityViolations,
   atLeastOnce,
   blendedRate,
   blendedUplift,
@@ -473,25 +473,31 @@ describe("độ nhạy theo giả định: phép tính", () => {
     for (const p of [8, 2, 0]) expect(dead(p, "none")).toBeGreaterThanOrEqual(dead(p, "best"));
   });
 
-  it("cảnh báo: bầy chết 'tới cùng' VƯỢT 5% ở giả định thận trọng (2 đan + đồ đúng bậc) bị nêu TÊN; đúng ngưỡng thì không; thiếu hàng thận trọng thì không cảnh báo", () => {
+  it("VI PHẠM: bầy chết 'tới cùng' VƯỢT 5% hoặc thắng DƯỚI mục tiêu ở giả định thận trọng (2 đan + đồ đúng bậc) bị nêu TÊN; đúng ngưỡng thì không; thiếu hàng thận trọng thì không", () => {
     const rows = sensitivityRows([QUY, EASY], 8);
-    const w = ambushSensitivityWarnings(rows);
+    const w = ambushSensitivityViolations(rows);
     expect(w).toHaveLength(1);
     expect(w[0]).toContain("mau_quy");
     expect(w[0]).toContain("giả định thận trọng");
+    expect(w[0]).toContain("chết vượt 5%");
     expect(w[0]).not.toContain("mau_de");
-    // chỉnh tay tỉ lệ chết của MỘT bầy quanh ngưỡng
+    // chỉnh tay tỉ lệ chết / thắng của MỘT bầy quanh ngưỡng (thắng = 1 - chết: không để thắng thấp làm nhiễu phép thử ngưỡng chết)
     const cautious = cautiousRow(rows)!;
-    const at = (lost: number): SensitivityRow[] => [
+    const at = (lost: number, won = 1 - lost): SensitivityRow[] => [
       {
         ...cautious,
-        sums: [{ ...cautious.sums[0]!, toEnd: { ...cautious.sums[0]!.toEnd, lost } }],
+        sums: [{ ...cautious.sums[0]!, toEnd: { ...cautious.sums[0]!.toEnd, lost, won } }],
       },
     ];
-    expect(ambushSensitivityWarnings(at(0.05))).toEqual([]); // đúng 5%: không vượt
-    expect(ambushSensitivityWarnings(at(0.0625))).toHaveLength(1); // 3 / 48
-    expect(ambushSensitivityWarnings(rows.filter((r) => r !== cautious))).toEqual([]);
-    expect(ambushSensitivityWarnings([])).toEqual([]);
+    expect(ambushSensitivityViolations(at(0.05, 0.95))).toEqual([]); // đúng 5%: không vượt (bầy thường cần thắng >= 90%)
+    expect(ambushSensitivityViolations(at(0.0625, 0.9375))).toHaveLength(1); // 3 / 48
+    // thắng dưới mục tiêu dù KHÔNG chết (hết giờ): vẫn là vi phạm, lý do nêu 'thắng dưới'
+    const slow = ambushSensitivityViolations(at(0, 0.8));
+    expect(slow).toHaveLength(1);
+    expect(slow[0]).toContain("thắng dưới 90%");
+    expect(slow[0]).not.toContain("chết vượt");
+    expect(ambushSensitivityViolations(rows.filter((r) => r !== cautious))).toEqual([]);
+    expect(ambushSensitivityViolations([])).toEqual([]);
   });
 });
 
@@ -506,7 +512,9 @@ describe("renderAmbushBalance", () => {
     expect(md).toContain("### 1. Tỉ lệ chết theo cảnh giới");
     expect(md).toContain("| mau_de |");
     expect(md).toContain("| mau_kho |");
-    expect(md).toContain("**VI PHẠM (1):**");
+    // bầy khó vi phạm HAI nơi: bảng chuẩn (thắng dưới mục tiêu) và hàng thận trọng (độ nhạy)
+    expect(md).toContain("**VI PHẠM (2):**");
+    expect(md).toContain("ở giả định thận trọng");
     expect(md).toContain("Luyện Khí");
   });
   it("mục 4 Độ nhạy: đủ 6 hàng (đan x đồ), đánh dấu hàng chuẩn và hàng thận trọng, nêu xác suất chết trong ngày và có lời kết luận về giả định chuẩn", () => {
@@ -518,11 +526,11 @@ describe("renderAmbushBalance", () => {
     expect(md).toContain(`${AMBUSH_DAY_CAP} lần chặn`);
     expect(md).toContain("Chết >= 1 lần / ngày");
     expect(md).toContain("mau_quy (chết"); // bầy chết nhiều nhất
-    expect(md).toContain("CHƯA đặt nó làm giả định chuẩn"); // Thạch Quy chết 2 đan: còn bầy dưới mục tiêu
+    expect(md).toContain("VI PHẠM** (tên ở mục vi phạm bên dưới): chưa đề xuất bật"); // Thạch Quy chết 2 đan: bầy vi phạm ở giả định thận trọng
     expect(md).toContain("ở giả định thận trọng");
-    expect(md).toContain("vượt 5%"); // cảnh báo độ nhạy đi vào danh sách cảnh báo của báo cáo
+    expect(md).toContain("chết vượt 5%"); // vi phạm độ nhạy đi vào danh sách VI PHẠM của báo cáo
     expect(md).toContain("bầy mau_quy (am_suong, bậc 13, normal): chết");
-    expect(renderAmbushBalance([EASY])).toContain("có thể đặt nó làm giả định CHUẨN");
+    expect(renderAmbushBalance([EASY])).toContain("không bầy nào vi phạm");
     expect(renderAmbushBalance([])).not.toContain("### 4.");
   });
 });
@@ -549,6 +557,8 @@ describe("DỮ LIỆU THẬT: độ nhạy (AMBUSH_FOES)", () => {
 describe("DỮ LIỆU THẬT (AMBUSH_FOES)", () => {
   it("không bầy nào vi phạm mục tiêu tỉ lệ thắng / thắng hơn bỏ chạy (nếu đỏ: chạy `npm run can-bang -w server`, đọc mục 'Chặn đường', chọn bầy yếu hơn hoặc chỉnh hằng số)", () => {
     expect(ambushBalanceViolations()).toEqual([]);
+    // GIẢ ĐỊNH THẬN TRỌNG là chuẩn bật AMBUSH (A chốt 22/11, CD6c): ít đan (2) + đồ đúng bậc vẫn chết <= 5% và thắng >= mục tiêu ở MỌI bầy (nếu đỏ: bầy nêu tên quá khó với người ít đan: giảm số con / nâng `minStep` / chọn loài nhẹ hơn, đo lại bằng `npm run can-bang -w server`)
+    expect(ambushSensitivityViolations(sensitivityRows())).toEqual([]);
     // không "đạt" chỉ vì bảng rỗng ở bản đã có dữ liệu: nếu có bầy thì phải đã đo
     expect(renderAmbushBalance().includes("Chưa có bầy") ? AMBUSH_FOES.length : -1).toBe(
       AMBUSH_FOES.length === 0 ? 0 : -1,
