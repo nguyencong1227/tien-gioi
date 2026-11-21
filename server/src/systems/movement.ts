@@ -9,6 +9,7 @@ import {
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import { rand, quantAngle, type World, type PlayerCtrl } from "../world";
+import { inMainRegion } from "./nav";
 
 /**
  * BACKLOG tối đa còn lại SAU khi đã dùng hết ngân sách bước của tick (mục 41 QUYET_DINH_M3, "trôi như liệt phím"): 5 input = 0,25 giây. Mạng nhà đứng rồi xả dồn
@@ -165,7 +166,7 @@ export const RELOCATE_MAX_PX = 24 * TILE;
 const RELOCATE_STEP = TILE / 2;
 
 /**
- * Chỗ đứng KHÔNG bị chặn GẦN (x, y) nhất trong `RELOCATE_MAX_PX` (lấy mẫu mỗi nửa ô, chọn khoảng cách nhỏ nhất; hoà thì lấy điểm quét trước: hàng trên, cột trái). `null` nếu không có.
+ * Chỗ đứng KHÔNG bị chặn và NỐI với thế giới mở (vùng chính, `inMainRegion`) GẦN (x, y) nhất trong `RELOCATE_MAX_PX` (lấy mẫu mỗi nửa ô, chọn khoảng cách nhỏ nhất; hoà thì lấy điểm quét trước: hàng trên, cột trái). `null` nếu không có.
  * Dùng khi bản đồ đổi (docs/THIET_KE_BAN_DO_TILED.md mục 7.2) hoặc hồ sơ lưu rơi vào tường: người đang săn ở xa không bị kéo về trấn. Chỉ chạy lúc vào phòng với vị trí hỏng (hiếm).
  */
 export function nearestFreeSpot(
@@ -186,6 +187,9 @@ export function nearestFreeSpot(
       const d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
       if (d >= bestD) continue;
       if (map.circleBlocked(cx, cy, PLAYER_RADIUS)) continue;
+      // Chỉ nhận chỗ NỐI với thế giới mở (vùng chính của cỡ thân người chơi): "gần nhất" mà nằm trong túi kín thì người chơi KHÔNG đi ra được và game không có lệnh gỡ kẹt (B đo ở review #1213:
+      // 12-22 % ô chặn dời vào túi kín nếu bỏ kiểm này). Chỉ gọi khi điểm sẽ thành `best` (đã qua `d < bestD`) nên rất ít lần.
+      if (!inMainRegion(map, PLAYER_RADIUS, cx, cy)) continue;
       bestD = d;
       best = { x: cx, y: cy };
     }
