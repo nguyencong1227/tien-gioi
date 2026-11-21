@@ -275,7 +275,7 @@ async function main() {
 
     /**
      * Chỗ đi bộ được ngoài trấn (không khu an toàn), có 160 px trống về phía +x để giữ phím D, không quái nào trong 260 px (quái nhắm người chơi làm
-     * "đang giao chiến"). Xếp theo độ XA TRÙM giảm dần (`ambushBlocked` nhánh "boss": trùm sống trong `MONSTER_WAKE_DIST` = 800 px chặn; trùm còn lang
+     * "đang giao chiến"). Xếp theo độ XA TRÙM giảm dần (`ambushBlocked` nhánh "boss": trùm sống trong `MONSTER_WAKE_DIST` = 900 px chặn; trùm còn lang
      * thang quanh nhà nên lấy chỗ xa nhất có thể, theo toạ độ NHÀ của trùm); `skip` lấy chỗ thứ `skip` của danh sách đó.
      */
     const wildSpot = (world: any, skip: number): { x: number; y: number } => {
