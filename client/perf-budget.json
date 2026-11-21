@@ -5,6 +5,8 @@
   "static": {
     "startupGzipKb": 220,
     "totalJsGzipKb": 548,
+    "mapFilesGzipKb": 48,
+    "_ghiChuJs": "Ba trần JS: khởi động (`startupGzipKb`) / tổng MÃ (`totalJsGzipKb`: chặn 'giấu' mã vào chunk tải sau, #1097) / DỮ LIỆU bản đồ Tiled (`mapFilesGzipKb`, #1283: chunk `map-files-<băm>.js`, JSON bản đồ biên dịch thành module, tăng theo từng bản đồ mới). Đo 22/11/2026: map-files 12,45 KiB gzip (4 bản đồ ~3 KiB mỗi bản) nên trần 48 chứa thêm ~10 bản đồ; `totalJsGzipKb` giữ 548 và nay chỉ tính mã (545,88 -> ~533,4). Không tìm thấy chunk khớp thì KHÔNG miễn trừ (mọi JS tính vào tổng) và cảnh báo.",
     "atlasTilesetKb": 1024,
     "aiAssets": {
       "maxFileKb": 150,
