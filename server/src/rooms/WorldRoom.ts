@@ -121,6 +121,7 @@ import {
   savePos,
   syncPublicPos,
 } from "../systems/movement";
+import { warmWalkReach } from "../systems/walk-reach";
 import { slash, swordQi } from "../systems/combat";
 import {
   spawnDungeonMonsters,
@@ -447,7 +448,11 @@ export class WorldRoom extends Room<WorldState> {
     this.setPatchRate(TICK_MS);
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
     if (run) spawnDungeonMonsters(this.world);
-    else if (!ticket) spawnInitial(this.world); // đấu trường: kẻ địch do `createArena` đặt, không sinh tự nhiên
+    else if (!ticket) {
+      spawnInitial(this.world); // đấu trường: kẻ địch do `createArena` đặt, không sinh tự nhiên
+      // Phòng thường nhận người vào với toạ độ đã lưu (`safeSpot` kiểm "tới được từ trấn"): dựng sẵn mặt nạ đi bộ ở đây, cạnh việc làm ấm lưới quái, để lần vào ĐẦU TIÊN không trễ ~15-25 ms trong `onJoin`
+      warmWalkReach(this.world.map);
+    }
     this.clock.setInterval(() => this.saveAll(), SAVE_EVERY_MS);
     if (run) {
       // Quái nhỏ dọn một lần (không hồi sinh); phòng trống thì huỷ (`autoDispose` bật ở lần vào đầu tiên: bật ngay bây giờ
