@@ -10,9 +10,11 @@ import {
 } from "@tien-gioi/shared";
 import {
   AMBUSH_DEATH_NOTE,
+  AMBUSH_POTION_MIN,
   AMBUSH_RETRY_MS,
   ambushChoiceForKey,
   ambushDialogView,
+  ambushPotionNote,
   ambushEndToast,
   ambushEndView,
   ambushMarkSeen,
@@ -20,9 +22,11 @@ import {
   ambushRemainingMs,
   chooseAmbush,
   isDangerousTier,
+  isHealPotion,
   openAmbush,
   parseAmbushEnd,
   parseAmbushOffer,
+  potionCountOf,
 } from "./ambush-view";
 
 const T0 = 10_000;
@@ -453,5 +457,104 @@ describe("MỤC 53: dòng 'Bị hạ trong trận là chết thật.' dưới n�
     const v = ambushDialogView(open(), ARMED);
     expect(v.buttons[1].aria).not.toContain("chết thật");
     expect(v.buttons[2].aria).not.toContain("chết thật");
+  });
+});
+
+describe("nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết; số đo #1252 / #1254)", () => {
+  it("hằng số: mức tối thiểu 2 (đo: 2 đan chết 0 %, 1 đan kẻ cầm đầu bậc 11 vẫn chết 71 %); có BA đan hồi khí huyết trong bảng vật phẩm (40 / 70 / 90 %)", () => {
+    expect(AMBUSH_POTION_MIN).toBe(2);
+    const heal = ITEMS.filter((i) => i.effect?.kind === "healHp").map((i) => i.id);
+    expect(heal).toEqual(
+      expect.arrayContaining(["hoi_huyet_dan", "dai_hoi_huyet_dan", "thuong_hoi_huyet_dan"]),
+    );
+  });
+
+  it("isHealPotion: MỌI đan hồi khí huyết (thường / Đại / Thượng) là đan; đan hồi linh, đan tu vi, id lạ và tên đặc biệt thì không", () => {
+    for (const id of ["hoi_huyet_dan", "dai_hoi_huyet_dan", "thuong_hoi_huyet_dan"])
+      expect(isHealPotion(id), id).toBe(true);
+    for (const id of [
+      "hoi_linh_dan",
+      "tu_khi_dan",
+      "khong_co_that",
+      "",
+      "constructor",
+      "__proto__",
+      "toString",
+    ])
+      expect(isHealPotion(id), id).toBe(false);
+    // khớp ĐÚNG định nghĩa theo dữ liệu: mọi vật phẩm có `healHp` đều tính, không món nào khác
+    for (const it of ITEMS) expect(isHealPotion(it.id), it.id).toBe(it.effect?.kind === "healHp");
+  });
+
+  it("potionCountOf: cộng MỌI ô đan hồi khí huyết (cả Đại / Thượng); bỏ ô trống, vật phẩm khác, số lượng không hợp lệ; làm tròn xuống", () => {
+    expect(potionCountOf([])).toBe(0);
+    expect(potionCountOf([null, undefined])).toBe(0);
+    expect(potionCountOf([{ itemId: "hoi_huyet_dan", qty: 3 }])).toBe(3);
+    expect(
+      potionCountOf([
+        { itemId: "hoi_huyet_dan", qty: 3 },
+        null,
+        { itemId: "hoi_linh_dan", qty: 9 }, // đan hồi linh không tính
+        { itemId: "hoi_huyet_dan", qty: 4 }, // hai ô cộng lại
+      ]),
+    ).toBe(7);
+    // người Kim Đan trở lên mang đan Đại / Thượng: KHÔNG bị coi là "không đan"
+    expect(potionCountOf([{ itemId: "dai_hoi_huyet_dan", qty: 2 }])).toBe(2);
+    expect(
+      potionCountOf([
+        { itemId: "thuong_hoi_huyet_dan", qty: 1 },
+        { itemId: "hoi_huyet_dan", qty: 1 },
+      ]),
+    ).toBe(2);
+    expect(potionCountOf([{ itemId: "hoi_huyet_dan", qty: 2.9 }])).toBe(2);
+    for (const qty of [0, -3, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(potionCountOf([{ itemId: "hoi_huyet_dan", qty }]), String(qty)).toBe(0);
+  });
+
+  it("ambushPotionNote: 0 và 1 đan có lời nhắc kèm SỐ đan thật; từ 2 đan trở lên, hoặc không biết số đan: rỗng (không nói điều chưa chắc)", () => {
+    expect(ambushPotionNote(0)).toBe("Túi không có đan hồi huyết: nên mang ít nhất 2.");
+    expect(ambushPotionNote(1)).toBe("Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.");
+    expect(ambushPotionNote(AMBUSH_POTION_MIN)).toBe("");
+    expect(ambushPotionNote(99)).toBe("");
+    expect(ambushPotionNote(undefined)).toBe("");
+    expect(ambushPotionNote(Number.NaN)).toBe("");
+    expect(ambushPotionNote(1.9)).toContain("còn 1 "); // làm tròn xuống
+    expect(ambushPotionNote(-4)).toContain("không có"); // số âm coi như 0
+  });
+
+  it("view: không truyền số đan thì y như cũ (không dòng nhắc, câu đọc và aria không đổi)", () => {
+    const d = open();
+    const v = ambushDialogView(d, ARMED);
+    expect(v.potionNote).toBe("");
+    expect(v.announce).not.toContain("đan hồi huyết");
+    expect(v.buttons[0].aria).not.toContain("đan hồi huyết");
+    expect(ambushDialogView(d, ARMED, 5)).toEqual(v); // đủ đan: giống hệt
+  });
+
+  it("view: thiếu đan thì có dòng nhắc, nằm trong câu đọc của hộp thoại và aria của nút Chiến; dòng 'chết thật' vẫn luôn có; nút KHÔNG bị khoá", () => {
+    const base = ambushDialogView(open(), ARMED);
+    for (const have of [0, 1]) {
+      const v = ambushDialogView(open(), ARMED, have);
+      expect(v.potionNote, `${have} đan`).toBe(ambushPotionNote(have));
+      expect(v.potionNote).not.toBe("");
+      expect(v.announce).toContain(v.potionNote);
+      expect(v.buttons[0].aria).toContain(v.potionNote);
+      expect(v.deathNote).toBe(AMBUSH_DEATH_NOTE);
+      // chỉ là LỜI NHẮC: trạng thái nút giữ nguyên
+      expect(v.buttons.map((b) => b.enabled)).toEqual(base.buttons.map((b) => b.enabled));
+      // bỏ chạy không nhắc đan (bỏ chạy là cách tránh)
+      expect(v.buttons[1].aria).not.toContain("đan hồi huyết");
+      expect(v.buttons[2].aria).not.toContain("đan hồi huyết");
+    }
+  });
+
+  it("view: dòng nhắc đan hiện ở MỌI mức và mọi trạng thái (đang khoá, đã gửi, hết giờ cục bộ)", () => {
+    for (const tier of ["normal", "elite", "leader"] as const) {
+      const d = openAmbush(null, sampleAmbushOffer(tier), T0).dialog;
+      for (const at of [T0, ARMED, ARMED + AMBUSH_OFFER_MS])
+        expect(ambushDialogView(d, at, 0).potionNote, `${tier} @${at - T0}`).not.toBe("");
+      const sent = chooseAmbush(d, "fight", ARMED).dialog;
+      expect(ambushDialogView(sent, ARMED + 10, 0).potionNote, `${tier} đã gửi`).not.toBe("");
+    }
   });
 });
