@@ -648,7 +648,7 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
 /**
  * Danh sách bản đồ thường của game (docs/THIET_KE_NHIEU_BAN_DO.md). Ban đầu là các định nghĩa sinh theo `seed` (`PROCEDURAL_MAPS`); `adoptTiledMaps` (bên dưới) thay từng mục bằng bản
  * dựng từ TỆP Tiled (`shared/maps/<id>.logic.json`, docs/THIET_KE_BAN_DO_TILED.md mục 4a): cùng id / thứ tự, cùng ô / cổng / trấn từng byte (test `tiled-maps.test.ts`). SERVER nhận tệp lúc
- * `defineRooms` (xem `shared/src/map-files.ts`); CLIENT chưa nhận (ở S2 vẫn sinh theo `seed`, KHÔNG nhập 4 tệp ~16 KB gzip vào gói KHỞI ĐỘNG đăng nhập: client sẽ nhận trong chunk game tải sau, S3).
+ * `defineRooms` (xem `shared/src/map-files.ts`); CLIENT cũng nhận tệp (S3a): `client/src/game-modules.ts` gọi `adoptTiledMapFiles()` khi chunk game tải xong, TRƯỚC khi dựng `WorldScene`, nên hai bên dựng bản đồ từ CÙNG tệp (từ S6 tệp sửa tay khác `seed`); 4 tệp ~16 KB gzip KHÔNG nằm trong gói KHỞI ĐỘNG.
  * Mảng này được SỬA TẠI CHỖ bởi `adoptTiledMaps`: giữ tham chiếu `MAPS` thì thấy bản mới.
  */
 const worldDefs: MapDef[] = [...PROCEDURAL_MAPS];
