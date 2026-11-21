@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HEARTBEAT_INTERVAL_MS } from "@tien-gioi/shared";
-import { ABUSE, DEFAULT_LIMIT, MESSAGE_LIMITS, RateLimiter } from "./rate-limit";
+import { ABUSE, DEFAULT_LIMIT, MAX_TRACKED_TYPES, MESSAGE_LIMITS, RateLimiter } from "./rate-limit";
 
 describe("giới hạn tần suất tin nhắn", () => {
   it("cho gửi dồn tới burst, sau đó bỏ; hồi lại theo thời gian", () => {
@@ -95,5 +95,23 @@ describe("giới hạn tần suất tin nhắn", () => {
     let kicked = false;
     for (let i = 0; i < 10_000 && !kicked; i++) kicked = lim.check(`rac_${i}`, 0) === "kick";
     expect(kicked).toBe(true);
+  });
+
+  it("#1250: người dùng đủ MAX_TRACKED_TYPES loại tin vẫn được tin ĐẦU của mỗi loại đó (loại thứ 65 không bị bỏ như spam), nhưng loại thứ MAX + 1 thì bị bỏ", () => {
+    const lim = new RateLimiter(0);
+    for (let i = 0; i < MAX_TRACKED_TYPES; i++)
+      expect(lim.check(`loai_${i}`, 0), `loại thứ ${i + 1}`).toBe("ok");
+    // loại ĐÃ theo dõi vẫn dùng bình thường sau khi đạt trần (quỹ riêng còn nguyên)
+    expect(lim.check("loai_0", 0)).toBe("ok");
+    expect(lim.check(`loai_${MAX_TRACKED_TYPES}`, 0)).toBe("drop");
+  });
+
+  it("#1250: loại thứ MAX + 1 bị bỏ KHÔNG hao quỹ ABUSE hơn một tin spam thường, và bị bỏ lặp lại thì cuối cùng bị ngắt", () => {
+    const lim = new RateLimiter(0);
+    for (let i = 0; i < MAX_TRACKED_TYPES; i++) lim.check(`loai_${i}`, 0);
+    let drops = 0;
+    for (; drops < 1000; drops++) if (lim.check(`la_${drops}`, 0) === "kick") break;
+    // quỹ ABUSE (burst 200) cạn sau đúng ABUSE.burst tin bị bỏ, tin kế tiếp mới là kick
+    expect(drops).toBe(ABUSE.burst);
   });
 });
