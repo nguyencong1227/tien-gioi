@@ -27,6 +27,7 @@ import { renderBotHuntSection } from "./bot-hunt";
 import { renderSectEconomy } from "./tong-mon";
 import { renderAmbushBalance } from "./chan-duong";
 import { renderBossBalance } from "./trum";
+import { renderWorldBossBalance } from "./trum-the-gioi";
 import { renderSkillBalanceMarkdown } from "./skills-model";
 import { renderSkillDpsMarkdown } from "./skills-dps";
 import { PK_TARGET_SECONDS, representativeLevels, summarizeDuels } from "./pk";
@@ -476,6 +477,8 @@ ${renderBotHuntSection()}
 ${renderSectEconomy()}
 
 ${renderBossBalance()}
+
+${renderWorldBossBalance()}
 
 ${renderAmbushBalance()}
 
