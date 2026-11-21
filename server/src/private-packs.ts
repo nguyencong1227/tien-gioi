@@ -23,6 +23,7 @@ import path from "node:path";
 import type { Express, Request, Response } from "express";
 import {
   PRIVATE_PACK_FILE_MAX_BYTES,
+  PRIVATE_PACK_PATH_MAX_LEN,
   PRIVATE_PACK_EMPTY_MANIFEST,
   PRIVATE_PACK_MIME,
   PRIVATE_PACK_URL_PREFIX,
@@ -278,6 +279,65 @@ export function buildPrivatePackManifest(
   if (bad.length > 0)
     throw new Error(`manifest sinh ra không hợp lệ: ${bad.slice(0, 5).join("; ")}`);
   return m;
+}
+
+/** Một tệp mà `manifest` BỎ QUA dù trông như ảnh / âm thanh của gói: `path` = `<gói>/<đường dẫn>`, `reason` = lý do bằng tiếng Việt (có thể nhiều lý do, nối bằng `; `). */
+export interface SkippedPrivateFile {
+  path: string;
+  reason: string;
+}
+
+/** Lý do `isSafePrivatePackPath` loại đường dẫn `rel` (tương đối trong gói), luôn trả MỘT lý do (mặc định `tên không hợp lệ`). Chỉ để GIẢI THÍCH cho người đóng gói, luật thật vẫn là `isSafePrivatePackPath`. */
+function pathProblems(rel: string): string {
+  const out: string[] = [];
+  const segs = rel.split("/");
+  if (rel.length > PRIVATE_PACK_PATH_MAX_LEN)
+    out.push(`đường dẫn dài ${rel.length} ký tự (tối đa ${PRIVATE_PACK_PATH_MAX_LEN})`);
+  if (segs.some((g) => /\s/.test(g))) out.push("có khoảng trắng");
+  if (segs.some((g) => /[^A-Za-z0-9._\-\s]/.test(g)))
+    out.push("có ký tự ngoài chữ / số / . _ - (dấu, ký hiệu)");
+  if (segs.some((g) => /^[A-Za-z0-9._-]+$/.test(g) && !/^[A-Za-z0-9]/.test(g)))
+    out.push("mỗi đoạn tên phải bắt đầu bằng chữ hoặc số");
+  return out.length > 0 ? out.join("; ") : "tên không hợp lệ";
+}
+
+/**
+ * Tệp BỊ BỎ QUA mà người đóng gói thường không biết (`assets-private:manifest` từng im lặng): (1) có đuôi trong danh sách trắng nhưng TÊN / đường dẫn sai luật `isSafePrivatePackPath` (khoảng trắng, dấu,
+ * ký tự lạ, > `PRIVATE_PACK_PATH_MAX_LEN`; gói tải từ itch.io hay có `Blue House.png`); (2) liên kết tượng trưng (không bao giờ được phục vụ) có đuôi hợp lệ hoặc trỏ tới thư mục. KHÔNG tính: đuôi ngoài
+ * danh sách trắng (`readme.txt`, `SOURCES.md`: bỏ qua là chủ ý), tệp / thư mục ẩn, tệp lẻ ở gốc `dist`. Chỉ CẢNH BÁO: không bao giờ đổi tên tệp của người dùng. Thứ tự tất định (cùng `buildPrivatePackManifest`).
+ */
+export function listSkippedPrivatePackFiles(distDir: string): SkippedPrivateFile[] {
+  const root = path.resolve(distDir);
+  const out: SkippedPrivateFile[] = [];
+  const scan = (dir: string, pack: string, rel: string): void => {
+    for (const name of readdirSync(dir).sort()) {
+      if (name.startsWith(".")) continue;
+      const abs = path.join(dir, name);
+      const r = rel === "" ? name : `${rel}/${name}`;
+      const st = lstatSync(abs);
+      if (st.isSymbolicLink()) {
+        let toDir = false;
+        try {
+          toDir = statSync(abs).isDirectory();
+        } catch {
+          // liên kết hỏng: chỉ tính nếu tên có đuôi hợp lệ
+        }
+        if (toDir || privatePackExtension(name) !== undefined)
+          out.push({
+            path: `${pack}/${r}`,
+            reason: "liên kết tượng trưng (không bao giờ được phục vụ)",
+          });
+      } else if (st.isDirectory()) scan(abs, pack, r);
+      else if (st.isFile() && !isSafePrivatePackPath(r) && privatePackExtension(r) !== undefined)
+        out.push({ path: `${pack}/${r}`, reason: pathProblems(r) });
+    }
+  };
+  for (const name of readdirSync(root).sort()) {
+    const abs = path.join(root, name);
+    if (name.startsWith(".") || !lstatSync(abs).isDirectory()) continue;
+    scan(abs, name, "");
+  }
+  return out;
 }
 
 /** Ghi manifest (đẹp, kết thúc bằng xuống dòng) vào `<dist>/manifest.json`. */
