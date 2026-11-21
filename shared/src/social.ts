@@ -240,11 +240,28 @@ export interface WorldBossSlot {
   boss: string;
   /** Bản đồ thường (không phải bí cảnh) nơi trùm xuất hiện. */
   mapId: string;
+  /**
+   * Hệ số MÁU so với loài trùm (mặc định 1, tuỳ chọn). Bộ chiêu `BOSSES` của loài hiện được cân cho đội 3-4 người hạ trong 1-2 phút (`CAN_BANG.md` mục "Trùm nhiều chiêu"),
+   * quá mỏng cho một sự kiện 30 phút của cả server: trùm thế giới nhân MÁU của loài (đòn đánh, chiêu, giai đoạn giữ nguyên) để cần nhiều người và nhiều phút; hệ số do mô phỏng
+   * `can-bang` chốt (số người hạ trong `durationMin` ở 5 / 20 / 50 người). `worldBossHpOf` là cách DUY NHẤT tính máu thật.
+   */
+  hpMult?: number;
   /** Trùm tồn tại tối đa chừng này phút rồi bỏ chạy. */
   durationMin: number;
   /** Thông báo toàn server trước giờ xuất hiện chừng này phút (giảm dần, vd [10, 5, 1]). */
   announceMin: readonly number[];
   reward: WorldBossReward;
+}
+
+/** Trần `WorldBossSlot.hpMult` (chặn gõ nhầm số: máu một trùm phải còn nằm trong số nguyên an toàn của schema). */
+export const WORLD_BOSS_HP_MULT_MAX = 500;
+
+/** Máu THẬT của trùm thế giới ở khung `slot`: máu loài x `hpMult` (mặc định 1), làm tròn, >= 1. Loài lạ / hệ số hỏng thì dùng 1 (dữ liệu hỏng đã bị `worldBossViolations` bắt). Thuần. */
+export function worldBossHpOf(slot: Pick<WorldBossSlot, "boss" | "hpMult">): number {
+  const base = hasOwn(MONSTER_BY_ID, String(slot.boss)) ? MONSTER_BY_ID[slot.boss].hp : 0;
+  const m = slot.hpMult;
+  const mult = typeof m === "number" && Number.isFinite(m) && m >= 1 ? m : 1;
+  return Math.max(1, Math.round(base * Math.min(mult, WORLD_BOSS_HP_MULT_MAX)));
 }
 
 /**
@@ -429,6 +446,11 @@ export function worldBossViolations(
       bad.push(`${at}: giờ phải là số nguyên 0-23`);
     if (!Number.isInteger(s.minute) || s.minute < 0 || s.minute > 59)
       bad.push(`${at}: phút phải là số nguyên 0-59`);
+    if (
+      s.hpMult !== undefined &&
+      (!Number.isFinite(s.hpMult) || s.hpMult < 1 || s.hpMult > WORLD_BOSS_HP_MULT_MAX)
+    )
+      bad.push(`${at}: hpMult phải là số 1-${WORLD_BOSS_HP_MULT_MAX} (hoặc bỏ trống = 1)`);
     if (!Number.isInteger(s.durationMin) || s.durationMin < 10 || s.durationMin > 120)
       bad.push(`${at}: thời lượng phải là số nguyên 10-120 phút`);
     else if (
