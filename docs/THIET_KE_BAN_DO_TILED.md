@@ -89,6 +89,19 @@ Chạy trong test (mọi tệp `shared/maps/*.json`) và `npm run check:content`
 
 S1 và S2 KHÔNG cần người dùng quyết gì thêm (hành vi không đổi); S3 cần hướng đồ hoạ đã duyệt (#1196); S5-S6 đổi bản đồ thật thì theo mục 7.
 
+## 6a. Quy trình S6 cho MỘT bản đồ thường đã có (E / G soạn, A duyệt; mỗi bản đồ MỘT PR)
+
+Điều kiện đã đủ (21/11/2026): S2 (tệp là nguồn), S3a (client nhận tệp trong chunk game), S4 (`map:check` / `map:build` / `map:show`), S5 (`spawnZone` + kiểm), `safeSpot` đưa vị trí lưu rơi vào ô chặn / túi kín tới chỗ đứng gần nhất. **Phạm vi nội dung của S6 (vẽ lại bốn bản đồ hay dựng bản đồ MỚI, mục 9 câu 3) do NGƯỜI DÙNG quyết**: chưa có trả lời thì chưa ai bắt đầu S6.
+
+1. **Sửa tệp soạn `shared/maps/<id>.json`** (lớp `logic` và `objects`; lần đầu thêm thuộc tính bản đồ `handEdited` = true, kiểu bool). Cờ này (`server/src/systems/map-hand-edited.ts`) báo "tệp là nguồn duy nhất, không còn bằng bản sinh theo `seed`": `map:bake` BỎ QUA bản đồ đó (khỏi ghi đè bản sửa tay) và test "giống từng byte bản sinh theo seed" (`shared/src/tiled-maps.test.ts`) chuyển sang kiểm hợp lệ. KHÔNG xoá bản đồ khỏi `PROCEDURAL_MAPS` (đó là đồng hồ chuẩn và cơ sở của đấu trường chặn đường).
+2. **`npm run map:build -w server -- <id>`** (sinh `<id>.logic.json` + `visual.json`), rồi **`npm run map:check -w server -- <id>`** (cú pháp, cờ lật, liên thông từ tâm trấn, cổng hai chiều, vùng sinh `spawnZoneViolations`). `map-sync.test.ts` (trong `npm test`) bắt quên `map:build`.
+3. **Đổi va chạm / cổng / vùng sinh thì tăng `PROTOCOL_VERSION`** (mục 7.1; `MIN_PROTOCOL_VERSION` khi client cũ không chịu nổi) và ghi CHANGELOG.
+4. **Cân bằng và hiệu năng:** `npm run can-bang -w server` (sinh lại `docs/CAN_BANG.md`) khi đổi vùng sinh / số quái; `npm run bench -w server` không được xấu đi.
+5. **Hồ sơ cũ:** thêm ca cho bản đồ đó: vị trí lưu rơi vào ô chặn MỚI hoặc túi kín MỚI được đưa tới chỗ đi bộ tới được gần nhất (cơ chế có sẵn, `server/src/systems/safe-spot.test.ts` + `walk-reach.ts`), không về trấn.
+6. **Ảnh trước / sau:** `npm run map:show -w server -- <id> --png <tệp>` đính vào PR.
+7. Toàn bộ `npm test` + `typecheck` + `lint` + `prettier --check .`; B hoặc C review phần `shared/` / client; A duyệt.
+**Đã thử trước (A, 21/11):** sửa tay một ô cỏ Lạc Hà + cờ `handEdited` + `map:build` thì `npm test` toàn bộ xanh (426 tệp), `map:check` xanh, `map:bake --check` bỏ qua đúng bản đồ đó; hai test từng vỡ (`DEFAULT_MAP` cùng byte với `getMap`, canary) đã sửa trong cùng PR. **Bản đồ MỚI (id mới)** CHƯA hỗ trợ: `adoptTiledMaps` chỉ thay bản đồ có sẵn trong `MAPS`; cần một PR hạ tầng riêng (thêm vào `MAPS` / `PROCEDURAL_MAPS` hoặc nhận id mới, `defineRooms`, cổng đôi, đấu trường) SAU khi người dùng quyết câu 3.
+
 ## 7. Khi va chạm thật đổi (S5, S6): tương thích và an toàn dữ liệu
 
 1. **Giao thức:** client dự đoán di chuyển bằng CÙNG tệp bản đồ; bản client cũ (bộ nhớ đệm) mà bản đồ đổi va chạm thì dự đoán lệch (giật). Mỗi PR đổi va chạm / cổng / vùng sinh của một bản đồ PHẢI tăng `PROTOCOL_VERSION` (và đặt `MIN_PROTOCOL_VERSION` khi không chịu nổi bản cũ), theo quy tắc đã có ở AGENTS.md.
