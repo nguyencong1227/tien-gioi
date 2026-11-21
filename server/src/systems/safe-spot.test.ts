@@ -91,6 +91,17 @@ describe("nearestFreeSpot / safeSpot: vị trí lưu rơi vào ô chặn", () =>
     expect(safeSpot(g, 40 * TILE, 40 * TILE)).toEqual({ x: 40 * TILE, y: 40 * TILE });
   });
 
+  it("người chơi ĐỨNG SÁT TƯỜNG (cách tường đúng cỡ thân, như sau khi trượt dọc tường) là vị trí hợp lệ: nút lưới gần nhất bị chặn nhưng nút kề thoáng, KHÔNG được dời oan", () => {
+    const g = pocketWorld();
+    // khối đá bắt đầu ở x = 20 ô (640 px); đứng cách mép 11,01 px (vừa chạm thân) ở vùng mở bên trái
+    const x = 20 * TILE - PLAYER_RADIUS - 0.01;
+    const y = 24.5 * TILE;
+    expect(blocked(g, x, y)).toBe(false);
+    // tiền đề: nút lưới 8 px gần nhất (632, 784) bị chặn (cách đá 8 px < thân), nên chỉ nút kề mới cứu được
+    expect(blocked(g, Math.round(x / 8) * 8, Math.round(y / 8) * 8)).toBe(true);
+    expect(safeSpot(g, x, y)).toEqual({ x, y });
+  });
+
   it("tâm trấn KHÔNG đứng được (bản đồ cấu hình hỏng): không kiểm được liên thông thì KHÔNG dời hàng loạt, giữ vị trí thoáng như cũ", () => {
     const g = pocketWorld(true);
     expect(blocked(g, g.townPx.x, g.townPx.y)).toBe(true);
