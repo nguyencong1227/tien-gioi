@@ -632,7 +632,11 @@ const TIER_VI: Readonly<Record<AmbushTier, string>> = {
 };
 
 /** Mục "Chặn đường" của `docs/CAN_BANG.md` (sinh từ `AMBUSH_FOES` thật; bảng rỗng thì chỉ nói chưa có dữ liệu). */
-export function renderAmbushBalance(foes: readonly AmbushFoeGroup[] = AMBUSH_FOES): string {
+export function renderAmbushBalance(
+  foes: readonly AmbushFoeGroup[] = AMBUSH_FOES,
+  /** Bảng độ nhạy ĐÃ đo (mục 4); vắng thì đo ở đây. Test dữ liệu thật truyền bản đã đo để không đo hai lần (6 kịch bản x mọi bầy x 48 trận, ~5 giây trên máy rảnh). */
+  sens: readonly SensitivityRow[] = sensitivityRows(foes),
+): string {
   const head = `## Chặn đường: tỉ lệ chết khi chọn Chiến (mục 52 / 59, CD6 #1066)
 
 > Phần này sinh từ \`server/src/balance/chan-duong.ts\`: chạy ĐẤU TRƯỜNG THẬT (\`createArena\` + \`tickWorld\`, thưởng \`payRewards\`) trên \`AMBUSH_FOES\` thật, nên thêm / sửa bầy là báo cáo đổi theo (chạy lại \`npm run can-bang -w server\`).
@@ -668,7 +672,6 @@ export function renderAmbushBalance(foes: readonly AmbushFoeGroup[] = AMBUSH_FOE
   const rewardText = AMBUSH_TIERS.map((t) => `${TIER_VI[t]} ${AMBUSH_REWARD_MIN[t]} phút`).join(
     " / ",
   );
-  const sens = sensitivityRows(foes);
   const sensTable = sens
     .map((r) => {
       const std =

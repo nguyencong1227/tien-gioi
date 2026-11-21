@@ -533,35 +533,64 @@ describe("renderAmbushBalance", () => {
     expect(renderAmbushBalance([EASY])).toContain("không bầy nào vi phạm");
     expect(renderAmbushBalance([])).not.toContain("### 4.");
   });
+  it("renderAmbushBalance nhận bảng độ nhạy ĐÃ đo và DÙNG nó (không đo lại): bảng rỗng thì không có hàng chuẩn; thiếu hàng thận trọng thì không có câu về giả định chuẩn", () => {
+    const rows = sensitivityRows([EASY, QUY], 4);
+    expect(renderAmbushBalance([EASY, QUY], rows)).toContain("(chuẩn)");
+    expect(renderAmbushBalance([EASY, QUY], rows)).toContain("LÀ chuẩn để quyết bật");
+    const md0 = renderAmbushBalance([EASY, QUY], []);
+    expect(md0).toContain("### 4.");
+    expect(md0).not.toContain("(chuẩn)");
+    const noCautious = rows.filter((r) => r !== cautiousRow(rows));
+    expect(renderAmbushBalance([EASY, QUY], noCautious)).not.toContain("LÀ chuẩn để quyết bật");
+  });
 });
 
+/** Hạn của ca dữ liệu thật (hạn mặc định 15 giây): 120 giây cho máy chung đang bận (tải 30 / 20 nhân từng làm bản 60 giây đỏ); kết quả sai vẫn đỏ ngay vì là khẳng định, không phải thời gian. */
+const REAL_DATA_TIMEOUT_MS = 120_000;
+
+/**
+ * Bảng độ nhạy của dữ liệu THẬT, đo MỘT lần cho cả tệp (6 kịch bản x mọi bầy x 48 trận: ~5 giây trên máy rảnh; máy chung tải 30 / 20 nhân từng đo gấp ~6 lần). Trước đây hai ca dữ liệu thật
+ * mỗi ca tự đo (cộng cả `renderAmbushBalance` đo lần nữa) nên ca thứ hai chạm hạn 60 giây khi máy bận và cả bộ đỏ 22/11.
+ */
+let realSensitivity: SensitivityRow[] | undefined;
+const realRows = (): SensitivityRow[] => (realSensitivity ??= sensitivityRows());
+
 describe("DỮ LIỆU THẬT: độ nhạy (AMBUSH_FOES)", () => {
-  it("chiều của số đo trên bảng thật: ít đan hơn / không đồ thì chết nhiều hơn; bỏ chạy không chết nhiều hơn tới cùng; xác suất ngày khớp chết / lần", () => {
-    if (AMBUSH_FOES.length === 0) return;
-    // 6 kịch bản x mọi bầy x 48 trận: ~4 giây trên máy dev, CI chậm hơn 2-3 lần (hạn riêng 60 giây bên dưới)
-    const rows = sensitivityRows();
-    expect(rows).toHaveLength(6);
-    const dead = (potions: number, gear: "best" | "none") =>
-      rows.find((r) => r.scenario.potions === potions && r.scenario.gear === gear)!.deadToEnd;
-    expect(dead(8, "best")).toBeLessThanOrEqual(dead(2, "best"));
-    expect(dead(2, "best")).toBeLessThanOrEqual(dead(0, "best"));
-    for (const p of [8, 2, 0]) expect(dead(p, "none")).toBeGreaterThanOrEqual(dead(p, "best"));
-    for (const r of rows) {
-      expect(r.groups).toBe(AMBUSH_FOES.length);
-      expect(r.deadFlee).toBeLessThanOrEqual(r.deadToEnd + 1e-12);
-      expect(r.deadDayToEnd).toBeCloseTo(atLeastOnce(r.deadToEnd, AMBUSH_DAY_CAP), 12);
-    }
-  }, 60_000);
+  it(
+    "chiều của số đo trên bảng thật: ít đan hơn / không đồ thì chết nhiều hơn; bỏ chạy không chết nhiều hơn tới cùng; xác suất ngày khớp chết / lần",
+    () => {
+      if (AMBUSH_FOES.length === 0) return;
+      const rows = realRows();
+      expect(rows).toHaveLength(6);
+      const dead = (potions: number, gear: "best" | "none") =>
+        rows.find((r) => r.scenario.potions === potions && r.scenario.gear === gear)!.deadToEnd;
+      expect(dead(8, "best")).toBeLessThanOrEqual(dead(2, "best"));
+      expect(dead(2, "best")).toBeLessThanOrEqual(dead(0, "best"));
+      for (const p of [8, 2, 0]) expect(dead(p, "none")).toBeGreaterThanOrEqual(dead(p, "best"));
+      for (const r of rows) {
+        expect(r.groups).toBe(AMBUSH_FOES.length);
+        expect(r.deadFlee).toBeLessThanOrEqual(r.deadToEnd + 1e-12);
+        expect(r.deadDayToEnd).toBeCloseTo(atLeastOnce(r.deadToEnd, AMBUSH_DAY_CAP), 12);
+      }
+    },
+    REAL_DATA_TIMEOUT_MS,
+  );
 });
 
 describe("DỮ LIỆU THẬT (AMBUSH_FOES)", () => {
-  it("không bầy nào vi phạm mục tiêu tỉ lệ thắng / thắng hơn bỏ chạy (nếu đỏ: chạy `npm run can-bang -w server`, đọc mục 'Chặn đường', chọn bầy yếu hơn hoặc chỉnh hằng số)", () => {
-    expect(ambushBalanceViolations()).toEqual([]);
-    // GIẢ ĐỊNH THẬN TRỌNG là chuẩn bật AMBUSH (A chốt 22/11, CD6c): ít đan (2) + đồ đúng bậc vẫn chết <= 5% và thắng >= mục tiêu ở MỌI bầy (nếu đỏ: bầy nêu tên quá khó với người ít đan: giảm số con / nâng `minStep` / chọn loài nhẹ hơn, đo lại bằng `npm run can-bang -w server`)
-    expect(ambushSensitivityViolations(sensitivityRows())).toEqual([]);
-    // không "đạt" chỉ vì bảng rỗng ở bản đã có dữ liệu: nếu có bầy thì phải đã đo
-    expect(renderAmbushBalance().includes("Chưa có bầy") ? AMBUSH_FOES.length : -1).toBe(
-      AMBUSH_FOES.length === 0 ? 0 : -1,
-    );
-  }, 60_000); // dựng cả báo cáo gồm mục 4 (6 kịch bản x 48 trận): ~4 giây trên máy dev, quá nửa hạn mặc định 15 giây khi CI chậm
+  it(
+    "không bầy nào vi phạm mục tiêu tỉ lệ thắng / thắng hơn bỏ chạy (nếu đỏ: chạy `npm run can-bang -w server`, đọc mục 'Chặn đường', chọn bầy yếu hơn hoặc chỉnh hằng số)",
+    () => {
+      expect(ambushBalanceViolations()).toEqual([]);
+      // GIẢ ĐỊNH THẬN TRỌNG là chuẩn bật AMBUSH (A chốt 22/11, CD6c): ít đan (2) + đồ đúng bậc vẫn chết <= 5% và thắng >= mục tiêu ở MỌI bầy (nếu đỏ: bầy nêu tên quá khó với người ít đan: giảm số con / nâng `minStep` / chọn loài nhẹ hơn, đo lại bằng `npm run can-bang -w server`)
+      expect(ambushSensitivityViolations(realRows())).toEqual([]);
+      // không "đạt" chỉ vì bảng rỗng ở bản đã có dữ liệu: nếu có bầy thì phải đã đo
+      expect(
+        renderAmbushBalance(AMBUSH_FOES, realRows()).includes("Chưa có bầy")
+          ? AMBUSH_FOES.length
+          : -1,
+      ).toBe(AMBUSH_FOES.length === 0 ? 0 : -1);
+    },
+    REAL_DATA_TIMEOUT_MS,
+  ); // đo / dựng cả báo cáo (mục 4) trên dữ liệu thật: nặng, nên hạn riêng
 });
