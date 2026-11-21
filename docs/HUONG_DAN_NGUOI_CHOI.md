@@ -323,7 +323,7 @@ Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hà
 - **Rớt mạng:** trò chơi **chờ nối lại 90 giây**, đồng hồ hộp thoại / trận **đóng băng** và kẻ địch bỏ mục tiêu; nối lại kịp thì mọi thứ còn nguyên. Chỉ khi quá hạn mới tính giá. Không ai bị phạt oan vì mạng chập chờn.
 - **Đội:** người trong đội gặp chặn đường vẫn đấu **một mình** (đấu trường chỉ nhận đúng một người, đồng đội không vào giúp được).
 
-> **Mẹo:** Hộp thoại có giá ngay trên nút, nên hãy quyết định theo khí huyết và đan còn lại. Nếu khí huyết đầy và bạn quen đánh bậc này thì **Chiến** là cách duy nhất để nhận thưởng; chưa chắc thì **Bỏ chạy** bằng Linh thạch cho khỏi tốn tu vi (thua trận là mất kiếp, nên đừng liều). **Hãy luôn mang theo ít nhất 2 Hồi Huyết Đan** và mặc đồ đúng bậc: đo thử cho thấy chiến với 2 đan gần như không chết, nhưng chiến khi không có đan có thể chết cứ sáu bảy lần một lần. Các con số trong mục này (xác suất, hồi, giá, thưởng) **có thể chỉnh** sau khi cân bằng.
+> **Mẹo:** Hộp thoại có giá ngay trên nút, nên hãy quyết định theo khí huyết và đan còn lại. Nếu khí huyết đầy và bạn quen đánh bậc này thì **Chiến** là cách duy nhất để nhận thưởng; chưa chắc thì **Bỏ chạy** bằng Linh thạch cho khỏi tốn tu vi (thua trận là mất kiếp, nên đừng liều). **Hãy luôn mang theo ít nhất 2 Hồi Huyết Đan** (hộp thoại sẽ **nhắc** bằng một dòng vàng dưới nút Chiến khi túi có ít hơn 2 viên; chỉ là lời nhắc, không khoá nút) và mặc đồ đúng bậc: đo thử cho thấy chiến với 2 đan gần như không chết, nhưng chiến khi không có đan có thể chết cứ sáu bảy lần một lần. Các con số trong mục này (xác suất, hồi, giá, thưởng) **có thể chỉnh** sau khi cân bằng.
 
 Chi tiết thiết kế: [docs/THIET_KE_CHAN_DUONG.md](THIET_KE_CHAN_DUONG.md).
 
