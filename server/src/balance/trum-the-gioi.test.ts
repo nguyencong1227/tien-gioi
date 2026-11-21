@@ -2,16 +2,20 @@
 // ca cuối khoá LỊCH THẬT (rỗng thì hiển nhiên đạt; có lịch thì phải đạt mục tiêu).
 import { describe, expect, it } from "vitest";
 import {
+  BOSSES,
   WORLD_BOSS_SCHEDULE,
   sampleWorldBossSchedule,
   type WorldBossSlot,
 } from "@tien-gioi/shared";
+import { ASSUME_DUNGEON } from "./dungeon";
+import { ASSUME_BOSS, fightBossMoves } from "./trum";
 import {
   ASSUME_WORLD_BOSS,
   measureSlot,
   perPlayerDps,
   renderWorldBossBalance,
   worldBossBalanceViolations,
+  type WorldBossRow,
 } from "./trum-the-gioi";
 
 const base = sampleWorldBossSchedule()[0]!; // Thiên Hàn Vương, 30 phút
@@ -70,6 +74,23 @@ describe("measureSlot", () => {
     expect(huge.noDodge[50]!.winRate).toBe(0);
     expect(huge.noDodge[50]!.deaths).toBe(50);
     expect(huge.noDodge[50]!.minutes).toBeNull();
+  });
+
+  it("không né: `minutes` là phút THẬT = giây mô phỏng TB của trận thắng / uptime / 60 (không phải giây, không bỏ uptime)", () => {
+    const row = measureSlot(slot({ hpMult: undefined }));
+    const def = BOSSES.find((b) => b.kind === base.boss)!;
+    const limit = base.durationMin * 60 * ASSUME_DUNGEON.bossUptime;
+    let sec = 0;
+    let wins = 0;
+    for (let seed = 1; seed <= ASSUME_WORLD_BOSS.runs; seed++) {
+      const f = fightBossMoves(def, 5, seed, 1, Math.min(limit, ASSUME_BOSS.maxSeconds * 4));
+      if (f.killed) {
+        wins++;
+        sec += f.seconds;
+      }
+    }
+    expect(wins).toBeGreaterThan(0);
+    expect(row.noDodge[5]!.minutes).toBeCloseTo(sec / wins / ASSUME_DUNGEON.bossUptime / 60, 6);
   });
 
   it("loài không có bộ chiêu: ném lỗi rõ ràng", () => {
@@ -160,5 +181,40 @@ describe("LỊCH THẬT (WORLD_BOSS_SCHEDULE)", () => {
     expect(WORLD_BOSS_SCHEDULE.length === 0 ? "rỗng" : "có lịch").toBe(
       WORLD_BOSS_SCHEDULE.length === 0 ? "rỗng" : "có lịch",
     );
+  });
+});
+
+describe("worldBossBalanceViolations: biên của mục tiêu (hàng dựng tay, không chạy mô phỏng)", () => {
+  const row = (over: Partial<WorldBossRow>): WorldBossRow => ({
+    slot: base,
+    hp: 1_000_000,
+    dpsPerPlayer: 400,
+    dodgeMinutes: { 5: 40, 20: 10, 50: 4 },
+    minPlayers: 6,
+    huntExpPerMin: 400,
+    huntCoinPerMin: 300,
+    // thưởng đúng giữa khoảng mục tiêu (17,5 phút ở đội điển hình): các ca biên dưới đây không bị lẫn vi phạm thưởng
+    expEquivMinutes: { 5: 35, 10: 17.5, 20: 8.75, 50: 3.5 },
+    coinEquivMinutes: { 5: 35, 10: 17.5, 20: 8.75, 50: 3.5 },
+    noDodge: {},
+    ...over,
+  });
+  const bad = (over: Partial<WorldBossRow>) => worldBossBalanceViolations([row(over)]);
+
+  it("số người tối thiểu: đúng 4 và đúng 8 ĐẠT; 3 và 9 vi phạm (biên hai đầu)", () => {
+    expect(bad({})).toEqual([]);
+    expect(bad({ minPlayers: 4 })).toEqual([]);
+    expect(bad({ minPlayers: 8 })).toEqual([]);
+    expect(bad({ minPlayers: 3 })).toHaveLength(1);
+    expect(bad({ minPlayers: 9 })).toHaveLength(1);
+  });
+
+  it("hạ quá nhanh: chỉ xét đội ĐÔNG NHẤT (50): đúng 3 phút đạt, 2,99 vi phạm; đội 5 / 20 hạ nhanh thì không sao", () => {
+    expect(bad({ dodgeMinutes: { 5: 0.5, 20: 0.5, 50: 3 } })).toEqual([]);
+    expect(bad({ dodgeMinutes: { 5: 40, 20: 10, 50: 2.99 } })).toHaveLength(1);
+  });
+
+  it("không đo được DPS: vi phạm (không có cơ sở chọn hệ số)", () => {
+    expect(bad({ dpsPerPlayer: null, minPlayers: null })).toHaveLength(1);
   });
 });
