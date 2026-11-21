@@ -194,7 +194,7 @@ import { headersAllowed, isProduction, type OriginPolicy } from "../origin-guard
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
-import { ambushBotsOn, ambushOn } from "../systems/ambush-config";
+import { ambushBotsOn, ambushMinPotions, ambushOn } from "../systems/ambush-config";
 import {
   ambushDropOffer,
   ambushResend,
@@ -364,6 +364,7 @@ export class WorldRoom extends Room<WorldState> {
         random: Math.random,
         exemptBots: !isProduction(process.env),
         ambushBots: ambushBotsOn(process.env),
+        minPotions: ambushMinPotions(process.env),
       });
       // "Chiến": lập vé, mở phòng đấu trường solo rồi đưa người chơi sang (chỗ cũ luôn được lưu trước)
       w.ambush.startFight = (world, sid, offer) => {
