@@ -59,21 +59,27 @@ export const TIER_LABEL: Readonly<Record<AmbushTier, string>> = {
 /** Dòng cố định dưới nút Chiến (mục 53; A chốt 18/11): bị hạ trong đấu trường là CHẾT THẬT, nói thẳng ở CẢ BA mức, LUÔN hiện (người chơi phải biết hậu quả trước khi bấm Chiến). */
 export const AMBUSH_DEATH_NOTE = "Bị hạ trong trận là chết thật.";
 
-/** Loại đan tính cho dòng nhắc túi đan dưới nút Chiến (client chỉ NHẮC, không tự tính sống chết; máy chủ vẫn quyết mọi kết quả). */
-export const AMBUSH_POTION_ID = "hoi_huyet_dan";
 /**
- * Số Hồi Huyết Đan TỐI THIỂU nên mang khi bị chặn đường. Đo ở `docs/CAN_BANG.md` mục "Độ nhạy theo giả định" (#1252 / #1254, đồ đúng bậc, 24 bầy x 48 trận): với 2 đan chết 0 % / lần; với 1 đan kẻ cầm
+ * Đan tính cho dòng nhắc túi đan dưới nút Chiến: MỌI đan hồi khí huyết (`effect.kind === "healHp"`: Hồi Huyết Đan 40 %, Đại 70 %, Thượng 90 %), không chỉ đan thường: người Kim Đan trở lên
+ * hay mang đan Đại / Thượng và không được nhắc sai "không có đan". Số đo cân bằng dùng đan thường (40 %) nên đếm mọi bậc là hướng an toàn (mỗi viên hồi >= 40 %). Client chỉ NHẮC,
+ * không tự tính sống chết; máy chủ vẫn quyết mọi kết quả. `itemId` lạ / tên đặc biệt (`constructor`) -> `false`.
+ */
+export function isHealPotion(itemId: string): boolean {
+  return hasOwn(ITEM_BY_ID, itemId) && ITEM_BY_ID[itemId]?.effect?.kind === "healHp";
+}
+/**
+ * Số đan hồi khí huyết TỐI THIỂU nên mang khi bị chặn đường. Đo ở `docs/CAN_BANG.md` mục "Độ nhạy theo giả định" (#1252 / #1254, đồ đúng bậc, 24 bầy x 48 trận): với 2 đan chết 0 % / lần; với 1 đan kẻ cầm
  * đầu bậc 11 vẫn chết 71 %; không đan chết 16 % / lần (dồn ở bậc >= 11). Đổi số đo thì đổi cả số này và mẹo ở `docs/HUONG_DAN_NGUOI_CHOI.md` (mục "Gặp chặn đường").
  */
 export const AMBUSH_POTION_MIN = 2;
 
-/** Tổng số Hồi Huyết Đan trong túi (nhiều ô cộng lại; ô trống, số lượng không hợp lệ hay vật phẩm khác thì bỏ qua). THUẦN. */
+/** Tổng số đan hồi khí huyết trong túi (`isHealPotion`; nhiều ô cộng lại; ô trống, số lượng không hợp lệ hay vật phẩm khác thì bỏ qua). THUẦN. */
 export function potionCountOf(
   inv: ReadonlyArray<{ itemId: string; qty: number } | null | undefined>,
 ): number {
   let n = 0;
   for (const s of inv) {
-    if (s && s.itemId === AMBUSH_POTION_ID && isNum(s.qty) && s.qty > 0) n += Math.floor(s.qty);
+    if (s && isHealPotion(s.itemId) && isNum(s.qty) && s.qty > 0) n += Math.floor(s.qty);
   }
   return n;
 }
@@ -86,7 +92,7 @@ export function ambushPotionNote(potions: number | undefined): string {
   if (potions === undefined || !isNum(potions)) return "";
   const n = Math.max(0, Math.floor(potions));
   if (n >= AMBUSH_POTION_MIN) return "";
-  const have = n === 0 ? "Túi không có Hồi Huyết Đan" : `Túi chỉ còn ${n} Hồi Huyết Đan`;
+  const have = n === 0 ? "Túi không có đan hồi huyết" : `Túi chỉ còn ${n} đan hồi huyết`;
   return `${have}: nên mang ít nhất ${AMBUSH_POTION_MIN}.`;
 }
 
@@ -291,7 +297,7 @@ function enabledOf(d: AmbushDialog, choice: AmbushChoice, now: number): boolean 
   return true;
 }
 
-/** View của hộp thoại tại `now` (đồng hồ máy khách); `potions` = số Hồi Huyết Đan trong túi (`potionCountOf`), vắng thì không có dòng nhắc đan. */
+/** View của hộp thoại tại `now` (đồng hồ máy khách); `potions` = số đan hồi khí huyết trong túi (`potionCountOf`), vắng thì không có dòng nhắc đan. */
 export function ambushDialogView(d: AmbushDialog, now: number, potions?: number): AmbushDialogView {
   const { offer } = d;
   const potionNote = ambushPotionNote(potions);

@@ -346,11 +346,13 @@ async function main() {
     };
 
     /** Vào game, tiêm cấu hình tất định, dịch ra vùng hoang, đặt quãng đi sát một bước chân. Trả sự thật server. */
-    /** Đặt ĐÚNG `n` Hồi Huyết Đan trong túi (xoá các ô cũ, rồi `giveItem` gửi tin `inv` cho client thật). */
-    const setPotions = (sp: Prepared, n: number) => {
+    /** Đặt ĐÚNG `n` đan hồi khí huyết loại `itemId` trong túi (xoá MỌI đan hồi khí huyết cũ, rồi `giveItem` gửi tin `inv` cho client thật). */
+    const HEAL_POTIONS = ["hoi_huyet_dan", "dai_hoi_huyet_dan", "thuong_hoi_huyet_dan"];
+    const setPotions = (sp: Prepared, n: number, itemId = "hoi_huyet_dan") => {
       const inv = sp.ctrl.inv as Array<{ itemId: string; qty: number } | null>;
-      for (let i = 0; i < inv.length; i++) if (inv[i]?.itemId === "hoi_huyet_dan") inv[i] = null;
-      if (n > 0) giveItem(sp.world, sp.sid, "hoi_huyet_dan", n);
+      for (let i = 0; i < inv.length; i++)
+        if (HEAL_POTIONS.includes(inv[i]?.itemId ?? "")) inv[i] = null;
+      if (n > 0) giveItem(sp.world, sp.sid, itemId, n);
     };
 
     const prepare = async (name: string, secret: string) => {
@@ -479,7 +481,7 @@ async function main() {
       check(/\d/.test(d.countdown), `đếm ngược hiện (${d.countdown})`);
       check(/CHẾT|chết|kiếp/i.test(d.death), `dòng cảnh báo chết thật luôn hiện ("${d.death}")`);
       check(
-        d.potion === "Túi chỉ còn 1 Hồi Huyết Đan: nên mang ít nhất 2.",
+        d.potion === "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
         `túi 1 đan: dòng nhắc đan nêu ĐÚNG số đan thật của máy chủ ("${d.potion}")`,
       );
       const offer = s0.a.offer!;
@@ -563,7 +565,7 @@ async function main() {
       const s0 = await prepare(NAME, secretOf(NAME));
       changeCoin(s0.world, s0.sid, 500); // TRƯỚC khi hộp thoại mở: `price.coin.enough` tính lúc mở
       const coin0 = Number(s0.ctrl.coin);
-      setPotions(s0, 3); // đủ đan: KHÔNG có dòng nhắc
+      setPotions(s0, 2, "dai_hoi_huyet_dan"); // đủ 2 đan (loại ĐẠI, không phải đan thường): KHÔNG có dòng nhắc
       await walkIntoAmbush();
       const price = s0.a.offer!.price as { exp: number; coin: { price: number; enough: boolean } };
       check(
@@ -571,7 +573,7 @@ async function main() {
         `giá Linh thạch trên nút ${price.coin.price} (đủ tiền)`,
       );
       const d = await dialog();
-      check(d.potion === "", `túi 3 đan: KHÔNG có dòng nhắc đan ("${d.potion}")`);
+      check(d.potion === "", `túi 2 Đại Hồi Huyết Đan: KHÔNG có dòng nhắc đan ("${d.potion}")`);
       check(
         new RegExp(`(^|\\D)${price.coin.price}(\\D|$)`).test(d.coin),
         `nút bỏ chạy bằng Linh thạch HIỆN đúng giá của máy chủ ("${d.coin}")`,
