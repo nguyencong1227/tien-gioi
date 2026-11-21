@@ -125,7 +125,9 @@ describe("việc phụ Âm Sương Trạch (Kim Đan, D8 #756)", () => {
     const bookCount = new Map<string, number>();
     for (const q of AM_SUONG_SIDE) {
       const books = (q.rewards.items ?? []).filter((i) => ITEM_BY_ID[i.itemId]?.type === "book");
-      expect(books.length, `${q.id}: quá 1 kinh quyển thưởng`).toBeLessThanOrEqual(1);
+      // Đếm TỔNG qty các dòng kinh (KHÔNG phải số dòng): một dòng qty: 2 của cùng một kinh vẫn là "quá 1 quyển".
+      const bookQty = books.reduce((a, b) => a + (b.qty ?? 1), 0);
+      expect(bookQty, `${q.id}: quá 1 kinh quyển thưởng (tính theo qty)`).toBeLessThanOrEqual(1);
       for (const b of books) {
         const it = ITEM_BY_ID[b.itemId];
         expect(it.rarity, `${q.id}: ${b.itemId} độ hiếm`).toBeLessThanOrEqual(2);
@@ -141,6 +143,19 @@ describe("việc phụ Âm Sương Trạch (Kim Đan, D8 #756)", () => {
     }
     // Mỗi kinh quyển thưởng không xuất hiện ở quá một việc phụ Âm Sương (tránh lặp thưởng)
     for (const [id, n] of bookCount) expect(n, `${id} thưởng ở nhiều việc phụ`).toBe(1);
+  });
+
+  it("đột biến chứng minh: thưởng MỘT dòng kinh qty: 2 bị bắt (luật đếm TỔNG qty, KHÔNG đếm số dòng)", () => {
+    // Giả lập đột biến dữ liệu: một việc phụ thưởng 2 quyển của cùng một kinh trên MỘT dòng.
+    // books.length vẫn = 1 (đếm dòng sẽ bỏ lọt — lỗi cũ), nhưng tổng qty = 2 -> luật mới phải đỏ.
+    const books = [{ itemId: "kinh_thi_doc_am_chuong", qty: 2 }].filter(
+      (i) => ITEM_BY_ID[i.itemId]?.type === "book",
+    );
+    expect(books.length, "đếm dòng vẫn = 1 (bỏ lọt nếu dùng số dòng)").toBe(1);
+    const bookQty = books.reduce((a, b) => a + (b.qty ?? 1), 0);
+    expect(bookQty, "đếm qty = 2 -> bắt được đột biến (quyển thưởng KHÔNG quá 1)").toBeGreaterThan(
+      1,
+    );
   });
 
   it("tiêu đề và mô tả KHÔNG trùng nhau", () => {
