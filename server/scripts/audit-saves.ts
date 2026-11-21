@@ -61,6 +61,12 @@ import {
   SECT_QUEST_SLOTS,
   questDefAny,
   DEFAULT_MAP_ID,
+  SOCIAL_ACH_MAX,
+  SOCIAL_COUNTER_CAP,
+  SOCIAL_COUNTER_KEYS_MAX,
+  SOCIAL_PK_CAP,
+  TITLE_ID_RE,
+  socialCounterMode,
 } from "@tien-gioi/shared";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
@@ -1165,6 +1171,118 @@ export function auditSoulSaveData(rawText: string, byteLength: number): AuditErr
         } else {
           seen.add(sId);
         }
+      }
+    }
+  }
+
+  // 11. social (M9, #1033)
+  if (data.social !== undefined) {
+    if (typeof data.social !== "object" || data.social === null || Array.isArray(data.social)) {
+      errors.push({
+        code: "invalid_soul_social",
+        message: "social phải là một JSON Object",
+      });
+    } else {
+      const s = data.social;
+      if (s.v !== 1) {
+        errors.push({
+          code: "invalid_soul_social_version",
+          message: `social.v (${show(s.v)}) phải bằng 1`,
+        });
+      }
+
+      // pk
+      if (typeof s.pk !== "object" || s.pk === null || Array.isArray(s.pk)) {
+        errors.push({
+          code: "invalid_soul_social_pk",
+          message: "social.pk phải là một JSON Object { won, lost }",
+        });
+      } else {
+        if (!Number.isInteger(s.pk.won) || s.pk.won < 0 || s.pk.won > SOCIAL_PK_CAP) {
+          errors.push({
+            code: "invalid_soul_social_pk_won",
+            message: `social.pk.won (${show(s.pk.won)}) phải là số nguyên [0, ${SOCIAL_PK_CAP}]`,
+          });
+        }
+        if (!Number.isInteger(s.pk.lost) || s.pk.lost < 0 || s.pk.lost > SOCIAL_PK_CAP) {
+          errors.push({
+            code: "invalid_soul_social_pk_lost",
+            message: `social.pk.lost (${show(s.pk.lost)}) phải là số nguyên [0, ${SOCIAL_PK_CAP}]`,
+          });
+        }
+      }
+
+      // counters
+      if (typeof s.counters !== "object" || s.counters === null || Array.isArray(s.counters)) {
+        errors.push({
+          code: "invalid_soul_social_counters",
+          message: "social.counters phải là một JSON Object",
+        });
+      } else {
+        const entries = Object.entries(s.counters);
+        if (entries.length > SOCIAL_COUNTER_KEYS_MAX) {
+          errors.push({
+            code: "social_counters_exceed_max",
+            message: `Số lượng bộ đếm (${entries.length}) vượt quá giới hạn tối đa (${SOCIAL_COUNTER_KEYS_MAX})`,
+          });
+        }
+        for (const [k, v] of entries) {
+          if (socialCounterMode(k) === null) {
+            errors.push({
+              code: "invalid_soul_social_counter_key",
+              message: `Khoá bộ đếm không hợp lệ: ${show(k)}`,
+            });
+          }
+          if (!Number.isInteger(v) || (v as number) < 0 || (v as number) > SOCIAL_COUNTER_CAP) {
+            errors.push({
+              code: "invalid_soul_social_counter_val",
+              message: `Giá trị bộ đếm ${show(k)} (${show(v)}) phải là số nguyên [0, ${SOCIAL_COUNTER_CAP}]`,
+            });
+          }
+        }
+      }
+
+      // ach
+      if (typeof s.ach !== "object" || s.ach === null || Array.isArray(s.ach)) {
+        errors.push({
+          code: "invalid_soul_social_ach",
+          message: "social.ach phải là một JSON Object",
+        });
+      } else {
+        const entries = Object.entries(s.ach);
+        if (entries.length > SOCIAL_ACH_MAX) {
+          errors.push({
+            code: "social_ach_exceed_max",
+            message: `Số lượng thành tựu (${entries.length}) vượt quá giới hạn tối đa (${SOCIAL_ACH_MAX})`,
+          });
+        }
+        for (const [k, v] of entries) {
+          if (typeof k !== "string" || !/^[a-z0-9][a-z0-9_]{0,47}$/.test(k)) {
+            errors.push({
+              code: "invalid_soul_social_ach_id",
+              message: `id thành tựu không hợp lệ: ${show(k)}`,
+            });
+          }
+          if (
+            typeof v !== "string" ||
+            v.length === 0 ||
+            v.length > 40 ||
+            Number.isNaN(Date.parse(v))
+          ) {
+            errors.push({
+              code: "invalid_soul_social_ach_date",
+              message: `Thời điểm đạt thành tựu ${show(k)} (${show(v)}) phải là chuỗi ISO [1, 40] ký tự hợp lệ`,
+            });
+          }
+        }
+      }
+
+      // title
+      if (s.title !== null && (typeof s.title !== "string" || !TITLE_ID_RE.test(s.title))) {
+        errors.push({
+          code: "invalid_soul_social_title",
+          message: `Danh hiệu social.title (${show(s.title)}) phải là null hoặc khớp TITLE_ID_RE`,
+        });
       }
     }
   }
