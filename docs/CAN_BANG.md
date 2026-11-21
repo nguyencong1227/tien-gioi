@@ -966,11 +966,11 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 |---|---|--:|--:|--:|---|--:|---|
 | Phàm Nhân | thường | 1 | 100% | **0%** | 100% / 0% / **0%** | 7 s | lac_ha_soi_le (chết 0%) |
 | Luyện Khí | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 10 s | lac_ha_soi_bay (chết 0%) |
-| Luyện Khí | tinh anh | 2 | 100% | **0%** | 81% / 19% / **0%** | 16 s | lac_ha_soi_tinh_anh (chết 0%) |
+| Luyện Khí | tinh anh | 2 | 100% | **0%** | 100% / 0% / **0%** | 15 s | lac_ha_soi_tinh_anh (chết 0%) |
 | Trúc Cơ | thường | 2 | 100% | **0%** | 100% / 0% / **0%** | 9 s | hac_phong_ho_doi (chết 0%) |
 | Trúc Cơ | tinh anh | 1 | 100% | **0%** | 100% / 0% / **0%** | 20 s | hac_phong_ho_tinh_anh (chết 0%) |
 | Trúc Cơ | kẻ cầm đầu | 1 | 100% | **0%** | 0% / 100% / **0%** | 28 s | hac_phong_yeu_vuong (chết 0%) |
-| Kim Đan | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 30 s | hac_phong_quy_chan (chết 0%) |
+| Kim Đan | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 23 s | hac_phong_quy_chan (chết 0%) |
 | Kim Đan | tinh anh | 2 | 100% | **0%** | 100% / 0% / **0%** | 26 s | hac_phong_ho_tinh_anh_doi (chết 0%) |
 | Kim Đan | kẻ cầm đầu | 1 | 100% | **0%** | 100% / 0% / **0%** | 18 s | am_suong_yeu_vuong (chết 0%) |
 | Nguyên Anh | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 16 s | han_van_lang_le (chết 0%) |
@@ -988,7 +988,7 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 | lac_ha_soi_dan | lac_ha | 3 | thường | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 11 s | 216 + 11 | 162 + 99 | 3,9 ph |
 | lac_ha_ho_le | lac_ha | 5 | thường | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 236 + 19 | 177 + 137 | 3,8 ph |
 | lac_ha_ho_doi | lac_ha | 8 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 452 + 32 | 273 + 226 | 3,9 ph |
-| lac_ha_soi_tinh_anh | lac_ha | 4 | tinh anh | Hôi Lang x1 | 100% / 0% / 0% | 63% / 38% / 0% | 16 s | 342 + 7 | 171 + 116 | 2,4 ph |
+| lac_ha_soi_tinh_anh | lac_ha | 6 | tinh anh | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 534 + 3 | 225 + 162 | 5,8 ph |
 | lac_ha_soi_tinh_anh_doi | lac_ha | 8 | tinh anh | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 17 s | 678 + 13 | 273 + 226 | 5,7 ph |
 | hac_phong_ho_doi | hac_phong | 10 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 9 s | 536 + 37 | 402 + 314 | 3,8 ph |
 | hac_phong_ho_ba | hac_phong | 11 | thường | Hắc Hổ x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 556 + 49 | 417 + 371 | 3,9 ph |
@@ -997,7 +997,7 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 | hac_phong_ho_tinh_anh_doi | hac_phong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 28 s | 3.138 + 63 | 1.569 + 609 | 5,5 ph |
 | hac_phong_yeu_vuong | hac_phong | 11 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 0% / 100% / 0% | 28 s | 1.390 + 196 | 417 + 371 | -3,5 ph |
 | am_suong_ho_suong | am_suong | 13 | thường | Sương Hồ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.028 + 53 | 1.521 + 516 | 3,8 ph |
-| am_suong_quy_doi | am_suong | 13 | thường | Thạch Quy x2 | 100% / 0% / 0% | 100% / 0% / 0% | 63 s | 2.028 + 222 | 1.521 + 516 | 2,9 ph |
+| am_suong_quy_le | am_suong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 122 | 1.521 + 516 | 3,5 ph |
 | am_suong_thiem_doc | am_suong | 15 | thường | Độc Thiềm x1 | 100% / 0% / 0% | 100% / 0% / 0% | 15 s | 2.144 + 122 | 1.608 + 718 | 3,8 ph |
 | am_suong_ho_tinh_anh | am_suong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 23 s | 3.138 + 54 | 1.569 + 609 | 5,6 ph |
 | am_suong_yeu_vuong | am_suong | 13 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 18 s | 5.070 + 214 | 1.521 + 516 | 9,7 ph |
@@ -1010,16 +1010,16 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 
 ### 3. Tu vi / phút so với săn quái
 
-Khoảng giữa hai lần bị chặn ước tính 14,7 phút (hồi tối thiểu 8 phút + quãng đi bộ tới lần tung trúng kế, 50% thời gian đi bộ). Tu vi / phút tăng thêm so với chỉ săn quái, trộn theo `AMBUSH_TIER_WEIGHTS` (thường 70 / tinh anh 25 / kẻ cầm đầu 5): **28%** (mục tiêu 20%-40%, không hơn bí cảnh). Chưa tính đồ rơi và sách chiêu (chưa có: `AMBUSH_LOOT`).
+Khoảng giữa hai lần bị chặn ước tính 14,7 phút (hồi tối thiểu 8 phút + quãng đi bộ tới lần tung trúng kế, 50% thời gian đi bộ). Tu vi / phút tăng thêm so với chỉ săn quái, trộn theo `AMBUSH_TIER_WEIGHTS` (thường 70 / tinh anh 25 / kẻ cầm đầu 5): **29%** (mục tiêu 20%-40%, không hơn bí cảnh). Chưa tính đồ rơi và sách chiêu (chưa có: `AMBUSH_LOOT`).
 
 Theo từng cảnh giới (thưởng và giá tính bằng phút săn của bậc, nên các hàng gần nhau; lệch nhiều là do bầy / tỉ lệ thắng của cảnh giới đó):
 
 | Cảnh giới | Thường | Tinh anh | Kẻ cầm đầu | **Trộn** |
 |---|--:|--:|--:|--:|
 | Phàm Nhân | 26% | - | - | **26%** |
-| Luyện Khí | 26% | 27% | - | **26%** |
+| Luyện Khí | 26% | 38% | - | **29%** |
 | Trúc Cơ | 26% | 38% | -23% | **26%** |
-| Kim Đan | 23% | 37% | 65% | **29%** |
+| Kim Đan | 24% | 37% | 65% | **29%** |
 | Nguyên Anh | 25% | 40% | 66% | **31%** |
 
 Giá bỏ chạy bằng tu vi: 2 phút (hộp thoại) / 3 phút (giữa trận); thưởng tu vi thắng: thường 4 phút / tinh anh 6 phút / kẻ cầm đầu 10 phút (phút săn của bậc người chơi; bảng tu vi / phút săn `AMBUSH_HUNT_EXP_PER_MIN` sinh từ mô phỏng). Giá bị kẹp bởi tu vi đang có trong thanh (không bao giờ rớt cảnh giới).
@@ -1030,14 +1030,14 @@ Bảng 1-3 đo ở giả định CHUẨN (8 đan + đồ tốt nhất đủ bậ
 
 | Đồ | Hồi Huyết Đan | Chết / lần (tới cùng) | Chết / lần (biết bỏ chạy) | Thoát / lần (biết bỏ chạy) | Chết >= 1 lần / ngày (tới cùng / biết bỏ chạy) | Bầy thắng dưới mục tiêu | Bầy chết nhiều nhất (tới cùng) |
 |---|--:|--:|--:|--:|---|--:|---|
-| đồ tốt nhất đủ bậc | 8 (chuẩn) | 0,3% | 0% | 3,9% | 3% / 0% | 0 / 24 | lac_ha_soi_tinh_anh (chết 6%) |
-| đồ tốt nhất đủ bậc | 2 (thận trọng) | 3,7% | 0% | 8,6% | 36% / 0% | 1 / 24 | am_suong_quy_doi (chết 73%) |
-| đồ tốt nhất đủ bậc | 0 | 25,1% | 0% | 40,3% | 97% / 0% | 7 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
-| KHÔNG đồ | 8 | 18,1% | 0% | 37,6% | 91% / 0% | 5 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
-| KHÔNG đồ | 2 | 22,8% | 0% | 37,9% | 96% / 0% | 6 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
-| KHÔNG đồ | 0 | 49,4% | 0% | 62,8% | 100% / 0% | 13 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
+| đồ tốt nhất đủ bậc | 8 (chuẩn) | 0% | 0% | 1,9% | 0% / 0% | 0 / 24 | lac_ha_soi_le (chết 0%) |
+| đồ tốt nhất đủ bậc | 2 (thận trọng) | 0% | 0% | 1,9% | 0% / 0% | 0 / 24 | lac_ha_soi_le (chết 0%) |
+| đồ tốt nhất đủ bậc | 0 | 16,3% | 0% | 31,5% | 88% / 0% | 5 / 24 | hac_phong_yeu_vuong (chết 100%) |
+| KHÔNG đồ | 8 | 14% | 0% | 29,1% | 84% / 0% | 4 / 24 | hac_phong_yeu_vuong (chết 100%) |
+| KHÔNG đồ | 2 | 14% | 0% | 29,1% | 84% / 0% | 4 / 24 | hac_phong_yeu_vuong (chết 100%) |
+| KHÔNG đồ | 0 | 44,5% | 0% | 62,6% | 100% / 0% | 12 / 24 | lac_ha_soi_tinh_anh_doi (chết 100%) |
 
-Ở giả định thận trọng (2 đan + đồ đúng bậc) còn **1 / 24 bầy dưới mục tiêu thắng**: CHƯA đặt nó làm giả định chuẩn được cho tới khi E / G chỉnh các bầy đó (tên ở cảnh báo bên dưới).
+Giả định thận trọng (2 đan + đồ đúng bậc) LÀ chuẩn để quyết bật `AMBUSH` (A chốt 22/11): **không bầy nào vi phạm** (chết <= 5%, thắng >= mục tiêu của mức).
 
 **Không vi phạm bất biến nào** (mọi bầy thắng >= 90% thường / 80% tinh anh / 60% kẻ cầm đầu, giá bỏ chạy và thời gian trận xem cảnh báo bên dưới).
 
@@ -1048,7 +1048,7 @@ Cảnh báo (không chặn):
 - bầy lac_ha_soi_dan: trận 11 giây (khung 30-70 giây)
 - bầy lac_ha_ho_le: trận 10 giây (khung 30-70 giây)
 - bầy lac_ha_ho_doi: trận 8 giây (khung 30-70 giây)
-- bầy lac_ha_soi_tinh_anh: trận 16 giây (khung 30-70 giây)
+- bầy lac_ha_soi_tinh_anh: trận 12 giây (khung 30-70 giây)
 - bầy lac_ha_soi_tinh_anh_doi: trận 17 giây (khung 30-70 giây)
 - bầy hac_phong_ho_doi: trận 9 giây (khung 30-70 giây)
 - bầy hac_phong_ho_ba: trận 8 giây (khung 30-70 giây)
@@ -1065,8 +1065,6 @@ Cảnh báo (không chặn):
 - bầy han_van_nha_gio: trận 12 giây (khung 30-70 giây)
 - bầy han_van_soi_tuyet: trận 8 giây (khung 30-70 giây)
 - bầy han_van_yeu_vuong: trận 10 giây (khung 30-70 giây)
-- bầy lac_ha_soi_tinh_anh (lac_ha, bậc 4, elite): chết 6% "tới cùng" / 0% "biết bỏ chạy" ở giả định thận trọng (2 đan + đồ đúng bậc, 48 trận), vượt 5%
-- bầy am_suong_quy_doi (am_suong, bậc 13, normal): chết 73% "tới cùng" / 0% "biết bỏ chạy" ở giả định thận trọng (2 đan + đồ đúng bậc, 48 trận), vượt 5%
 
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)

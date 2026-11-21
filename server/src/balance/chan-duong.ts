@@ -550,19 +550,26 @@ export function cautiousRow(rows: readonly SensitivityRow[]): SensitivityRow | u
 }
 
 /**
- * Cảnh báo (không chặn) từ bảng độ nhạy: mỗi bầy chết "tới cùng" NHIỀU HƠN `cautious.deathAbove` ở giả định thận trọng (ít đan, đồ đúng bậc). Bầy ở đúng ngưỡng không bị cảnh báo
- * ("vượt"). Chưa là vi phạm vì bảng chuẩn (nhiều đan) vẫn đạt: khi E / G chỉnh xong các bầy này thì đặt giả định thận trọng làm chuẩn và chuyển thành vi phạm.
+ * VI PHẠM từ bảng độ nhạy (A chốt 22/11: giả định THẬN TRỌNG, ít đan + đồ đúng bậc, LÀ chuẩn để quyết bật `AMBUSH`; thua = chết thật, mục 53, mà người chơi thật không luôn mang 8 đan):
+ * mỗi bầy ở hàng thận trọng (1) chết "tới cùng" NHIỀU HƠN `cautious.deathAbove`, hoặc (2) thắng "tới cùng" DƯỚI mục tiêu của mức (`targets.winRate`). Bầy ở đúng ngưỡng không vi phạm.
+ * (Bản của B ở #1252 chỉ cảnh báo vì còn hai bầy vượt; A sửa hai bầy đó ở CD6c rồi nâng lên vi phạm.)
  */
-export function ambushSensitivityWarnings(rows: readonly SensitivityRow[]): string[] {
+export function ambushSensitivityViolations(rows: readonly SensitivityRow[]): string[] {
   const row = cautiousRow(rows);
   if (!row) return [];
   const { potions, deathAbove } = ASSUME_AMBUSH.sensitivity.cautious;
-  return row.sums
-    .filter((s) => s.toEnd.lost > deathAbove + 1e-9)
-    .map(
-      (s) =>
-        `bầy ${s.group.id} (${s.group.mapId}, bậc ${s.step}, ${s.group.tier}): chết ${pct(s.toEnd.lost)} "tới cùng" / ${pct(s.flee.lost)} "biết bỏ chạy" ở giả định thận trọng (${potions} đan + đồ đúng bậc, ${row.runs} trận), vượt ${pct(deathAbove)}`,
-    );
+  const out: string[] = [];
+  for (const s of row.sums) {
+    const need = ASSUME_AMBUSH.targets.winRate[s.group.tier];
+    const why: string[] = [];
+    if (s.toEnd.lost > deathAbove + 1e-9) why.push(`chết vượt ${pct(deathAbove)}`);
+    if (s.toEnd.won + 1e-9 < need) why.push(`thắng dưới ${pct(need)}`);
+    if (why.length > 0)
+      out.push(
+        `bầy ${s.group.id} (${s.group.mapId}, bậc ${s.step}, ${s.group.tier}): chết ${pct(s.toEnd.lost)} "tới cùng" / ${pct(s.flee.lost)} "biết bỏ chạy", thắng ${pct(s.toEnd.won)} ở giả định thận trọng (${potions} đan + đồ đúng bậc, ${row.runs} trận): ${why.join(", ")}`,
+      );
+  }
+  return out;
 }
 
 // ---------- Bất biến ----------
@@ -674,13 +681,14 @@ export function renderAmbushBalance(foes: readonly AmbushFoeGroup[] = AMBUSH_FOE
     })
     .join("\n");
   const cautious = cautiousRow(sens);
+  const violations = [...ambushBalanceViolations(sums), ...ambushSensitivityViolations(sens)];
+  const warnings = ambushBalanceWarnings(sums);
+  const cautiousViolations = ambushSensitivityViolations(sens).length;
   const cautiousText = !cautious
     ? ""
-    : cautious.belowTarget === 0
-      ? `Ở giả định thận trọng (${cautious.scenario.potions} đan + đồ đúng bậc) không bầy nào dưới mục tiêu thắng: có thể đặt nó làm giả định CHUẨN (\`ASSUME_AMBUSH\`).`
-      : `Ở giả định thận trọng (${cautious.scenario.potions} đan + đồ đúng bậc) còn **${cautious.belowTarget} / ${cautious.groups} bầy dưới mục tiêu thắng**: CHƯA đặt nó làm giả định chuẩn được cho tới khi E / G chỉnh các bầy đó (tên ở cảnh báo bên dưới).`;
-  const violations = ambushBalanceViolations(sums);
-  const warnings = [...ambushBalanceWarnings(sums), ...ambushSensitivityWarnings(sens)];
+    : cautiousViolations === 0
+      ? `Giả định thận trọng (${cautious.scenario.potions} đan + đồ đúng bậc) LÀ chuẩn để quyết bật \`AMBUSH\` (A chốt 22/11): **không bầy nào vi phạm** (chết <= ${pct(ASSUME_AMBUSH.sensitivity.cautious.deathAbove)}, thắng >= mục tiêu của mức).`
+      : `Giả định thận trọng (${cautious.scenario.potions} đan + đồ đúng bậc) LÀ chuẩn để quyết bật \`AMBUSH\` (A chốt 22/11): còn **${cautiousViolations} / ${cautious.groups} bầy VI PHẠM** (tên ở mục vi phạm bên dưới): chưa đề xuất bật.`;
   return `${head}
 ### 1. Tỉ lệ chết theo cảnh giới và mức (trung bình các bầy)
 
