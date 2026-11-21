@@ -299,16 +299,17 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
   it("getOptimalModel trả về mốc thời gian và ngưỡng cân bằng chuẩn xác", () => {
     const model = getOptimalModel();
     expect(model.preKdFinishHours).toBeCloseTo(2.86, 1);
-    expect(model.kdHauKyReachHours).toBeCloseTo(6.03, 1);
-    expect(model.kdFinishHours).toBeCloseTo(8.3, 1);
-    // Ngưỡng Kim Đan Hậu kỳ = 2.86 + 0.7 * (6.03 - 2.86) ~ 5.08h
-    expect(model.kdHauKyThresholdHours).toBeCloseTo(5.08, 1);
-    // Ngưỡng hết Kim Đan = 2.86 + 4.0 = ~6.86h
+    // #756: việc phụ Âm Sương Trạch Kim Đan +1500 exp (trong ngân sách 2,5%) rút ngắn ~4 phút
+    expect(model.kdHauKyReachHours).toBeCloseTo(5.97, 1);
+    expect(model.kdFinishHours).toBeCloseTo(8.21, 1);
+    // Ngưỡng Kim Đan Hậu kỳ = preKd + 0.7 * (kdHauKyReach - preKd) ~ 5.03h
+    expect(model.kdHauKyThresholdHours).toBeCloseTo(5.03, 1);
+    // Ngưỡng hết Kim Đan = preKd + 4.0 = ~6.84h
     expect(model.postKdThresholdHours).toBeCloseTo(6.86, 1);
   });
 
-  it("cảnh báo QUÁ NHANH khi trung vị Kim Đan Hậu kỳ < ngưỡng ~5.08h", () => {
-    // 5 mẫu với 4.8h (< 5.08h) -> cảnh báo
+  it("cảnh báo QUÁ NHANH khi trung vị Kim Đan Hậu kỳ < ngưỡng ~5.03h", () => {
+    // 5 mẫu với 4.8h (< 5.03h) -> cảnh báo
     const records = [
       {
         realm: KD_REALM,
@@ -360,7 +361,7 @@ describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport",
   });
 
   it("báo 'Chưa thấy dấu hiệu quá nhanh (cận trên)' khi trung vị Kim Đan Hậu kỳ >= ngưỡng", () => {
-    // 5 mẫu với 5.5h (>= 5.08h)
+    // 5 mẫu với 5.5h (>= 5.03h)
     const records = [
       {
         realm: KD_REALM,
