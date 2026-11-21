@@ -435,6 +435,8 @@ describe("độ nhạy theo giả định: phép tính", () => {
     expect(r.worst.group.id).toBe("mau_kho");
     expect(r.belowTarget).toBe(1); // HARD (tinh anh) thua gần hết, EASY thắng hết
     expect(r.deadToEnd).toBeGreaterThan(0);
+    expect(r.fledFlee).toBeGreaterThan(0); // HARD (tinh anh) buộc người biết bỏ chạy phải thoát
+    expect(r.fledFlee).toBeLessThanOrEqual(1);
     expect(r.deadDayToEnd).toBeCloseTo(atLeastOnce(r.deadToEnd, AMBUSH_DAY_CAP), 12);
     expect(r.deadDayFlee).toBeCloseTo(atLeastOnce(r.deadFlee, AMBUSH_DAY_CAP), 12);
     expect(r.deadFlee).toBeLessThanOrEqual(r.deadToEnd + 1e-12); // bỏ chạy không bao giờ chết nhiều hơn đánh tới cùng
@@ -497,6 +499,8 @@ describe("renderAmbushBalance", () => {
     expect(md).toContain("mau_quy (chết"); // bầy chết nhiều nhất
     expect(md).toContain("CHƯA đặt nó làm giả định chuẩn"); // Thạch Quy chết 2 đan: còn bầy dưới mục tiêu
     expect(md).toContain("ở giả định thận trọng");
+    expect(md).toContain("vượt 5%"); // cảnh báo độ nhạy đi vào danh sách cảnh báo của báo cáo
+    expect(md).toContain("bầy mau_quy (am_suong, bậc 13, normal): chết");
     expect(renderAmbushBalance([EASY])).toContain("có thể đặt nó làm giả định CHUẨN");
     expect(renderAmbushBalance([])).not.toContain("### 4.");
   });
