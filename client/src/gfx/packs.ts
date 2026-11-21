@@ -57,6 +57,13 @@ export interface PackManifest {
   packs: PackDef[];
 }
 
+/** Một dòng màn Ghi công của gói riêng (chuỗi đã qua `parsePrivatePackManifest`; `url` chỉ có khi `isSafePrivatePackUrl`). */
+export interface PrivateCredit {
+  title: string;
+  url?: string;
+  license?: string;
+}
+
 /** Thời gian chờ gói ở màn chuyển cảnh (ms): khớp `client/perf-budget.json` `packs.mapLoadTimeoutMs` / `dungeonLoadTimeoutMs` (có test). */
 export const MAP_PACK_TIMEOUT_MS = 8000;
 export const DUNGEON_PACK_TIMEOUT_MS = 3000;
@@ -211,6 +218,11 @@ export interface PackController {
   takeMapWait(mapId: string): Promise<PackResult>;
   /** Lúc rảnh sau khi vào thế giới: tải trước gói của các bản đồ KỀ (tối đa `NEIGHBOR_PREFETCH_MAX`), chỉ khi mạng 4g và không tiết kiệm dữ liệu. */
   prefetchNeighbors(neighborMapIds: readonly string[]): void;
+  /**
+   * Màn Ghi công: tên / trang chính thức / giấy phép của MỖI gói riêng đang DÙNG (đã `ready`; gói chưa tải xong hoặc đã giải phóng thì không hiện, vì hình chưa / không còn trên màn).
+   * Đồng bộ (không tải gì); chưa nạp manifest riêng thì rỗng. Thứ tự theo manifest.
+   */
+  privateCredits(): PrivateCredit[];
 }
 
 interface Entry {
@@ -523,6 +535,19 @@ export function createPacks(
       if (env.connection() !== "4g") return;
       for (const id of ids.slice(0, NEIGHBOR_PREFETCH_MAX)) prefetch(mapPackId(id));
     },
+    privateCredits() {
+      const out: PrivateCredit[] = [];
+      if (privateMap)
+        for (const e of privateMap.values()) {
+          if (e.state !== "ready" || e.def.title === undefined) continue;
+          out.push({
+            title: e.def.title,
+            ...(e.def.url !== undefined ? { url: e.def.url } : {}),
+            ...(e.def.license !== undefined ? { license: e.def.license } : {}),
+          });
+        }
+      return out;
+    },
   };
 }
 
@@ -602,6 +627,7 @@ export function packs(): PackController {
       startMapWait: () => undefined,
       takeMapWait: async () => "skipped",
       prefetchNeighbors: () => undefined,
+      privateCredits: () => [],
     }
   );
 }
