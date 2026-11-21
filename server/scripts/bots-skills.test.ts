@@ -69,6 +69,16 @@ describe("bot dùng chiêu thức: sampleSkillsForRealm (M7.10 #511)", () => {
       expect(s4.learned[naSkill]).toBeGreaterThanOrEqual(1);
     }
   });
+
+  it("hỗ trợ customSkillId: trang bị chiêu cụ thể vào ô 2 (CT13 #1058)", () => {
+    const sCustom = sampleSkillsForRealm(1, "huyen_bang_chi");
+    expect(sCustom.slots[0]).toBe("huyen_bang_chi");
+    expect(sCustom.learned["huyen_bang_chi"]).toBe(1);
+
+    // Bỏ qua nếu skillId không hợp lệ
+    const sInvalid = sampleSkillsForRealm(1, "chieu_khong_ton_tai");
+    expect(sInvalid.slots[0]).toBe("hoa_van_kiem");
+  });
 });
 
 describe("bot dùng chiêu thức: autoAssignBotSkills", () => {

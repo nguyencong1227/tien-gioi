@@ -19,6 +19,8 @@ export default defineConfig(({ mode }) => {
   const proxy = {
     "/api": { target: `http://localhost:${serverPort}` },
     "/health": { target: `http://localhost:${serverPort}` },
+    // Gói tài nguyên riêng (mục 63): máy chủ của dev phục vụ `ASSETS_PRIVATE_DIR`; không đặt biến thì máy chủ trả manifest rỗng / 404 và client dùng hình thay thế
+    "/assets-private": { target: `http://localhost:${serverPort}` },
   };
   return {
     envDir: "..",
