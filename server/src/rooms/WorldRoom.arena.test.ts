@@ -63,7 +63,9 @@ async function waitFor<T>(
   ms = 6000,
   what = "điều kiện",
 ): Promise<T> {
-  const end = Date.now() + ms;
+  // Hạn tối thiểu `WAIT_FLOOR_MS`: các lời gọi ghi 3-6 giây là mức máy rảnh; máy tải cao / cả bộ `npm test` chạy song song làm tin tới muộn hàng giây ("Hết thời gian chờ: nhận ambushEnd", #1215).
+  // Chờ theo ĐIỀU KIỆN nên nâng hạn không làm test chậm đi khi tin tới đúng hạn; treo thật vẫn đỏ, chỉ muộn hơn.
+  const end = Date.now() + Math.max(ms, WAIT_FLOOR_MS);
   for (;;) {
     const v = fn();
     if (v) return v;
@@ -71,6 +73,7 @@ async function waitFor<T>(
     await sleep(20);
   }
 }
+const WAIT_FLOOR_MS = 12_000;
 
 let seq = 0;
 const secretOf = (name: string) => `secret-${name.replace(/\s/g, "")}-0123456789abcdef`;
