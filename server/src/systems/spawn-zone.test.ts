@@ -16,6 +16,7 @@ import { Hub } from "../hub";
 import { makeWorld, addMonster } from "./test-helpers";
 import { bossSpawnOk, spawnInitial, spawnMonster, topUpMonsters, zoneSpawnSpot } from "./monsters";
 import { tickWorldBoss } from "./world-boss";
+import { MIN_ZONE_SPOTS, spawnZoneViolations } from "./map-checks";
 
 const SIDE = 48;
 
@@ -35,7 +36,10 @@ function tiles(): Uint8Array {
 function mapWith(
   zones: SpawnZoneDef[],
   monsterCap: Record<string, number> = { lang: 20, ho: 10 },
+  edit?: (t: Uint8Array) => void,
 ): GameMap {
+  const t = tiles();
+  edit?.(t);
   return new GameMap({
     id: "thu_vung",
     name: "Thử Vùng",
@@ -44,7 +48,7 @@ function mapWith(
     h: SIDE,
     town: { cx: 10, cy: 10, r: 3 },
     monsterCap,
-    tiles: tiles(),
+    tiles: t,
     spawnZones: zones,
   });
 }
@@ -242,5 +246,70 @@ describe("spawnZone: trùm", () => {
     const b = w.state.monsters.get(w.wbossId!)!;
     expect(inSpawnZone(z, b.x, b.y), `${b.x},${b.y}`).toBe(true);
     expect(of(w, "thien_han_vuong")).toHaveLength(2); // con thường đứng sẵn + trùm thế giới
+  });
+});
+
+describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)", () => {
+  it("vùng hợp lệ (cỏ thoáng) và bản đồ không khai vùng đều không có lỗi", () => {
+    expect(spawnZoneViolations(mapWith([zone("lang", 18, 18, 8, 8)]))).toEqual([]);
+    expect(spawnZoneViolations(mapWith([]))).toEqual([]);
+  });
+
+  it("loài không có trong monsterCap bị báo; trùm của lịch thế giới ở bản đồ này thì được", () => {
+    const m = mapWith([zone("ho", 18, 18, 8, 8)], { lang: 5 });
+    expect(spawnZoneViolations(m).join("\n")).toMatch(/\(ho\): loài này không có trong monsterCap/);
+    const boss = mapWith([zone("thien_han_vuong", 18, 18, 8, 8)], { lang: 5 });
+    expect(spawnZoneViolations(boss).join("\n")).toMatch(/thien_han_vuong/);
+    const slot = { ...sampleWorldBossSchedule()[0]!, mapId: "thu_vung" };
+    expect(spawnZoneViolations(boss, [slot])).toEqual([]);
+    // lịch của bản đồ KHÁC không tính
+    expect(spawnZoneViolations(boss, [{ ...slot, mapId: "han_van" }]).length).toBeGreaterThan(0);
+  });
+
+  it("vùng nằm trọn trên đá hoặc trong khu an toàn: không có chỗ sinh nào", () => {
+    const onRock = spawnZoneViolations(mapWith([zone("lang", 31, 31, 3, 3)]));
+    expect(onRock.join("\n")).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    const inTown = spawnZoneViolations(mapWith([zone("lang", 8, 8, 4, 4)]));
+    expect(inTown.join("\n")).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+  });
+
+  it(`vùng quá chật (ít hơn ${MIN_ZONE_SPOTS} chỗ) bị báo, đủ rộng thì qua`, () => {
+    // ô cỏ duy nhất giữa khối đá và đá dựng thêm: khung 1 x 1 ô chỉ có 4 điểm lưới
+    const one = spawnZoneViolations(mapWith([zone("lang", 18, 18, 1, 1)]));
+    expect(one.join("\n")).toMatch(/chỉ có \d chỗ sinh hợp lệ/);
+    expect(spawnZoneViolations(mapWith([zone("lang", 18, 18, 3, 3)]))).toEqual([]);
+  });
+
+  it("vùng chứa TÚI KÍN (đất đứng được bị đá bao kín) bị báo; bỏ vòng đá thì qua", () => {
+    const pocket = (t: Uint8Array) => {
+      for (let i = 20; i <= 25; i++) {
+        t[38 * SIDE + i] = T.Rock;
+        t[43 * SIDE + i] = T.Rock;
+        t[(38 + (i - 20)) * SIDE + 20] = T.Rock;
+        t[(38 + (i - 20)) * SIDE + 25] = T.Rock;
+      }
+    };
+    const z = zone("lang", 19, 37, 8, 8); // phủ cả túi (21..24 x 39..42) lẫn đất ngoài
+    const bad = spawnZoneViolations(mapWith([z], { lang: 5 }, pocket));
+    expect(bad.join("\n")).toMatch(/túi kín/);
+    expect(spawnZoneViolations(mapWith([z], { lang: 5 }))).toEqual([]);
+  });
+
+  it("trùm: vùng sát đá (mọi chỗ trong 62 px quanh đá) không có chỗ `bossSpawnOk`; quái thường cùng vùng thì qua", () => {
+    const z = (m: string) => zone(m, 28, 30, 2, 4); // sát khối đá 30..35 ở phía trái
+    const cap = { lang: 5, thien_han_vuong: 1 };
+    expect(spawnZoneViolations(mapWith([z("lang")], cap))).toEqual([]);
+    expect(spawnZoneViolations(mapWith([z("thien_han_vuong")], cap)).join("\n")).toMatch(
+      /chỉ có 0 chỗ sinh hợp lệ/,
+    );
+  });
+
+  it("tổng `max` các vùng nhỏ hơn monsterCap bị báo; có một vùng không khai `max` thì qua", () => {
+    const a = zone("lang", 14, 14, 6, 6, { max: 5 });
+    const b = zone("lang", 38, 4, 6, 6, { max: 3 });
+    const bad = spawnZoneViolations(mapWith([a, b], { lang: 20 }));
+    expect(bad.join("\n")).toMatch(/tổng max các vùng \(8\) nhỏ hơn monsterCap \(20\)/);
+    expect(spawnZoneViolations(mapWith([a, b], { lang: 8 }))).toEqual([]);
+    expect(spawnZoneViolations(mapWith([a, { ...b, max: undefined }], { lang: 20 }))).toEqual([]);
   });
 });

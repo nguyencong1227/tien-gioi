@@ -3,6 +3,7 @@ import {
   PLAYER_RADIUS,
   MONSTERS,
   inSpawnZone,
+  type GameMap,
   type MonsterKind,
   type SpawnZoneDef,
 } from "@tien-gioi/shared";
@@ -50,9 +51,14 @@ export const BOSS_SPAWN_MARGIN = 32;
 
 /** Chỗ sinh của trùm đủ rộng: không sát cây / đá và nằm trong vùng chính của bản đồ cho cỡ thân của trùm (không nằm trong túi kín). */
 export function bossSpawnOk(w: World, def: MonsterKind, x: number, y: number): boolean {
+  return bossSpawnOkOn(w.map, def, x, y);
+}
+
+/** Như `bossSpawnOk` nhưng chỉ cần bản đồ (công cụ kiểm bản đồ không có `World`). */
+export function bossSpawnOkOn(map: GameMap, def: MonsterKind, x: number, y: number): boolean {
   return (
-    squareFree(w.map, x, y, def.radius + BOSS_SPAWN_MARGIN) &&
-    inMainRegion(w.map, def.radius * 0.8, x, y)
+    squareFree(map, x, y, def.radius + BOSS_SPAWN_MARGIN) &&
+    inMainRegion(map, def.radius * 0.8, x, y)
   );
 }
 
