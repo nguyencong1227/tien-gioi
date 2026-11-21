@@ -57,6 +57,7 @@ function fuzzMoveOnly(): { ticks: number; dist: number } {
   let prevY = p.y;
   let dist = 0; // quãng đường thực tế đã đi
   let credit = 0; // tổng credit bước đã cấp (= sum(dt)/TICK_MS)
+  const budget0 = c.moveBudget; // ngân sách ban đầu: quãng đường bền vững <= (budget0 + credit) bước, CHẶT
 
   const ticks = ri(20, 48);
   for (let t = 0; t < ticks; t++) {
@@ -104,10 +105,14 @@ function fuzzMoveOnly(): { ticks: number; dist: number } {
     expect(
       tickDist,
       `tick ${t}: một tick đi quá trần ngân sách (MAX_MOVE_BUDGET=10)`,
-    ).toBeLessThanOrEqual(11 * cap);
+    ).toBeLessThanOrEqual(10 * cap + 1e-6);
     // Bất biến ngân sách: quãng đường <= (ngân sách dồn tối đa + credit theo thời gian thật) x tốc độ
     const budgetSteps = MAX_INPUT_BACKLOG + MAX_INPUT_BACKLOG + credit + MAX_INPUT_BACKLOG; // nới đủ (xem M1)
     expect(dist, `tick ${t}: đi nhanh hơn ngân sách`).toBeLessThanOrEqual(budgetSteps * cap + cap);
+    // CHẶT (B, review #1268): tổng bước đã đi <= ngân sách đầu + tổng credit theo thời gian thật (ngân sách chỉ bị trần cắt bớt, KHÔNG bao giờ được cộng thêm): bắt cả speed hack bền vững 20 %
+    expect(dist, `tick ${t}: vượt (ngân sách đầu + credit) thời gian thật`).toBeLessThanOrEqual(
+      (budget0 + credit) * cap + 1e-6,
+    );
   }
   // Bảo toàn input: đã enqueue = đã áp + đã bỏ (queueInput) + đã bỏ (applyInputs) + còn chờ — KHÔNG mất dấu
   const pending = c.inputs.length;
@@ -161,7 +166,7 @@ describe("Fuzz bất biến di chuyển (issue #859): dồn sau khi nghỉ — t
     expect(
       tickSteps,
       `một tick đi ${tickSteps.toFixed(1)} bước > trần 10 (M1 bỏ trần ngân sách)`,
-    ).toBeLessThanOrEqual(11);
+    ).toBeLessThanOrEqual(10 + 1e-6);
   });
 });
 
@@ -182,6 +187,7 @@ function fuzzGoStop(): { ticks: number; dist: number } {
   let prevY = p.y;
   let dist = 0;
   let credit = 0;
+  const budget0 = c.moveBudget;
 
   const ticks = ri(20, 48);
   for (let t = 0; t < ticks; t++) {
@@ -213,6 +219,10 @@ function fuzzGoStop(): { ticks: number; dist: number } {
     expect(dist, `tick ${t}: đi nhanh hơn ngân sách (xen đi/dừng)`).toBeLessThanOrEqual(
       budgetSteps * cap + cap,
     );
+    expect(
+      dist,
+      `tick ${t}: vượt (ngân sách đầu + credit) thời gian thật (xen đi/dừng)`,
+    ).toBeLessThanOrEqual((budget0 + credit) * cap + 1e-6);
   }
   return { ticks, dist };
 }
