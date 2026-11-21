@@ -8,7 +8,6 @@
 // - vai khác (trấn, cổng, bí cảnh, PK, tông môn) giữ nguyên như cũ.
 import { mkdirSync } from "node:fs";
 import {
-  DEFAULT_MAP,
   HAN_VAN_ID,
   REALMS,
   SKILLS_M7,
@@ -18,6 +17,8 @@ import {
   LEARNABLE_SLOTS,
   type SkillBook,
   type SkillDef,
+  DEFAULT_MAP_ID,
+  getMap,
 } from "@tien-gioi/shared";
 import { seedBotSaveFile } from "./bots";
 
@@ -154,7 +155,7 @@ export function planM7Bots(roles: readonly SoakRole[], bots: number): (M7BotPlan
       skills.slots[j] = def.id;
       usage.set(def.id, (usage.get(def.id) ?? 0) + 1);
     });
-    plans.push({ realm, tier, mapId: isNa ? HAN_VAN_ID : DEFAULT_MAP.def.id, skills });
+    plans.push({ realm, tier, mapId: isNa ? HAN_VAN_ID : getMap(DEFAULT_MAP_ID)!.def.id, skills });
   }
   return plans;
 }

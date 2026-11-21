@@ -1,5 +1,12 @@
 // Quái: sinh, bổ sung, AI (lang thang, phát hiện, đuổi, tấn công, về nhà).
-import { PLAYER_RADIUS, MONSTERS, type MonsterKind } from "@tien-gioi/shared";
+import {
+  PLAYER_RADIUS,
+  MONSTERS,
+  inSpawnZone,
+  type GameMap,
+  type MonsterKind,
+  type SpawnZoneDef,
+} from "@tien-gioi/shared";
 import type { Monster } from "../schema";
 import { rand, quantAngle, takeWhole, type World, type MonsterCtrl } from "../world";
 import { hurtPlayer } from "./combat";
@@ -44,9 +51,14 @@ export const BOSS_SPAWN_MARGIN = 32;
 
 /** Chỗ sinh của trùm đủ rộng: không sát cây / đá và nằm trong vùng chính của bản đồ cho cỡ thân của trùm (không nằm trong túi kín). */
 export function bossSpawnOk(w: World, def: MonsterKind, x: number, y: number): boolean {
+  return bossSpawnOkOn(w.map, def, x, y);
+}
+
+/** Như `bossSpawnOk` nhưng chỉ cần bản đồ (công cụ kiểm bản đồ không có `World`). */
+export function bossSpawnOkOn(map: GameMap, def: MonsterKind, x: number, y: number): boolean {
   return (
-    squareFree(w.map, x, y, def.radius + BOSS_SPAWN_MARGIN) &&
-    inMainRegion(w.map, def.radius * 0.8, x, y)
+    squareFree(map, x, y, def.radius + BOSS_SPAWN_MARGIN) &&
+    inMainRegion(map, def.radius * 0.8, x, y)
   );
 }
 
@@ -90,11 +102,82 @@ function sameKindNear(w: World, kind: string, x: number, y: number, r: number): 
   return false;
 }
 
+/** Diện tích thật của vùng (px²): elip bằng pi/4 khung. Dùng làm trọng số chọn vùng nên con số tương đối mới quan trọng. */
+function zoneArea(z: SpawnZoneDef): number {
+  return z.shape === "rect" ? z.w * z.h : (Math.PI / 4) * z.w * z.h;
+}
+
+/** Số con CÙNG loài đang đứng trong vùng `z` (để áp `max` của vùng). Trùm thế giới (M9.4) là THÊM, không chiếm chỗ `max` (như `topUpMonsters`). */
+function countInZone(w: World, z: SpawnZoneDef): number {
+  let n = 0;
+  w.state.monsters.forEach((m, id) => {
+    if (id !== w.wbossId && m.kind === z.monster && inSpawnZone(z, m.x, m.y)) n++;
+  });
+  return n;
+}
+
+export interface ZoneSpotOpts {
+  /** Khoảng cách tối thiểu tới con cùng loài (xem `SPAWN_SPREAD_PX`) */
+  spread?: number;
+  /** Bỏ qua `max` của vùng: trùm thế giới là THÊM, không chiếm chỗ của quái thường */
+  ignoreMax?: boolean;
+}
+
+/**
+ * Chọn chỗ sinh cho loài `def` trong các VÙNG SINH dữ liệu của bản đồ (S5, `GameMap.spawnZonesOf`; gọi khi loài có ít nhất một vùng). Chọn vùng theo diện tích trong số vùng còn chỗ
+ * (`max`), bốc điểm trong khung rồi lọc: đúng hình vùng, không đè ô chặn, ngoài khu an toàn (cùng đệm 160 px như cách cũ), trùm thì thêm `bossSpawnOk`. KHÔNG xét `dangerAt` / `minDanger`:
+ * vùng do người soạn đặt là quyết định rõ ràng. Hết lượt thử (vùng đầy, chật, rải đều không được) thì `null`: lần này KHÔNG sinh, không rơi về cách cũ (`topUpMonsters` thử lại nhịp sau),
+ * vì rơi về cách cũ sẽ đặt quái ra ngoài vùng người soạn đã giới hạn.
+ */
+export function zoneSpawnSpot(
+  w: World,
+  def: MonsterKind,
+  zones: readonly SpawnZoneDef[],
+  opts: ZoneSpotOpts = {},
+): { x: number; y: number } | null {
+  const map = w.map;
+  const open = zones.filter(
+    (z) => opts.ignoreMax || z.max === undefined || countInZone(w, z) < z.max,
+  );
+  if (open.length === 0) return null;
+  let total = 0;
+  for (const z of open) total += zoneArea(z);
+  for (const strict of def.boss ? [true, false] : [false]) {
+    const tries = opts.spread !== undefined ? SPREAD_TRIES : strict ? 200 : 40;
+    for (let i = 0; i < tries; i++) {
+      let pick = rand(0, total);
+      let z = open[open.length - 1]!;
+      for (const c of open) {
+        pick -= zoneArea(c);
+        if (pick < 0) {
+          z = c;
+          break;
+        }
+      }
+      const x = z.x + rand(0, z.w);
+      const y = z.y + rand(0, z.h);
+      if (!inSpawnZone(z, x, y)) continue;
+      if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
+      if (strict && !bossSpawnOk(w, def, x, y)) continue;
+      if (opts.spread !== undefined && sameKindNear(w, def.id, x, y, opts.spread)) continue;
+      return { x, y };
+    }
+  }
+  return null;
+}
+
 export function spawnMonster(w: World, def: MonsterKind) {
   const map = w.map;
   const spread = Object.prototype.hasOwnProperty.call(SPAWN_SPREAD_PX, def.id)
     ? SPAWN_SPREAD_PX[def.id]
     : undefined;
+  // Bản đồ khai VÙNG SINH cho loài này (S5): chỉ sinh trong vùng; không khai thì cách cũ dưới đây (không đổi hành vi, không thêm `Math.random`)
+  const zones = map.spawnZonesOf(def.id);
+  if (zones.length > 0) {
+    const spot = zoneSpawnSpot(w, def, zones, { spread });
+    if (spot) placeMonster(w, def, spot.x, spot.y, rollElite(w, def));
+    return;
+  }
   // Trùm khó tìm chỗ hơn (vòng ngoài xa trấn + rộng + thuộc vùng chính): thử nhiều lần; không thấy chỗ rộng nào thì quay về luật cũ (còn hơn thiếu trùm: bản đồ thật còn > 1000 chỗ rộng, test giữ)
   for (const strict of def.boss ? [true, false] : [false]) {
     const tries = spread !== undefined ? SPREAD_TRIES : strict ? 200 : 40;

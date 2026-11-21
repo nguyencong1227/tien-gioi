@@ -22,13 +22,13 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import {
-  DEFAULT_MAP,
   DEFAULT_MAP_ID,
   DUEL_MSG,
   DUNGEON_MSG,
   NPC_BY_ID,
   SECT_MSG,
   roomNameOf,
+  getMap,
 } from "@tien-gioi/shared";
 import { Tab, sleep, shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
@@ -323,8 +323,8 @@ async function main() {
     world.map = Object.create(world.map, { monsterCapOf: { value: () => 0 } });
     world.state.monsters.clear();
     world.mctrl.clear();
-    me.x = DEFAULT_MAP.townPx.x + DEFAULT_MAP.townPx.r + 500;
-    me.y = DEFAULT_MAP.townPx.y;
+    me.x = getMap(DEFAULT_MAP_ID)!.townPx.x + getMap(DEFAULT_MAP_ID)!.townPx.r + 500;
+    me.y = getMap(DEFAULT_MAP_ID)!.townPx.y;
     const [nearId, midId, farId] = [40, 150, 300].map(
       (dx) => addMonster(world, "tho", me.x + dx, me.y).id,
     ) as string[];
@@ -608,8 +608,8 @@ async function main() {
 
     // ---- 9. Túi đồ: mũi tên chuyển ô, Enter dùng đan ----
     // về giữa trấn (khu an toàn: quái không đánh, không hồi sinh quái): máu thấp mà gặp quái hồi sinh gần đó thì chết, kiểm chập chờn
-    me.x = DEFAULT_MAP.townPx.x;
-    me.y = DEFAULT_MAP.townPx.y + 150;
+    me.x = getMap(DEFAULT_MAP_ID)!.townPx.x;
+    me.y = getMap(DEFAULT_MAP_ID)!.townPx.y + 150;
     giveItem(world, sid, "hoi_huyet_dan", 3);
     me.hp = 30;
     await waitUntil(async () =>
@@ -1247,8 +1247,8 @@ async function main() {
       world.ctrl.get(sidB).lastHitAt = 0;
     };
     // hai người đứng ngoài trấn (trong trấn không thách đấu được), cạnh nhau, trong tầm nhìn của nhau
-    me.x = DEFAULT_MAP.townPx.x + DEFAULT_MAP.townPx.r + 500;
-    me.y = pb.y = DEFAULT_MAP.townPx.y;
+    me.x = getMap(DEFAULT_MAP_ID)!.townPx.x + getMap(DEFAULT_MAP_ID)!.townPx.r + 500;
+    me.y = pb.y = getMap(DEFAULT_MAP_ID)!.townPx.y;
     pb.x = me.x + 90;
     calmWorld();
     await t.waitFor(
@@ -1592,7 +1592,7 @@ async function main() {
     check("Esc đóng lò rèn", !(await ev(shown("forge-modal"))), "forge-modal vẫn mở");
 
     // ---- 16. Qua cổng bằng phím F (CUỐI CÙNG: người chơi sang phòng khác) ----
-    const portal = DEFAULT_MAP.portals[0];
+    const portal = getMap(DEFAULT_MAP_ID)!.portals[0];
     me.x = portal.x;
     me.y = portal.y + 30;
     world.ctrl.get(sid).lastHitAt = 0;

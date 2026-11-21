@@ -25,7 +25,6 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import {
-  DEFAULT_MAP,
   DEFAULT_MAP_ID,
   INVENTORY_SLOTS,
   ITEM_BY_ID,
@@ -38,6 +37,7 @@ import {
   roomNameOf,
   sectFailMessage,
   sectQuestCh,
+  getMap,
 } from "@tien-gioi/shared";
 import { Tab, shown, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
@@ -195,12 +195,12 @@ async function main() {
     // Hai người đứng cạnh nhau trong trấn (cùng thấy nhau, bấm chuột được)
     const pa = playerOf(A.name);
     const pb = playerOf(B.name);
-    pa.x = DEFAULT_MAP.townPx.x - 40;
-    pb.x = DEFAULT_MAP.townPx.x + 40;
-    pa.y = pb.y = DEFAULT_MAP.townPx.y + 60;
+    pa.x = getMap(DEFAULT_MAP_ID)!.townPx.x - 40;
+    pb.x = getMap(DEFAULT_MAP_ID)!.townPx.x + 40;
+    pa.y = pb.y = getMap(DEFAULT_MAP_ID)!.townPx.y + 60;
     for (const tab of tabs)
       await tab.waitFor(
-        `[...window.__scene.state.players.values()].filter(p => Math.abs((p.px ?? p.x) - ${Math.round(DEFAULT_MAP.townPx.x)}) < 120).length === 2`,
+        `[...window.__scene.state.players.values()].filter(p => Math.abs((p.px ?? p.x) - ${Math.round(getMap(DEFAULT_MAP_ID)!.townPx.x)}) < 120).length === 2`,
         "hai người ở chỗ mới",
       );
     if (ctrlOf(A.name).coin !== A.coin)

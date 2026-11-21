@@ -83,7 +83,6 @@ import {
   originMult,
   engraveSlotsOf,
   soulView,
-  DEFAULT_MAP,
   cleanName,
   sanitizeSkillBook,
   SKILL_MSG,
@@ -752,6 +751,9 @@ export class WorldRoom extends Room<WorldState> {
     // Phòng bí cảnh: luôn xuất hiện ở cổng vào (toạ độ trong file là của Lạc Hà, vô nghĩa ở đây)
     const inRun = this.world.runId !== null || this.world.arena !== null;
     const spot = inRun ? safeSpot(this.world.map) : safeSpot(this.world.map, save.x, save.y);
+    // Vị trí đã lưu không dùng được (bản đồ đổi, hồ sơ rơi vào tường): ghi nhật ký kiểm toán (không có dữ liệu cá nhân: chỉ bản đồ, khoảng dời, về đâu)
+    if (spot.moved)
+      audit("map.relocate", { map: this.mapId, dist: spot.moved.dist, to: spot.moved.to });
     p.x = spot.x;
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
@@ -1046,7 +1048,7 @@ export class WorldRoom extends Room<WorldState> {
     const def = dungeonOf(run.dungeonId);
     const roomId = run.roomId;
     if (!def || !roomId) return;
-    const entry = getMap(def.entryMapId) ?? DEFAULT_MAP;
+    const entry = getMap(def.entryMapId) ?? getMap(DEFAULT_MAP_ID)!;
     const spot = safeSpot(entry);
     await this.handOff(
       sid,
@@ -1065,7 +1067,7 @@ export class WorldRoom extends Room<WorldState> {
   /** Hook `World.onDungeonExit`: đưa một người từ phòng bí cảnh về cổng vào (Lạc Hà). */
   private async exitDungeonRoom(sid: string) {
     const entryId = dungeonOfMap(this.mapId)?.entryMapId ?? DEFAULT_MAP_ID;
-    const entry = getMap(entryId) ?? DEFAULT_MAP;
+    const entry = getMap(entryId) ?? getMap(DEFAULT_MAP_ID)!;
     const spot = safeSpot(entry);
     await this.handOff(sid, { mapId: entry.def.id, x: spot.x, y: spot.y });
   }
@@ -1416,7 +1418,7 @@ export class WorldRoom extends Room<WorldState> {
       this.world.events.toast(sid, { text: `Đầu thai: ${notes.join("; ")}.`, tone: "info" });
     }
     if (this.mapId !== DEFAULT_MAP_ID) {
-      const spot = safeSpot(DEFAULT_MAP);
+      const spot = safeSpot(getMap(DEFAULT_MAP_ID)!);
       await this.handOff(sid, { mapId: DEFAULT_MAP_ID, x: spot.x, y: spot.y });
     } else {
       await this.persist(p, c).catch((e) => console.error("save failed (rebirth)", e));

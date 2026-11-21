@@ -6,13 +6,17 @@ import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   ARENA_MAPS,
+  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
   GameMap,
   MAPS,
   MAP_BY_ID,
   PROCEDURAL_MAPS,
   adoptTiledMaps,
   arenaMapIdOf,
+  dangerAt,
   getMap,
+  tileAt,
   type MapDef,
 } from "./map";
 import { portalLinkViolations } from "./map-checks";
@@ -37,6 +41,17 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
       expect(getMap(def.id)!.def.tiles).toBeDefined();
       expect(def.tiles).toBeUndefined(); // định nghĩa sinh theo seed vẫn nguyên làm đồng hồ chuẩn
     }
+  });
+  it("DEFAULT_MAP (dựng một lần lúc nạp module) KHÁC getMap(DEFAULT_MAP_ID) sau khi nhận tệp, nhưng cùng từng byte: vì thế mã nguồn phải dùng getMap, không nhập DEFAULT_MAP (no-global-map-imports canh)", () => {
+    adoptTiledMapFiles();
+    const now = getMap(DEFAULT_MAP_ID)!;
+    expect(now).not.toBe(DEFAULT_MAP);
+    expect(now.def.tiles).toBeDefined();
+    expect(DEFAULT_MAP.def.tiles).toBeUndefined();
+    expect(Buffer.from(now.tiles).equals(Buffer.from(DEFAULT_MAP.tiles))).toBe(true);
+    // các hàm tên cũ tra bản mới nhất mỗi lần gọi
+    expect(tileAt(10, 10)).toBe(now.tileAt(10, 10));
+    expect(dangerAt(40, 40)).toBe(now.dangerAt(40, 40));
   });
   it("adoptTiledMaps từ chối id không phải bản đồ thường, tệp sai, và tệp khai lệch id", () => {
     expect(() => adoptTiledMaps({ khong_co: TILED_MAP_FILES.lac_ha })).toThrow(

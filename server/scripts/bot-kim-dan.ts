@@ -12,7 +12,6 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import {
   AM_SUONG_ID,
-  DEFAULT_MAP,
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   HAN_VAN_ID,
@@ -504,7 +503,7 @@ export async function runPortalScenario(): Promise<{ success: boolean; log: stri
     await new Promise((r) => setTimeout(r, 200));
 
     // Di chuyển tới cổng Bắc Môn Quan (lac_ha_bac: x=1536, y=112)
-    const portal1 = DEFAULT_MAP.portal("lac_ha_bac")!;
+    const portal1 = getMap(DEFAULT_MAP_ID)!.portal("lac_ha_bac")!;
     let arrivedPortal1 = false;
     let nextMapId: string | null = null;
 
