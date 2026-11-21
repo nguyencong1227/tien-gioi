@@ -39,21 +39,36 @@ const MAX_MOVE_BUDGET = 10;
 /** Sai số cộng dồn số thực: 0,9999999999 bước coi như đủ một bước (dt chia cho TICK_MS không luôn tròn). */
 const BUDGET_EPS = 1 - 1e-9;
 
+/** `seq` lớn nhất nhận được (số nguyên không dấu 32 bit: `lastSeq` lưu bằng `>>> 0`). Client thật tăng 1 mỗi 50 ms từ 0 nên 2^32 mất hơn sáu năm liên tục. */
+export const INPUT_SEQ_MAX = 0xffff_ffff;
+
 /**
  * Nhận input từ client; bỏ qua dữ liệu sai kiểu. Input DỪNG (`dx = dy = 0`) cắt hàng đợi còn `STOP_KEEP_INPUTS` input cũ nhất (xem trên); đầy `INPUT_QUEUE_HARD_CAP` thì bỏ
  * input cũ nhất. Mọi input DI CHUYỂN bị bỏ tính vào `World.inputStats.dropped` (input dừng thừa bị cắt thì không).
+ * KHÔNG tin client (#1263): `seq` phải là SỐ NGUYÊN trong [0, `INPUT_SEQ_MAX`] (NaN / Infinity / âm / thập phân / quá 32 bit bị bỏ lặng lẽ: `typeof NaN === "number"` nên kiểm kiểu thôi chưa đủ, và `NaN >>> 0` = 0 sẽ kéo `lastSeq` lùi về 0 làm client tưởng input chưa được ack rồi đối chiếu lại), `dx` / `dy` hữu hạn.
  */
 export function queueInput(w: World, sid: string, m: InputMsg | undefined) {
   const c = w.ctrl.get(sid);
-  if (!c || typeof m?.seq !== "number" || !Number.isFinite(m.dx) || !Number.isFinite(m.dy)) return;
-  if (Math.hypot(m.dx, m.dy) <= STOP_LEN && c.inputs.length > STOP_KEEP_INPUTS) {
+  const seq = m?.seq;
+  const dx = m?.dx;
+  const dy = m?.dy;
+  if (!c || typeof seq !== "number" || !Number.isInteger(seq) || seq < 0 || seq > INPUT_SEQ_MAX)
+    return;
+  if (
+    typeof dx !== "number" ||
+    typeof dy !== "number" ||
+    !Number.isFinite(dx) ||
+    !Number.isFinite(dy)
+  )
+    return;
+  if (Math.hypot(dx, dy) <= STOP_LEN && c.inputs.length > STOP_KEEP_INPUTS) {
     // Chỉ input DI CHUYỂN bị cắt mới tính vào `dropped`: input DỪNG thừa bị cắt (client lặp tin dừng cho chắc: tin thứ ba cắt tin thứ hai) là vô hại
     // và làm `input_dropped` ở `/metrics` nhiễu (chỉ cần một bước chờ + ba tin dừng là dropped = 1; B đo ở #963).
     for (let i = STOP_KEEP_INPUTS; i < c.inputs.length; i++)
       if (Math.hypot(c.inputs[i]!.dx, c.inputs[i]!.dy) > STOP_LEN) w.inputStats.dropped++;
     c.inputs.length = STOP_KEEP_INPUTS;
   }
-  c.inputs.push({ seq: m.seq >>> 0, dx: m.dx, dy: m.dy });
+  c.inputs.push({ seq, dx, dy });
   if (c.inputs.length > INPUT_QUEUE_HARD_CAP) {
     c.inputs.shift();
     w.inputStats.dropped++;
