@@ -321,9 +321,12 @@ describe("cống hiến / điểm tông chỉ ghi qua MỘT cổng (sectAwardDay
 
     it("đột biến 6: object-literal bọc Math.min có cộng `{ ...m, contrib: Math.min(CAP, (m.contrib ?? 0) + 10) }` ngoài cổng -> ĐỎ (lỗ 1: cộng quấn trong lệnh gọi)", () => {
       // Mẫu thật của shopRefund; nếu detector KHÔNG đệ quy tìm phép cộng trong Math.min thì bỏ lỡ -> test này đỏ.
-      const code = "const next = { ...m, contrib: Math.min(SECT_CONTRIB_CAP, (m.contrib ?? 0) + 10) };";
+      const code =
+        "const next = { ...m, contrib: Math.min(SECT_CONTRIB_CAP, (m.contrib ?? 0) + 10) };";
       const found = findContribWrites(code);
-      expect(found.some((v) => v.prop === "contrib" && /contrib/.test(v.text) && /\+/.test(v.text))).toBe(true);
+      expect(
+        found.some((v) => v.prop === "contrib" && /contrib/.test(v.text) && /\+/.test(v.text)),
+      ).toBe(true);
     });
 
     it("đột biến 7: clamp gán biến `const contrib = Math.min(CAP, ...)` (KHÔNG có +/–) ngoài cổng -> ĐỎ (lỗ 2: clamp-to-named-var)", () => {
