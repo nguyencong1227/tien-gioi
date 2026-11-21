@@ -18,6 +18,24 @@ import {
 } from "./map-style";
 import { NO_DECOR, buildDecorGrid, decorAtTile, decorCounts, hash01, hashId } from "./map-decor";
 
+/**
+ * Thời gian CPU (ms) của CHÍNH luồng đang chạy bước `fn`, kẹp trên bởi đồng hồ tường: bản sao gọn của `measureSyncStepMs` ở `server/src/perf/bench.ts`
+ * (client không import chéo workspace). `process.threadCpuUsage` có từ Node 22.19 (`.nvmrc` = 22); Node cũ quay về CPU cả tiến trình.
+ */
+function cpuStepMs(fn: () => void): number {
+  const read = (
+    process as unknown as { threadCpuUsage?: (prev?: NodeJS.CpuUsage) => NodeJS.CpuUsage }
+  ).threadCpuUsage;
+  const cpu = (prev?: NodeJS.CpuUsage) =>
+    read ? read.call(process, prev) : process.cpuUsage(prev);
+  const c0 = cpu();
+  const t0 = performance.now();
+  fn();
+  const wallMs = performance.now() - t0;
+  const c1 = cpu(c0);
+  return Math.min(wallMs, (c1.user + c1.system) / 1000);
+}
+
 const ALL_IDS = [...MAPS, ...DUNGEON_MAPS].map((m) => m.id);
 const mapOf = (id: string): GameMap => getMap(id)!;
 
@@ -321,9 +339,8 @@ describe("map-decor (sinh trang trí tất định)", () => {
 
   it("tốc độ: dựng lưới bản đồ lớn nhất dưới 50 ms (một lần mỗi lần vào bản đồ)", () => {
     const biggest = ALL_IDS.map(mapOf).sort((a, b) => b.def.w * b.def.h - a.def.w * a.def.h)[0];
-    const t0 = performance.now();
-    buildDecorGrid(biggest, styleOf(biggest.def.id));
-    expect(performance.now() - t0).toBeLessThan(50);
+    // CPU của chính luồng, KHÔNG đồng hồ tường: cả bộ `npm test` chạy `pool: "threads"` + máy tải cao làm tường vọt (A đo 51,1 ms ở load 35-50, #1215)
+    expect(cpuStepMs(() => buildDecorGrid(biggest, styleOf(biggest.def.id)))).toBeLessThan(50);
   });
 });
 
