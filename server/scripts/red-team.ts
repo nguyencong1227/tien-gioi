@@ -11,6 +11,7 @@
 //   npm run red-team -w server -- --report   # In bảng chi tiết từng loại tin x payload
 
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { getHeapStatistics } from "node:v8";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -325,6 +326,8 @@ export interface RedTeamSummary {
   payloadLatencyAvgMs: number;
   payloadLatencyMaxMs: number;
   rssDeltaMb: number;
+  /** Tăng heap (MB) của CHÍNH luồng chạy bài (isolate V8 riêng mỗi luồng). Không bị đội bởi tệp test khác chạy song song trong cùng tiến trình (vitest `pool: "threads"`), khác `rssDeltaMb`. */
+  heapDeltaMb: number;
   rateLimitKicked: boolean;
   discoveredMessageTypes: string[];
   results: RedTeamTestResult[];
@@ -353,6 +356,7 @@ export async function runRedTeam(options: {
   const verbose = options.verbose ?? false;
 
   const initialRss = readVmRssMb();
+  const initialHeap = getHeapStatistics().used_heap_size / 1024 / 1024;
   const unhandledErrors: string[] = [];
   const handlerExceptions: string[] = [];
 
@@ -790,6 +794,10 @@ export async function runRedTeam(options: {
 
   const finalRss = readVmRssMb();
   const rssDeltaMb = Math.max(0, finalRss - initialRss);
+  const heapDeltaMb = Math.max(
+    0,
+    Math.round(getHeapStatistics().used_heap_size / 1024 / 1024 - initialHeap),
+  );
 
   latencySamples.sort((a, b) => a - b);
   const avgLatency =
@@ -807,6 +815,7 @@ export async function runRedTeam(options: {
     payloadLatencyAvgMs: Number(avgLatency.toFixed(2)),
     payloadLatencyMaxMs: Number(maxLatency.toFixed(2)),
     rssDeltaMb,
+    heapDeltaMb,
     rateLimitKicked,
     discoveredMessageTypes,
     results,
