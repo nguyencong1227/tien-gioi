@@ -43,8 +43,10 @@ export function collectDistFiles(dir, baseDir = dir) {
  * @returns {string[]}
  */
 export function buildPrecacheUrls(distDir, allFiles) {
-  // 1. Lọc các file không thuộc /packs/
-  const normalFiles = allFiles.filter((rel) => !rel.startsWith("/packs/"));
+  // 1. Lọc các file không thuộc /packs/ và KHÔNG BAO GIỜ đưa gói tài nguyên riêng (/assets-private/, mục 63: cấm phân phối lại, chỉ máy chủ phục vụ) vào precache
+  const normalFiles = allFiles.filter(
+    (rel) => !rel.startsWith("/packs/") && !rel.startsWith("/assets-private/"),
+  );
   const precacheUrls = ["/", ...normalFiles];
 
   // 2. Kiểm tra nếu có dist/packs/manifest.json để đưa gói 'core' vào
