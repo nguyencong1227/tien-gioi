@@ -13,15 +13,19 @@
 // hướng dẫn nối vào `award` hoặc xin LGTM Dev A):
 //
 //   server/src/sect-service.ts
-//     - `award`  : MỘT cổng cống hiến DUY NHẤT — mọi nguồn (nhiệm vụ, góp kho, bí cảnh...) đều gọi hàm này;
-//                 trong một `update` nguyên tử cộng contrib + merit + Sect.points cùng `granted` đã qua `sectAwardDay` (trần ngày / trần nguồn).
-//     - `shopBuy`: trừ `contrib` khi mua đồ ở cửa hàng tông (chỉ MẤT, không bao giờ tăng; KHÔNG đụng merit / points).
+//     - `award`   : MỘT cổng cống hiến DUY NHẤT — mọi nguồn (nhiệm vụ, góp kho, bí cảnh...) đều gọi hàm này;
+//                   trong một `update` nguyên tử cộng contrib + merit + Sect.points cùng `granted` đã qua `sectAwardDay` (trần ngày / trần nguồn).
+//     - `shopBuy` : trừ `contrib` khi mua đồ ở cửa hàng tông (chỉ MẤT, không bao giờ tăng; KHÔNG đụng merit / points).
+//     - `shopRefund`: trả lại `contrib` khi hoàn mua (túi đầy / đã rời tông): `Math.min(CAP, (me.contrib ?? 0) + cost)` —
+//                   chỉ TĂNG khi hoàn (cùng cổng cho-ngày); phép cộng QUẤN trong `Math.min` nên detector phải ĐỆ QUI mới bắt được.
+//   server/src/sect-store.ts
+//     - `sanitizeSect`: chuẩn hoá bản ghi khi NẠP — kẹp `const contrib = Math.min(...)`, `const points = Math.max(...)`
+//                   (đọc hỏng thì kẹp về giới hạn, KHÔNG phải logic game kiếm điểm); kẹp GÁN vào biến tên đúng nên detector bắt được -> cần whitelist.
+//   shared/src/social.ts
+//     - `sampleBoardRow`: dữ liệu MẪU bảng xếp hạng (mock `points` giảm dần theo chỉ số `i`), KHÔNG ghi `Sect.points` thật.
 //   server/src/store-contract.ts
 //     - Module HỢP ĐỒNG KIỂM THỬ (import `vitest`, chứa `it()` / `describe()`); mọi chỗ ghi contrib/points/merit
 //       ở đây là fixtures / test-only, KHÔNG phải logic game.
-//
-// sect-store.ts KHÔNG cần whitelist: `sanitizeSect` chỉ kẹp qua `const x = ...` và spread `{ ...(x ? {x} : {}) }`
-// (đọc / chuẩn hoá bản ghi khi nạp), KHÔNG có phép gán member-access hay object-literal có phép tính -> detector không bắt.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,10 +51,22 @@ interface GateViolation {
 /** Danh sách trắng: tệp -> { lý do, [tên hàm được phép] }. Không có `funcs` = toàn bộ tệp được phép. */
 const WHITELIST: Record<string, { reason: string; funcs?: string[] }> = {
   "server/src/sect-service.ts": {
-    funcs: ["award", "shopBuy"],
+    funcs: ["award", "shopBuy", "shopRefund"],
     reason:
       "award = MỘT cổng cống hiến duy nhất (cộng contrib+merit+points cùng granted qua sectAwardDay có trần ngày); " +
-      "shopBuy = trừ contrib khi mua đồ (chỉ MẤT). Đây là nơi hợp lệ duy nhất ghi contrib/points/merit trong logic game.",
+      "shopBuy = trừ contrib khi mua đồ (chỉ MẤT); shopRefund = trả contrib khi hoàn mua (chỉ TĂNG khi hoàn, cùng cổng cho-ngày; " +
+      "phép cộng quấn trong Math.min). Đây là nơi hợp lệ duy nhất ghi contrib/points/merit trong logic game.",
+  },
+  "server/src/sect-store.ts": {
+    funcs: ["sanitizeSect"],
+    reason:
+      "Chuẩn hoá bản ghi khi NẠP: kẹp contrib/points về giới hạn bằng `const <thuộc tính> = Math.min/Math.max(...)` " +
+      "(đọc hỏng thì kẹp, KHÔNG phải logic game kiếm điểm); kẹp gán vào biến tên đúng nên detector bắt được -> cần whitelist.",
+  },
+  "shared/src/social.ts": {
+    funcs: ["sampleBoardRow"],
+    reason:
+      "Dữ liệu MẪU bảng xếp hạng (mock points giảm dần theo chỉ số i); KHÔNG ghi Sect.points thật.",
   },
   "server/src/store-contract.ts": {
     reason:
@@ -76,13 +92,37 @@ function isAssignmentExpression(node: ts.Node): node is ts.BinaryExpression {
   ).isAssignmentExpression(node);
 }
 
-/** object-literal property có giá trị là phép cộng/trừ (mẫu "cộng/trừ cống hiến"): `points: x + n`, `contrib: x - t`. */
-function hasAddSub(node: ts.Node): boolean {
+/** Lệnh gọi kẹp `Math.min(...)` / `Math.max(...)` — kẹp giá trị gate prop khi trả lại / chuẩn hoá. */
+function isClampCall(node: ts.Node): boolean {
   return (
+    ts.isCallExpression(node) &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    node.expression.expression.getText().trim() === "Math" &&
+    (node.expression.name.text === "min" || node.expression.name.text === "max")
+  );
+}
+
+/**
+ * `node` (một cây biểu thức) CHỨA — ở BẤT CỨ đâu trong nhánh — phép cộng/trừ (`+` / `-`) HOẶC lệnh kẹp `Math.min` / `Math.max`:
+ * tức là một "phép tính ghi giá trị" (KHÔNG phải đọc thuần như `me.contrib ?? 0`, `pointsNow`, `merit: 120`).
+ * ĐỆ QUI bằng `ts.forEachChild` vì hai mẫu thật quấn phép tính trong lệnh gọi, nên kiểm nút gốc là BinaryExpression đã bỏ lỡ:
+ *   - `contrib: Math.min(CAP, (me.contrib ?? 0) + cost)` — cộng ở ĐỐI SỐ của Math.min (shopRefund, lỗ 1).
+ *   - `const contrib = Math.min(...)` — kẹp, KHÔNG có +/– (sanitizeSect, lỗ 2).
+ * Trước đây `hasAddSub` chỉ kiểm `node` là BinaryExpression +/- trực tiếp -> bỏ cả hai; đây là bản vá (#970).
+ */
+function hasAddSubOrClamp(node: ts.Node): boolean {
+  if (
     ts.isBinaryExpression(node) &&
     (node.operatorToken.kind === ts.SyntaxKind.PlusToken ||
       node.operatorToken.kind === ts.SyntaxKind.MinusToken)
-  );
+  ) {
+    return true; // phép cộng/trừ trực tiếp
+  }
+  if (isClampCall(node)) {
+    return true; // lệnh kẹp Math.min / Math.max (sanitizeSect, shopRefund)
+  }
+  // ĐỆ QUI xuống con: phép tính có thể quấn trong lời gọi (vd `(m.contrib ?? 0) + cost` là đối số của Math.min).
+  return ts.forEachChild(node, hasAddSubOrClamp) ?? false;
 }
 
 /** Tên phương thức / hàm bao quanh nút (đi lên theo parent); rỗng nếu là hàm ẩn danh ở tầng module. */
@@ -161,11 +201,23 @@ export function findContribWrites(sourceText: string, fileName = "snippet.ts"): 
           ts.isPropertyAssignment(p) &&
           ts.isIdentifier(p.name) &&
           GATE_PROPS.has(p.name.text) &&
-          hasAddSub(p.initializer)
+          hasAddSubOrClamp(p.initializer)
         ) {
           record(p, p.name);
         }
       }
+    }
+    // Biến gate prop được GÁN bằng phép tính / kẹp: `const contrib = Math.min(...)`, `const points = Math.max(...)`.
+    // Bắt mẫu "clamp-to-named-var" của sanitizeSect (kẹp khi nạp bản ghi) — hợp lệ nên cần whitelist theo hàm.
+    // Ghi cả `VariableDeclarationList` (chứa chữ `const`) để báo cáo dễ đọc; `const` KHÔNG thuộc VariableDeclaration.
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      GATE_PROPS.has(node.name.text) &&
+      node.initializer &&
+      hasAddSubOrClamp(node.initializer)
+    ) {
+      record(ts.isVariableDeclarationList(node.parent) ? node.parent : node, node.name);
     }
     ts.forEachChild(node, walk);
   };
@@ -265,6 +317,20 @@ describe("cống hiến / điểm tông chỉ ghi qua MỘT cổng (sectAwardDay
       const found = findContribWrites(code, "server/src/sect-service.ts");
       expect(found.length).toBe(1);
       expect(isWhitelisted("server/src/sect-service.ts", found[0]!.func)).toBe(false);
+    });
+
+    it("đột biến 6: object-literal bọc Math.min có cộng `{ ...m, contrib: Math.min(CAP, (m.contrib ?? 0) + 10) }` ngoài cổng -> ĐỎ (lỗ 1: cộng quấn trong lệnh gọi)", () => {
+      // Mẫu thật của shopRefund; nếu detector KHÔNG đệ quy tìm phép cộng trong Math.min thì bỏ lỡ -> test này đỏ.
+      const code = "const next = { ...m, contrib: Math.min(SECT_CONTRIB_CAP, (m.contrib ?? 0) + 10) };";
+      const found = findContribWrites(code);
+      expect(found.some((v) => v.prop === "contrib" && /contrib/.test(v.text) && /\+/.test(v.text))).toBe(true);
+    });
+
+    it("đột biến 7: clamp gán biến `const contrib = Math.min(CAP, ...)` (KHÔNG có +/–) ngoài cổng -> ĐỎ (lỗ 2: clamp-to-named-var)", () => {
+      // Mẫu thật của sanitizeSect; nếu detector KHÔNG kiểm VariableDeclaration + kẹp thì bỏ lỡ -> test này đỏ.
+      const code = "function load() { const contrib = Math.min(SECT_CONTRIB_CAP, m.contrib); }";
+      const found = findContribWrites(code);
+      expect(found.some((v) => v.prop === "contrib" && /const contrib =/.test(v.text))).toBe(true);
     });
   });
 });
