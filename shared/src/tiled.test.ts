@@ -239,11 +239,50 @@ describe("tiledViolations: mỗi luật có ca sai (đột biến dữ liệu)",
       /cần ĐÚNG một đối tượng 'town' \(có 2\)/,
     ],
     ["town r < 1", (m) => (objects(m)[0]!.properties = [prop("r", 0.5)]), /r phải >= 1 ô/],
+    [
+      "town là elip (x, y là góc trên trái của khung, không phải tâm)",
+      (m) => {
+        const t = objects(m)[0]!;
+        delete t.point;
+        t.width = 64;
+        t.height = 64;
+      },
+      /town[^\n]*phải là đối tượng ĐIỂM/,
+    ],
+    [
+      "cổng là hình chữ nhật",
+      (m) => {
+        const c = objects(m)[1]!;
+        c.point = false;
+        c.width = 32;
+        c.height = 32;
+      },
+      /portal[^\n]*phải là đối tượng ĐIỂM/,
+    ],
+    [
+      "lair không phải điểm",
+      (m) =>
+        objects(m).push({
+          id: 8,
+          class: "lair",
+          x: 5 * TW,
+          y: 12 * TW,
+          properties: [prop("r", 1)],
+        }),
+      /lair[^\n]*phải là đối tượng ĐIỂM/,
+    ],
     ["town ngoài bản đồ", (m) => (objects(m)[0]!.x = 99 * TW), /nằm ngoài bản đồ/],
     [
       "hai lair",
       (m) => {
-        const lair = { id: 8, class: "lair", x: 5 * TW, y: 12 * TW, properties: [prop("r", 1)] };
+        const lair = {
+          id: 8,
+          class: "lair",
+          x: 5 * TW,
+          y: 12 * TW,
+          point: true,
+          properties: [prop("r", 1)],
+        };
         objects(m).push(lair, { ...lair, id: 9 });
       },
       /tối đa một đối tượng 'lair'/,

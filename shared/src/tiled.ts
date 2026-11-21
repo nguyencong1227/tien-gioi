@@ -264,6 +264,11 @@ function analyze(json: unknown): Analysis {
         errors.push(`${oAt}: thiếu x / y`);
         continue;
       }
+      // Tiled ghi x, y của elip / chữ nhật là GÓC TRÊN TRÁI của khung, không phải tâm: coi là tâm thì trấn / cổng lệch im lặng. Chỉ nhận đối tượng ĐIỂM.
+      if (o.point !== true) {
+        errors.push(`${oAt}: phải là đối tượng ĐIỂM (point), không phải elip / chữ nhật / chữ`);
+        continue;
+      }
       const p = propsOf(o, oAt, errors);
       if (kindOf === "portal") {
         const pid = needStr(p, "id", oAt, errors);

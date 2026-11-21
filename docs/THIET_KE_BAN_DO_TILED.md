@@ -44,6 +44,7 @@ Tiled JSON (`.tmj` xuất JSON; lưu `.json`), `orientation: "orthogonal"`, `inf
 | `ground`, `decor`, `over` | hình: nền (đã bo góc), trang trí, phủ trên đầu nhân vật | CHỈ client |
 
 **Lớp đối tượng (objectgroup)** `objects`; mỗi đối tượng có `type` + thuộc tính:
+- **Mọi** đối tượng `town` / `lair` / `portal` PHẢI là đối tượng ĐIỂM (`point: true`): Tiled ghi `x, y` của elip / chữ nhật là GÓC TRÊN TRÁI của khung nên coi là tâm sẽ đặt lệch im lặng; `tiledViolations` từ chối elip / chữ nhật (hình elip / chữ nhật chỉ dành cho `spawnZone` ở S5).
 - `town` (điểm đặt trong ô tâm + thuộc tính `r` tính bằng Ô): khu an toàn (`MapDef.town`). `lair` cùng quy ước.
 - `portal` (đối tượng ĐIỂM đặt ở tâm cổng): `id`, `name`, `toMap`, `toPortal`, `r`, `safeR`, `spawnX`, `spawnY`. MỌI toạ độ / bán kính của đối tượng tính bằng px CỦA TỆP (`tilewidth`); `parseTiledMap` nhân `TILE / tilewidth` ra px thế giới, nên tệp tự nhất quán khi mở bằng Tiled.
 - `lair` (bí cảnh / hang cố định, nếu có).
