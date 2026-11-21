@@ -1452,11 +1452,16 @@ describe("bảo mật", () => {
       ...nearValid,
     ];
 
-    // Chia đợt <= 12 tin mỗi loại, nghỉ giữa các đợt cho giới hạn tần suất của từng loại tin hồi lại (burst 16, 8 tin/giây)
-    for (let i = 0; i < junk.length; i += 12) {
-      const wave = junk.slice(i, i + 12);
+    // Chia đợt <= 6 tin mỗi loại, nghỉ giữa các đợt cho giới hạn tần suất của từng loại tin hồi lại. Đợt 12 tin (bản cũ) làm mỗi đợt bị BỎ ~80-100 tin (loại có
+    // burst nhỏ: ambush.* 4, titleSet / achievementsGet / worldBossGet 3, chat 5, boardsGet / ping 6...) trong khi quỹ "tha thứ" ABUSE chỉ 200 và hồi 30 / giây:
+    // quỹ thấp nhất đo được chỉ 7,5 / 200 NGAY CẢ khi máy rảnh, nên chỉ cần vòng lặp sự kiện trễ (test và máy chủ chung một luồng) làm hai đợt tới CÙNG LÚC là
+    // `RateLimiter` ngắt kết nối (chập chờn #1215, A tái hiện ở `isOpen`). Đợt 6 tin bỏ ~30 tin mỗi đợt, đủ hồi trong 1,5 giây, quỹ không cạn.
+    const WAVE = 6;
+    for (let i = 0; i < junk.length; i += WAVE) {
+      const wave = junk.slice(i, i + WAVE);
       for (const t of types) for (const j of wave) a.room.send(t, j);
-      await sleep(1500);
+      // MỘT lần KHÔNG nghỉ (đợt 2 và 3 tới máy chủ gần như cùng lúc) = mô phỏng vòng lặp sự kiện trễ lúc máy tải: phải vẫn không bị ngắt kết nối
+      if (i !== WAVE) await sleep(1500);
     }
 
     expect(a.room.connection.isOpen).toBe(true);
