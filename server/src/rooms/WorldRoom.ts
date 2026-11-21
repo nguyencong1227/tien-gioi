@@ -193,7 +193,7 @@ import { headersAllowed, type OriginPolicy } from "../origin-guard";
 import { RateLimiter } from "../rate-limit";
 import { audit, auditCoinThreshold } from "../audit";
 import { bossMovesOf } from "../systems/boss-config";
-import { ambushOn } from "../systems/ambush-config";
+import { ambushBotsOn, ambushOn } from "../systems/ambush-config";
 import {
   ambushDropOffer,
   ambushResend,
@@ -359,7 +359,10 @@ export class WorldRoom extends Room<WorldState> {
     w.bossMoves = bossMovesOf(process.env); // bộ chiêu trùm (mục 42): mặc định tắt, `BOSS_MOVES=on` để bật
     // Gặp chặn đường (mục 52): mặc định TẮT (`w.ambush` null), `AMBUSH=on` để bật; ngẫu nhiên do phòng tiêm vào (system không gọi `Math.random` trong tick)
     if (ambushOn(process.env)) {
-      w.ambush = createAmbushRuntime({ random: Math.random });
+      w.ambush = createAmbushRuntime({
+        random: Math.random,
+        ambushBots: ambushBotsOn(process.env),
+      });
       // "Chiến": lập vé, mở phòng đấu trường solo rồi đưa người chơi sang (chỗ cũ luôn được lưu trước)
       w.ambush.startFight = (world, sid, offer) => {
         const ticket = openTicket(world, sid, offer);

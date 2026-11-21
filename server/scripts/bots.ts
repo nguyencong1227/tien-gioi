@@ -12,6 +12,8 @@ import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 import { Client, Protocol, type Room } from "colyseus.js";
 import {
+  AMBUSH_ARM_MS,
+  AMBUSH_MSG,
   AUTH_API,
   DEFAULT_MAP,
   DUEL_COOLDOWN_MS,
@@ -44,6 +46,13 @@ import {
   skillReqMet,
   slotOpen,
   type AttackMsg,
+  type AmbushChoice,
+  type AmbushChooseMsg,
+  type AmbushEndMsg,
+  type AmbushFleeMsg,
+  type AmbushOfferMsg,
+  type AmbushSeenMsg,
+  type AmbushStateMsg,
   type BuyMsg,
   type CastMsg,
   type FxMsg,
@@ -141,6 +150,7 @@ interface CliArgs {
   evade: boolean;
   boss: boolean;
   reflexMs: number;
+  ambush: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -180,6 +190,7 @@ function parseArgs(argv: string[]): CliArgs {
   let evade = false;
   let boss = false;
   let reflexMs = 400;
+  let ambush = false;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
@@ -251,6 +262,7 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--allow-other-port") allowOtherPort = true;
     else if (arg === "--account") account = true;
     else if (arg === "--login-storm") loginStorm = true;
+    else if (arg === "--ambush") ambush = true;
   }
 
   if (leak) {
@@ -321,6 +333,7 @@ function parseArgs(argv: string[]): CliArgs {
     evade,
     boss,
     reflexMs,
+    ambush,
   };
 }
 
@@ -974,6 +987,21 @@ export interface BotState {
   warnsTargetedCount: number;
   warnsEvadedCount: number;
   warnsHitCount: number;
+  // Các trường cho thử tải chặn đường (--ambush, CD9 #1069)
+  ambush?: boolean;
+  ambushState?: AmbushStateMsg;
+  ambushFleeing?: boolean;
+  ambushOffersCount: number;
+  ambushFightCount: number;
+  ambushFleeCoinCount: number;
+  ambushFleeExpCount: number;
+  ambushMidFleeCount: number;
+  ambushWonCount: number;
+  ambushLostCount: number;
+  ambushFledCount: number;
+  ambushTimeoutCount: number;
+  ambushDroppedCount: number;
+  ambushCanceledCount: number;
 }
 
 export interface LoadTestMetrics {
@@ -1111,6 +1139,19 @@ export interface LoadTestMetrics {
   warnsEvadedTotal?: number;
   warnsHitTotal?: number;
   evadeSuccessRatePct?: number;
+  /** Các chỉ số thử tải chặn đường CD9 #1069 (--ambush) */
+  ambush?: boolean;
+  ambushOffersTotal?: number;
+  ambushFightTotal?: number;
+  ambushFleeCoinTotal?: number;
+  ambushFleeExpTotal?: number;
+  ambushMidFleeTotal?: number;
+  ambushWonTotal?: number;
+  ambushLostTotal?: number;
+  ambushFledTotal?: number;
+  ambushTimeoutTotal?: number;
+  ambushDroppedTotal?: number;
+  ambushCanceledTotal?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -1890,6 +1931,54 @@ function bindRoomEvents(
     }
   });
 
+  room.onMessage(AMBUSH_MSG.offer, (msg: AmbushOfferMsg) => {
+    if (isMeasuring()) b.ambushOffersCount++;
+    // Gửi xác nhận đã thấy ngay lập tức để không bị hủy sau AMBUSH_SEEN_MS
+    room.send(AMBUSH_MSG.seen, { id: msg.id } satisfies AmbushSeenMsg);
+
+    // Chờ qua AMBUSH_ARM_MS (700 ms) rồi mới chọn
+    const armDelay = AMBUSH_ARM_MS + 100 + Math.floor(Math.random() * 200);
+    setTimeout(() => {
+      if (b.closedCode !== null || b.room !== room) return;
+      // Chọn ngẫu nhiên giữa Chiến / Bỏ chạy (Linh thạch, Tu vi)
+      const choices: AmbushChoice[] = ["fight", "flee_exp"];
+      if (msg.price?.coin?.enough) {
+        choices.push("flee_coin");
+      }
+      const choice = choices[Math.floor(Math.random() * choices.length)];
+      if (isMeasuring()) {
+        if (choice === "fight") b.ambushFightCount++;
+        else if (choice === "flee_coin") b.ambushFleeCoinCount++;
+        else b.ambushFleeExpCount++;
+      }
+      room.send(AMBUSH_MSG.choose, { id: msg.id, choice } satisfies AmbushChooseMsg);
+    }, armDelay);
+  });
+
+  room.onMessage(AMBUSH_MSG.state, (msg: AmbushStateMsg) => {
+    b.ambushState = msg;
+    // Trong đấu trường, 10% xác suất bot thử bỏ chạy giữa trận (vận 1s)
+    if (b.ambush && !b.ambushFleeing && Math.random() < 0.1) {
+      b.ambushFleeing = true;
+      const fleeChoice = msg.price?.coin?.enough && Math.random() < 0.5 ? "flee_coin" : "flee_exp";
+      if (isMeasuring()) b.ambushMidFleeCount++;
+      room.send(AMBUSH_MSG.flee, { choice: fleeChoice } satisfies AmbushFleeMsg);
+    }
+  });
+
+  room.onMessage(AMBUSH_MSG.end, (msg: AmbushEndMsg) => {
+    b.ambushState = undefined;
+    b.ambushFleeing = false;
+    if (isMeasuring()) {
+      if (msg.result === "won") b.ambushWonCount++;
+      else if (msg.result === "lost") b.ambushLostCount++;
+      else if (msg.result === "fled") b.ambushFledCount++;
+      else if (msg.result === "timeout") b.ambushTimeoutCount++;
+      else if (msg.result === "dropped") b.ambushDroppedCount++;
+      else if (msg.result === "canceled") b.ambushCanceledCount++;
+    }
+  });
+
   room.onLeave((code) => {
     if (!b.isFlapping && !b.isTravelling && code !== 4000) {
       b.closedCode = code;
@@ -2001,6 +2090,7 @@ async function runLoadTest(
   evade = false,
   boss = false,
   reflexMs = 400,
+  ambush = false,
 ): Promise<LoadTestMetrics> {
   const currentMap = getMap(mapId) ?? DEFAULT_MAP;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
@@ -2367,6 +2457,18 @@ async function runLoadTest(
       warnsTargetedCount: 0,
       warnsEvadedCount: 0,
       warnsHitCount: 0,
+      ambush,
+      ambushOffersCount: 0,
+      ambushFightCount: 0,
+      ambushFleeCoinCount: 0,
+      ambushFleeExpCount: 0,
+      ambushMidFleeCount: 0,
+      ambushWonCount: 0,
+      ambushLostCount: 0,
+      ambushFledCount: 0,
+      ambushTimeoutCount: 0,
+      ambushDroppedCount: 0,
+      ambushCanceledCount: 0,
     };
 
     bindRoomEvents(
@@ -3553,6 +3655,18 @@ async function runLoadTest(
       ? Number(((totalWarnsEvaded / totalWarnsTargeted) * 100).toFixed(1))
       : undefined;
 
+  const totalAmbushOffers = bots.reduce((s, b) => s + b.ambushOffersCount, 0);
+  const totalAmbushFight = bots.reduce((s, b) => s + b.ambushFightCount, 0);
+  const totalAmbushFleeCoin = bots.reduce((s, b) => s + b.ambushFleeCoinCount, 0);
+  const totalAmbushFleeExp = bots.reduce((s, b) => s + b.ambushFleeExpCount, 0);
+  const totalAmbushMidFlee = bots.reduce((s, b) => s + b.ambushMidFleeCount, 0);
+  const totalAmbushWon = bots.reduce((s, b) => s + b.ambushWonCount, 0);
+  const totalAmbushLost = bots.reduce((s, b) => s + b.ambushLostCount, 0);
+  const totalAmbushFled = bots.reduce((s, b) => s + b.ambushFledCount, 0);
+  const totalAmbushTimeout = bots.reduce((s, b) => s + b.ambushTimeoutCount, 0);
+  const totalAmbushDropped = bots.reduce((s, b) => s + b.ambushDroppedCount, 0);
+  const totalAmbushCanceled = bots.reduce((s, b) => s + b.ambushCanceledCount, 0);
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -3689,6 +3803,18 @@ async function runLoadTest(
     warnsEvadedTotal: totalWarnsEvaded > 0 ? totalWarnsEvaded : undefined,
     warnsHitTotal: totalWarnsHit > 0 ? totalWarnsHit : undefined,
     evadeSuccessRatePct,
+    ambush: ambush ? true : undefined,
+    ambushOffersTotal: ambush || totalAmbushOffers > 0 ? totalAmbushOffers : undefined,
+    ambushFightTotal: ambush || totalAmbushFight > 0 ? totalAmbushFight : undefined,
+    ambushFleeCoinTotal: ambush || totalAmbushFleeCoin > 0 ? totalAmbushFleeCoin : undefined,
+    ambushFleeExpTotal: ambush || totalAmbushFleeExp > 0 ? totalAmbushFleeExp : undefined,
+    ambushMidFleeTotal: ambush || totalAmbushMidFlee > 0 ? totalAmbushMidFlee : undefined,
+    ambushWonTotal: ambush || totalAmbushWon > 0 ? totalAmbushWon : undefined,
+    ambushLostTotal: ambush || totalAmbushLost > 0 ? totalAmbushLost : undefined,
+    ambushFledTotal: ambush || totalAmbushFled > 0 ? totalAmbushFled : undefined,
+    ambushTimeoutTotal: ambush || totalAmbushTimeout > 0 ? totalAmbushTimeout : undefined,
+    ambushDroppedTotal: ambush || totalAmbushDropped > 0 ? totalAmbushDropped : undefined,
+    ambushCanceledTotal: ambush || totalAmbushCanceled > 0 ? totalAmbushCanceled : undefined,
   };
 
   printMetrics(metrics);
@@ -3828,6 +3954,11 @@ function printMetrics(m: LoadTestMetrics) {
         `  + Chiều sâu M8: Nhận NV: ${m.sectQuestsAcceptedTotal ?? 0} | Gửi trả NV: ${m.sectQuestsTurnedInTotal ?? 0} | Đổi bảo khố: ${m.sectShopBuysTotal ?? 0} | Nhảy tông: ${m.sectLeavesTotal ?? 0}`,
       );
     }
+  }
+  if (m.ambush || (m.ambushOffersTotal !== undefined && m.ambushOffersTotal > 0)) {
+    console.log(
+      `- Thử tải Chặn đường (--ambush, CD9 #1069): Bị chặn: ${m.ambushOffersTotal ?? 0} lần | Chọn Chiến: ${m.ambushFightTotal ?? 0} | Bỏ chạy (Linh thạch: ${m.ambushFleeCoinTotal ?? 0}, Tu vi: ${m.ambushFleeExpTotal ?? 0}) | Thoát giữa trận: ${m.ambushMidFleeTotal ?? 0} | Thắng: ${m.ambushWonTotal ?? 0} | Thua: ${m.ambushLostTotal ?? 0} | Bỏ chạy thành công: ${m.ambushFledTotal ?? 0} | Hết giờ: ${m.ambushTimeoutTotal ?? 0} | Canceled: ${m.ambushCanceledTotal ?? 0}`,
+    );
   }
 }
 
@@ -4121,6 +4252,7 @@ async function main() {
           args.evade,
           args.boss,
           args.reflexMs,
+          args.ambush,
         ),
       );
     }

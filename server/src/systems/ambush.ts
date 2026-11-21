@@ -64,6 +64,7 @@ export const AMBUSH_PARTY_NEAR_PX = 700;
 export type AmbushBlock =
   | "off" // tính năng tắt (World.ambush === null) hoặc người chơi không còn trong phòng
   | "protocol" // client cũ (v < AMBUSH_MIN_PROTOCOL): không có hộp thoại
+  | "bot" // tài khoản bot bị bỏ qua (trừ AMBUSH_BOTS=on, CD9 #1069)
   | "run" // phòng bí cảnh / đấu trường
   | "safe" // trong trấn / khu an toàn / tầm cổng
   | "dead" // đã chết / đang nằm
@@ -128,11 +129,18 @@ export interface AmbushRuntime {
   readonly open: Set<string>;
   /** Có sự kiện đặc biệt đang diễn ra trong bản đồ (trùm thế giới, M9.4)? Có thì không chặn. */
   eventBusy?: (w: World) => boolean;
+  /** Cho phép tài khoản bot gặp chặn đường? Mặc định false (mục 52, CD9 #1069). */
+  ambushBots?: boolean;
   /**
    * CD3 gắn vào: dựng đấu trường solo cho lựa chọn `fight`. Trả `true` nếu ĐÃ nhận việc (từ đây CD3 lo kết cục + `ambushEnd`); `false` (đầy phòng, lỗi) thì huỷ lặng lẽ không phạt.
    * Không có móc: huỷ lặng lẽ.
    */
   startFight?: (w: World, sid: string, offer: AmbushOfferCtrl) => boolean;
+}
+
+/** Nhận dạng tài khoản bot của kịch bản thử tải (`bots.ts`): tiền tố `Bot ` hoặc `bot_`. */
+export function isBotPlayer(name: string): boolean {
+  return /^bot[\s_]/i.test(name.trim());
 }
 
 /** Dựng cấu hình chạy với mặc định (dữ liệu thật của `shared/`, không bot, chưa có đấu trường). `random` bắt buộc: không có `Math.random` ngầm trong luồng tick. */
@@ -275,6 +283,7 @@ export function ambushBlocked(w: World, sid: string): AmbushBlock | null {
   const c = w.ctrl.get(sid);
   if (!rt || !p || !c) return "off";
   if ((c.proto ?? 0) < AMBUSH_MIN_PROTOCOL) return "protocol";
+  if (isBotPlayer(p.name) && !rt.ambushBots) return "bot";
   if (w.runId !== null || w.arena !== null) return "run";
   if (p.dead) return "dead";
   if (c.limbo) return "limbo";
