@@ -138,6 +138,7 @@ async function main() {
 
   const { WorldRoom, defineRooms } = await import("../src/rooms/WorldRoom.js");
   const { changeCoin } = await import("../src/systems/wallet.js");
+  const { giveItem } = await import("../src/systems/inventory.js");
   const { ambushOf, ambushBlocked, ambushPriceOf } = await import("../src/systems/ambush.js");
   const { syncPublicPos } = await import("../src/systems/movement.js");
 
@@ -345,6 +346,15 @@ async function main() {
     };
 
     /** Vào game, tiêm cấu hình tất định, dịch ra vùng hoang, đặt quãng đi sát một bước chân. Trả sự thật server. */
+    /** Đặt ĐÚNG `n` đan hồi khí huyết loại `itemId` trong túi (xoá MỌI đan hồi khí huyết cũ, rồi `giveItem` gửi tin `inv` cho client thật). */
+    const HEAL_POTIONS = ["hoi_huyet_dan", "dai_hoi_huyet_dan", "thuong_hoi_huyet_dan"];
+    const setPotions = (sp: Prepared, n: number, itemId = "hoi_huyet_dan") => {
+      const inv = sp.ctrl.inv as Array<{ itemId: string; qty: number } | null>;
+      for (let i = 0; i < inv.length; i++)
+        if (HEAL_POTIONS.includes(inv[i]?.itemId ?? "")) inv[i] = null;
+      if (n > 0) giveItem(sp.world, sp.sid, itemId, n);
+    };
+
     const prepare = async (name: string, secret: string) => {
       await login(name, secret);
       const sp = await serverPlayer();
@@ -387,7 +397,7 @@ async function main() {
     const dialog = async () =>
       (await T.ev(
         `(() => { const q = (id) => document.getElementById(id); const sub = (id) => q(id).querySelector('.ab-sub')?.textContent ?? ''; const lab = (id) => q(id).querySelector('.ab-label')?.textContent ?? '';
-          return { foe: q('ambush-foe').textContent, scene: q('ambush-scene').textContent, countdown: q('ambush-countdown').textContent, fight: lab('ambush-fight'), coin: lab('ambush-flee-coin') + ' | ' + sub('ambush-flee-coin'), exp: lab('ambush-flee-exp') + ' | ' + sub('ambush-flee-exp'), death: q('ambush-death-note').textContent }; })()`,
+          return { foe: q('ambush-foe').textContent, scene: q('ambush-scene').textContent, countdown: q('ambush-countdown').textContent, fight: lab('ambush-fight'), coin: lab('ambush-flee-coin') + ' | ' + sub('ambush-flee-coin'), exp: lab('ambush-flee-exp') + ' | ' + sub('ambush-flee-exp'), death: q('ambush-death-note').textContent, potion: q('ambush-potion-note').textContent }; })()`,
       )) as Record<string, string>;
 
     /** Bấm nút theo id (hàm `click()` của trang: sự kiện bấm của chính nút, đã qua `AMBUSH_ARM_MS`). */
@@ -457,6 +467,7 @@ async function main() {
       const originRoomId = s0.roomId;
       const coinBefore = Number(s0.ctrl.coin ?? 0);
       const expBefore = Number(s0.p.exp ?? 0);
+      setPotions(s0, 1); // túi chỉ còn 1 Hồi Huyết Đan: hộp thoại phải nhắc (số đo #1254: 1 đan chưa đủ cho kẻ cầm đầu bậc 11)
       await walkIntoAmbush();
       const d = await dialog();
       out(`  - hộp thoại: ${JSON.stringify(d)}`);
@@ -469,6 +480,10 @@ async function main() {
       );
       check(/\d/.test(d.countdown), `đếm ngược hiện (${d.countdown})`);
       check(/CHẾT|chết|kiếp/i.test(d.death), `dòng cảnh báo chết thật luôn hiện ("${d.death}")`);
+      check(
+        d.potion === "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
+        `túi 1 đan: dòng nhắc đan nêu ĐÚNG số đan thật của máy chủ ("${d.potion}")`,
+      );
       const offer = s0.a.offer!;
       check(offer, "máy chủ có hộp thoại (offer) cho người này");
       const origin = { x: s0.p.x as number, y: s0.p.y as number };
@@ -550,6 +565,7 @@ async function main() {
       const s0 = await prepare(NAME, secretOf(NAME));
       changeCoin(s0.world, s0.sid, 500); // TRƯỚC khi hộp thoại mở: `price.coin.enough` tính lúc mở
       const coin0 = Number(s0.ctrl.coin);
+      setPotions(s0, 2, "dai_hoi_huyet_dan"); // đủ 2 đan (loại ĐẠI, không phải đan thường): KHÔNG có dòng nhắc
       await walkIntoAmbush();
       const price = s0.a.offer!.price as { exp: number; coin: { price: number; enough: boolean } };
       check(
@@ -557,6 +573,7 @@ async function main() {
         `giá Linh thạch trên nút ${price.coin.price} (đủ tiền)`,
       );
       const d = await dialog();
+      check(d.potion === "", `túi 2 Đại Hồi Huyết Đan: KHÔNG có dòng nhắc đan ("${d.potion}")`);
       check(
         new RegExp(`(^|\\D)${price.coin.price}(\\D|$)`).test(d.coin),
         `nút bỏ chạy bằng Linh thạch HIỆN đúng giá của máy chủ ("${d.coin}")`,
