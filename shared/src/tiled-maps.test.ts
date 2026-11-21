@@ -6,13 +6,17 @@ import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   ARENA_MAPS,
+  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
   GameMap,
   MAPS,
   MAP_BY_ID,
   PROCEDURAL_MAPS,
   adoptTiledMaps,
   arenaMapIdOf,
+  dangerAt,
   getMap,
+  tileAt,
   type MapDef,
 } from "./map";
 import { portalLinkViolations } from "./map-checks";
@@ -21,6 +25,12 @@ import { tiledViolations, type TiledMap } from "./tiled";
 import { TILED_MAP_FILES, adoptTiledMapFiles } from "./map-files";
 
 const mapsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../maps");
+/** Tệp của `id` có đánh dấu sửa tay (`handEdited` = true) không: đọc thẳng thuộc tính bản đồ của JSON. */
+const handEditedFile = (id: string): boolean => {
+  const props = (TILED_MAP_FILES[id] as { properties?: { name?: string; value?: unknown }[] })
+    ?.properties;
+  return !!props?.some((p) => p.name === "handEdited" && p.value === true);
+};
 const readText = (id: string) => readFileSync(path.join(mapsDir, `${id}.logic.json`), "utf8");
 
 // Server nhận tệp lúc `defineRooms`; client (S2) chưa nhận nên vẫn sinh theo seed. Ở đây nhận để kiểm CHÍNH các tệp.
@@ -37,6 +47,19 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
       expect(getMap(def.id)!.def.tiles).toBeDefined();
       expect(def.tiles).toBeUndefined(); // định nghĩa sinh theo seed vẫn nguyên làm đồng hồ chuẩn
     }
+  });
+  it("DEFAULT_MAP (dựng một lần lúc nạp module) KHÁC getMap(DEFAULT_MAP_ID) sau khi nhận tệp, nhưng cùng từng byte: vì thế mã nguồn phải dùng getMap, không nhập DEFAULT_MAP (no-global-map-imports canh)", () => {
+    adoptTiledMapFiles();
+    const now = getMap(DEFAULT_MAP_ID)!;
+    expect(now).not.toBe(DEFAULT_MAP);
+    expect(now.def.tiles).toBeDefined();
+    expect(DEFAULT_MAP.def.tiles).toBeUndefined();
+    // cùng từng byte với bản sinh theo seed, TRỪ khi Lạc Hà đã SỬA TAY (S6: khi đó khác nhau chính là lý do không được nhập `DEFAULT_MAP`)
+    if (!handEditedFile(DEFAULT_MAP_ID))
+      expect(Buffer.from(now.tiles).equals(Buffer.from(DEFAULT_MAP.tiles))).toBe(true);
+    // các hàm tên cũ tra bản mới nhất mỗi lần gọi
+    expect(tileAt(10, 10)).toBe(now.tileAt(10, 10));
+    expect(dangerAt(40, 40)).toBe(now.dangerAt(40, 40));
   });
   it("adoptTiledMaps từ chối id không phải bản đồ thường, tệp sai, và tệp khai lệch id", () => {
     expect(() => adoptTiledMaps({ khong_co: TILED_MAP_FILES.lac_ha })).toThrow(
@@ -55,6 +78,16 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
   });
 
   for (const def of PROCEDURAL_MAPS) {
+    // Bản đồ SỬA TAY (S6): thuộc tính bản đồ `handEdited` = true (cùng tên với `server/src/systems/map-hand-edited.ts`): tệp là nguồn duy nhất, không còn bằng bản sinh theo seed
+    if (handEditedFile(def.id)) {
+      describe(`${def.id} (SỬA TAY: tệp là nguồn duy nhất, không so với seed)`, () => {
+        it("tệp hợp lệ theo tiledViolations; getMap thấy bản dựng từ tệp (có ô dựng sẵn)", () => {
+          expect(tiledViolations(TILED_MAP_FILES[def.id])).toEqual([]);
+          expect(getMap(def.id)!.def.tiles).toBeDefined();
+        });
+      });
+      continue;
+    }
     describe(def.id, () => {
       const file = getMap(def.id)!;
       const seed = new GameMap(def);

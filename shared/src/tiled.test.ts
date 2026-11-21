@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { GameMap, MAPS, T, TILE, getMap } from "./map";
+import { GameMap, MAPS, T, TILE, getMap, inSpawnZone, type SpawnZoneDef } from "./map";
+import { bakeTiledMap, formatTiledJson } from "./tiled-bake";
 import {
   LOGIC_TILE_COUNT,
   TILED_MAX_SIDE,
@@ -123,11 +124,11 @@ describe("tiledViolations / parseTiledMap: tệp Tiled hợp lệ", () => {
     expect(parseTiledMap(m, TILE).tiles[5 * 16 + 5]).toBe(T.Water);
   });
 
-  it("`type` kiểu cũ (Tiled <= 1.8) thay cho `class` vẫn nhận; đối tượng loại khác (spawnZone sau này) bị bỏ qua", () => {
+  it("`type` kiểu cũ (Tiled <= 1.8) thay cho `class` vẫn nhận; đối tượng loại lạ bị bỏ qua", () => {
     const m = clone();
     const o = objects(m);
     o[0] = { ...o[0]!, type: "town", class: undefined };
-    o.push({ id: 9, name: "z", class: "spawnZone", x: 1, y: 1 });
+    o.push({ id: 9, name: "z", class: "ghi_chu", x: 1, y: 1 });
     expect(tiledViolations(m)).toEqual([]);
     expect(parseTiledMap(m, TILE).town.cx).toBe(8);
   });
@@ -332,6 +333,224 @@ describe("tiledViolations: mỗi luật có ca sai (đột biến dữ liệu)",
   it("không phải đối tượng JSON thì báo lỗi, không ném", () => {
     for (const bad of [null, undefined, 5, "x", [], { layers: 3 }])
       expect(tiledViolations(bad).length).toBeGreaterThan(0);
+  });
+});
+
+describe("spawnZone (S5): vùng sinh quái theo dữ liệu", () => {
+  /** Hình chữ nhật (ô 4..8 x 3..6) + elip (ô 9..13 x 9..14) trên bản đồ mẫu 16 x 16 (px tệp: 16 mỗi ô) */
+  const withZones = (): TiledMap => {
+    const m = clone();
+    objects(m).push(
+      {
+        id: 20,
+        name: "tho_1",
+        class: "spawnZone",
+        x: 4 * TW,
+        y: 3 * TW,
+        width: 4 * TW,
+        height: 3 * TW,
+        properties: [prop("monster", "tho"), prop("max", 3)],
+      },
+      {
+        id: 21,
+        name: "lang_1",
+        class: "spawnZone",
+        x: 9 * TW,
+        y: 9 * TW,
+        width: 4 * TW,
+        height: 5 * TW,
+        ellipse: true,
+        properties: [prop("monster", "lang")],
+      },
+    );
+    return m;
+  };
+
+  it("đọc chữ nhật và elip; đổi sang px thế giới (×2); `max` tuỳ chọn", () => {
+    expect(tiledViolations(withZones())).toEqual([]);
+    expect(parseTiledMap(clone(), TILE).spawnZones).toEqual([]);
+    expect(parseTiledMap(withZones(), TILE).spawnZones).toEqual([
+      { monster: "tho", shape: "rect", x: 4 * TILE, y: 3 * TILE, w: 4 * TILE, h: 3 * TILE, max: 3 },
+      { monster: "lang", shape: "ellipse", x: 9 * TILE, y: 9 * TILE, w: 4 * TILE, h: 5 * TILE },
+    ]);
+  });
+
+  it("`rotation: 0` (Tiled ghi mặc định mọi đối tượng) và khung SÁT viền trong (cách mép đúng một ô) vẫn được nhận", () => {
+    const m = withZones();
+    Object.assign(objects(m).at(-2)!, {
+      rotation: 0,
+      x: TW,
+      y: TW,
+      width: 14 * TW,
+      height: 14 * TW,
+    });
+    Object.assign(objects(m).at(-1)!, { rotation: 0 });
+    expect(tiledViolations(m)).toEqual([]);
+    expect(parseTiledMap(m, TILE).spawnZones[0]).toMatchObject({ x: TILE, y: TILE, w: 14 * TILE });
+    expect(() => new GameMap(mapDefFromTiled(m, TILE))).not.toThrow(); // khớp luật của `GameMap`
+  });
+
+  it("`MapDef` / `GameMap`: không khai vùng thì không có khoá `spawnZones`; có vùng thì tra theo loài", () => {
+    expect("spawnZones" in mapDefFromTiled(clone(), TILE)).toBe(false);
+    const map = new GameMap(mapDefFromTiled(withZones(), TILE));
+    expect(map.spawnZones).toHaveLength(2);
+    expect(map.spawnZonesOf("tho")).toEqual([map.spawnZones[0]]);
+    expect(map.spawnZonesOf("lang")).toEqual([map.spawnZones[1]]);
+    // loài không khai vùng (và id lạ, kể cả tên thuộc tính của Object) -> rỗng: sinh theo cách cũ
+    for (const id of ["ho", "khong_co", "constructor", "__proto__", "toString"])
+      expect(map.spawnZonesOf(id), id).toEqual([]);
+    expect(new GameMap(mapDefFromTiled(clone(), TILE)).spawnZones).toEqual([]);
+  });
+
+  const bad: [string, (m: TiledMap) => void, RegExp][] = [
+    ["vùng là một điểm", (m) => (objects(m).at(-2)!.point = true), /CHỮ NHẬT hoặc ELIP/],
+    [
+      "vùng là đa giác",
+      (m) => Object.assign(objects(m).at(-2)!, { polygon: [{ x: 0, y: 0 }] }),
+      /CHỮ NHẬT hoặc ELIP/,
+    ],
+    [
+      "vùng là chữ",
+      (m) => Object.assign(objects(m).at(-2)!, { text: { text: "x" } }),
+      /CHỮ NHẬT hoặc ELIP/,
+    ],
+    [
+      "thiếu thuộc tính monster",
+      (m) => (objects(m).at(-2)!.properties = [prop("max", 3)]),
+      /thiếu thuộc tính chuỗi 'monster'/,
+    ],
+    ["khung rộng 0", (m) => (objects(m).at(-2)!.width = 0), /width \/ height > 0/],
+    ["khung không có chiều cao", (m) => delete objects(m).at(-2)!.height, /width \/ height > 0/],
+    [
+      "max = 0",
+      (m) => (objects(m).at(-2)!.properties = [prop("monster", "tho"), prop("max", 0)]),
+      /max phải là số nguyên >= 1/,
+    ],
+    [
+      "max lẻ",
+      (m) => (objects(m).at(-2)!.properties = [prop("monster", "tho"), prop("max", 1.5)]),
+      /max phải là số nguyên >= 1/,
+    ],
+    ["khung tràn qua mép phải", (m) => (objects(m).at(-2)!.x = 14 * TW), /ngoài bản đồ/],
+    ["khung có y âm", (m) => (objects(m).at(-2)!.y = -1), /ngoài bản đồ/],
+    [
+      "ellipse không phải boolean",
+      (m) => Object.assign(objects(m).at(-1)!, { ellipse: "có" }),
+      /ellipse phải là true/,
+    ],
+    ["thiếu x", (m) => Object.assign(objects(m).at(-2)!, { x: undefined }), /thiếu x \/ y/],
+    // Tiled cho xoay hình / đối tượng ô: đọc như khung thẳng thì vùng lệch im lặng (B bắt ở review #1214)
+    [
+      "chữ nhật xoay 45 độ",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: 45 }),
+      /không được xoay/,
+    ],
+    [
+      "chữ nhật xoay 90 độ",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: 90 }),
+      /không được xoay/,
+    ],
+    [
+      "elip xoay -30 độ",
+      (m) => Object.assign(objects(m).at(-1)!, { rotation: -30 }),
+      /không được xoay/,
+    ],
+    [
+      "rotation không phải số",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: "0" }),
+      /không được xoay/,
+    ],
+    [
+      "rotation = NaN",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: NaN }),
+      /không được xoay/,
+    ],
+    [
+      "đối tượng ô (gid)",
+      (m) => Object.assign(objects(m).at(-2)!, { gid: 5 }),
+      /đối tượng ô \(gid\)/,
+    ],
+    // viền núi một ô: lỗi gom ở `errors`, không đợi `GameMap` ném lúc dựng
+    ["đè viền núi (x = 0)", (m) => (objects(m).at(-2)!.x = 0), /đè viền núi/],
+    ["đè viền núi (y = 0)", (m) => (objects(m).at(-2)!.y = 0), /đè viền núi/],
+    [
+      "chạm viền dưới (y + height = height của bản đồ)",
+      (m) => Object.assign(objects(m).at(-2)!, { y: 13 * TW, height: 3 * TW }),
+      /đè viền núi/,
+    ],
+    [
+      "chạm viền phải (x + width = width của bản đồ)",
+      (m) => Object.assign(objects(m).at(-2)!, { x: 12 * TW, width: 4 * TW }),
+      /đè viền núi/,
+    ],
+    ["khung hẹp hơn một ô", (m) => (objects(m).at(-2)!.width = TW / 2), /ít nhất một ô/],
+  ];
+  for (const [label, mutate, re] of bad) {
+    it(`bắt: ${label}`, () => {
+      const m = withZones();
+      mutate(m);
+      const errs = tiledViolations(m);
+      expect(errs.length, label).toBeGreaterThan(0);
+      expect(errs.join("\n"), label).toMatch(re);
+      expect(() => parseTiledMap(m, TILE), label).toThrow();
+    });
+  }
+
+  it("`GameMap` từ chối vùng sai khi dựng (loài lạ, khung nhỏ hơn một ô, đè viền núi, số không hữu hạn)", () => {
+    const base = mapDefFromTiled(clone(), TILE);
+    const ok: SpawnZoneDef = {
+      monster: "tho",
+      shape: "rect",
+      x: 2 * TILE,
+      y: 2 * TILE,
+      w: 3 * TILE,
+      h: 3 * TILE,
+    };
+    expect(() => new GameMap({ ...base, spawnZones: [ok] })).not.toThrow();
+    const cases: [string, Partial<SpawnZoneDef>, RegExp][] = [
+      ["loài lạ", { monster: "khong_co" }, /loại quái lạ/],
+      ["loài là tên thuộc tính Object", { monster: "constructor" }, /loại quái lạ/],
+      ["shape lạ", { shape: "tron" as never }, /shape phải là/],
+      ["khung hẹp hơn một ô", { w: TILE - 1 }, /ít nhất một ô/],
+      ["đè viền núi (x = 0)", { x: 0 }, /không nằm gọn/],
+      ["đè viền núi (y = 0)", { y: 0 }, /không nằm gọn/],
+      ["tràn mép phải", { x: 14 * TILE, w: 2 * TILE }, /không nằm gọn/],
+      ["tràn mép dưới", { y: 14 * TILE, h: 2 * TILE }, /không nằm gọn/],
+      ["x = NaN", { x: NaN }, /số hữu hạn/],
+      ["w = Infinity", { w: Infinity }, /số hữu hạn/],
+      ["max = 0", { max: 0 }, /max phải là số nguyên >= 1/],
+      ["max lẻ", { max: 2.5 }, /max phải là số nguyên >= 1/],
+    ];
+    for (const [label, patch, re] of cases)
+      expect(() => new GameMap({ ...base, spawnZones: [{ ...ok, ...patch }] }), label).toThrow(re);
+  });
+
+  it("`inSpawnZone`: chữ nhật kín cạnh trên / trái, hở cạnh dưới / phải; elip loại bốn góc khung", () => {
+    const r: SpawnZoneDef = { monster: "tho", shape: "rect", x: 100, y: 200, w: 50, h: 40 };
+    expect(inSpawnZone(r, 100, 200)).toBe(true);
+    expect(inSpawnZone(r, 149.9, 239.9)).toBe(true);
+    expect(inSpawnZone(r, 150, 220)).toBe(false);
+    expect(inSpawnZone(r, 120, 240)).toBe(false);
+    expect(inSpawnZone(r, 99.9, 220)).toBe(false);
+    const e: SpawnZoneDef = { ...r, shape: "ellipse" };
+    expect(inSpawnZone(e, 125, 220)).toBe(true); // tâm
+    expect(inSpawnZone(e, 100, 220)).toBe(true); // mút trái của trục ngang
+    expect(inSpawnZone(e, 125, 200)).toBe(true); // mút trên của trục dọc
+    expect(inSpawnZone(e, 100.5, 200.5)).toBe(false); // góc khung
+    expect(inSpawnZone(e, 149.5, 239.5)).toBe(false);
+  });
+
+  it("bake -> đọc lại cho đúng các vùng (một nguồn); tệp định dạng vẫn hợp lệ", () => {
+    const map = new GameMap(mapDefFromTiled(withZones(), TILE));
+    const baked = bakeTiledMap(map);
+    expect(tiledViolations(baked)).toEqual([]);
+    expect(mapDefFromTiled(baked, TILE).spawnZones).toEqual(map.spawnZones);
+    expect(mapDefFromTiled(JSON.parse(formatTiledJson(baked)), TILE).spawnZones).toEqual(
+      map.spawnZones,
+    );
+    // bản đồ không có vùng thì tệp không có đối tượng spawnZone (bốn bản đồ thật giữ từng byte)
+    const plain = bakeTiledMap(new GameMap(mapDefFromTiled(clone(), TILE)));
+    expect(JSON.stringify(plain)).not.toContain("spawnZone");
   });
 });
 

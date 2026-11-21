@@ -1,6 +1,7 @@
 // Tìm đường theo bán kính thân (mục 48, #1012): lưới, A*, khe 1 ô / 2 ô, không tới được, trần CPU, tính tất định.
 // Bản đồ thử dựng bằng `GameMap` thật rồi san phẳng `tiles` (mảng này sửa được) TRƯỚC khi hỏi tìm đường lần đầu (mặt nạ dựng lười, giữ theo bản đồ).
 import { describe, expect, it } from "vitest";
+import { measureSyncStepMs } from "../perf/bench";
 import { DEFAULT_MAP, TILE, getMap, MAPS, type GameMap } from "@tien-gioi/shared";
 import {
   NAV_CELL,
@@ -210,17 +211,19 @@ describe("dữ liệu bản đồ thật", () => {
     const map = DEFAULT_MAP;
     // Dựng mặt nạ trước (một lần mỗi cỡ thân), đo riêng phần tìm
     findPath(map, 24, map.townPx.x, map.townPx.y, map.townPx.x + 100, map.townPx.y, 30);
-    const t0 = performance.now();
     let worst = 0;
     const N = 60;
-    for (let i = 0; i < N; i++) {
-      const a = (i / N) * Math.PI * 2;
-      const gx = map.townPx.x + Math.cos(a) * 1500;
-      const gy = map.townPx.y + Math.sin(a) * 1300;
-      const p = findPath(map, 24, map.townPx.x, map.townPx.y + 200, gx, gy, 30);
-      if (p) worst = Math.max(worst, p.expanded);
-    }
-    const ms = (performance.now() - t0) / N;
+    // CPU của chính luồng (không đồng hồ tường): máy tải cao / pool threads của vitest không làm "chậm" giả (#1215)
+    const ms =
+      measureSyncStepMs(() => {
+        for (let i = 0; i < N; i++) {
+          const a = (i / N) * Math.PI * 2;
+          const gx = map.townPx.x + Math.cos(a) * 1500;
+          const gy = map.townPx.y + Math.sin(a) * 1300;
+          const p = findPath(map, 24, map.townPx.x, map.townPx.y + 200, gx, gy, 30);
+          if (p) worst = Math.max(worst, p.expanded);
+        }
+      }) / N;
     expect(worst).toBeLessThanOrEqual(NAV_MAX_NODES);
     // Ngân sách rộng (máy chủ dùng chung nhiều dev): một lần tìm trung bình dưới 5 ms; số đo thường < 1 ms
     expect(ms).toBeLessThan(5);

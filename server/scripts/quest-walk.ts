@@ -14,7 +14,6 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import {
   AM_SUONG_ID,
-  DEFAULT_MAP,
   DEFAULT_MAP_ID,
   DROP_TABLES,
   EQUIP_SLOTS,
@@ -729,7 +728,7 @@ export async function moveTo(
   ignoreMonsterKind?: string,
   avoidPenaltyFactor = 18,
 ): Promise<boolean> {
-  const mapObj = getMap(mapId) ?? DEFAULT_MAP;
+  const mapObj = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   const grid = gridOf(mapObj);
   const goals = freeCellsNear(grid, targetX, targetY);
 
@@ -1197,7 +1196,7 @@ export async function walkSingleQuest(
       await travelToMap(targetMapId);
 
       const monDef = monsterKind ? MONSTER_BY_ID[monsterKind] : undefined;
-      const mapObj = getMap(currentMapId) ?? DEFAULT_MAP;
+      const mapObj = getMap(currentMapId) ?? getMap(DEFAULT_MAP_ID)!;
       const patrolPoints = monDef
         ? getPatrolPoints(mapObj, monDef)
         : [{ x: mapObj.townPx.x, y: mapObj.townPx.y }];

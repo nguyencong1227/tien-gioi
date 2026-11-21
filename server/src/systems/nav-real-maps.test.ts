@@ -22,6 +22,7 @@ import {
 import { inMainRegion, lineClear, squareFree } from "./nav";
 import { isEvading } from "./nav-chase";
 import { flatMap, paint } from "./nav-test-helpers";
+import { measureSyncStepMs } from "../perf/bench";
 
 function lcg(seed: number) {
   let s = seed >>> 0;
@@ -239,9 +240,7 @@ describe("CPU: 8 trùm + 50 người trên bản đồ thật (ngân sách tick 
             o.p.y = ny;
           }
         }
-        const t0 = performance.now();
-        tickMonsters(w, 0.05);
-        ms.push(performance.now() - t0);
+        ms.push(measureSyncStepMs(() => tickMonsters(w, 0.05))); // CPU của luồng, không đồng hồ tường (#1215)
       }
       ms.sort((a, b) => a - b);
       const avg = ms.reduce((a, b) => a + b, 0) / ms.length;

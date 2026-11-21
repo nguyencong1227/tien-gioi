@@ -15,7 +15,6 @@ import {
   AMBUSH_ARM_MS,
   AMBUSH_MSG,
   AUTH_API,
-  DEFAULT_MAP,
   DUEL_COOLDOWN_MS,
   DUEL_MSG,
   DUEL_RANGE,
@@ -87,6 +86,7 @@ import {
   type TravelMsg,
   type TravelToMsg,
   type WalletMsg,
+  DEFAULT_MAP_ID,
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
@@ -147,6 +147,7 @@ interface CliArgs {
   duel: boolean;
   sect: boolean;
   skills: boolean;
+  skillOverride?: string;
   evade: boolean;
   boss: boolean;
   reflexMs: number;
@@ -176,7 +177,7 @@ function parseArgs(argv: string[]): CliArgs {
   let flapDelay: [number, number] = [1, 5];
   let storm = false;
   let leak = false;
-  let map = DEFAULT_MAP.def.id;
+  let map = getMap(DEFAULT_MAP_ID)!.def.id;
   let travel = false;
   let die = false;
   let account = false;
@@ -187,6 +188,7 @@ function parseArgs(argv: string[]): CliArgs {
   let duel = false;
   let sect = false;
   let skills = false;
+  let skillOverride: string | undefined;
   let evade = false;
   let boss = false;
   let reflexMs = 400;
@@ -200,7 +202,13 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
     else if (arg === "--skills") skills = true;
-    else if (arg === "--evade") evade = true;
+    else if (arg.startsWith("--skill=")) {
+      const s = arg.slice(8).trim();
+      if (s) {
+        skillOverride = s;
+        skills = true;
+      }
+    } else if (arg === "--evade") evade = true;
     else if (arg === "--no-evade" || arg === "--evade=false") evade = false;
     else if (arg === "--boss" || arg === "--boss-hunt") {
       boss = true;
@@ -284,7 +292,7 @@ function parseArgs(argv: string[]): CliArgs {
 
   if (!getMap(map)) {
     console.warn(
-      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${DEFAULT_MAP.def.id}".`,
+      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${getMap(DEFAULT_MAP_ID)!.def.id}".`,
     );
   }
 
@@ -330,6 +338,7 @@ function parseArgs(argv: string[]): CliArgs {
     duel,
     sect,
     skills,
+    skillOverride,
     evade,
     boss,
     reflexMs,
@@ -396,7 +405,16 @@ export function decideSectM8Action(state: BotSectM8DecisionState): BotSectM8Deci
  * Mẫu sổ chiêu (SkillBook) hợp lệ theo từng cảnh giới cho bot thử tải (M7.10 #511).
  * Đảm bảo chiêu đã học và gắn vào các ô mở theo đúng luật của shared/skills.ts.
  */
-export function sampleSkillsForRealm(realm: number): SkillBook {
+export function sampleSkillsForRealm(realm: number, customSkillId?: string): SkillBook {
+  if (customSkillId) {
+    const def = skillOf(customSkillId);
+    if (def) {
+      return {
+        learned: { [def.id]: 1 },
+        slots: [def.id, "", "", ""],
+      };
+    }
+  }
   if (realm <= 0) {
     return { learned: {}, slots: ["", "", "", ""] };
   }
@@ -456,7 +474,7 @@ export function seedBotSaveFile(
   y: number,
   realm: number,
   tier: number,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
   life?: { playMs: number; kills: number; bossKills: number },
   coinOverride?: number,
   dataDirOverride?: string,
@@ -1185,9 +1203,9 @@ async function runIdleZeroBotTest(
   url: string,
   port: number,
   keepSaves: boolean,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
 ): Promise<IdleZeroBotMetrics> {
-  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
+  const currentMap = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   console.log(
     `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}, bản đồ=${currentMap.def.name}) ===`,
   );
@@ -2077,7 +2095,7 @@ async function runLoadTest(
   flapDelay: [number, number] = [1, 5],
   storm = false,
   leak = false,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
   travel = false,
   die = false,
   account = false,
@@ -2087,12 +2105,13 @@ async function runLoadTest(
   duel = false,
   sect = false,
   skills = false,
+  skillOverride?: string,
   evade = false,
   boss = false,
   reflexMs = 400,
   ambush = false,
 ): Promise<LoadTestMetrics> {
-  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
+  const currentMap = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
   const shopSuffix = shop ? ", mua bán shop" : "";
   const flapSuffix = flap > 0 ? `, flap=${flap}` : "";
@@ -2112,7 +2131,7 @@ async function runLoadTest(
   const evadeSuffix = evade ? ", né đòn (--evade)" : "";
   const bossSuffix = boss ? `, săn trùm (--boss, reflex=${reflexMs}ms)` : "";
   const mapSuffix =
-    currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
+    currentMap.def.id !== getMap(DEFAULT_MAP_ID)!.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
       ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
@@ -2267,14 +2286,20 @@ async function runLoadTest(
       joinOpts = { token: botToken, v: PROTOCOL_VERSION };
     } else {
       const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
-      const skillsSeed = skills ? sampleSkillsForRealm(realm) : undefined;
+      const customSkillDef = skillOverride ? skillOf(skillOverride) : undefined;
+      const botRealm = customSkillDef ? Math.max(realm, customSkillDef.reqRealm) : realm;
+      const botTier =
+        customSkillDef && customSkillDef.reqRealm === botRealm
+          ? Math.max(tier, customSkillDef.reqTier)
+          : tier;
+      const skillsSeed = skills ? sampleSkillsForRealm(botRealm, skillOverride) : undefined;
       seedBotSaveFile(
         name,
         secret,
         campX,
         campY,
-        duel ? 1 : dungeon ? 1 : die ? 1 : realm,
-        duel ? 4 : dungeon ? 8 : die ? 8 : tier,
+        duel ? 1 : dungeon ? 1 : die ? 1 : botRealm,
+        duel ? 4 : dungeon ? 8 : die ? 8 : botTier,
         currentMap.def.id,
         lifeSeed,
         sect ? 5000 : undefined,
@@ -2292,7 +2317,7 @@ async function runLoadTest(
 
     const handleBotTravel = async (bot: BotState, msg: TravelToMsg) => {
       try {
-        const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
+        const nextMap = getMap(msg.mapId) ?? getMap(DEFAULT_MAP_ID)!;
         const targetClient = new Client(url);
         const nextOpts = bot.token
           ? { token: bot.token, v: PROTOCOL_VERSION }
@@ -4249,6 +4274,7 @@ async function main() {
           args.duel,
           args.sect,
           args.skills,
+          args.skillOverride,
           args.evade,
           args.boss,
           args.reflexMs,

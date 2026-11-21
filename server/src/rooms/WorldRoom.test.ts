@@ -19,6 +19,8 @@ import {
   MONSTER_CAP,
   TOWN_PX,
   PLAYER_RADIUS,
+  T,
+  TILE,
   SKILLS,
   expToNext,
   statsFor,
@@ -57,6 +59,7 @@ import {
   TRAVEL_COOLDOWN_MS,
   type TravelToMsg,
 } from "@tien-gioi/shared";
+import { setAuditSink } from "../audit";
 import { changeCoin } from "../systems/wallet";
 import { applyPlayerStatus } from "../systems/status";
 import { addMonster } from "../systems/test-helpers";
@@ -1449,11 +1452,16 @@ describe("bảo mật", () => {
       ...nearValid,
     ];
 
-    // Chia đợt <= 12 tin mỗi loại, nghỉ giữa các đợt cho giới hạn tần suất của từng loại tin hồi lại (burst 16, 8 tin/giây)
-    for (let i = 0; i < junk.length; i += 12) {
-      const wave = junk.slice(i, i + 12);
+    // Chia đợt <= 6 tin mỗi loại, nghỉ giữa các đợt cho giới hạn tần suất của từng loại tin hồi lại. Đợt 12 tin (bản cũ) làm mỗi đợt bị BỎ ~80-100 tin (loại có
+    // burst nhỏ: ambush.* 4, titleSet / achievementsGet / worldBossGet 3, chat 5, boardsGet / ping 6...) trong khi quỹ "tha thứ" ABUSE chỉ 200 và hồi 30 / giây:
+    // quỹ thấp nhất đo được chỉ 7,5 / 200 NGAY CẢ khi máy rảnh, nên chỉ cần vòng lặp sự kiện trễ (test và máy chủ chung một luồng) làm hai đợt tới CÙNG LÚC là
+    // `RateLimiter` ngắt kết nối (chập chờn #1215, A tái hiện ở `isOpen`). Đợt 6 tin bỏ ~30 tin mỗi đợt, đủ hồi trong 1,5 giây, quỹ không cạn.
+    const WAVE = 6;
+    for (let i = 0; i < junk.length; i += WAVE) {
+      const wave = junk.slice(i, i + WAVE);
       for (const t of types) for (const j of wave) a.room.send(t, j);
-      await sleep(1500);
+      // MỘT lần KHÔNG nghỉ (đợt 2 và 3 tới máy chủ gần như cùng lúc) = mô phỏng vòng lặp sự kiện trễ lúc máy tải: phải vẫn không bị ngắt kết nối
+      if (i !== WAVE) await sleep(1500);
     }
 
     expect(a.room.connection.isOpen).toBe(true);
@@ -1480,7 +1488,7 @@ describe("bảo mật", () => {
     // Phòng vẫn phục vụ người khác
     b.room.send("chat", { text: "còn sống sau tin rác" });
     await waitFor(() => a.chat.find((m) => m.text === "còn sống sau tin rác"));
-  }, 20_000);
+  }, 40_000); // 8 đợt x 1,5 giây nghỉ ~12 giây khi máy rảnh; hạn 20 giây cũ chỉ dư 8 giây khi máy tải
 
   it("spam tin nhắn liên tục thì bị ngắt kết nối", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -1889,6 +1897,38 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     expect(e.code).toBe(JOIN_WRONG_MAP);
     expect(parseWrongMap(e.code, e.message)).toBe(DEFAULT_MAP_ID);
     expect(saveFileOf(name)).toBeUndefined();
+  });
+
+  it("vị trí lưu rơi vào ô chặn: vào phòng ở chỗ thoáng GẦN nhất (không bị kéo về trấn) và ghi nhật ký kiểm toán map.relocate", async () => {
+    const name = "Ro Tuong";
+    const m = getMap(DEFAULT_MAP_ID)!;
+    // một ô cây ở xa trấn (bản đồ đổi: chỗ đứng cũ nay là vật cản)
+    let wall: { x: number; y: number } | null = null;
+    for (let ty = 20; ty < 40 && !wall; ty++)
+      for (let tx = 60; tx < 90 && !wall; tx++)
+        if (
+          m.tileAt(tx, ty) === T.Tree &&
+          m.circleBlocked(tx * TILE + 16, ty * TILE + 16, PLAYER_RADIUS)
+        )
+          wall = { x: tx * TILE + 16, y: ty * TILE + 16 };
+    expect(wall).not.toBeNull();
+    await seedSave(name, { x: wall!.x, y: wall!.y });
+    const lines: string[] = [];
+    setAuditSink((l) => lines.push(l));
+    try {
+      const a = await join(name, secretOf(name));
+      const me = a.me();
+      expect(m.circleBlocked(me.x, me.y, PLAYER_RADIUS)).toBe(false);
+      expect(Math.hypot(me.x - wall!.x, me.y - wall!.y)).toBeLessThanOrEqual(3 * TILE);
+      expect(m.inTown(me.x, me.y)).toBe(false); // bản cũ kéo về trấn
+      const ev = lines.map((l) => JSON.parse(l)).find((l) => l.ev === "map.relocate");
+      expect(ev).toMatchObject({ map: DEFAULT_MAP_ID, to: "near" });
+      expect(ev.dist).toBeGreaterThan(0);
+      expect(ev.dist).toBeLessThanOrEqual(3 * TILE);
+      expect(JSON.stringify(ev)).not.toContain(name); // không dữ liệu cá nhân
+    } finally {
+      setAuditSink(null);
+    }
   });
 
   it("tên phòng của bản đồ không có thì Colyseus từ chối, không tạo phòng; tuỳ chọn mapId của client không đổi được bản đồ của phòng", async () => {

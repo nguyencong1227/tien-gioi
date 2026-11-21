@@ -9,7 +9,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   COIN_CAP,
-  DEFAULT_MAP,
   AMBUSH_DAY_CAP,
   DUNGEON_DAILY_REWARDS,
   EQUIP_SLOTS,
@@ -61,6 +60,7 @@ import {
   sectKey,
   SECT_QUEST_SLOTS,
   questDefAny,
+  DEFAULT_MAP_ID,
 } from "@tien-gioi/shared";
 import { byId } from "../src/systems/lookup.js";
 import { soulIdOf } from "../src/soul.js";
@@ -258,7 +258,7 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
   }
 
   // 6. Bản đồ (mapId)
-  let targetMap = DEFAULT_MAP;
+  let targetMap = getMap(DEFAULT_MAP_ID)!;
   if (data.mapId !== undefined) {
     const m = getMap(data.mapId);
     if (!m) {

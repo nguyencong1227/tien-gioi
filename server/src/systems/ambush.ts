@@ -33,6 +33,7 @@ import {
   ambushFillScene,
   ambushPrice,
   ambushRollP,
+  ITEM_BY_ID,
   MONSTER_BY_ID,
   dayKey,
   parseAmbushChoose,
@@ -52,6 +53,7 @@ import { randomBytes } from "node:crypto";
 import type { Player } from "../schema";
 import type { PlayerCtrl, World } from "../world";
 import type { AmbushDaily } from "../store";
+import { byId } from "./lookup";
 import { MONSTER_WAKE_DIST, forgetTarget } from "./monsters";
 import { trySpendCoin } from "./wallet";
 
@@ -73,6 +75,7 @@ export type AmbushBlock =
   | "travel" // đang chuyển phòng / còn hồi qua cổng
   | "duel" // đang thách đấu PK
   | "hp" // khí huyết dưới ngưỡng
+  | "potion" // túi có ít Hồi Huyết Đan hơn `AmbushRuntime.minPotions` (AMBUSH_MIN_POTIONS)
   | "combat" // đang giao chiến
   | "party_combat" // đồng đội gần đó đang giao chiến
   | "boss" // trùm đang nhắm / ở gần
@@ -136,11 +139,27 @@ export interface AmbushRuntime {
   exemptBots?: boolean;
   /** Cho phép tài khoản bot gặp chặn đường? Mặc định false (mục 52, CD9 #1069). */
   ambushBots?: boolean;
+  /** Số đan hồi khí huyết (mọi bậc: thường / Đại / Thượng) tối thiểu trong túi để bị chặn (`AMBUSH_MIN_POTIONS`, CD6c): ít hơn thì KHÔNG chặn. Mặc định 0 / vắng = không đòi. */
+  minPotions?: number;
   /**
    * CD3 gắn vào: dựng đấu trường solo cho lựa chọn `fight`. Trả `true` nếu ĐÃ nhận việc (từ đây CD3 lo kết cục + `ambushEnd`); `false` (đầy phòng, lỗi) thì huỷ lặng lẽ không phạt.
    * Không có móc: huỷ lặng lẽ.
    */
   startFight?: (w: World, sid: string, offer: AmbushOfferCtrl) => boolean;
+}
+
+/**
+ * Số ĐAN HỒI KHÍ HUYẾT trong túi (cộng mọi ô; số lượng rác coi là 0): MỌI vật phẩm có `effect.kind === "healHp"` (Hồi Huyết Đan 40%, Đại 70%, Thượng 90%), không riêng `hoi_huyet_dan`:
+ * người từ Kim Đan thường mang đan Đại / Thượng (B, review #1257). Mô phỏng cân bằng chặn đường dùng Hồi Huyết Đan 40% (`ASSUME_DUNGEON.potions`) nên đếm mọi đan là hướng AN TOÀN
+ * (mỗi viên hồi >= 40%, không lạc quan hơn số đo). Tra bảng bằng `byId` (id lấy từ hồ sơ lưu, không tin).
+ */
+export function potionCount(c: PlayerCtrl): number {
+  let n = 0;
+  for (const slot of c.inv) {
+    if (!slot || !Number.isFinite(slot.qty) || slot.qty <= 0) continue;
+    if (byId(ITEM_BY_ID, slot.itemId)?.effect?.kind === "healHp") n += slot.qty;
+  }
+  return n;
 }
 
 /** Nhận dạng tài khoản bot của kịch bản thử tải (`bots.ts`): tiền tố `Bot ` hoặc `bot_`. */
@@ -245,10 +264,7 @@ export function ambushPause(w: World, c: PlayerCtrl, ms: number): void {
 
 /** Cả hai giá của người này ở thời điểm `stage`, đọc từ nhân vật THẬT (không bao giờ từ client). */
 export function ambushPriceOf(p: Player, c: PlayerCtrl, stage: AmbushPriceStage): AmbushPrice {
-  return ambushPrice(
-    { barSize: p.expMax, expInBar: p.exp, step: stepOf(p.realm, p.tier), wallet: c.coin },
-    stage,
-  );
+  return ambushPrice({ expInBar: p.exp, step: stepOf(p.realm, p.tier), wallet: c.coin }, stage);
 }
 
 // ---------- Điều kiện ----------
@@ -304,6 +320,8 @@ export function ambushBlocked(w: World, sid: string): AmbushBlock | null {
   if (c.ambush?.offer) return "offer";
   if (w.map.inSafe(p.x, p.y)) return "safe";
   if (p.maxHp > 0 && (p.hp / p.maxHp) * 100 < AMBUSH_MIN_HP_PCT) return "hp";
+  if (rt.minPotions !== undefined && rt.minPotions > 0 && potionCount(c) < rt.minPotions)
+    return "potion";
   if (fighting(w, sid, c)) return "combat";
   if (partyFighting(w, sid, p)) return "party_combat";
   if (bossNear(w, p)) return "boss";

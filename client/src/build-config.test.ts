@@ -44,3 +44,25 @@ describe("vite.config: production không lộ source map", () => {
     }
   });
 });
+
+describe("vite.config: proxy dev cho gói tài nguyên riêng (mục 63)", () => {
+  it("/assets-private đi về cổng máy chủ của dev, cùng chỗ với /api và /health (cả server và preview)", () => {
+    for (const mode of ["development", "production"]) {
+      const cfg = resolved(mode);
+      const proxy = (cfg.server?.proxy ?? {}) as Record<string, { target?: string }>;
+      const previewProxy = (cfg.preview?.proxy ?? {}) as Record<string, { target?: string }>;
+      for (const p of [proxy, previewProxy]) {
+        const target = p["/assets-private"]?.target;
+        expect(target, mode).toMatch(/^http:\/\/localhost:\d+$/);
+        expect(target, mode).toBe(p["/health"]?.target);
+        expect(target, mode).toBe(p["/api"]?.target);
+      }
+    }
+  });
+
+  it("client/dist (nếu đã build) không chứa thư mục assets-private: gói riêng KHÔNG đi theo bản đóng gói", () => {
+    const dist = resolve(__dirname, "../dist");
+    if (!existsSync(dist)) return;
+    expect(existsSync(resolve(dist, "assets-private"))).toBe(false);
+  });
+});

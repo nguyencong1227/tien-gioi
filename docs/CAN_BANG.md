@@ -942,6 +942,131 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 **Không vi phạm bất biến nào** (mọi đòn <= ngưỡng, bot né hoàn hảo không bị trúng, bot đứng yên bị trúng).
 
 
+## Trùm thế giới: máu nhân `hpMult` (M9.10 #1029, mục 59)
+
+> Phần này sinh từ `server/src/balance/trum-the-gioi.ts` (chạy bộ thực thi trùm thật `fightBossMoves`, máu = `worldBossHpOf`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x 0.6)) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội 5 người hạ trùm ở máu gốc (8 trận đạt). Thưởng (`WorldBossReward` là MỘT quỹ chia theo tỉ lệ đóng góp) quy ra phút săn quái tốt nhất cùng bậc cho một người trong đội 10 người (mục tiêu 12-25; bí cảnh 15-20). Mục tiêu: số người tối thiểu hạ được trong thời lượng là 4-8 (cộng đồng nhỏ vẫn hạ được, không một mình), đội 50 người không dưới 3 phút.
+
+| Khung | Trùm (máu thật) | Bản đồ | Giờ / thời lượng | DPS mỗi người | **Người tối thiểu** | Thưởng một người (đội 10): quỹ -> phút săn (tu vi / Linh thạch) | Né hoàn hảo: 5 / 20 / 50 người | Không né: 5 / 20 / 50 người (thắng, thời gian thật, chết) |
+|---|---|---|---|--:|--:|---|---|---|
+| han_van_trua | Thiên Hàn Vương x38 (4.674.000 máu) | han_van | 12:00 / 30 ph | 456 | **6** | 69.000 + 51.000 -> 17,4 / 17,3 ph | 34,2 ph / 8,5 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 75% 3,9 ph, 36,5 chết |
+| am_suong_toi | Hắc Giao x40 (3.000.000 máu) | am_suong | 21:00 / 30 ph | 290 | **6** | 94.000 + 49.000 -> 17,5 / 17,6 ph | 34,4 ph / 8,6 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 0%, 50 chết |
+
+**Không vi phạm mục tiêu nào.**
+
+
+## Chặn đường: tỉ lệ chết khi chọn Chiến (mục 52 / 59, CD6 #1066)
+
+> Phần này sinh từ `server/src/balance/chan-duong.ts`: chạy ĐẤU TRƯỜNG THẬT (`createArena` + `tickWorld`, thưởng `payRewards`) trên `AMBUSH_FOES` thật, nên thêm / sửa bầy là báo cáo đổi theo (chạy lại `npm run can-bang -w server`).
+> Người chơi đúng bậc `minStep` của bầy (ca khó nhất bầy có thể gặp), mặc đồ tốt nhất đủ bậc, 8 Hồi Huyết Đan (uống khi khí huyết < 50%), đánh thường vào con gần nhất (tiến sát khi ngoài tầm chém; quái tầm xa lùi khi bị áp sát), KHÔNG né, KHÔNG dùng chiêu (ca khó, như bí cảnh); 8 trận (hạt giống 1..8) mỗi bầy. Thời gian thật = giây mô phỏng / uptime (thường và tinh anh 0.8, kẻ cầm đầu 0.6); hết giờ trận 120 giây thật.
+> **Thua = chết thật** (mục 53), nên đây là số quyết định có bật `AMBUSH=on` hay không (mục 59). Hai cách chơi đo trên CÙNG một trận: **tới cùng** (không bao giờ bỏ chạy: cận trên tỉ lệ chết) và **biết bỏ chạy** (bấm khi khí huyết < 25%, vận 1 giây không bất khả xâm phạm rồi thoát, trả giá).
+
+### 1. Tỉ lệ chết theo cảnh giới và mức (trung bình các bầy)
+
+| Cảnh giới | Mức | Số bầy | Thắng (tới cùng) | **Chết (tới cùng)** | Thắng / thoát / **chết** (biết bỏ chạy) | Trận thật | Bầy tệ nhất |
+|---|---|--:|--:|--:|---|--:|---|
+| Phàm Nhân | thường | 1 | 100% | **0%** | 100% / 0% / **0%** | 7 s | lac_ha_soi_le (chết 0%) |
+| Luyện Khí | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 10 s | lac_ha_soi_bay (chết 0%) |
+| Luyện Khí | tinh anh | 2 | 100% | **0%** | 100% / 0% / **0%** | 15 s | lac_ha_soi_tinh_anh (chết 0%) |
+| Trúc Cơ | thường | 2 | 100% | **0%** | 100% / 0% / **0%** | 9 s | hac_phong_ho_doi (chết 0%) |
+| Trúc Cơ | tinh anh | 1 | 100% | **0%** | 100% / 0% / **0%** | 20 s | hac_phong_ho_tinh_anh (chết 0%) |
+| Trúc Cơ | kẻ cầm đầu | 1 | 100% | **0%** | 0% / 100% / **0%** | 28 s | hac_phong_yeu_vuong (chết 0%) |
+| Kim Đan | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 23 s | hac_phong_quy_chan (chết 0%) |
+| Kim Đan | tinh anh | 2 | 100% | **0%** | 100% / 0% / **0%** | 26 s | hac_phong_ho_tinh_anh_doi (chết 0%) |
+| Kim Đan | kẻ cầm đầu | 1 | 100% | **0%** | 100% / 0% / **0%** | 18 s | am_suong_yeu_vuong (chết 0%) |
+| Nguyên Anh | thường | 4 | 100% | **0%** | 100% / 0% / **0%** | 16 s | han_van_lang_le (chết 0%) |
+| Nguyên Anh | tinh anh | 1 | 100% | **0%** | 100% / 0% / **0%** | 8 s | han_van_soi_tuyet (chết 0%) |
+| Nguyên Anh | kẻ cầm đầu | 1 | 100% | **0%** | 100% / 0% / **0%** | 10 s | han_van_yeu_vuong (chết 0%) |
+
+### 2. Từng bầy (ở bậc `minStep`)
+
+"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi (`ambushRewardExp`: phút săn của bậc x mức, CD6b) + Linh thạch (`ARENA_REWARD_MULT` TẠM) MỖI trận thắng; giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang 50% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
+
+| Bầy | Bản đồ | Bậc | Mức | Kẻ địch | Thắng / chết / hết giờ | Thắng / thoát / chết | Trận thật | Thưởng thắng | Giá bỏ chạy | Tương đương |
+|---|---|--:|---|---|---|---|--:|---|---|--:|
+| lac_ha_soi_le | lac_ha | 0 | thường | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 7 s | 120 + 4 | 20 + 60 | 3,8 ph |
+| lac_ha_soi_bay | lac_ha | 1 | thường | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 192 + 9 | 140 + 71 | 3,9 ph |
+| lac_ha_soi_dan | lac_ha | 3 | thường | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 11 s | 216 + 11 | 162 + 99 | 3,9 ph |
+| lac_ha_ho_le | lac_ha | 5 | thường | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 236 + 19 | 177 + 137 | 3,8 ph |
+| lac_ha_ho_doi | lac_ha | 8 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 452 + 32 | 273 + 226 | 3,9 ph |
+| lac_ha_soi_tinh_anh | lac_ha | 6 | tinh anh | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 534 + 3 | 225 + 162 | 5,8 ph |
+| lac_ha_soi_tinh_anh_doi | lac_ha | 8 | tinh anh | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 17 s | 678 + 13 | 273 + 226 | 5,7 ph |
+| hac_phong_ho_doi | hac_phong | 10 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 9 s | 536 + 37 | 402 + 314 | 3,8 ph |
+| hac_phong_ho_ba | hac_phong | 11 | thường | Hắc Hổ x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 556 + 49 | 417 + 371 | 3,9 ph |
+| hac_phong_quy_chan | hac_phong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 122 | 1.521 + 516 | 3,5 ph |
+| hac_phong_ho_tinh_anh | hac_phong | 11 | tinh anh | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 20 s | 834 + 22 | 417 + 371 | 5,7 ph |
+| hac_phong_ho_tinh_anh_doi | hac_phong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 28 s | 3.138 + 63 | 1.569 + 609 | 5,5 ph |
+| hac_phong_yeu_vuong | hac_phong | 11 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 0% / 100% / 0% | 28 s | 1.390 + 196 | 417 + 371 | -3,5 ph |
+| am_suong_ho_suong | am_suong | 13 | thường | Sương Hồ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.028 + 53 | 1.521 + 516 | 3,8 ph |
+| am_suong_quy_le | am_suong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 122 | 1.521 + 516 | 3,5 ph |
+| am_suong_thiem_doc | am_suong | 15 | thường | Độc Thiềm x1 | 100% / 0% / 0% | 100% / 0% / 0% | 15 s | 2.144 + 122 | 1.608 + 718 | 3,8 ph |
+| am_suong_ho_tinh_anh | am_suong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 23 s | 3.138 + 54 | 1.569 + 609 | 5,6 ph |
+| am_suong_yeu_vuong | am_suong | 13 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 18 s | 5.070 + 214 | 1.521 + 516 | 9,7 ph |
+| han_van_lang_le | han_van | 16 | thường | Hàn Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 2.208 + 128 | 1.656 + 848 | 3,9 ph |
+| han_van_lang_doi | han_van | 18 | thường | Hàn Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 14 s | 1.584 + 338 | 1.188 + 1.180 | 3,8 ph |
+| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 451 | 1.425 + 1.000 | 3,5 ph |
+| han_van_nha_gio | han_van | 16 | thường | Phong Nha x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.208 + 161 | 1.656 + 848 | 3,8 ph |
+| han_van_soi_tuyet | han_van | 16 | tinh anh | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 3.312 + 24 | 1.656 + 848 | 5,9 ph |
+| han_van_yeu_vuong | han_van | 16 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 5.520 + 213 | 1.656 + 848 | 9,8 ph |
+
+### 3. Tu vi / phút so với săn quái
+
+Khoảng giữa hai lần bị chặn ước tính 14,7 phút (hồi tối thiểu 8 phút + quãng đi bộ tới lần tung trúng kế, 50% thời gian đi bộ). Tu vi / phút tăng thêm so với chỉ săn quái, trộn theo `AMBUSH_TIER_WEIGHTS` (thường 70 / tinh anh 25 / kẻ cầm đầu 5): **29%** (mục tiêu 20%-40%, không hơn bí cảnh). Chưa tính đồ rơi và sách chiêu (chưa có: `AMBUSH_LOOT`).
+
+Theo từng cảnh giới (thưởng và giá tính bằng phút săn của bậc, nên các hàng gần nhau; lệch nhiều là do bầy / tỉ lệ thắng của cảnh giới đó):
+
+| Cảnh giới | Thường | Tinh anh | Kẻ cầm đầu | **Trộn** |
+|---|--:|--:|--:|--:|
+| Phàm Nhân | 26% | - | - | **26%** |
+| Luyện Khí | 26% | 38% | - | **29%** |
+| Trúc Cơ | 26% | 38% | -23% | **26%** |
+| Kim Đan | 24% | 37% | 65% | **29%** |
+| Nguyên Anh | 25% | 40% | 66% | **31%** |
+
+Giá bỏ chạy bằng tu vi: 2 phút (hộp thoại) / 3 phút (giữa trận); thưởng tu vi thắng: thường 4 phút / tinh anh 6 phút / kẻ cầm đầu 10 phút (phút săn của bậc người chơi; bảng tu vi / phút săn `AMBUSH_HUNT_EXP_PER_MIN` sinh từ mô phỏng). Giá bị kẹp bởi tu vi đang có trong thanh (không bao giờ rớt cảnh giới).
+
+### 4. Độ nhạy theo giả định (Hồi Huyết Đan, đồ)
+
+Bảng 1-3 đo ở giả định CHUẨN (8 đan + đồ tốt nhất đủ bậc). Người chơi thật thường mang ít đan hơn hoặc chưa lên đồ, nên bảng này đo lại CÙNG 24 bầy (ở bậc `minStep`, mỗi bầy 48 trận, hạt giống 1..48: ít nhiễu hơn bảng 1-3 vốn 8 trận) với từng tổ hợp số đan x có đồ hay không. "Chết / lần" là tỉ lệ chết MỖI lần bị chặn, trộn theo `AMBUSH_TIER_WEIGHTS` (thường 70 / tinh anh 25 / kẻ cầm đầu 5); "chết >= 1 lần / ngày" là xác suất chết ít nhất một lần trong 12 lần chặn (mức tối đa mỗi ngày, các lần độc lập: 1 - (1 - p)^12), tới cùng / biết bỏ chạy. Cách "tới cùng" là cận TRÊN của tỉ lệ chết; cách "biết bỏ chạy" của mô hình bấm Bỏ chạy ĐÚNG lúc khí huyết < 25% rồi sống qua giây vận nên là cận DƯỚI (người chơi thật nằm giữa: bấm trễ hoặc không bấm); cái giá của cận dưới là cột "Thoát / lần" (mỗi lần thoát trả tu vi hoặc Linh thạch). Thua = chết thật nên con số "chết >= 1 lần / ngày" đáng chú ý hơn tỉ lệ từng lần.
+
+| Đồ | Hồi Huyết Đan | Chết / lần (tới cùng) | Chết / lần (biết bỏ chạy) | Thoát / lần (biết bỏ chạy) | Chết >= 1 lần / ngày (tới cùng / biết bỏ chạy) | Bầy thắng dưới mục tiêu | Bầy chết nhiều nhất (tới cùng) |
+|---|--:|--:|--:|--:|---|--:|---|
+| đồ tốt nhất đủ bậc | 8 (chuẩn) | 0% | 0% | 1,9% | 0% / 0% | 0 / 24 | lac_ha_soi_le (chết 0%) |
+| đồ tốt nhất đủ bậc | 2 (thận trọng) | 0% | 0% | 1,9% | 0% / 0% | 0 / 24 | lac_ha_soi_le (chết 0%) |
+| đồ tốt nhất đủ bậc | 0 | 16,3% | 0% | 31,5% | 88% / 0% | 5 / 24 | hac_phong_yeu_vuong (chết 100%) |
+| KHÔNG đồ | 8 | 14% | 0% | 29,1% | 84% / 0% | 4 / 24 | hac_phong_yeu_vuong (chết 100%) |
+| KHÔNG đồ | 2 | 14% | 0% | 29,1% | 84% / 0% | 4 / 24 | hac_phong_yeu_vuong (chết 100%) |
+| KHÔNG đồ | 0 | 44,5% | 0% | 62,6% | 100% / 0% | 12 / 24 | lac_ha_soi_tinh_anh_doi (chết 100%) |
+
+Giả định thận trọng (2 đan + đồ đúng bậc) LÀ chuẩn để quyết bật `AMBUSH` (A chốt 22/11): **không bầy nào vi phạm** (chết <= 5%, thắng >= mục tiêu của mức).
+
+**Không vi phạm bất biến nào** (mọi bầy thắng >= 90% thường / 80% tinh anh / 60% kẻ cầm đầu, giá bỏ chạy và thời gian trận xem cảnh báo bên dưới).
+
+Cảnh báo (không chặn):
+
+- bầy lac_ha_soi_le: trận 7 giây (khung 30-70 giây)
+- bầy lac_ha_soi_bay: trận 10 giây (khung 30-70 giây)
+- bầy lac_ha_soi_dan: trận 11 giây (khung 30-70 giây)
+- bầy lac_ha_ho_le: trận 10 giây (khung 30-70 giây)
+- bầy lac_ha_ho_doi: trận 8 giây (khung 30-70 giây)
+- bầy lac_ha_soi_tinh_anh: trận 12 giây (khung 30-70 giây)
+- bầy lac_ha_soi_tinh_anh_doi: trận 17 giây (khung 30-70 giây)
+- bầy hac_phong_ho_doi: trận 9 giây (khung 30-70 giây)
+- bầy hac_phong_ho_ba: trận 8 giây (khung 30-70 giây)
+- bầy hac_phong_ho_tinh_anh: trận 20 giây (khung 30-70 giây)
+- bầy hac_phong_ho_tinh_anh_doi: trận 28 giây (khung 30-70 giây)
+- bầy hac_phong_yeu_vuong: trận 28 giây (khung 30-70 giây)
+- bầy am_suong_ho_suong: trận 12 giây (khung 30-70 giây)
+- bầy am_suong_thiem_doc: trận 15 giây (khung 30-70 giây)
+- bầy am_suong_ho_tinh_anh: trận 23 giây (khung 30-70 giây)
+- bầy am_suong_yeu_vuong: trận 18 giây (khung 30-70 giây)
+- bầy han_van_lang_le: trận 8 giây (khung 30-70 giây)
+- bầy han_van_lang_doi: trận 14 giây (khung 30-70 giây)
+- bầy han_van_tuong_xuong: trận 29 giây (khung 30-70 giây)
+- bầy han_van_nha_gio: trận 12 giây (khung 30-70 giây)
+- bầy han_van_soi_tuyet: trận 8 giây (khung 30-70 giây)
+- bầy han_van_yeu_vuong: trận 10 giây (khung 30-70 giây)
+
+
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
 
 > Dựa trên `shared/src/skills.ts` (18 chiêu: 12 đợt 1 + 6 chiêu Nguyên Anh đợt 2, #654) và `server/src/systems/status-rules.ts`. Mọi chiêu thức được mô phỏng theo chu kỳ thi triển đều đặn theo hồi chiêu, kết hợp đan xen Kiếm chém thường (`SKILLS.slash`).

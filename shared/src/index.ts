@@ -30,3 +30,4 @@ export * from "./protocol";
 export * from "./heartbeat";
 export * from "./tiled-bake";
 export * from "./map-checks";
+export * from "./private-pack";

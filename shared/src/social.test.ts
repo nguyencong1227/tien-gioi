@@ -1,5 +1,6 @@
 // Hợp đồng M9 (M9.1 #1020): bảng xếp hạng, trùm thế giới theo giờ, thành tựu + danh hiệu, hàm mẫu.
 import { describe, expect, it } from "vitest";
+import { MONSTER_BY_ID } from "./game";
 import {
   ACHIEVEMENTS,
   ACHIEVEMENT_BY_ID,
@@ -39,6 +40,8 @@ import {
   worldBossPhaseAt,
   worldBossPoints,
   worldBossViolations,
+  worldBossHpOf,
+  WORLD_BOSS_HP_MULT_MAX,
   type AchievementDef,
   type BoardRow,
   type TitleDef,
@@ -54,9 +57,27 @@ const at7 = (y: number, mo: number, d: number, h = 0, mi = 0) =>
   Date.UTC(y, mo - 1, d, h, mi) - WORLD_BOSS_TZ_OFFSET_MS;
 
 describe("dữ liệu thật đã vào phải qua luật kiểm", () => {
-  it("lịch trùm thế giới (rỗng tới khi E có dữ liệu), thành tựu, danh hiệu", () => {
+  it("lịch trùm thế giới (hai khung 12:00 Hàn Vân + 21:00 Âm Sương), thành tựu, danh hiệu", () => {
     expect(worldBossViolations()).toEqual([]);
-    expect(WORLD_BOSS_SCHEDULE.length).toBe(0); // KHUNG: E thêm ở M9.10 (bộ thực thi không lập lịch khi rỗng)
+    // A soạn (M9.10): số do `server/src/balance/trum-the-gioi.ts` đo, cổng ở `trum-the-gioi.test.ts`; đổi lịch là đổi có chủ ý
+    expect(
+      WORLD_BOSS_SCHEDULE.map((s) => [
+        s.id,
+        s.boss,
+        s.mapId,
+        s.hour,
+        s.minute,
+        s.hpMult,
+        s.durationMin,
+      ]),
+    ).toEqual([
+      ["han_van_trua", "thien_han_vuong", "han_van", 12, 0, 38, 30],
+      ["am_suong_toi", "hac_giao", "am_suong", 21, 0, 40, 30],
+    ]);
+    for (const s of WORLD_BOSS_SCHEDULE) {
+      expect(worldBossHpOf(s)).toBeGreaterThan(MONSTER_BY_ID[s.boss]!.hp * 30); // nhân máu thật (trùm đội cân cho 1-2 phút)
+      expect(s.announceMin).toEqual([10, 5, 1]);
+    }
     expect(achievementViolations()).toEqual([]);
     expect(titleViolations()).toEqual([]);
     expect(ACHIEVEMENTS.length).toBeGreaterThanOrEqual(4);
@@ -100,6 +121,23 @@ describe("worldBossViolations: bắt dữ liệu sai", () => {
     expect(
       bad({ reward: { exp: 10, coin: 1, top: { itemId: "dai_hoi_huyet_dan", count: 0 } } }).join(),
     ).toContain("số vật phẩm");
+  });
+
+  it("hpMult: bỏ trống hoặc 1-500 thì hợp lệ; ngoài khoảng, không hữu hạn, sai kiểu thì đỏ", () => {
+    expect(bad({})).toEqual([]);
+    expect(bad({ hpMult: 1 })).toEqual([]);
+    expect(bad({ hpMult: 40.5 })).toEqual([]);
+    expect(bad({ hpMult: WORLD_BOSS_HP_MULT_MAX })).toEqual([]);
+    for (const v of [
+      0,
+      0.5,
+      -3,
+      WORLD_BOSS_HP_MULT_MAX + 1,
+      NaN,
+      Infinity,
+      "40" as unknown as number,
+    ])
+      expect(bad({ hpMult: v }).join()).toContain("hpMult");
   });
 
   it("khung giờ không được vắt qua nửa đêm (giờ + thời lượng <= 24:00); đúng 24:00 thì được", () => {
@@ -472,5 +510,22 @@ describe("hàm mẫu khớp kiểu thật", () => {
     const m = sampleAchievements();
     for (const id of Object.keys(m.ach)) expect(ACHIEVEMENT_BY_ID[id]).toBeDefined();
     expect(TITLE_BY_ID[m.title!]).toBeDefined();
+  });
+});
+
+describe("worldBossHpOf: máu thật = máu loài x hpMult", () => {
+  const kind = sampleWorldBossSchedule()[0].boss;
+  const hp = MONSTER_BY_ID[kind].hp;
+  it("mặc định 1; nhân và làm tròn; hệ số hỏng / loài lạ không làm máu về 0 hay NaN", () => {
+    expect(worldBossHpOf({ boss: kind })).toBe(hp);
+    expect(worldBossHpOf({ boss: kind, hpMult: 1 })).toBe(hp);
+    expect(worldBossHpOf({ boss: kind, hpMult: 20 })).toBe(hp * 20);
+    expect(worldBossHpOf({ boss: kind, hpMult: 1.5 })).toBe(Math.round(hp * 1.5));
+    expect(worldBossHpOf({ boss: kind, hpMult: 0 })).toBe(hp);
+    expect(worldBossHpOf({ boss: kind, hpMult: NaN })).toBe(hp);
+    expect(worldBossHpOf({ boss: kind, hpMult: -5 })).toBe(hp);
+    expect(worldBossHpOf({ boss: kind, hpMult: 1e9 })).toBe(hp * WORLD_BOSS_HP_MULT_MAX);
+    expect(worldBossHpOf({ boss: "khong_co", hpMult: 9 })).toBe(1);
+    expect(worldBossHpOf({ boss: "constructor", hpMult: 9 })).toBe(1);
   });
 });

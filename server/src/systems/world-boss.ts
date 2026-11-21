@@ -13,6 +13,7 @@ import {
   WORLD_BOSS_TOP_N,
   expMultOf,
   getMap,
+  worldBossHpOf,
   worldBossAnnouncements,
   worldBossNoneMsg,
   type MonsterKind,
@@ -28,7 +29,7 @@ import { bossDespawnAdds } from "./boss-state";
 import { titleOf } from "./chat-title";
 import { giveItem } from "./inventory";
 import { spawnLoot } from "./loot";
-import { bossSpawnOk } from "./monsters";
+import { bossSpawnOk, zoneSpawnSpot } from "./monsters";
 import { placeMonster } from "./monster-place";
 import { gainExp } from "./progression";
 import { onMonsterKilled } from "./quests";
@@ -65,6 +66,9 @@ function targetWorld(hub: Hub, mapId: string): World | undefined {
 /** Tìm chỗ sinh đủ rộng, xa khu an toàn (như trùm thường: thử chặt trước, không được thì nới); `null` nếu bản đồ không có chỗ nào. */
 function findSpot(w: World, def: MonsterKind): { x: number; y: number } | null {
   const map = w.map;
+  // Bản đồ khai vùng sinh cho loài trùm này (S5): chỉ sinh trong vùng, bỏ `max` của vùng (trùm thế giới là thêm); không khai thì cách cũ
+  const zones = map.spawnZonesOf(def.id);
+  if (zones.length > 0) return zoneSpawnSpot(w, def, zones, { ignoreMax: true });
   for (const strict of [true, false]) {
     for (let i = 0; i < (strict ? 200 : 60); i++) {
       const x = rand(64, map.worldW - 64);
@@ -80,8 +84,12 @@ function findSpot(w: World, def: MonsterKind): { x: number; y: number } | null {
 
 /** Sinh trùm thế giới ở `w` cho sự kiện `ev`. Trả `false` nếu không tìm được chỗ (sự kiện bị huỷ). */
 function spawnBoss(w: World, ev: WbEvent): boolean {
-  const def = MONSTER_BY_ID[ev.slot.boss];
-  if (!def) return false;
+  const kind = MONSTER_BY_ID[ev.slot.boss];
+  if (!kind) return false;
+  // Máu THẬT = máu loài x `hpMult` của khung giờ (`worldBossHpOf`, `shared/`): bộ chiêu `BOSSES` cân cho đội 3-4 người hạ trong 1-2 phút, sự kiện 30 phút cần nhiều máu hơn.
+  // Chỉ bản SAO của loài đổi máu (đòn đánh, chiêu, giai đoạn giữ nguyên; bảng `MONSTERS` dùng chung không bị sửa); không có `hpMult` thì dùng đúng loài gốc như trước.
+  const hp = worldBossHpOf(ev.slot);
+  const def: MonsterKind = hp === kind.hp ? kind : { ...kind, hp };
   const spot = findSpot(w, def);
   if (!spot) return false;
   const id = placeMonster(w, def, spot.x, spot.y);

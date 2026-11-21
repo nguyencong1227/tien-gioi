@@ -4,7 +4,8 @@
 // không làm chậm, đòn đánh thường của mọi quái bị tắt (chỉ đo chiêu của bộ thực thi); vũng cũ chạm vào kế hoạch thì bỏ qua đòn đó. Hai vùng chồng nhau cùng lúc chưa kiểm.
 import {
   BOSS_HIT_GRACE_PX,
-  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
+  getMap,
   MONSTER_BY_ID,
   PLAYER_RADIUS,
   type BossAbility,
@@ -30,7 +31,7 @@ const REACH = PLAYER_RADIUS - BOSS_HIT_GRACE_PX;
 // ---------- Cảnh: bãi trống + trùm đứng yên + một người chơi ----------
 
 function openArena(): GameMap {
-  const m = Object.create(DEFAULT_MAP) as GameMap;
+  const m = Object.create(getMap(DEFAULT_MAP_ID)!) as GameMap;
   m.circleBlocked = () => false;
   return m;
 }

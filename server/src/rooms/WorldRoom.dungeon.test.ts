@@ -1,6 +1,6 @@
 // Test tích hợp Bí cảnh (M3 bước 4b-2): server Colyseus thật, client colyseus.js như client thật.
 // Mở -> mời -> vào (travelTo kèm roomId, joinById) -> chạy / kết thúc -> về Lạc Hà; chống vào lậu; không bao giờ kẹt trong bí cảnh.
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -585,6 +585,17 @@ describe("không bao giờ kẹt trong bí cảnh", () => {
 });
 
 describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", () => {
+  // GHIM `Date` giữa ngày (12:00 giờ VN) cho cả khối: cả code lẫn test đều đọc `Date.now()` (qua `w.now` mỗi tick), nên gần nửa đêm ngày ghi vào hồ sơ và ngày test so sánh có thể lọt hai phía
+  // (đo: `Date.now() - world.now` chỉ ~35 ms nên so với `w.now` KHÔNG chặn được). Chỉ giả `Date`; hẹn giờ / ws vẫn thật, đồng hồ giả vẫn chạy theo giờ thật (`shouldAdvanceTime`). Issue #1125.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-11-21T05:00:00Z"));
+    // CHỨNG KIẾN ghim đang hoạt động (A đề nghị ở review #1228): bỏ `useFakeTimers` / `setSystemTime` thì dòng này ĐỎ, không để chập chờn quanh nửa đêm quay lại âm thầm
+    expect(new Date().toISOString().slice(0, 13)).toBe("2026-11-21T05");
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   /** Cả hai đã vào phòng bí cảnh; trả phòng, world và trùm phía server. */
   async function inside() {
     const { a, b, run } = await setupRun();
@@ -628,8 +639,10 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
       "HUD thắng",
     );
     // hồ sơ: lượt ngày ghi vào file ở lần lưu tới; đồ và tiền cùng bản ghi
+    // Cùng đồng hồ với code: `dungeonDaily.day` do code ghi bằng `dayKey(w.now)`. Riêng việc so với `w.now` KHÔNG đủ chặn nửa đêm (phòng thật cập nhật `w.now` từ `Date.now()` mỗi tick, lệch ~35 ms);
+    // chặn thật là ghim `Date` giữa ngày ở đầu khối (xem `beforeEach`). Issue #1125.
     await (serverRoom(t.ra) as any).saveAll();
-    expect(saveOf(t.a.name).dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(saveOf(t.a.name).dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 1 });
     expect(saveOf(t.a.name).coin).toBeGreaterThanOrEqual(LINH_HU.reward.coin);
     expect(saveOf(t.b.name).dungeonDaily).toBeUndefined();
     expect(saveOf(t.a.name).mapId).toBe(DEFAULT_MAP_ID); // vẫn ghi Lạc Hà
@@ -647,7 +660,8 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
   it("đã nhận đủ 3 lượt hôm nay (hồ sơ): vẫn thắng nhưng `daily_limit`, không thêm thưởng, bộ đếm giữ nguyên; hồ sơ bộ đếm hỏng thì coi như chưa dùng", async () => {
     const t = await inside();
     const wa = t.world.ctrl.get(t.ra.sessionId);
-    wa.save.dungeonDaily = { day: dayKey(Date.now()), rewards: 3 };
+    // Ngày lấy theo giờ máy chủ (`w.now`) như code; `Date` đã ghim giữa ngày nên không lọt qua nửa đêm giữa lúc đặt "đã dùng 3 lượt" và lúc thắng
+    wa.save.dungeonDaily = { day: dayKey(t.world.now), rewards: 3 };
     const wb = t.world.ctrl.get(t.rb.sessionId);
     wb.save.dungeonDaily = { day: "khong-phai-ngay", rewards: 99 }; // hỏng
     const mc = t.world.mctrl.get(t.bossId);
@@ -660,14 +674,25 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
     expect(ea).toMatchObject({ result: "won", noReward: "daily_limit", rewardsLeft: 0 });
     expect(ea.reward).toBeUndefined();
     expect(wa.coin).toBeGreaterThanOrEqual(coinA); // chỉ tiền rơi từ xác trùm (nếu có), không có thưởng hoàn thành
-    expect(wa.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 3 });
+    expect(wa.save.dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 3 });
     expect(eb.reward!.coin).toBe(LINH_HU.reward.coin);
     expect(eb.rewardsLeft).toBe(2);
-    expect(wb.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(wb.save.dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 1 });
   });
 });
 
 describe("gục trong bí cảnh: không mất kiếp (quyết định 11/11)", () => {
+  // GHIM `Date` giữa ngày (12:00 giờ VN) cho cả khối: cả code lẫn test đều đọc `Date.now()` (qua `w.now` mỗi tick), nên gần nửa đêm ngày ghi vào hồ sơ và ngày test so sánh có thể lọt hai phía
+  // (đo: `Date.now() - world.now` chỉ ~35 ms nên so với `w.now` KHÔNG chặn được). Chỉ giả `Date`; hẹn giờ / ws vẫn thật, đồng hồ giả vẫn chạy theo giờ thật (`shouldAdvanceTime`). Issue #1125.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-11-21T05:00:00Z"));
+    // CHỨNG KIẾN ghim đang hoạt động (A đề nghị ở review #1228): bỏ `useFakeTimers` / `setSystemTime` thì dòng này ĐỎ, không để chập chờn quanh nửa đêm quay lại âm thầm
+    expect(new Date().toISOString().slice(0, 13)).toBe("2026-11-21T05");
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   /** Cả hai đã vào phòng bí cảnh; trả phòng, world phía server. */
   async function inside() {
     const { a, b, run } = await setupRun();
@@ -715,7 +740,7 @@ describe("gục trong bí cảnh: không mất kiếp (quyết định 11/11)", 
     expect([rec.realm, rec.tier]).toEqual([1, 8]);
     expect(rec.lifeId).toBe(lifeId);
     expect(rec.mapId).toBe(DEFAULT_MAP_ID);
-    expect(rec.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(rec.dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 1 });
     expect(ctrlA.soul.kiep).toBe(kiep);
     expect(t.a.limbos).toBe(0);
 

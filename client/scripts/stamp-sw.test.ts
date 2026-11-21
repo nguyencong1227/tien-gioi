@@ -129,6 +129,27 @@ describe("M7.15: stamp-sw (Đóng dấu Service Worker và chỉ precache gói c
     }
   });
 
+  it("mục 63: gói tài nguyên RIÊNG (/assets-private/) KHÔNG BAO GIỜ vào PRECACHE_URLS, kể cả khi lỡ có trong dist (cấm phân phối lại: chỉ máy chủ phục vụ)", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stamp-private-"));
+    try {
+      const base = ["/index.html", "/assets/ai/login_bg.webp", "/icons/icon-192.png"];
+      const before = buildPrecacheUrls(tmpDir, base);
+      const withPrivate = buildPrecacheUrls(tmpDir, [
+        ...base,
+        "/assets-private/manifest.json",
+        "/assets-private/cainos/atlas.png",
+        "/assets-private/cainos/tiles/ground.webp",
+      ]);
+      expect(withPrivate).toEqual(before); // danh sách precache KHÔNG đổi một byte
+      expect(withPrivate.some((u) => u.includes("assets-private"))).toBe(false);
+      // tiền tố gần giống không bị oan: tệp thường vẫn được precache như cũ
+      const near = buildPrecacheUrls(tmpDir, [...base, "/assets-privateer/x.png"]);
+      expect(near).toContain("/assets-privateer/x.png");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("stampServiceWorker: ghi đúng CACHE_NAME và PRECACHE_URLS vào sw.js", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-stamp-run-"));
     try {
