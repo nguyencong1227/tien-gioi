@@ -58,7 +58,6 @@ export interface PrivatePackManifest {
 const ID_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const SEG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SHA_RE = /^[0-9a-f]{64}$/;
-// eslint-disable-next-line no-control-regex
 const CONTROL_RE = /[\u0000-\u001f\u007f]/;
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
