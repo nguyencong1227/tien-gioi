@@ -99,6 +99,8 @@ describe("giới hạn tần suất tin nhắn", () => {
 
   it("#1250: người dùng đủ MAX_TRACKED_TYPES loại tin vẫn được tin ĐẦU của mỗi loại đó (loại thứ 65 không bị bỏ như spam), nhưng loại thứ MAX + 1 thì bị bỏ", () => {
     const lim = new RateLimiter(0);
+    // GHIM 100 (> 64 của bản lỗi): hạ MAX_TRACKED_TYPES xuống dưới số này là test đỏ, không chỉ chờ test dư địa ở red-team
+    expect(MAX_TRACKED_TYPES).toBeGreaterThanOrEqual(100);
     for (let i = 0; i < MAX_TRACKED_TYPES; i++)
       expect(lim.check(`loai_${i}`, 0), `loại thứ ${i + 1}`).toBe("ok");
     // loại ĐÃ theo dõi vẫn dùng bình thường sau khi đạt trần (quỹ riêng còn nguyên)
