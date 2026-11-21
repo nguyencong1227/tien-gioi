@@ -58,12 +58,15 @@ describe("nearestFreeSpot / safeSpot: vị trí lưu rơi vào ô chặn", () =>
 
   it("không có chỗ trong tầm (khối đá rộng) hoặc ngoài bản đồ: về TRẤN, `moved.to = town`", () => {
     const g = rockWorld();
-    // trấn ở góc (10, 10); vị trí (50, 50) cách chỗ thoáng gần nhất > 24 ô
-    expect(blocked(g, 50 * TILE, 50 * TILE)).toBe(true);
-    expect(nearestFreeSpot(g, 50 * TILE, 50 * TILE)).toBeNull();
-    const s = safeSpot(g, 50 * TILE, 50 * TILE);
+    // trấn ở góc (10, 10), đường tới x = 20, ổ nhỏ ở (60..62, 60..62); vị trí (45, 20) cách MỌI chỗ thoáng > 24 ô
+    expect(blocked(g, 45 * TILE, 20 * TILE)).toBe(true);
+    expect(nearestFreeSpot(g, 45 * TILE, 20 * TILE)).toBeNull();
+    const s = safeSpot(g, 45 * TILE, 20 * TILE);
     expect(s.moved?.to).toBe("town");
     expect(g.inTown(s.x, s.y)).toBe(true);
+    // ổ thoáng ở đường chéo cách ~29 ô (trong ô vuông ±24 ô nhưng ngoài vòng tròn): KHÔNG được chọn
+    expect(blocked(g, 61 * TILE + 16, 61 * TILE + 16)).toBe(false);
+    expect(nearestFreeSpot(g, 40 * TILE, 40 * TILE)).toBeNull();
     // gần hơn tầm thì vẫn về chỗ đứng gần nhất thay vì trấn
     const near = safeSpot(g, 30 * TILE, 10 * TILE);
     expect(near.moved?.to).toBe("near");
@@ -93,7 +96,10 @@ function rockWorld(): GameMap {
   const data: number[] = [];
   for (let y = 0; y < 64; y++)
     for (let x = 0; x < 64; x++) {
-      const free = Math.hypot(x - 10, y - 10) < 6 || (y >= 9 && y <= 11 && x <= 20);
+      const free =
+        Math.hypot(x - 10, y - 10) < 6 ||
+        (y >= 9 && y <= 11 && x <= 20) ||
+        (x >= 60 && x <= 62 && y >= 60 && y <= 62); // ổ nhỏ ở đường chéo: trong ô vuông tìm kiếm nhưng NGOÀI bán kính 24 ô
       data.push(1 + (free ? T.Grass : T.Rock));
     }
   const logic = json.layers.find((l) => l.name === "logic")!;
