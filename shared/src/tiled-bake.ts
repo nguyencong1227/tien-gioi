@@ -67,6 +67,21 @@ export function bakeTiledMap(map: GameMap): TiledMap {
                 },
               ]
             : []),
+          // Vùng sinh (S5): chữ nhật / elip, `x, y` là góc trên trái của khung (như Tiled ghi); thứ tự vùng giữ nguyên
+          ...map.spawnZones.map((z, i) => ({
+            id: 100 + i,
+            name: `${z.monster}_${i + 1}`,
+            class: "spawnZone",
+            x: z.x * k,
+            y: z.y * k,
+            width: z.w * k,
+            height: z.h * k,
+            ...(z.shape === "ellipse" ? { ellipse: true } : {}),
+            properties: [
+              prop("monster", z.monster),
+              ...(z.max !== undefined ? [prop("max", z.max)] : []),
+            ],
+          })),
           ...map.portals.map((p, i) => ({
             id: 10 + i,
             name: p.id,
