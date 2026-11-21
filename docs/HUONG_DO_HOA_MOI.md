@@ -143,7 +143,7 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 **Điều ảnh 3-4 (bản đồ thật) cho thấy thêm:**
 
 - **Rừng quá dày nếu vẽ mỗi ô `T.Tree` một cây của gói** (như ảnh vùng săn): các tán 2 ô chồng lên nhau, nhân vật đứng giữa cụm bị tán vây quanh. Cần một bước **xếp cây** (mỗi khối 2x2 ô cây một cây, ô thừa là bụi / gốc), tán chỉ phủ phần trên thân và mờ khi người chơi ở dưới (mục 7); đây là việc của Bước 2 (và `map:build` S4), không phải của hình gói.
-- **Dải 1 ô (bờ cát quanh ao, đường đất hẹp) bị ghép góc rách:** bộ 56 ô ghép góc là kiểu blob, đẹp với mảng từ 2 ô trở lên; dải 1 ô nên dựng bằng ô viền riêng hoặc làm rộng 2 ô khi dựng bản đồ (S4 / S6).
+- **Dải 1 ô (bờ cát quanh ao) vẫn rời rạc; ao và đường đất ra sạch sau khi sửa lỗi chuẩn hoá mặt nạ:** bản dựng đầu của B (và bảng tra `WANG_BLOB_LUT` của #1210 lúc review) chọn sai ô khi hai mảng chỉ chạm nhau ở đường chéo (góc bật mà thiếu một cạnh kề): B đo 9-28 % ô đất / nước sai trên 4 bản đồ thật; chuẩn hoá bit góc theo luật Wang (chỉ giữ khi cả hai cạnh kề đều có) làm ao thành mảng liền và đường đất gọn (ảnh trong repo đã dựng lại). Dải cát rộng 1 ô vẫn rời vì bộ 56 ô kiểu blob đẹp với mảng từ 2 ô trở lên: dải 1 ô nên dựng bằng ô viền riêng hoặc làm rộng 2 ô khi dựng bản đồ (S4 / S6).
 - **Độ đọc nhân vật phụ thuộc zoom:** ở 360x640 và 915x412 (zoom 0,75) nhân vật gói cao ~24 px màn hình (16 px x2 x 0,75) so với ~29 px hiện tại (39 px x 0,75), đầu to và tối hơn nền; đó là lý do đề xuất giữ nhân vật hiện tại ở hướng C và thêm viền / hào quang vẽ bằng mã nếu thay.
 - Nước của gói trong ảnh là khối băng đổi màu (mục 2): sáng và nhạt hơn nước hiện tại; nên chọn lại màu khi có tileset nước thật.
 
