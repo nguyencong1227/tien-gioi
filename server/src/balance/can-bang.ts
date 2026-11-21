@@ -25,6 +25,7 @@ import { renderOwnerGearSensitivity } from "./do-o-rieng";
 import { renderTinhAnh } from "./tinh-anh";
 import { renderBotHuntSection } from "./bot-hunt";
 import { renderSectEconomy } from "./tong-mon";
+import { renderAmbushBalance } from "./chan-duong";
 import { renderBossBalance } from "./trum";
 import { renderSkillBalanceMarkdown } from "./skills-model";
 import { renderSkillDpsMarkdown } from "./skills-dps";
@@ -475,6 +476,8 @@ ${renderBotHuntSection()}
 ${renderSectEconomy()}
 
 ${renderBossBalance()}
+
+${renderAmbushBalance()}
 
 ${renderSkillBalanceMarkdown(statsFor(3, 0, emptyEquipment()))}
 
