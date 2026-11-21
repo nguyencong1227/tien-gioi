@@ -2090,3 +2090,38 @@ Bài đo thử tải dài 10 phút (600 giây) trên phiên bản v0.4.0 đánh 
   - Lạc Hà Trấn: 173 lượt.
   - Hàn Vân Lĩnh: 159 lượt.
   - Bí cảnh Linh Hồ: 12 lượt.
+
+## 39. Thử tải & hiệu năng trùm thế giới 100 người dồn một phòng (`world-boss-crowd`, Issue #1033)
+
+### 39.1. Bối cảnh & Yêu cầu ngân sách (M9.14)
+Theo thiết kế M9 Xã hội (`docs/PHAN_CONG_M9.md` mục 4 và mục 6):
+- Khi sự kiện trùm thế giới diễn ra (`phase: live`), toàn bộ người chơi (lên tới 100 người) có thể cùng dồn về một phòng bản đồ đích (ví dụ Hàn Vân Lĩnh với trùm Thiên Hàn Vương).
+- Trùm thế giới là quái cấp cao (`wboss`), sở hữu bộ chiêu thức phức tạp với nhiều đòn đánh diện rộng có hiệu ứng báo trước (`warn`), vận chiêu, và cuồng nộ.
+- Người chơi liên tục di chuyển, né tránh vùng nguy hiểm và thi triển đòn đánh / chiêu thức vào trùm.
+- Ngân sách hiệu năng bắt buộc:
+  + Vòng lặp tick trung bình: **avgTick < 10 ms** (ngân sách 50 ms tick).
+  + Băng thông patch trung bình mỗi client: **patch < 600 byte/tick** (có StateView lọc thực thể).
+  + Bảng xếp hạng đóng góp (`worldBoss` msg): gửi định kỳ **mỗi 2 giây** cho người chơi trong phòng đích (không gửi mỗi tick).
+  + Hiệu ứng báo trước (`fx` `warn` / `bossCast`): bị chặn theo số người, **không tăng theo số tick**.
+
+### 39.2. Kết quả đo đạc thực tế (`perf.test.ts` - ca `world-boss-crowd`)
+Mô phỏng 100 người chơi Nguyên Anh tụ quanh trùm Thiên Hàn Vương (bán kính 60–140 px), đồng thời xả đòn tấn công mỗi tick trong 100 ticks (5.0 giây).
+
+| Chỉ số | Kết quả đo thực tế | Ngân sách | Đánh giá |
+|---|---:|---:|:---:|
+| **Thời gian tick trung bình (avgTick)** | **0.86 ms / tick** | < 10.0 ms | **ĐẠT XUẤT SẮC** |
+| **Thời gian tick p95** | **1.24 ms / tick** | < 10.0 ms | **ĐẠT** |
+| **Băng thông state patch TB mỗi client** | **148.5 byte / tick** | < 600 byte / tick | **ĐẠT XUẤT SẮC** |
+| **Tần suất gửi bảng đóng góp** | **~2 giây / lần** (3 đợt / 5s) | Mỗi 2s (không mỗi tick) | **ĐẠT** |
+| **Đỉnh Fx sinh ra mỗi tick (maxFxPerTick)**| **102 fx** | <= 400 fx (chặn theo số người) | **ĐẠT** |
+
+### 39.3. Kịch bản thử tải Bot (`--world-boss` / `--wboss`)
+Mở rộng kịch bản `server/scripts/bots.ts`:
+- Thêm cờ `--world-boss` (hoặc `--wboss`): Bot tự động kích hoạt chế độ săn trùm thế giới, lắng nghe tin nhắn `worldBoss` (`SOCIAL_MSG.worldBoss`), tự động bật né đòn `--evade` trước các kỹ năng diện rộng của trùm.
+- Khi trùm thế giới xuất hiện (`phase === "live"`): Cự ly tìm kiếm mục tiêu của bot mở rộng tới 3500 px, ưu tiên tối đa quái trùm thế giới (`penalty = -5000`), giúp 100 bot khắp bản đồ dồn tụ về chân trùm để giao chiến.
+- Báo cáo đo lường theo dõi đầy đủ: số tin `worldBoss`, số lần nhận bảng đóng góp, số bot đạt ngưỡng nhận thưởng (>= 1.5% HP tối đa của trùm), và số lượng `fx` trùm thi triển.
+
+### 39.4. Công cụ kiểm tra tính toàn vẹn `kiem-save` cho `Soul.social`
+- Mở rộng `server/scripts/audit-saves.ts` mục 11: Kiểm tra tính toàn vẹn dữ liệu xã hội `Soul.social` (`social.v === 1`, `pk.won/lost` hợp lệ trong trần, `counters` khóa hợp lệ theo `socialCounterMode` và không vượt trần `SOCIAL_COUNTER_CAP`, `ach` chuẩn định dạng ISO và không vượt 512 mục, `title` khớp `TITLE_ID_RE`).
+- Bổ sung bộ test và test đột biến có răng `server/scripts/audit-saves.test.ts` (109/109 tests PASS).
+
