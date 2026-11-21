@@ -20,9 +20,16 @@
  * bằng môi trường giả; `browserPacksEnv` ở cuối là bản thật.
  */
 
-import { isDungeonMap } from "@tien-gioi/shared";
+import {
+  PRIVATE_PACK_MANIFEST_URL,
+  isDungeonMap,
+  parsePrivatePackManifest,
+  privatePackUrl,
+} from "@tien-gioi/shared";
+import { PRIVATE_MAP_PACKS } from "./private-art";
 
-export type PackKind = "core" | "map" | "icons" | "audio" | "art" | "hd";
+/** `private`: gói tài nguyên RIÊNG (mục 63: cấm phân phối lại, chỉ máy chủ phục vụ ở `/assets-private/`); KHÔNG bao giờ do `/packs/manifest.json` khai báo (`sanitizeManifest` bỏ). */
+export type PackKind = "core" | "map" | "icons" | "audio" | "art" | "hd" | "private";
 export type PackResult = "loaded" | "cached" | "failed" | "skipped";
 export type PackState = "idle" | "loading" | "ready" | "failed";
 
@@ -40,6 +47,10 @@ export interface PackDef {
   files: PackFile[];
   /** Tổng `bytes` các tệp (tính lại khi làm sạch, không tin giá trị trong tệp) */
   bytes: number;
+  /** Chỉ gói `private`: tên / trang chính thức / giấy phép cho màn Ghi công (đã kiểm bởi `parsePrivatePackManifest`). */
+  title?: string;
+  url?: string;
+  license?: string;
 }
 
 export interface PackManifest {
@@ -60,6 +71,7 @@ export const MAP_WAIT_TTL_MS = 30_000;
 /** `hd:*` chỉ nạp khi bậc Rất cao đã ổn định chừng này (ms). */
 export const HD_STABLE_MS = 60_000;
 
+// KHÔNG có "private": gói riêng chỉ đến từ `/assets-private/manifest.json` (đi qua `parsePrivatePackManifest`), nên `/packs/manifest.json` không thể khai báo / ghi đè chúng
 const KINDS: ReadonlySet<string> = new Set(["core", "map", "icons", "audio", "art", "hd"]);
 const ID_RE = /^[a-z0-9_:.-]{1,64}$/i;
 const SHA_RE = /^[0-9a-f]{64}$/i;
@@ -69,6 +81,12 @@ const MAX_FILES = 512;
 export const mapPackId = (mapId: string): string => `map:${mapId}`;
 /** Gói ảnh minh hoạ AI tải theo nhu cầu (thẻ trùm `art:trum`, chân dung NPC `art:npc`; docs/art/PHONG_CACH_MINH_HOA.md mục 4). */
 export const artPackId = (name: string): string => `art:${name}`;
+/** Mã gói riêng trong bộ nạp: `private:<mã gói của manifest riêng>`. */
+export const PRIVATE_PACK_ID_PREFIX = "private:";
+export const privatePackDefId = (packId: string): string => `${PRIVATE_PACK_ID_PREFIX}${packId}`;
+export const isPrivatePackDefId = (id: string): boolean => id.startsWith(PRIVATE_PACK_ID_PREFIX);
+/** Hạn chờ manifest riêng (ms): quá hạn thì coi như KHÔNG có gói (client chạy bằng hình thay thế), không chặn gì. */
+export const PRIVATE_MANIFEST_TIMEOUT_MS = 3000;
 
 function cleanPath(p: unknown): string | null {
   if (typeof p !== "string" || p.length === 0 || p.length > 200) return null;
@@ -123,6 +141,13 @@ export function sanitizeManifest(raw: unknown): PackManifest {
 /** URL của một tệp gói: gắn băm (`?v=`) để bản mới tự thay và Service Worker không tải hai lần (thiết kế mục 10.2). */
 export function packFileUrl(f: PackFile): string {
   return `/packs/${f.path}?v=${f.sha256.slice(0, 12)}`;
+}
+
+/** URL của một tệp theo LOẠI gói: gói thường dưới `/packs/`, gói riêng dưới `/assets-private/<gói>/` (cùng `?v=` 12 hex đầu sha256). */
+export function defFileUrl(def: PackDef, f: PackFile): string {
+  return isPrivatePackDefId(def.id)
+    ? privatePackUrl(def.id.slice(PRIVATE_PACK_ID_PREFIX.length), f.path, f.sha256)
+    : packFileUrl(f);
 }
 
 /** Phần môi trường mà bộ nạp cần (tiêm vào để test không cần trình duyệt). */
@@ -198,10 +223,22 @@ interface Entry {
   progress: Set<(loaded: number, total: number) => void>;
 }
 
-export function createPacks(env: PacksEnv): PackController {
+/**
+ * `privateMapPacks`: bản đồ -> mã gói riêng (không kèm `private:`) mà bản đồ đó cần; vào bản đồ thì `startMapWait` / `takeMapWait` chờ cả các gói này (CÙNG hạn với gói bản đồ), nên nền / cây / nhà
+ * của gói riêng có sẵn lúc dựng cảnh (không nháy hình); về muộn thì `onReady` báo để dựng lại một lần. Mặc định `PRIVATE_MAP_PACKS` (rỗng cho tới khi chọn hình).
+ */
+export function createPacks(
+  env: PacksEnv,
+  privateMapPacks: Readonly<Record<string, readonly string[]>> = PRIVATE_MAP_PACKS,
+): PackController {
   let manifest: Promise<Map<string, Entry>> | null = null;
   // `state` / `release` cần đồng bộ: giữ bảng đã nạp để tra ngay (chưa nạp xong thì mọi gói là `idle`)
   let loadedMap: Map<string, Entry> | null = null;
+  // Gói RIÊNG ở bảng riêng (manifest riêng, tải LƯỜI khi có người xin gói `private:*`): manifest thường không bị chậm vì manifest riêng
+  let privateManifest: Promise<Map<string, Entry>> | null = null;
+  let privateMap: Map<string, Entry> | null = null;
+  const entryOf = (id: string): Entry | undefined =>
+    (isPrivatePackDefId(id) ? privateMap : loadedMap)?.get(id);
   const readyCbs = new Set<(id: string) => void>();
   const releaseCbs = new Set<(id: string) => void>();
   const prefetched = new Set<string>();
@@ -249,6 +286,56 @@ export function createPacks(env: PacksEnv): PackController {
     return manifest;
   };
 
+  /**
+   * Manifest RIÊNG (`/assets-private/manifest.json`, mục 63): 404 / lỗi mạng / quá `PRIVATE_MANIFEST_TIMEOUT_MS` / JSON sai / `index.html` / sai hợp đồng (`parsePrivatePackManifest`)
+   * đều là KHÔNG có gói, IM LẶNG (không cảnh báo: thiếu gói là trạng thái bình thường của CI và máy dev). Kết quả giữ cả phiên như manifest thường.
+   */
+  const loadPrivate = (): Promise<Map<string, Entry>> => {
+    privateManifest ??= (async () => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const text = await Promise.race([
+        Promise.resolve()
+          .then(() => env.fetchText(PRIVATE_PACK_MANIFEST_URL))
+          .catch(() => null),
+        new Promise<null>((r) => (timer = setTimeout(() => r(null), PRIVATE_MANIFEST_TIMEOUT_MS))),
+      ]);
+      if (timer !== undefined) clearTimeout(timer);
+      let parsed: unknown = null;
+      if (text !== null) {
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = null;
+        }
+      }
+      const m = parsePrivatePackManifest(parsed);
+      const map = new Map<string, Entry>();
+      for (const p of m?.packs ?? []) {
+        const id = privatePackDefId(p.id);
+        map.set(id, {
+          def: {
+            id,
+            kind: "private",
+            files: p.files.map((f) => ({ ...f })),
+            bytes: p.files.reduce((a, f) => a + f.bytes, 0),
+            title: p.title,
+            ...(p.url !== undefined ? { url: p.url } : {}),
+            ...(p.license !== undefined ? { license: p.license } : {}),
+          },
+          state: "idle",
+          attempts: 0,
+          promise: null,
+          abort: null,
+          loaded: 0,
+          progress: new Set(),
+        });
+      }
+      privateMap = map;
+      return map;
+    })();
+    return privateManifest;
+  };
+
   const fire = (set: Set<(id: string) => void>, id: string): void => {
     for (const cb of [...set]) {
       try {
@@ -274,7 +361,7 @@ export function createPacks(env: PacksEnv): PackController {
         let allCached = e.def.files.length > 0 && env.isCached !== undefined;
         if (allCached) {
           for (const f of e.def.files) {
-            if (!(await env.isCached!(packFileUrl(f)))) {
+            if (!(await env.isCached!(defFileUrl(e.def, f)))) {
               allCached = false;
               break;
             }
@@ -282,7 +369,7 @@ export function createPacks(env: PacksEnv): PackController {
         }
         if (!allCached) {
           for (const f of e.def.files) {
-            const got = await env.fetchBytes(packFileUrl(f), {
+            const got = await env.fetchBytes(defFileUrl(e.def, f), {
               signal: ctl.signal,
               lowPriority,
             });
@@ -325,8 +412,10 @@ export function createPacks(env: PacksEnv): PackController {
     try {
       const isHd = id.startsWith("hd:");
       if (isHd && (env.native() || !env.hdAllowed())) return "skipped";
+      const isPrivate = isPrivatePackDefId(id);
+      if (isPrivate && env.native()) return "skipped"; // gói riêng KHÔNG nằm trong APK (cấm phân phối lại): bản native dùng hình thay thế
       if (env.native()) return "cached"; // đã đóng sẵn trong APK
-      const m = await loadManifest();
+      const m = isPrivate ? await loadPrivate() : await loadManifest();
       if (m.size === 0) return "skipped"; // chưa có tài sản nào: không có gì để tải
       const e = m.get(id);
       if (!e) {
@@ -367,7 +456,7 @@ export function createPacks(env: PacksEnv): PackController {
 
   const release = (id: string): void => {
     prefetched.delete(id); // giải phóng rồi thì lần lại gần sau được tải trước lại
-    const e = loadedMap?.get(id);
+    const e = entryOf(id);
     if (!e || e.state === "idle") return;
     e.abort?.abort();
     e.abort = null;
@@ -388,12 +477,19 @@ export function createPacks(env: PacksEnv): PackController {
     env.idle(() => void ensure(id, { lowPriority: true }));
   };
 
-  const waitFor = (mapId: string): Promise<PackResult> =>
-    ensure(mapPackId(mapId), { timeoutMs: mapPackTimeoutMs(isDungeonMap(mapId)) });
+  const waitFor = (mapId: string): Promise<PackResult> => {
+    const timeoutMs = mapPackTimeoutMs(isDungeonMap(mapId));
+    const own = Object.prototype.hasOwnProperty.call(privateMapPacks, mapId)
+      ? privateMapPacks[mapId]!
+      : [];
+    // gói riêng của bản đồ chờ CÙNG hạn nhưng KHÔNG đổi kết quả trả về (chỉ kết quả gói bản đồ): thiếu / lỗi gói riêng thì từng khoá lùi về hình thay thế, về muộn thì `onReady` dựng lại
+    const privates = own.map((p) => ensure(privatePackDefId(p), { timeoutMs }));
+    return Promise.all([ensure(mapPackId(mapId), { timeoutMs }), ...privates]).then(([r]) => r!);
+  };
 
   return {
     ensure,
-    state: (id) => loadedMap?.get(id)?.state ?? "idle",
+    state: (id) => entryOf(id)?.state ?? "idle",
     onReady(cb) {
       readyCbs.add(cb);
       return () => readyCbs.delete(cb);
@@ -404,13 +500,14 @@ export function createPacks(env: PacksEnv): PackController {
     },
     release,
     releaseKind(kind) {
-      if (!loadedMap) return;
-      for (const e of loadedMap.values()) if (e.def.kind === kind) release(e.def.id);
+      for (const m of [loadedMap, privateMap])
+        if (m) for (const e of m.values()) if (e.def.kind === kind) release(e.def.id);
     },
     prefetch,
     fileUrl(id, path) {
-      const f = loadedMap?.get(id)?.def.files.find((x) => x.path === path);
-      if (f) return packFileUrl(f);
+      const def = entryOf(id)?.def;
+      const f = def?.files.find((x) => x.path === path);
+      if (def && f) return defFileUrl(def, f);
       // Bản native trả `cached` mà KHÔNG nạp manifest (mọi gói đã đóng sẵn trong APK): URL không băm vẫn đúng tệp trong `dist/packs/`
       return env.native() && cleanPath(path) !== null ? `/packs/${path}` : null;
     },
