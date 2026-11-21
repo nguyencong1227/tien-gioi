@@ -453,6 +453,8 @@ describe("spawnZone (S5): vùng sinh quái theo dữ liệu", () => {
       ["shape lạ", { shape: "tron" as never }, /shape phải là/],
       ["khung hẹp hơn một ô", { w: TILE - 1 }, /ít nhất một ô/],
       ["đè viền núi (x = 0)", { x: 0 }, /không nằm gọn/],
+      ["đè viền núi (y = 0)", { y: 0 }, /không nằm gọn/],
+      ["tràn mép phải", { x: 14 * TILE, w: 2 * TILE }, /không nằm gọn/],
       ["tràn mép dưới", { y: 14 * TILE, h: 2 * TILE }, /không nằm gọn/],
       ["x = NaN", { x: NaN }, /số hữu hạn/],
       ["w = Infinity", { w: Infinity }, /số hữu hạn/],
