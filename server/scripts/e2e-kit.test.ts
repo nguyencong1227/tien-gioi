@@ -205,6 +205,22 @@ describe("e2e-kit: listenWithRetry", () => {
     }
   });
 
+  it("lỗi KHÁC EADDRINUSE (địa chỉ không phải của máy: EADDRNOTAVAIL) thì reject ngay, KHÔNG xin cổng mới", async () => {
+    let picks = 0;
+    const server = net.createServer();
+    await expect(
+      listenWithRetry(server, 38123, {
+        explicit: false,
+        host: "203.0.113.1", // TEST-NET-3: không phải địa chỉ của máy nào -> EADDRNOTAVAIL
+        pick: () => {
+          picks++;
+          return 0;
+        },
+      }),
+    ).rejects.toMatchObject({ code: "EADDRNOTAVAIL" });
+    expect(picks).toBe(0); // lỗi này không phải do cổng bận: thử cổng khác chỉ che lỗi thật
+  });
+
   it("hết số lần thử: reject (không lặp vô hạn)", async () => {
     const busy = await occupyPort();
     const server = http.createServer();
