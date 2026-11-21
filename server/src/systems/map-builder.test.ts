@@ -14,7 +14,7 @@ import {
   GID_TREE_TRUNK,
 } from "./map-builder";
 import { checkTiledMapComplete } from "./map-visual-checks";
-import { formatTiledJson, mapDefFromTiled, T, type TiledMap } from "@tien-gioi/shared";
+import { formatTiledJson, mapDefFromTiled, T, TILE, type TiledMap } from "@tien-gioi/shared";
 
 const mapsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../shared/maps");
 
@@ -90,7 +90,7 @@ describe("map-builder", () => {
   it("tất định (idempotent): chạy hai lần trên bản đồ thật cho cùng kết quả byte 100%", () => {
     const raw = readFileSync(path.join(mapsDir, "lac_ha.logic.json"), "utf8");
     const mapObj: TiledMap = JSON.parse(raw);
-    const def = mapDefFromTiled(mapObj, 32);
+    const def = mapDefFromTiled(mapObj, TILE);
 
     const full1 = buildFullTiledMap(mapObj, def.tiles!);
     const text1 = formatTiledJson(full1);
@@ -118,11 +118,11 @@ describe("map-builder", () => {
   it("bảo toàn lớp logic và objects (mở / lưu giả lập không đổi logic)", () => {
     const raw = readFileSync(path.join(mapsDir, "lac_ha.logic.json"), "utf8");
     const mapObj: TiledMap = JSON.parse(raw);
-    const origDef = mapDefFromTiled(mapObj, 32);
+    const origDef = mapDefFromTiled(mapObj, TILE);
 
     const fullMap = buildFullTiledMap(mapObj, origDef.tiles!);
     const logicMap = buildLogicRuntimeMap(fullMap);
-    const newDef = mapDefFromTiled(logicMap, 32);
+    const newDef = mapDefFromTiled(logicMap, TILE);
 
     // Ô logic khớp từng byte
     expect(Buffer.from(origDef.tiles!).equals(Buffer.from(newDef.tiles!))).toBe(true);

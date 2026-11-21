@@ -10,7 +10,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import zlib from "node:zlib";
-import { GameMap, mapDefFromTiled, type TiledMap } from "@tien-gioi/shared";
+import { GameMap, TILE, mapDefFromTiled, type TiledMap } from "@tien-gioi/shared";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const mapsDir = path.resolve(here, "../../shared/maps");
@@ -118,7 +118,7 @@ if (!existsSync(jsonPath)) {
 
 const rawText = readFileSync(jsonPath, "utf8");
 const mapObj: TiledMap = JSON.parse(rawText);
-const mapDef = mapDefFromTiled(mapObj, 32);
+const mapDef = mapDefFromTiled(mapObj, TILE);
 const gameMap = new GameMap(mapDef);
 
 const w = mapDef.w;

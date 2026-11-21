@@ -98,6 +98,14 @@ for (const id of baseIds) {
       console.error(`✗ Lệch lớp logic giữa tệp soạn ${fullFile} và bản chạy ${logicFile}!`);
       totalErrors++;
     }
+    // So sánh MỌI dữ liệu game ngoài ô (trấn, cổng, hang, vùng sinh, monsterCap, tên, hạt giống...): sửa đối tượng ở tệp soạn mà quên `map:build` thì máy chủ (đọc bản chạy) chạy dữ liệu cũ
+    const sansTiles = (d: MapDef) => JSON.stringify({ ...d, tiles: undefined });
+    if (sansTiles(full.mapDef) !== sansTiles(logic.mapDef)) {
+      console.error(
+        `✗ Lệch đối tượng / thuộc tính giữa tệp soạn ${fullFile} và bản chạy ${logicFile} (trấn, cổng, hang, vùng sinh, monsterCap...): chạy npm run map:build -w server -- ${id}`,
+      );
+      totalErrors++;
+    }
     // So sánh kích thước
     if (full.mapDef.w !== logic.mapDef.w || full.mapDef.h !== logic.mapDef.h) {
       console.error(

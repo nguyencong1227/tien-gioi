@@ -1,7 +1,7 @@
 // Công cụ sinh lớp hình bo góc Wang blob 47 ô cho bản đồ Tiled (docs/THIET_KE_BAN_DO_TILED.md lát cắt S4, Issue #1207).
 // Xuất:
 //   1. shared/maps/<id>.json: tệp soạn đủ lớp (logic, ground, decor, over, objects, tilesets)
-//   2. shared/maps/<id>.logic.json: bản chạy logic cho server & getMap (thêm generated: true)
+//   2. shared/maps/<id>.logic.json: bản chạy logic cho server & getMap
 //   3. client/public/packs/map-<id>/visual.json: bản chạy hình cho gói tải theo nhu cầu của client
 //
 // Chạy:
@@ -14,6 +14,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import {
+  TILE,
   formatTiledJson,
   mapDefFromTiled,
   PROCEDURAL_MAPS,
@@ -55,7 +56,7 @@ for (const id of mapIds) {
 
   const rawText = readFileSync(srcPath, "utf8");
   const baseMap: TiledMap = JSON.parse(rawText);
-  const def = mapDefFromTiled(baseMap, 32);
+  const def = mapDefFromTiled(baseMap, TILE);
 
   // Sinh 3 tệp
   const fullMap = buildFullTiledMap(baseMap, def.tiles!);

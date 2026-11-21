@@ -3,6 +3,7 @@
 
 import {
   GameMap,
+  TILE,
   mapDefFromTiled,
   tiledViolations,
   type MapDef,
@@ -190,7 +191,7 @@ export function checkTiledMapComplete(
   let mapDef: MapDef | undefined;
   if (baseErrs.length === 0 && options.checkReachability !== false) {
     try {
-      mapDef = mapDefFromTiled(json, 32);
+      mapDef = mapDefFromTiled(json, TILE);
       const gameMap = new GameMap(mapDef);
       const reachErrs = reachabilityViolations(gameMap);
       errs.push(...reachErrs);

@@ -11,7 +11,7 @@ import {
   type TiledProperty,
   type TiledTileset,
 } from "@tien-gioi/shared";
-import { neighborMaskClamped, resolveAutotile, toTileGid } from "../../../shared/src/autotile";
+import { neighborMaskClamped, resolveAutotile, toTileGid } from "@tien-gioi/shared/src/autotile";
 
 /** GID cơ sở cho tileset nhúng 'world' */
 export const TILES_WORLD_FIRSTGID = 10;
@@ -236,7 +236,7 @@ export function buildFullTiledMap(baseMap: TiledMap, tiles: Uint8Array): TiledMa
 
 /**
  * Tạo tệp bản chạy logic `shared/maps/<id>.logic.json`:
- * Chỉ gồm lớp `logic` + `objects`, thêm thuộc tính `"generated": true`.
+ * Chỉ gồm lớp `logic` + `objects`, giữ nguyên các thuộc tính cần thiết cho server runtime.
  */
 export function buildLogicRuntimeMap(fullMap: TiledMap): TiledMap {
   const logicLayer = fullMap.layers.find((l) => l.name === "logic");
