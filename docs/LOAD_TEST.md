@@ -2156,7 +2156,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 - **Tệp mẫu nhật ký:** `server/soak-ambush.json` (tệp cục bộ trên máy dev, không commit repo theo `.gitignore`).
 - **Thời lượng:** 10.0 phút (600 giây, 60 mẫu lấy mỗi 10 giây).
 - **Số bot:** 100 khởi tạo -> 100 kết thúc (tỉ lệ rớt: 0%).
-- **Cấu hình bot:** `--ambush` mặc định gieo 50% bot mang 0 đan và 50% bot mang 5 đan, ưu tiên chọn "Chiến" 75% để thử tải đấu trường solo (có cả thắng và thua thay vì chỉ người chơi bình thường).
+- **Cấu hình bot:** `--ambush` mặc định gieo 50% bot mang 0 đan (`i % 2 === 0 ? 0 : 5`) và 50% bot mang 5 đan, ưu tiên chọn "Chiến" 75% để tập trung thử tải đấu trường solo (đây là lý do duy nhất có trận "Thua" khi bot cạn máu không có đan hồi phục; các nhánh bỏ chạy chọn 0 lần nên không được lượt chính thức này phủ, nhánh bỏ chạy đã được phủ ở lượt trước của mục 40).
 
 | Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Ngân sách | Đánh giá |
 |---|---|---:|---:|:---:|
@@ -2166,7 +2166,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | **Chặn đường** | Số lần bot bị chặn đường | **8 lần** | > 0 | **ĐẠT** |
 | | Lựa chọn hộp thoại | Chiến: 8 \| Bỏ chạy: 0 | Phân nhánh tự động | **ĐẠT** |
 | | Thoát giữa trận (vận 1s) | 0 lần | - | **ĐẠT** |
-| | **Kết quả trận đấu** | **Thắng: 7, Thua: 1, Chạy thoát: 0, Hết giờ: 0**, Rớt: 0, Huỷ: 0 | won + lost > 0, timeout = 0 | **ĐẠT** |
+| | **Kết quả trận đấu** | **Thắng: 7, Thua: 1, Chạy thoát: 0, Hết giờ: 0**, Rớt: 0, Huỷ: 0 | mục tiêu quan sát: won + lost > 0, timeout = 0 *(soak-analysis chỉ tự động canh trần phòng, rò phòng, offersTotal)* | **Quan sát đạt** |
 | **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 177.79 MB | - | - |
 | | VmRSS sau warmup (5.0m) | 223.69 MB | - | - |
 | | VmRSS kết thúc | 224.07 MB | - | - |
@@ -2188,7 +2188,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 
 ### 40.4. Nhận xét & Giới hạn
 - Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục (CD10b mục 2) chứng minh:
-  - **Bot soak hạ kẻ địch thành công, có cả thắng và thua:** Đạt **7 trận Thắng**, **1 trận Thua** (chết thật qua limbo và hồi sinh về Lạc Hà), **0 trận Hết giờ** (`timeout = 0`). Điều này giải quyết triệt để lỗi bot đứng im dẫn tới 4/4 trận hết giờ ở PR #1279.
+  - **Bot soak hạ kẻ địch thành công, có cả thắng và thua:** Đạt **7 trận Thắng**, **1 trận Thua** (chết thật qua limbo và hồi sinh về Lạc Hà), **0 trận Hết giờ** (`timeout = 0`). Bot trong đấu trường chủ động tiếp cận, tấn công kẻ địch bằng đòn đánh cơ bản và tự sử dụng Hồi Huyết Đan khi HP < 60% (`useItem {slot}`, hồi 1,5s). Điều này giải quyết triệt để lỗi bot đứng im dẫn tới 4/4 trận hết giờ ở PR #1279.
   - **Không rò rỉ phòng đấu trường:** Đúng 8 lượt vào `arena_lac_ha` và 8 lượt về `lac_ha`; số phòng đấu trường solo về đúng 0 khi dừng bot (`finalActiveArenaRooms === 0`).
   - **Không rò rỉ bộ nhớ:** VmRSS tăng sau warmup chỉ +0.38 MB (xa dưới trần 50 MB); dốc VmRSS OLS nửa sau `+0.068 MB/phút` (rất thấp so với ngưỡng <= 1.0 MB/phút).
   - **Hiệu năng nhịp tick:** Tick p95 trung bình 4.46 ms (max 5.99 ms <= 10.0 ms), 0 overruns. *(Lưu ý kỹ thuật theo review của Dev A và Dev B: Tick p95 được theo dõi riêng trên từng phòng Colyseus qua WorldState, bắt được trường hợp một phòng bị chậm, không phải là độ trễ vòng lặp sự kiện của cả tiến trình khi 20 phòng cùng chạy).*
@@ -2222,6 +2222,9 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
 | | Bảo toàn Linh thạch | Ban đầu 10000 + Thả ra 0 - Tiêu 6200 = Trần 10000 \| Thực tế: Ví 3800 + Kho 0 = 3800 (Lệch ví: 0) *(lưu ý: ~49 lần chết ngoài hoang dã)* | ĐẠT | **ĐẠT** |
 
-- **Kết luận:** Trong lượt chạy 5 phút với 100 bot đi hoang, ghi nhận mẫu n = 1 hộp thoại chặn đường (thuộc về nhóm 5 đan, nhóm 1 đan nhận 0 hộp thoại). Mẫu thực tế này nhất quán và không mâu thuẫn với cơ chế chặn người ít đan của `AMBUSH_MIN_POTIONS=2`. Bằng chứng quyết định tính đúng đắn tuyệt đối của cổng logic này đã được bảo vệ độc lập bởi các bộ unit test tất định (`WorldRoom.ambush-potions.test.ts` và `server/src/systems/ambush.test.ts`).
+- **Kết luận & Phân tích đối chứng:**
+  - Trong lượt chạy 5 phút của Dev C với 100 bot đi hoang, ghi nhận mẫu thực tế $n = 1$ hộp thoại chặn đường (thuộc về nhóm 5 đan, nhóm 1 đan nhận 0 hộp thoại).
+  - **Đối chứng độc lập (Dev B thực hiện trên đầu `7e304a17`, 100 bot, 10 phút, `AMBUSH_MIN_POTIONS=0 AMBUSH_SPLIT_POTIONS=1`):** Khi không bật bộ lọc đan (`AMBUSH_MIN_POTIONS=0`), nhóm 1 đan nhận **4** hộp thoại và nhóm 5 đan nhận **5** hộp thoại (tái hiện độc lập nhánh bot hạ kẻ địch với 9 thắng / 0 thua / 0 hết giờ).
+  - So sánh với số đo đối chứng trên (~4 hộp thoại / 10 phút cho 50 bot 1 đan khi không lọc, kỳ vọng $\lambda \approx 2$ hộp thoại trong 5 phút), xác suất ngẫu nhiên quan sát được 0 hộp thoại ngay cả khi bộ lọc bị hỏng là $P(\text{Poisson}(0; \lambda=2)) = e^{-2} \approx 13,5\%$. Do đó, mẫu $n = 1$ ở lượt chạy 5 phút là quan sát thực tế nhất quán và không mâu thuẫn với cơ chế chặn người ít đan, nhưng không phải là bằng chứng khẳng định độc lập. Bằng chứng quyết định tính đúng đắn của cổng logic này nằm ở các bộ unit test tất định (`WorldRoom.ambush-potions.test.ts` và `server/src/systems/ambush.test.ts`).
 
 

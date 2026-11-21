@@ -889,6 +889,8 @@ export async function main(): Promise<number> {
       }, armDelay);
     });
 
+    let midFleeTimer: NodeJS.Timeout | undefined;
+
     room.onMessage(AMBUSH_MSG.state, (msg: AmbushStateMsg) => {
       b.ambushState = msg;
       // Trong đấu trường: quyết định 1 lần duy nhất mỗi trận (khoảng 15% xác suất trận này sẽ bỏ chạy giữa trận, còn lại đánh tới cùng)
@@ -907,7 +909,7 @@ export async function main(): Promise<number> {
           b.ambushMidFleeCount++;
           room.send(AMBUSH_MSG.flee, { choice: fleeChoice } satisfies AmbushFleeMsg);
           // Hẹn giờ dự phòng: nếu sau 3s chưa nhận ambushEnd (bị quái đánh hoặc lỗi), reset để chiến tiếp
-          setTimeout(() => {
+          midFleeTimer = setTimeout(() => {
             if (b.ambushState && b.ambushFleeing) {
               b.ambushFleeing = false;
             }
@@ -919,6 +921,10 @@ export async function main(): Promise<number> {
     });
 
     room.onMessage(AMBUSH_MSG.end, (msg: AmbushEndMsg) => {
+      if (midFleeTimer) {
+        clearTimeout(midFleeTimer);
+        midFleeTimer = undefined;
+      }
       b.ambushState = undefined;
       b.ambushFleeing = false;
       b.ambushMidFleeDecided = false;
@@ -2063,15 +2069,29 @@ export async function main(): Promise<number> {
     );
   }
   if (process.env.AMBUSH_SPLIT_POTIONS === "1") {
+    const minPotions = parseInt(process.env.AMBUSH_MIN_POTIONS || "0", 10);
     const pot1Bots = bots.filter((b) => b.index % 2 === 0);
     const pot5Bots = bots.filter((b) => b.index % 2 !== 0);
     const pot1Offers = pot1Bots.reduce((s, b) => s + b.ambushOffersCount, 0);
     const pot5Offers = pot5Bots.reduce((s, b) => s + b.ambushOffersCount, 0);
-    console.log(
-      `- Khẳng định AMBUSH_MIN_POTIONS=2: Bot mang 1 đan (chẵn, 50 bot) nhận ${pot1Offers} hộp thoại (${
-        pot1Offers === 0 ? "ĐẠT - KHÔNG BAO GIỜ NHẬN" : "FAIL"
-      }) | Bot mang 5 đan (lẻ, 50 bot) nhận ${pot5Offers} hộp thoại`,
-    );
+    if (minPotions >= 2) {
+      const pass = pot1Offers === 0;
+      console.log(
+        `- Khẳng định AMBUSH_MIN_POTIONS=${minPotions}: Bot mang 1 đan (chẵn, 50 bot) nhận ${pot1Offers} hộp thoại (${
+          pass ? "ĐẠT - KHÔNG BAO GIỜ NHẬN" : "FAIL - CÓ HỘP THOẠI"
+        }) | Bot mang 5 đan (lẻ, 50 bot) nhận ${pot5Offers} hộp thoại`,
+      );
+      if (!pass) {
+        analysis.pass = false;
+        analysis.reasons.push(
+          `Cơ chế AMBUSH_MIN_POTIONS=${minPotions}: bot mang 1 đan nhận ${pot1Offers} hộp thoại (yêu cầu: 0)`,
+        );
+      }
+    } else {
+      console.log(
+        `- Đối chứng AMBUSH_MIN_POTIONS=${minPotions} (< 2): Bot mang 1 đan (chẵn, 50 bot) nhận ${pot1Offers} hộp thoại | Bot mang 5 đan (lẻ, 50 bot) nhận ${pot5Offers} hộp thoại (số đo đối chứng khi không lọc)`,
+      );
+    }
   }
   const mapVisitsObj = Object.fromEntries(mapVisits);
   console.log(
