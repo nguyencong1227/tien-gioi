@@ -33,15 +33,27 @@ function burnCpu(ms: number): void {
 
 describe("measureSyncStepMs", () => {
   it.skipIf(!hasThreadCpu)(
-    "KHÔNG cộng CPU của luồng khác trong cùng tiến trình: luồng bị chặn 250 ms tường với một worker đang quay vẫn đo ~0, không hàng chục ms",
+    "KHÔNG cộng CPU của luồng khác trong cùng tiến trình: luồng bị chặn (ngủ trong nhân) cạnh một worker đang quay vẫn đo ~0",
     async () => {
       const busy = new Worker("for(;;){}", { eval: true }); // như một tệp test khác đang chạy song song
       try {
         await new Promise((r) => setTimeout(r, 300)); // cho luồng bận chạy hẳn
-        // Cửa sổ 250 ms (không phải 40): máy quá tải làm luồng bận chỉ nhận một phần CPU, cửa sổ dài thì vẫn tích đủ hàng chục ms CPU cho
-        // `process.cpuUsage()` cũ đo ra "hàng chục ms" và phép thử bắt được nó. Phía ĐÚNG (CPU của luồng này, đang ngủ trong nhân) luôn ~0
-        // nên KHÔNG BAO GIỜ đỏ giả dù máy tải đến đâu (tải quá cao chỉ làm phép thử mất khả năng phân biệt bản cũ, không làm nó đỏ).
-        const ms = measureSyncStepMs(() => blockWithoutCpu(250));
+        // Chặn luồng này (ngủ trong nhân, ~0 CPU) cho tới khi CPU CẢ TIẾN TRÌNH đã tăng >= 30 ms (tức luồng bận kia THẬT SỰ đã chạy), tối đa 5 giây.
+        // Cố định 40 ms tường thì khi máy quá tải luồng bận bị bỏ đói và tiền đề không đạt (A đo: 12/12 lần đỏ dưới 40 tiến trình bận trên 20 nhân, review #1232);
+        // cửa sổ cố định dài hơn thì chỉ giảm chứ không bảo đảm. Cách này ĐẢM BẢO tiền đề và bản `process.cpuUsage()` cũ luôn đo ra >= 30.
+        let procCpuMs = 0;
+        const ms = measureSyncStepMs(() => {
+          const before = process.cpuUsage();
+          const giveUp = performance.now() + 5000;
+          do {
+            blockWithoutCpu(10);
+            const proc = process.cpuUsage(before);
+            procCpuMs = (proc.user + proc.system) / 1000;
+          } while (procCpuMs < 30 && performance.now() < giveUp);
+        });
+        // điều kiện của phép thử: CPU CẢ TIẾN TRÌNH thật sự bị luồng bận đội lên (nếu không thì phép thử không chứng minh gì)
+        expect(procCpuMs).toBeGreaterThanOrEqual(30);
+        // `process.cpuUsage()` cũ sẽ ra >= 30 (cộng luồng bận); CPU luồng thì ~0
         expect(ms).toBeLessThan(10);
       } finally {
         await busy.terminate();
