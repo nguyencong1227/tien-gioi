@@ -44,6 +44,34 @@ describe("dữ liệu chặn đường: khung", () => {
   });
 });
 
+describe("dữ liệu chặn đường THẬT: bầy kẻ chặn đường (CD5b #1065)", () => {
+  it("24 bầy; độ phủ chỉ còn thiếu cảnh + bầy CẦM ĐẦU của Lạc Hà (E / D bổ sung cả hai rồi sửa dòng này)", () => {
+    expect(AMBUSH_FOES.length).toBe(24);
+    expect(ambushCoverageViolations()).toEqual([
+      "lac_ha / leader: thiếu cảnh",
+      "lac_ha / leader: thiếu bầy",
+    ]);
+  });
+
+  it("khoảng bậc HẸP (<= 5 bậc): `payRewards` chưa giảm tu vi theo chênh bậc nên người bậc cao hơn nhiều vẫn nhận đủ", () => {
+    for (const g of AMBUSH_FOES) expect(g.maxStep - g.minStep, g.id).toBeLessThanOrEqual(5);
+  });
+
+  it("kẻ cầm đầu là Xích Mãng đúng 1 con (trùm duy nhất thắng >= 60% một mình ở bậc >= 11); mọi bầy tinh anh / thường KHÔNG có trùm", () => {
+    for (const g of AMBUSH_FOES.filter((x) => x.tier === "leader")) {
+      expect(g.foes, g.id).toEqual([{ kind: "mang", count: 1 }]);
+      expect(g.minStep, g.id).toBeGreaterThanOrEqual(11);
+    }
+    for (const g of AMBUSH_FOES.filter((x) => x.tier !== "leader"))
+      for (const f of g.foes) expect(MONSTER_BY_ID[f.kind]!.boss ?? false, g.id).toBe(false);
+  });
+
+  it("tinh anh Kim Đan / Nguyên Anh dùng loài CẤP THẤP (<= cấp 7): loài cùng cấp tinh anh không đạt 80% ở bậc nào (đo ở thiết kế mục 9)", () => {
+    for (const g of AMBUSH_FOES.filter((x) => x.tier === "elite" && x.minStep >= 13))
+      for (const f of g.foes) expect(MONSTER_BY_ID[f.kind]!.level, g.id).toBeLessThanOrEqual(7);
+  });
+});
+
 describe("ambushFillScene", () => {
   it("điền cả hai biến (mọi lần xuất hiện); biến lạ giữ nguyên chữ", () => {
     const vars = { dia_danh: "Vân Mộng Sơn", ke_dich: "Sói Hoang" };
@@ -76,6 +104,21 @@ describe("ambushViolations: cảnh", () => {
       /không được phép/,
     ],
     ["ngoặc thừa", { text: "Đường vắng hẳn, {ke_dich} lao ra chặn lối } giữa đường." }, /ngoặc/],
+    [
+      "viết như đang ngồi: 'chỗ ngươi ngồi'",
+      { text: "Con thủy quái đang bò lên bờ, thẳng về chỗ ngươi ngồi, mùi bùn tanh nồng nặc." },
+      /NGỒI/,
+    ],
+    [
+      "viết như vừa thiền: 'ngươi mở mắt'",
+      { text: "Ngươi mở mắt trên Hàn Vân Lĩnh thì quanh người đã kín mắt xanh mắt đỏ rồi." },
+      /NGỒI/,
+    ],
+    [
+      "viết như đang ngồi: 'quanh chỗ ngồi'",
+      { text: "Bầy yêu nhỏ đã vây kín quanh chỗ ngồi của ngươi từ lúc nào chẳng hay biết." },
+      /NGỒI/,
+    ],
     ["mapIds rỗng", { mapIds: [] }, /mapIds rỗng/],
     ["bản đồ lạ", { mapIds: ["khong_co"] }, /không có/],
     ["bản đồ đấu trường không hợp", { mapIds: ["arena_lac_ha"] }, /không có/],
@@ -89,6 +132,15 @@ describe("ambushViolations: cảnh", () => {
       expect(v.length, name).toBeGreaterThan(0);
       expect(v.join("\n")).toMatch(re);
     });
+  it("KHÔNG bắt kẻ địch 'ngồi' / 'mở mắt' (ngôi thứ ba) và người chơi 'dừng chân' / 'ghé vào' (đúng lối đi bộ)", () => {
+    for (const text of [
+      "Con đại xà đen cuộn trong hang mở mắt, đuôi quật nước tanh vào mặt ngươi giữa đường.",
+      'Tên sơn tặc ngồi trên tảng đá chặn đầu, rìu gác vai: "Mãi lộ năm mươi linh thạch."',
+      "Cái hang ngươi ghé vào trú chân khô ráo, kín gió, sâu trong có ổ xương của ai đó.",
+      "Ngươi dừng chân giữa Hàn Vân Lĩnh thì quanh người đã kín mắt xanh mắt đỏ rồi.",
+    ])
+      expect(ambushViolations([scene({ text })], []), text).toEqual([]);
+  });
   it("bắt id trùng", () => {
     expect(ambushViolations([scene(), scene()], []).join("\n")).toMatch(/trùng id/);
   });

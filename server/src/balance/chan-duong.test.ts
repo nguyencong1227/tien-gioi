@@ -184,11 +184,14 @@ describe("bất biến cân bằng", () => {
     expect(bad.some((v) => v.includes("mau_de"))).toBe(false);
   });
 
-  it("thưởng tu vi không hơn giá bỏ chạy thì bị bắt (đảm bảo 'thắng luôn hơn bỏ chạy')", () => {
-    const cheat: GroupSummary = { ...easy, winExp: easy.fleeExp };
-    expect(ambushBalanceViolations([cheat]).some((v) => v.includes("giá bỏ chạy"))).toBe(true);
-    const ok: GroupSummary = { ...easy, winExp: easy.fleeExp + 1 };
-    expect(ambushBalanceViolations([ok])).toEqual([]);
+  it("thưởng tu vi không hơn giá bỏ chạy là CẢNH BÁO (bỏ chạy đắt hơn cả thưởng), KHÔNG phải vi phạm: thắng +R luôn hơn bỏ chạy -P", () => {
+    const dear: GroupSummary = { ...easy, winExp: easy.fleeExp, realSeconds: 45 };
+    expect(ambushBalanceViolations([dear])).toEqual([]);
+    expect(ambushBalanceWarnings([dear]).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
+    const cheap: GroupSummary = { ...easy, winExp: easy.fleeExp + 1, realSeconds: 45 };
+    expect(ambushBalanceWarnings([cheap])).toEqual([]);
+    const none: GroupSummary = { ...easy, winExp: 0, realSeconds: 45 }; // chưa có thưởng thắng nào đo được: không cảnh báo giá
+    expect(ambushBalanceWarnings([none])).toEqual([]);
   });
 
   it("thời gian trận ngoài khung chỉ là CẢNH BÁO, không phải vi phạm", () => {
