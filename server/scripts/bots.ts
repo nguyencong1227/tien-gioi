@@ -1809,8 +1809,8 @@ function bindRoomEvents(
       b.fxCount++;
       if (
         b.worldBoss &&
-        (b.worldBossState?.phase === "live" ||
-          msg?.kind === "warn" ||
+        (msg?.kind === "warn" ||
+          msg?.kind === "bossCast" ||
           msg?.kind === "bossPhase" ||
           msg?.kind === "bossEnrage" ||
           msg?.kind === "bossArmor" ||

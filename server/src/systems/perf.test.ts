@@ -1368,7 +1368,6 @@ describe("trùm thế giới theo giờ đông người (M9.14 #1033)", () => {
 
     const avgPatchBytes = bytesPerTick.reduce((a, b) => a + b, 0) / bytesPerTick.length;
     expect(avgPatchBytes).toBeLessThan(600); // Ngân sách patch < 600 byte/tick mỗi client
-    expect(avgPatchBytes).toBeLessThan(600); // Ngân sách patch < 600 byte/tick mỗi client
 
     // fx bị chặn theo số người (slash + boss cast / telegraph / warning), không bùng nổ theo số tick
     expect(maxFxPerTick).toBeLessThanOrEqual(100 * 4);
