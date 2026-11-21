@@ -20,8 +20,11 @@ import { bestOption, expectedTotalCoin } from "./simulate";
 export const ASSUME_WORLD_BOSS = {
   /** Đội nhỏ dùng đo DPS mỗi người (trận ở máu gốc phải hạ được với 0 chết). */
   perPlayerParty: 5,
-  /** Số hạt giống đo DPS và chạy mô hình "không né". */
+  /** Số hạt giống chạy mô hình "không né". */
   runs: 4,
+  /** Số trận ĐẠT (thắng, 0 chết) dùng đo DPS mỗi người, và số hạt giống thử tối đa để gom đủ. */
+  dpsRuns: 8,
+  dpsMaxSeeds: 64,
   /** Cỡ đội đo (theo issue #1029: 5 / 20 / 50 người). */
   parties: [5, 20, 50] as readonly number[],
   /** Mục tiêu: số người tối thiểu hạ được trùm trong thời lượng (né hoàn hảo) nằm trong khoảng này. */
@@ -54,7 +57,11 @@ export interface WorldBossRow {
   noDodge: Record<number, { winRate: number; minutes: number | null; deaths: number }>;
 }
 
-/** DPS thật mỗi người từ trận đội nhỏ ở máu gốc (hạt giống 1..runs, chỉ tính trận thắng với 0 chết). */
+/**
+ * DPS thật mỗi người từ trận đội nhỏ ở máu gốc: lấy `dpsRuns` trận ĐẠT (thắng với 0 chết) theo hạt giống tăng dần 1..`dpsMaxSeeds` (trận có người chết bị bỏ: chết làm DPS đội thấp giả).
+ * Chọn theo "đủ số trận đạt" thay vì "4 hạt giống đầu": Thiên Hàn Vương chỉ ~13 / 24 hạt giống đạt nên 4 hạt giống đầu có thể chỉ còn 1-2 trận (B nhắc ở review #1238); độ lệch chuẩn
+ * giữa các trận đạt ~1%. `null` nếu không đủ `dpsRuns` trận đạt trong `dpsMaxSeeds` hạt giống (đội nhỏ không hạ ổn định trùm gốc: không có cơ sở đo).
+ */
 export function perPlayerDps(boss: string): number | null {
   const def = BOSSES.find((b) => b.kind === boss);
   if (!def) return null;
@@ -62,14 +69,18 @@ export function perPlayerDps(boss: string): number | null {
   const n = ASSUME_WORLD_BOSS.perPlayerParty;
   let sum = 0;
   let k = 0;
-  for (let seed = 1; seed <= ASSUME_WORLD_BOSS.runs; seed++) {
+  for (
+    let seed = 1;
+    seed <= ASSUME_WORLD_BOSS.dpsMaxSeeds && k < ASSUME_WORLD_BOSS.dpsRuns;
+    seed++
+  ) {
     const f = fightBossMoves(def, n, seed, 1);
     if (f.killed && f.deaths === 0) {
       sum += hp / f.seconds / n;
       k++;
     }
   }
-  return k > 0 ? (sum / k) * ASSUME_DUNGEON.bossUptime : null;
+  return k >= ASSUME_WORLD_BOSS.dpsRuns ? (sum / k) * ASSUME_DUNGEON.bossUptime : null;
 }
 
 /** Đo MỘT khung giờ. */
@@ -190,7 +201,7 @@ export function renderWorldBossBalance(
 ): string {
   const head = `## Trùm thế giới: máu nhân \`hpMult\` (M9.10 #1029, mục 59)
 
-> Phần này sinh từ \`server/src/balance/trum-the-gioi.ts\` (chạy bộ thực thi trùm thật \`fightBossMoves\`, máu = \`worldBossHpOf\`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x ${ASSUME_DUNGEON.bossUptime})) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội ${ASSUME_WORLD_BOSS.perPlayerParty} người hạ trùm ở máu gốc (${ASSUME_WORLD_BOSS.runs} hạt giống). Thưởng (\`WorldBossReward\` là MỘT quỹ chia theo tỉ lệ đóng góp) quy ra phút săn quái tốt nhất cùng bậc cho một người trong đội ${ASSUME_WORLD_BOSS.typicalPlayers} người (mục tiêu ${ASSUME_WORLD_BOSS.rewardMinutes.min}-${ASSUME_WORLD_BOSS.rewardMinutes.max}; bí cảnh 15-20). Mục tiêu: số người tối thiểu hạ được trong thời lượng là ${ASSUME_WORLD_BOSS.minPlayers.min}-${ASSUME_WORLD_BOSS.minPlayers.max} (cộng đồng nhỏ vẫn hạ được, không một mình), đội ${Math.max(...ASSUME_WORLD_BOSS.parties)} người không dưới ${ASSUME_WORLD_BOSS.fastestMinutes} phút.
+> Phần này sinh từ \`server/src/balance/trum-the-gioi.ts\` (chạy bộ thực thi trùm thật \`fightBossMoves\`, máu = \`worldBossHpOf\`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x ${ASSUME_DUNGEON.bossUptime})) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội ${ASSUME_WORLD_BOSS.perPlayerParty} người hạ trùm ở máu gốc (${ASSUME_WORLD_BOSS.dpsRuns} trận đạt). Thưởng (\`WorldBossReward\` là MỘT quỹ chia theo tỉ lệ đóng góp) quy ra phút săn quái tốt nhất cùng bậc cho một người trong đội ${ASSUME_WORLD_BOSS.typicalPlayers} người (mục tiêu ${ASSUME_WORLD_BOSS.rewardMinutes.min}-${ASSUME_WORLD_BOSS.rewardMinutes.max}; bí cảnh 15-20). Mục tiêu: số người tối thiểu hạ được trong thời lượng là ${ASSUME_WORLD_BOSS.minPlayers.min}-${ASSUME_WORLD_BOSS.minPlayers.max} (cộng đồng nhỏ vẫn hạ được, không một mình), đội ${Math.max(...ASSUME_WORLD_BOSS.parties)} người không dưới ${ASSUME_WORLD_BOSS.fastestMinutes} phút.
 `;
   if (slots.length === 0)
     return `${head}

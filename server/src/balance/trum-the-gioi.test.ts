@@ -31,10 +31,12 @@ describe("perPlayerDps", () => {
   it("Thiên Hàn Vương: DPS thật mỗi người ~457 (đo từ trận đội nhỏ x uptime), Hắc Giao thấp hơn; loài không phải trùm có bộ chiêu thì null", () => {
     const han = perPlayerDps("thien_han_vuong")!;
     const giao = perPlayerDps("hac_giao")!;
-    expect(han).toBeGreaterThan(430);
-    expect(han).toBeLessThan(485);
-    expect(giao).toBeGreaterThan(260);
-    expect(giao).toBeLessThan(320);
+    // 24 hạt giống A đo: THV 456,7 (độ lệch ~1%), Hắc Giao 290,0 (~1%): khoảng +-1,5% quanh số đó (gom đủ `dpsRuns` trận ĐẠT, không phụ thuộc 4 hạt giống đầu)
+    expect(han).toBeGreaterThan(450);
+    expect(han).toBeLessThan(464);
+    expect(giao).toBeGreaterThan(285);
+    expect(giao).toBeLessThan(295);
+    expect(ASSUME_WORLD_BOSS.dpsRuns).toBe(8);
     expect(perPlayerDps("ho")).toBeNull();
     expect(perPlayerDps("khong_co")).toBeNull();
   });
