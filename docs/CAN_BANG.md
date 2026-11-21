@@ -945,7 +945,7 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 ## Chặn đường: tỉ lệ chết khi chọn Chiến (mục 52 / 59, CD6 #1066)
 
 > Phần này sinh từ `server/src/balance/chan-duong.ts`: chạy ĐẤU TRƯỜNG THẬT (`createArena` + `tickWorld`, thưởng `payRewards`) trên `AMBUSH_FOES` thật, nên thêm / sửa bầy là báo cáo đổi theo (chạy lại `npm run can-bang -w server`).
-> Người chơi đúng bậc `minStep` của bầy (ca khó nhất bầy có thể gặp), mặc đồ tốt nhất đủ bậc, 8 Hồi Huyết Đan (uống khi khí huyết < 50%), đứng đánh thường vào con gần nhất, KHÔNG né, KHÔNG dùng chiêu (ca khó, như bí cảnh); 8 trận (hạt giống 1..8) mỗi bầy. Thời gian thật = giây mô phỏng / uptime (thường và tinh anh 0.8, kẻ cầm đầu 0.6); hết giờ trận 120 giây thật.
+> Người chơi đúng bậc `minStep` của bầy (ca khó nhất bầy có thể gặp), mặc đồ tốt nhất đủ bậc, 8 Hồi Huyết Đan (uống khi khí huyết < 50%), đánh thường vào con gần nhất (tiến sát khi ngoài tầm chém; quái tầm xa lùi khi bị áp sát), KHÔNG né, KHÔNG dùng chiêu (ca khó, như bí cảnh); 8 trận (hạt giống 1..8) mỗi bầy. Thời gian thật = giây mô phỏng / uptime (thường và tinh anh 0.8, kẻ cầm đầu 0.6); hết giờ trận 120 giây thật.
 > **Thua = chết thật** (mục 53), nên đây là số quyết định có bật `AMBUSH=on` hay không (mục 59). Hai cách chơi đo trên CÙNG một trận: **tới cùng** (không bao giờ bỏ chạy: cận trên tỉ lệ chết) và **biết bỏ chạy** (bấm khi khí huyết < 25%, vận 1 giây không bất khả xâm phạm rồi thoát, trả giá).
 
 **Chưa có bầy kẻ chặn đường nào** (`AMBUSH_FOES` rỗng, CD5b #1065): chưa có gì để đo. Khi E / G nhập bảng, chạy lại `npm run can-bang -w server` để mục này có số; `AMBUSH=on` chỉ được đề xuất khi bảng dưới đây không còn vi phạm.
