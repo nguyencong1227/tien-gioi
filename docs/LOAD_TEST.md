@@ -2153,43 +2153,44 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 (Máy chủ con tự động chạy với `AMBUSH=on` và `AMBUSH_BOTS=on`).
 
 ### 40.3. Kết quả đo đạc thực tế (Lượt chạy 10 phút ngày 22/11/2026)
-- **Tệp mẫu nhật ký:** `server/soak-2026-11-21T20-01-58-814Z.json`
+- **Tệp mẫu nhật ký:** `server/soak-2026-11-21T20-23-53-797Z.json`
 - **Thời lượng:** 10.0 phút (600 giây, 60 mẫu lấy mỗi 10 giây).
 - **Số bot:** 100 khởi tạo -> 100 kết thúc (tỉ lệ rớt: 0%).
 
 | Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Ngân sách | Đánh giá |
 |---|---|---:|---:|:---:|
 | **Phòng đấu trường** | **Số phòng cuối cùng khi dừng** | **0 phòng** | = 0 | **ĐẠT** |
-| | **Số phòng tối đa đồng thời** | **1 phòng** | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
-| | Lượt qua cổng vào / ra đấu trường | 2 lượt vào `arena_lac_ha`, 2 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
-| **Chặn đường** | Số lần bot bị chặn đường | **6 lần** | > 0 | **ĐẠT** |
-| | Lựa chọn hộp thoại | Chiến: 2 \| Bỏ chạy: 4 (Linh thạch: 0, Tu vi: 4) | Phân nhánh tự động | **ĐẠT** |
-| | Thoát giữa trận (vận 1s) | 2 lần | - | **ĐẠT** |
-| | Kết quả trận đấu | Chạy thoát: 6, Thắng: 0, Thua: 0, Rớt: 0, Huỷ: 0 | - | **ĐẠT** |
-| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 157.55 MB | - | - |
-| | VmRSS sau warmup (5.0m) | 161.64 MB | - | - |
-| | VmRSS kết thúc | 163.41 MB | - | - |
-| | Tăng sau warmup | **+1.77 MB** | <= 50.0 MB | **ĐẠT XUẤT SẮC** |
-| | **Dốc nửa sau (OLS)** | **+0.249 MB / phút** | <= 1.00 MB / phút | **ĐẠT XUẤT SẮC** |
-| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 2.71 ms, Max 3.08 ms** | <= 10.0 ms | **ĐẠT XUẤT SẮC** |
+| | **Số phòng tối đa đồng thời** | **3 phòng** | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
+| | Lượt qua cổng vào / ra đấu trường | 5 lượt vào `arena_lac_ha`, 4 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
+| **Chặn đường** | Số lần bot bị chặn đường | **7 lần** | > 0 | **ĐẠT** |
+| | Lựa chọn hộp thoại | Chiến: 4 \| Bỏ chạy: 3 (Linh thạch: 0, Tu vi: 3) | Phân nhánh tự động | **ĐẠT** |
+| | Thoát giữa trận (vận 1s) | 1 lần | - | **ĐẠT** |
+| | Kết quả trận đấu | Thắng: 0, Thua: 0, Chạy thoát: 2, Hết giờ: 4, Rớt: 0, Huỷ: 0 | - | **ĐẠT** |
+| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 149.22 MB | - | - |
+| | VmRSS sau warmup (5.0m) | 153.36 MB | - | - |
+| | VmRSS kết thúc | 155.42 MB | - | - |
+| | Tăng sau warmup | **+2.06 MB** | <= 50.0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0.258 MB / phút** | <= 1.00 MB / phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 2.74 ms, Max 3.35 ms** | <= 10.0 ms | **ĐẠT** |
 | | Tick overruns (> 50 ms) | **0** | 0 | **ĐẠT** |
-| | CPU luồng chính / tick | TB 3.09 ms / tick | - | **ĐẠT** |
+| | CPU luồng chính / tick | TB 3.25 ms / tick | - | **ĐẠT** |
 | | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi max 0.0s, Lỗi 0 | - | **ĐẠT** |
-| | Độ trễ vòng lặp p99 | 22.8 ms | <= 100 ms | **ĐẠT** |
-| **Băng thông WebSocket** | Nhận trung bình | 249 B / tick | <= 600 B / tick | **ĐẠT** |
-| | Phân vị p95 | 342 B / tick | - | **ĐẠT** |
-| | Băng thông nhận TB / bot | 4.86 KB/s | - | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | 23.1 ms | <= 100 ms | **ĐẠT** |
+| **Băng thông WebSocket** | Nhận trung bình | 238 B / tick | <= 600 B / tick | **ĐẠT** |
+| | Phân vị p95 | 334 B / tick | - | **ĐẠT** |
+| | Băng thông nhận TB / bot | 4.66 KB/s | - | **ĐẠT** |
 | **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 | **ĐẠT** |
 | | Lỗi gọi `/metrics` | 0 | 0 | **ĐẠT** |
 | | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
 | | Tệp hỏng (`*.hong-*`) | 0 | 0 | **ĐẠT** |
-| | Bảo toàn Linh thạch | ĐẠT (Trần 10.251, Thực tế 10.043, Lệch ví: 0) | ĐẠT | **ĐẠT** |
+| | Bảo toàn Linh thạch | ĐẠT (Trần 10.201, Thực tế 9.499, Lệch ví: 0) | ĐẠT | **ĐẠT** |
 
-### 40.4. Kết luận
-Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục chứng minh cơ chế Chặn đường và Đấu trường solo hoạt động hoàn toàn ổn định dưới tải cao:
-- Không rò rỉ phòng đấu trường (về đúng 0).
-- Không rò rỉ bộ nhớ (dốc OLS +0.249 MB/phút rất thấp, cách xa ngưỡng 1.0 MB/phút).
-- Vòng lặp tick nhẹ nhàng (~2.71 ms < 10 ms).
-- Dữ liệu file lưu và Linh thạch bảo toàn tuyệt đối, 0 lỗi kiem-save.
-Đủ điều kiện kỹ thuật để nghiệm thu CD10.
+### 40.4. Nhận xét & Giới hạn
+- Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục chứng minh:
+  - **Không rò rỉ phòng đấu trường:** Số phòng đấu trường solo về đúng 0 khi dừng bot.
+  - **Không rò rỉ bộ nhớ:** Dốc VmRSS OLS nửa sau `+0.258 MB/phút` (nằm trong ngưỡng <= 1.0 MB/phút).
+  - **Nhịp tick và hiệu năng:** Tick p95 trung bình 2.74 ms (max 3.35 ms <= 10.0 ms), 0 overruns.
+  - **Toàn vẹn dữ liệu:** `kiem-save` 100 nhân vật / 100 chân linh báo 0 lỗi, bảo toàn Linh thạch lệch ví 0.
+- **Giới hạn số đo:**
+  - 100 bot phân bổ đi hoang ghi nhận 7 lần bị chặn đường, số phòng đấu trường đồng thời đạt đỉnh 3/20 phòng (chưa chạm trần `MAX_AMBUSH_ROOMS = 20` do thiết kế thời gian hồi chiêu chặn đường giữa các lần là 8 phút). Vì vậy, kết quả này chứng minh việc dọn dẹp phòng sạch sẽ khi kết thúc và hệ thống vận hành không rò rỉ phòng / bộ nhớ / lưu trữ, nhưng chưa đo được thực tế trường hợp chặn đường bị từ chối khi vượt trần 20 phòng (nhánh này đã được bảo vệ độc lập bởi bộ unit test).
 

@@ -12,6 +12,8 @@ import {
   DUNGEON_MAPS,
   HAN_VAN_ID,
   INVENTORY_SLOTS,
+  isArenaMap,
+  isDungeonMap,
   ITEM_BY_ID,
   LINH_HU_MAP_ID,
   MAPS,
@@ -1268,6 +1270,27 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(rawOverCap, rawOverCap.length).map((e) => e.code)).toContain(
         "invalid_dungeon_daily_rewards",
       );
+    });
+
+    it("chặn bản đồ đấu trường solo (isArenaMap, CD10 #1276) trong hồ sơ lưu và đột biến chứng minh", () => {
+      const arenaMapId = "arena_lac_ha";
+      expect(isArenaMap(arenaMapId)).toBe(true);
+      expect(getMap(arenaMapId)).toBeDefined();
+
+      const rawArenaMap = JSON.stringify({ ...validPlayer, mapId: arenaMapId });
+      const errs = auditPlayerSaveData(rawArenaMap, rawArenaMap.length);
+      const mapErrs = errs.filter((e) => e.code === "invalid_map_id");
+      expect(mapErrs.length).toBeGreaterThan(0);
+      expect(mapErrs[0].message).toContain("đấu trường");
+
+      // Đột biến: bỏ kiểm isArenaMap sẽ làm lọt file lưu mang bản đồ đấu trường
+      const laxMapCheck = (mapId: unknown) => {
+        const m = getMap(mapId);
+        if (!m) return false;
+        if (isDungeonMap(mapId)) return false; // Chỉ chặn bí cảnh, bỏ quên đấu trường!
+        return true;
+      };
+      expect(laxMapCheck(arenaMapId)).toBe(true); // Đột biến để lọt dữ liệu sai!
     });
   });
 

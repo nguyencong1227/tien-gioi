@@ -462,6 +462,8 @@ interface BotState extends SkillCaster {
   ambush?: boolean;
   ambushState?: AmbushStateMsg;
   ambushFleeing?: boolean;
+  ambushMidFleeDecided?: boolean;
+  ambushWillMidFlee?: boolean;
   ambushOffersCount: number;
   ambushFightCount: number;
   ambushFleeCoinCount: number;
@@ -879,8 +881,12 @@ export async function main(): Promise<number> {
 
     room.onMessage(AMBUSH_MSG.state, (msg: AmbushStateMsg) => {
       b.ambushState = msg;
-      // Trong đấu trường, xác suất 10% bot thử bỏ chạy giữa trận (vận 1s)
-      if (args.ambush && !b.ambushFleeing && Math.random() < 0.1) {
+      // Trong đấu trường: quyết định 1 lần duy nhất mỗi trận (khoảng 15% xác suất trận này sẽ bỏ chạy giữa trận, còn lại đánh tới cùng)
+      if (args.ambush && !b.ambushMidFleeDecided) {
+        b.ambushMidFleeDecided = true;
+        b.ambushWillMidFlee = Math.random() < 0.15;
+      }
+      if (args.ambush && b.ambushWillMidFlee && !b.ambushFleeing) {
         b.ambushFleeing = true;
         const fleeChoice =
           msg.price?.coin?.enough && Math.random() < 0.5 ? "flee_coin" : "flee_exp";
@@ -892,6 +898,8 @@ export async function main(): Promise<number> {
     room.onMessage(AMBUSH_MSG.end, (msg: AmbushEndMsg) => {
       b.ambushState = undefined;
       b.ambushFleeing = false;
+      b.ambushMidFleeDecided = false;
+      b.ambushWillMidFlee = false;
       if (msg.result === "won") b.ambushWonCount++;
       else if (msg.result === "lost") b.ambushLostCount++;
       else if (msg.result === "fled") b.ambushFledCount++;
@@ -1092,6 +1100,8 @@ export async function main(): Promise<number> {
       resting: false,
       nextMeditateAt: 0,
       ambush: args.ambush,
+      ambushMidFleeDecided: false,
+      ambushWillMidFlee: false,
       ambushOffersCount: 0,
       ambushFightCount: 0,
       ambushFleeCoinCount: 0,
