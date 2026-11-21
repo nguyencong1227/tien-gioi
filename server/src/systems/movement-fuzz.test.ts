@@ -248,8 +248,8 @@ describe("Fuzz bất biến di chuyển (issue #859): đầu vào sai kiểu + n
     queueInput(w, "a", { seq: "x" as unknown as number, dx: 1, dy: 0 } as never);
     expect(c.inputs.length, "input sai kiểu KHÔNG vào hàng đợi").toBe(1);
     expect(w.inputStats.dropped).toBe(before);
-    // Lưu ý: `seq: NaN` HIỆN TẠI vẫn lọt qua (typeof NaN === "number") và bị lưu thành seq 0,
-    // có thể đẩy lastSeq lùi — đã báo Dev A (issue dev-a) để vá cửa, KHÔNG sửa mã trò chơi trong PR này.
+    // `seq: NaN` / Infinity / âm / thập phân từng lọt qua (typeof NaN === "number") và bị lưu thành seq 0 (kéo lastSeq lùi): A vá ở #1263 (PR #1271) và khoá
+    // từng giá trị ở `movement-drift.test.ts` ("cửa nhận input KHÔNG tin seq"); fuzz này không sửa mã trò chơi.
   });
 
   it("người choáng: vẫn tiêu thụ input + tăng lastSeq, nhưng KHÔNG di chuyển", () => {
