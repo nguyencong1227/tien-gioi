@@ -200,7 +200,7 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
   },
   {
     id: "am_suong_suong_tanh_tren_ho",
-    text: "Sương trên mặt hồ Âm Sương Trạch dày lên, tanh mùi bùn. Nước dưới chân ngươi rút đi một khoảng rồi dâng ngược: con thủy quái đang bò lên bờ, thẳng về chỗ ngươi ngồi.",
+    text: "Sương trên mặt hồ Âm Sương Trạch dày lên, tanh mùi bùn. Nước dưới chân ngươi rút đi một khoảng rồi dâng ngược: con thủy quái đang bò lên bờ, thẳng về phía ngươi.",
     mapIds: ["am_suong"],
     tiers: ["normal"],
     source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_ho_suong_tanh",
@@ -285,14 +285,14 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
   },
   {
     id: "han_van_hang_co_chu",
-    text: "Cái hang ngươi ngồi trên Hàn Vân Lĩnh khô ráo, kín gió, sâu trong có ổ xương. Giữa đêm, chủ của nó về: một con cự thú chắn kín cửa hang, gầm vang vách đá, hơi thở đóng băng không khí.",
+    text: "Cái hang ngươi ghé vào trú chân trên Hàn Vân Lĩnh khô ráo, kín gió, sâu trong có ổ xương. Chưa kịp yên chỗ, chủ của nó đã về: một con cự thú chắn kín cửa hang, gầm vang vách đá, hơi thở đóng băng không khí.",
     mapIds: ["han_van"],
     tiers: ["elite"],
     source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_son_chu_hang",
   },
   {
     id: "han_van_bay_yeu_vien_dan",
-    text: "Ngươi mở mắt trên Hàn Vân Lĩnh thì quanh chỗ ngồi đã kín mắt xanh mắt đỏ. Bầy yêu nhỏ bị linh khí kéo tới, còn con đầu đàn đứng sau cùng, chờ chúng cắn trước khi nó ra tay.",
+    text: "Ngươi dừng chân giữa Hàn Vân Lĩnh thì quanh người đã kín mắt xanh mắt đỏ. Bầy yêu nhỏ bị linh khí kéo tới, còn con đầu đàn đứng sau cùng, chờ chúng cắn trước khi nó ra tay.",
     mapIds: ["han_van"],
     tiers: ["elite"],
     source: "/content/encounters/bien_co/be_quan.yaml#ev.bq_yv_bay_nho",
@@ -316,6 +316,12 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
 export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [];
 
 const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+/**
+ * Chặn đường chỉ kích hoạt khi người chơi ĐI BỘ thật (`systems/ambush.ts`; đứng yên / dịch chuyển không tính), nên văn mẫu không được viết như người chơi đang NGỒI / vừa thiền
+ * ("thẳng về chỗ ngươi ngồi", "ngươi mở mắt", "quanh chỗ ngồi"): nhiều cảnh lấy từ sự kiện BẾ QUAN của nguồn nên dễ lọt (B bắt 3 cảnh ở review #1240). Chỉ bắt dạng nói về NGƯƠI / chỗ ngồi
+ * của ngươi; kẻ địch "ngồi" / "mở mắt" (ngôi thứ ba) vẫn hợp lệ.
+ */
+const SITTING_RE = /(?:ngươi|chỗ)\s+(?:ngồi|mở mắt|nhập định|đả tọa|bế quan)|chỗ ngồi/iu;
 const ID_RE = /^[a-z][a-z0-9_]{0,47}$/;
 const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
 const MAP_IDS: ReadonlySet<string> = new Set(MAPS.map((m) => m.id));
@@ -351,6 +357,10 @@ export function ambushViolations(
       bad.push(`${at}: text phải 20-600 ký tự`);
     else {
       if (CJK_RE.test(s.text)) bad.push(`${at}: text có chữ Hán / chữ lạ`);
+      if (SITTING_RE.test(s.text))
+        bad.push(
+          `${at}: text viết như người chơi đang NGỒI / vừa thiền (chặn đường chỉ kích hoạt khi ĐI BỘ): đổi sang "đi tới / dừng chân / ghé vào"`,
+        );
       for (const m of s.text.matchAll(/\{([^}]*)\}/g))
         if (!(AMBUSH_SCENE_VARS as readonly string[]).includes(m[1]))
           bad.push(`${at}: biến {${m[1]}} không được phép`);

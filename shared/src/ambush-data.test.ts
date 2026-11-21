@@ -76,6 +76,21 @@ describe("ambushViolations: cảnh", () => {
       /không được phép/,
     ],
     ["ngoặc thừa", { text: "Đường vắng hẳn, {ke_dich} lao ra chặn lối } giữa đường." }, /ngoặc/],
+    [
+      "viết như đang ngồi: 'chỗ ngươi ngồi'",
+      { text: "Con thủy quái đang bò lên bờ, thẳng về chỗ ngươi ngồi, mùi bùn tanh nồng nặc." },
+      /NGỒI/,
+    ],
+    [
+      "viết như vừa thiền: 'ngươi mở mắt'",
+      { text: "Ngươi mở mắt trên Hàn Vân Lĩnh thì quanh người đã kín mắt xanh mắt đỏ rồi." },
+      /NGỒI/,
+    ],
+    [
+      "viết như đang ngồi: 'quanh chỗ ngồi'",
+      { text: "Bầy yêu nhỏ đã vây kín quanh chỗ ngồi của ngươi từ lúc nào chẳng hay biết." },
+      /NGỒI/,
+    ],
     ["mapIds rỗng", { mapIds: [] }, /mapIds rỗng/],
     ["bản đồ lạ", { mapIds: ["khong_co"] }, /không có/],
     ["bản đồ đấu trường không hợp", { mapIds: ["arena_lac_ha"] }, /không có/],
@@ -89,6 +104,15 @@ describe("ambushViolations: cảnh", () => {
       expect(v.length, name).toBeGreaterThan(0);
       expect(v.join("\n")).toMatch(re);
     });
+  it("KHÔNG bắt kẻ địch 'ngồi' / 'mở mắt' (ngôi thứ ba) và người chơi 'dừng chân' / 'ghé vào' (đúng lối đi bộ)", () => {
+    for (const text of [
+      "Con đại xà đen cuộn trong hang mở mắt, đuôi quật nước tanh vào mặt ngươi giữa đường.",
+      'Tên sơn tặc ngồi trên tảng đá chặn đầu, rìu gác vai: "Mãi lộ năm mươi linh thạch."',
+      "Cái hang ngươi ghé vào trú chân khô ráo, kín gió, sâu trong có ổ xương của ai đó.",
+      "Ngươi dừng chân giữa Hàn Vân Lĩnh thì quanh người đã kín mắt xanh mắt đỏ rồi.",
+    ])
+      expect(ambushViolations([scene({ text })], []), text).toEqual([]);
+  });
   it("bắt id trùng", () => {
     expect(ambushViolations([scene(), scene()], []).join("\n")).toMatch(/trùng id/);
   });
