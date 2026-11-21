@@ -352,6 +352,7 @@ async function main() {
   let chrome: ChildProcess | null = null;
   let tab: Tab | null = null;
   let failed: string | null = null;
+  let blackholeAt = 0; // lúc bật blackhole ca 1 (chỉ để in chẩn đoán khi thất bại)
 
   try {
     chrome = spawn(
@@ -467,9 +468,16 @@ async function main() {
     out("  - Chờ nhịp tim đầu tiên xác nhận server hỗ trợ (supported = true)...");
     await sleep(6000);
 
+    // Chẩn đoán chập chờn (nightly 18/11: ca 1 'chip Mạng chậm không hiện trong 12 s' đỏ MỘT lần, lần thử lại đạt): đo độ đứng hình lớn nhất của luồng chính trong trang. `NetSlowDetector`
+    // bỏ mốc chờ khi hai lần `poll` cách nhau > SLOW_STALE_POLL_MS (2 s), nên một cú đứng hình đúng lúc blackhole có thể làm chip không hiện. Số này chỉ để IN khi thất bại.
+    await tab.ev(
+      `window.__stall = { max: 0, last: performance.now() }; setInterval(() => { const n = performance.now(); window.__stall.max = Math.max(window.__stall.max, n - window.__stall.last); window.__stall.last = n; }, 100); 1`,
+    );
+
     // Kích hoạt BLACKHOLE tại proxy: socket TCP vẫn hoàn toàn MỞ nhưng không byte nào đi qua
     out("  - Bật TCP blackhole (socket vẫn mở 100%, không byte nào truyền qua)...");
     const t0 = Date.now();
+    blackholeAt = t0;
     proxy.setBlackhole(true);
 
     // Kiểm tra mỗi HEARTBEAT_INTERVAL_MS nên xấu nhất = chờ tới nhịp ping kế (5s) + hạn chờ làm tròn lên bội nhịp (10s) = 15s (bản đầu
@@ -1136,6 +1144,31 @@ async function main() {
             hudName: document.getElementById('hud-name')?.textContent
           })`);
         out(`  [TAB INFO]: ${JSON.stringify(info)}`);
+        // trạng thái chip "Mạng chậm" + nhịp tim + độ đứng hình luồng chính (xem chẩn đoán ở ca 1); lỗi đọc thì bỏ qua
+        try {
+          const live = await tab.ev(`(() => { try {
+            const m = window.__netSlow, h = window.__heartbeat, d = m?.detector;
+            return {
+              now: Date.now(),
+              chipHidden: document.getElementById('net-slow')?.hidden,
+              bannerHidden: document.getElementById('reconnect-banner')?.hidden,
+              slow: m?.isSlow?.(),
+              pongSeen: m?.pongSeen,
+              waitingSince: d?.waitingSince,
+              shownAt: d?.shownAt,
+              lastPoll: d?.lastPoll,
+              hbSupported: h?.state?.supported,
+              hbPendingSince: h?.state?.pendingSince,
+              rttMs: h?.lastRttMs,
+              stallMaxMs: window.__stall ? Math.round(window.__stall.max) : null,
+            };
+          } catch (e) { return { err: String(e) }; } })()`);
+          out(
+            `  [LIVENESS]: ${JSON.stringify(live)}${blackholeAt ? ` | blackhole bật cách ${Date.now() - blackholeAt}ms` : ""}`,
+          );
+        } catch {
+          /* tab đã đóng */
+        }
         if (tab.consoleTail.length)
           out(`  [CONSOLE TAIL]:\n    ${tab.consoleTail.slice(-10).join("\n    ")}`);
         if (tab.errors.length) out(`  [TAB ERRORS]:\n    ${tab.errors.join("\n    ")}`);

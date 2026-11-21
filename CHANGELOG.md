@@ -2,6 +2,11 @@
 
 Định dạng theo từng bản phát hành (thẻ `vX.Y.Z`). Số `#` là PR / issue trên GitHub.
 
+## [Chưa phát hành] — sau v0.5.2
+
+### Công cụ và tài liệu
+- **`e2e:nhip-tim` in thêm chẩn đoán khi thất bại (QA v0.5.2 trên runner CI: ca 1 đỏ MỘT lần rồi đạt khi thử lại, `FLAKY`; chỉ test, KHÔNG đổi mã trò chơi) (B):** lần đỏ đó 'chip Mạng chậm' không hiện trong 12 s sau blackhole, nhưng log chỉ có dòng 'hết giờ chờ' nên không biết vì sao. Nay ca 1 đo độ đứng hình lớn nhất của luồng chính trong trang (`NetSlowDetector` bỏ mốc chờ khi hai lần `poll` cách nhau quá 2 s) và khi thất bại IN dòng `[LIVENESS]`: chip / banner, `pongSeen`, `waitingSince` / `lastPoll`, nhịp tim (`supported`, `pendingSince`, RTT), `stallMaxMs` và thời gian từ lúc bật blackhole. Kiểm: ép hết giờ 1 s thì dòng `[LIVENESS]` in đủ; chạy bình thường 7 ca đạt. Lần FLAKY kế tiếp sẽ tự giải thích (đứng hình luồng chính hay mốc chờ bị đặt lại).
+
 ## [0.5.2] — 18/11/2026: sửa lỗi gấp "nhân vật mới không đầu thai được"
 
 Bản vá nhỏ sau v0.5.1 (QUYET_DINH_M3 mục 58); không đổi giao thức (`PROTOCOL_VERSION` giữ 6) hay định dạng lưu.
