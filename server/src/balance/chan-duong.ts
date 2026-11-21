@@ -11,6 +11,7 @@
 // Dùng `Math.random` có hạt giống như `dungeon.ts` nên kết quả cố định. Số liệu bầy là của E / G (CD5). Giá và thưởng TU VI tính bằng PHÚT SĂN của bậc (`AMBUSH_EXP_PRICE_MIN`, `AMBUSH_REWARD_MIN`, bảng `AMBUSH_HUNT_EXP_PER_MIN` sinh từ `bestOption`: CD6b); thưởng Linh thạch vẫn TẠM (`ARENA_REWARD_MULT`): ở đây ĐO và báo vi phạm.
 import {
   AMBUSH_COOLDOWN_MS,
+  AMBUSH_DAY_CAP,
   AMBUSH_EXP_PRICE_MIN,
   AMBUSH_HUNT_EXP_PER_MIN,
   AMBUSH_REWARD_MIN,
@@ -28,6 +29,7 @@ import {
   TICK_MS,
   ambushPrice,
   arenaMapIdOf,
+  emptyEquipment,
   expToNext,
   getMap,
   statsFor,
@@ -71,6 +73,20 @@ export const ASSUME_AMBUSH = {
   walkPxPerSec: 170,
   /** Người chơi đang có chừng này phần thanh tu vi khi bị chặn (để tính giá bỏ chạy bằng tu vi). */
   expInBarShare: 0.5,
+  /**
+   * Độ nhạy theo giả định (A đồng ý 22/11, phát hiện của B ở #1244: kết quả đổi rất mạnh theo số đan và đồ). Bảng 1-3 đo ở giả định CHUẨN (`ASSUME_DUNGEON.potions` đan + đồ tốt nhất đủ bậc);
+   * mục 4 đo lại CÙNG các bầy với từng tổ hợp (số đan x có đồ hay không).
+   */
+  sensitivity: {
+    /** Số trận mỗi bầy mỗi kịch bản (hạt giống 1..N): nhiều hơn `runs` ở trên vì mục này dựa vào tỉ lệ chết nhỏ (vài phần trăm). */
+    runs: 48,
+    /** Số Hồi Huyết Đan mang theo của các hàng (mỗi số đi với cả hai kiểu đồ). */
+    potions: [8, 2, 0],
+    /** Số lần bị chặn tối đa mỗi ngày (`AMBUSH_DAY_CAP`) để tính xác suất chết ít nhất một lần trong ngày (các lần độc lập). */
+    dayCap: AMBUSH_DAY_CAP,
+    /** Giả định THẬN TRỌNG (đề xuất của A làm giả định chuẩn): ít đan, đồ đúng bậc. Bầy chết "tới cùng" nhiều hơn `deathAbove` ở đây bị CẢNH BÁO (chưa chặn). */
+    cautious: { potions: 2, gear: "best", deathAbove: 0.05 },
+  },
   /** Mục tiêu (thiết kế mục 9). */
   targets: {
     /** Tỉ lệ thắng tối thiểu theo mức (ca khó: không né, không chiêu, chỉ đánh thường). */
@@ -105,6 +121,8 @@ export interface AmbushFightOptions {
   step: number;
   seed?: number;
   potions?: number;
+  /** `best` (mặc định): đồ tốt nhất đủ bậc (`bestGear`); `none`: không mặc gì (người chơi chưa kịp lên đồ). */
+  gear?: "best" | "none";
 }
 
 /** Vé giả cho đấu trường thử (không qua `openTicket`: không cần người chơi / hồ sơ). */
@@ -140,7 +158,8 @@ export function fightAmbush(g: AmbushFoeGroup, o: AmbushFightOptions): AmbushFig
     const a = createArena(w, ticket);
     const sid = "mo-phong";
     const { p, c } = addPlayer(w, sid, realm, tier);
-    setEquipment(p, bestGear(realm, tier));
+    const gear = o.gear === "none" ? emptyEquipment() : bestGear(realm, tier);
+    setEquipment(p, gear);
     applyStats(p, true);
     c.inv[0] = { itemId: "hoi_huyet_dan", qty: o.potions ?? ASSUME_DUNGEON.potions };
     const lair = w.map.lairPx ?? { x: w.map.townPx.x, y: w.map.townPx.y - 400, r: 80 };
@@ -148,7 +167,7 @@ export function fightAmbush(g: AmbushFoeGroup, o: AmbushFightOptions): AmbushFig
     p.y = lair.y + ASSUME_AMBUSH.startOffsetPx;
     arenaJoined(w, sid);
 
-    const speed = statsFor(realm, tier, bestGear(realm, tier)).speed; // px / giây: người chơi TIẾN SÁT con gần nhất khi ngoài tầm chém (quái tầm xa lùi khi bị áp sát nên không thể đứng yên chờ)
+    const speed = statsFor(realm, tier, gear).speed; // px / giây: người chơi TIẾN SÁT con gần nhất khi ngoài tầm chém (quái tầm xa lùi khi bị áp sát nên không thể đứng yên chờ)
     const uptime = ASSUME_AMBUSH.uptime[g.tier];
     const limitSec = (AMBUSH_TIME_MS / 1000) * uptime; // trận thật dài ra 1 / uptime nên hết giờ sớm hơn theo giây mô phỏng
     const dt = TICK_MS / 1000;
@@ -240,8 +259,18 @@ export interface GroupSummary {
 
 const emptyRates = (): Record<AmbushOutcome, number> => ({ won: 0, lost: 0, timeout: 0, fled: 0 });
 
-/** Chạy `runs` trận của MỘT bầy ở bậc `minStep` và tổng hợp. */
-export function summarizeGroup(g: AmbushFoeGroup, runs: number = ASSUME_AMBUSH.runs): GroupSummary {
+/** Một kịch bản của bảng độ nhạy: số Hồi Huyết Đan mang theo và có mặc đồ tốt nhất đủ bậc hay không. */
+export interface AmbushScenario {
+  potions: number;
+  gear: "best" | "none";
+}
+
+/** Chạy `runs` trận của MỘT bầy ở bậc `minStep` và tổng hợp (`scenario` vắng: giả định chuẩn của `fightAmbush`). */
+export function summarizeGroup(
+  g: AmbushFoeGroup,
+  runs: number = ASSUME_AMBUSH.runs,
+  scenario?: AmbushScenario,
+): GroupSummary {
   const step = g.minStep;
   const { realm, tier } = realmTierOfStep(step);
   const toEnd = emptyRates();
@@ -251,7 +280,7 @@ export function summarizeGroup(g: AmbushFoeGroup, runs: number = ASSUME_AMBUSH.r
   let winCoin = 0;
   let wins = 0;
   for (let seed = 1; seed <= runs; seed++) {
-    const f = fightAmbush(g, { step, seed });
+    const f = fightAmbush(g, { step, seed, potions: scenario?.potions, gear: scenario?.gear });
     toEnd[outcomeOf(f, "to_end")] += 1 / runs;
     flee[outcomeOf(f, "flee")] += 1 / runs;
     sec += f.seconds / ASSUME_AMBUSH.uptime[g.tier];
@@ -417,6 +446,125 @@ export function upliftByRealm(sums: readonly GroupSummary[]): RealmUplift[] {
   return out;
 }
 
+// ---------- Độ nhạy theo giả định (số đan, đồ) ----------
+
+/**
+ * Tỉ lệ kết cục `outcome` MỖI lần bị chặn theo cách chơi `policy`, trộn theo `AMBUSH_TIER_WEIGHTS` (trung bình các bầy trong từng mức; mức không có bầy thì bỏ khỏi phép trộn).
+ * `null` nếu không có bầy nào.
+ */
+export function blendedRate(
+  sums: readonly GroupSummary[],
+  policy: "toEnd" | "flee",
+  outcome: AmbushOutcome,
+): number | null {
+  let w = 0;
+  let acc = 0;
+  for (const tier of AMBUSH_TIERS) {
+    const of = sums.filter((s) => s.group.tier === tier);
+    if (of.length === 0) continue;
+    w += AMBUSH_TIER_WEIGHTS[tier];
+    acc += (AMBUSH_TIER_WEIGHTS[tier] * of.reduce((a, s) => a + s[policy][outcome], 0)) / of.length;
+  }
+  return w > 0 ? acc / w : null;
+}
+
+/** Xác suất xảy ra ÍT NHẤT MỘT lần trong `n` lần độc lập, mỗi lần xác suất `p`: 1 - (1 - p)^n. `p` ngoài [0, 1] hoặc không hữu hạn kẹp về đầu gần nhất; `n` < 0 coi là 0. Thuần. */
+export function atLeastOnce(p: number, n: number): number {
+  const q = Number.isFinite(p) ? Math.min(1, Math.max(0, p)) : 0;
+  return 1 - Math.pow(1 - q, Math.max(0, Math.floor(n)));
+}
+
+/** Các kịch bản của bảng độ nhạy: đồ tốt nhất rồi KHÔNG đồ, mỗi kiểu đi với từng số đan của `ASSUME_AMBUSH.sensitivity.potions`. */
+export function sensitivityScenarios(): AmbushScenario[] {
+  const out: AmbushScenario[] = [];
+  for (const gear of ["best", "none"] as const)
+    for (const potions of ASSUME_AMBUSH.sensitivity.potions) out.push({ potions, gear });
+  return out;
+}
+
+export interface SensitivityRow {
+  scenario: AmbushScenario;
+  runs: number;
+  groups: number;
+  /** Chết MỖI lần bị chặn (trộn theo mức): "đánh tới cùng" và "biết bỏ chạy". */
+  deadToEnd: number;
+  deadFlee: number;
+  /** Bỏ chạy MỖI lần bị chặn khi "biết bỏ chạy" (trộn theo mức): cái giá của việc sống sót (trả tu vi / Linh thạch). */
+  fledFlee: number;
+  /** Xác suất chết ít nhất một lần trong `sensitivity.dayCap` lần chặn của một ngày (các lần độc lập): cùng hai cách chơi. */
+  deadDayToEnd: number;
+  deadDayFlee: number;
+  /** Số bầy có tỉ lệ thắng "tới cùng" DƯỚI mục tiêu của mức (`targets.winRate`). */
+  belowTarget: number;
+  /** Bầy chết nhiều nhất ("tới cùng"). */
+  worst: GroupSummary;
+  /** Tổng hợp từng bầy của kịch bản này (để cảnh báo nêu đúng tên bầy). */
+  sums: GroupSummary[];
+}
+
+/** Đo MỘT kịch bản trên `foes` (`null` nếu bảng rỗng). Mỗi bầy ở bậc `minStep` (ca khó nhất), hạt giống 1..`runs`: kết quả cố định. */
+export function sensitivityRow(
+  foes: readonly AmbushFoeGroup[],
+  scenario: AmbushScenario,
+  runs: number = ASSUME_AMBUSH.sensitivity.runs,
+): SensitivityRow | null {
+  if (foes.length === 0) return null;
+  const sums = foes.map((g) => summarizeGroup(g, runs, scenario));
+  const deadToEnd = blendedRate(sums, "toEnd", "lost") ?? 0;
+  const deadFlee = blendedRate(sums, "flee", "lost") ?? 0;
+  const { dayCap } = ASSUME_AMBUSH.sensitivity;
+  return {
+    scenario,
+    runs,
+    groups: sums.length,
+    deadToEnd,
+    deadFlee,
+    fledFlee: blendedRate(sums, "flee", "fled") ?? 0,
+    deadDayToEnd: atLeastOnce(deadToEnd, dayCap),
+    deadDayFlee: atLeastOnce(deadFlee, dayCap),
+    belowTarget: sums.filter(
+      (s) => s.toEnd.won + 1e-9 < ASSUME_AMBUSH.targets.winRate[s.group.tier],
+    ).length,
+    worst: sums.reduce((a, b) => (b.toEnd.lost > a.toEnd.lost ? b : a)),
+    sums,
+  };
+}
+
+/** Cả bảng độ nhạy (mọi kịch bản của `sensitivityScenarios`, thứ tự cố định); bảng rỗng thì rỗng. */
+export function sensitivityRows(
+  foes: readonly AmbushFoeGroup[] = AMBUSH_FOES,
+  runs: number = ASSUME_AMBUSH.sensitivity.runs,
+): SensitivityRow[] {
+  const out: SensitivityRow[] = [];
+  for (const sc of sensitivityScenarios()) {
+    const r = sensitivityRow(foes, sc, runs);
+    if (r) out.push(r);
+  }
+  return out;
+}
+
+/** Hàng của giả định THẬN TRỌNG (`sensitivity.cautious`) trong `rows`, hoặc `undefined`. */
+export function cautiousRow(rows: readonly SensitivityRow[]): SensitivityRow | undefined {
+  const { potions, gear } = ASSUME_AMBUSH.sensitivity.cautious;
+  return rows.find((r) => r.scenario.potions === potions && r.scenario.gear === gear);
+}
+
+/**
+ * Cảnh báo (không chặn) từ bảng độ nhạy: mỗi bầy chết "tới cùng" NHIỀU HƠN `cautious.deathAbove` ở giả định thận trọng (ít đan, đồ đúng bậc). Bầy ở đúng ngưỡng không bị cảnh báo
+ * ("vượt"). Chưa là vi phạm vì bảng chuẩn (nhiều đan) vẫn đạt: khi E / G chỉnh xong các bầy này thì đặt giả định thận trọng làm chuẩn và chuyển thành vi phạm.
+ */
+export function ambushSensitivityWarnings(rows: readonly SensitivityRow[]): string[] {
+  const row = cautiousRow(rows);
+  if (!row) return [];
+  const { potions, deathAbove } = ASSUME_AMBUSH.sensitivity.cautious;
+  return row.sums
+    .filter((s) => s.toEnd.lost > deathAbove + 1e-9)
+    .map(
+      (s) =>
+        `bầy ${s.group.id} (${s.group.mapId}, bậc ${s.step}, ${s.group.tier}): chết ${pct(s.toEnd.lost)} "tới cùng" / ${pct(s.flee.lost)} "biết bỏ chạy" ở giả định thận trọng (${potions} đan + đồ đúng bậc, ${row.runs} trận), vượt ${pct(deathAbove)}`,
+    );
+}
+
 // ---------- Bất biến ----------
 
 /**
@@ -469,6 +617,7 @@ export function ambushBalanceWarnings(sums: readonly GroupSummary[]): string[] {
 const f0 = (n: number) => Math.round(n).toLocaleString("vi-VN");
 const f1 = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 1 });
 const pct = (n: number) => `${Math.round(n * 100)}%`;
+const pct1 = (n: number) => `${f1(n * 100)}%`;
 const TIER_VI: Readonly<Record<AmbushTier, string>> = {
   normal: "thường",
   elite: "tinh anh",
@@ -512,8 +661,26 @@ export function renderAmbushBalance(foes: readonly AmbushFoeGroup[] = AMBUSH_FOE
   const rewardText = AMBUSH_TIERS.map((t) => `${TIER_VI[t]} ${AMBUSH_REWARD_MIN[t]} phút`).join(
     " / ",
   );
+  const sens = sensitivityRows(foes);
+  const sensTable = sens
+    .map((r) => {
+      const std =
+        r.scenario.potions === ASSUME_DUNGEON.potions && r.scenario.gear === "best"
+          ? " (chuẩn)"
+          : r === cautiousRow(sens)
+            ? " (thận trọng)"
+            : "";
+      return `| ${r.scenario.gear === "best" ? "đồ tốt nhất đủ bậc" : "KHÔNG đồ"} | ${r.scenario.potions}${std} | ${pct1(r.deadToEnd)} | ${pct1(r.deadFlee)} | ${pct1(r.fledFlee)} | ${pct(r.deadDayToEnd)} / ${pct(r.deadDayFlee)} | ${r.belowTarget} / ${r.groups} | ${r.worst.group.id} (chết ${pct(r.worst.toEnd.lost)}) |`;
+    })
+    .join("\n");
+  const cautious = cautiousRow(sens);
+  const cautiousText = !cautious
+    ? ""
+    : cautious.belowTarget === 0
+      ? `Ở giả định thận trọng (${cautious.scenario.potions} đan + đồ đúng bậc) không bầy nào dưới mục tiêu thắng: có thể đặt nó làm giả định CHUẨN (\`ASSUME_AMBUSH\`).`
+      : `Ở giả định thận trọng (${cautious.scenario.potions} đan + đồ đúng bậc) còn **${cautious.belowTarget} / ${cautious.groups} bầy dưới mục tiêu thắng**: CHƯA đặt nó làm giả định chuẩn được cho tới khi E / G chỉnh các bầy đó (tên ở cảnh báo bên dưới).`;
   const violations = ambushBalanceViolations(sums);
-  const warnings = ambushBalanceWarnings(sums);
+  const warnings = [...ambushBalanceWarnings(sums), ...ambushSensitivityWarnings(sens)];
   return `${head}
 ### 1. Tỉ lệ chết theo cảnh giới và mức (trung bình các bầy)
 
@@ -540,6 +707,16 @@ Theo từng cảnh giới (thưởng và giá tính bằng phút săn của bậ
 ${upliftTable}
 
 Giá bỏ chạy bằng tu vi: ${priceText}; thưởng tu vi thắng: ${rewardText} (phút săn của bậc người chơi; bảng tu vi / phút săn \`AMBUSH_HUNT_EXP_PER_MIN\` sinh từ mô phỏng). Giá bị kẹp bởi tu vi đang có trong thanh (không bao giờ rớt cảnh giới).
+
+### 4. Độ nhạy theo giả định (Hồi Huyết Đan, đồ)
+
+Bảng 1-3 đo ở giả định CHUẨN (${ASSUME_DUNGEON.potions} đan + đồ tốt nhất đủ bậc). Người chơi thật thường mang ít đan hơn hoặc chưa lên đồ, nên bảng này đo lại CÙNG ${foes.length} bầy (ở bậc \`minStep\`, mỗi bầy ${ASSUME_AMBUSH.sensitivity.runs} trận, hạt giống 1..${ASSUME_AMBUSH.sensitivity.runs}: ít nhiễu hơn bảng 1-3 vốn ${ASSUME_AMBUSH.runs} trận) với từng tổ hợp số đan x có đồ hay không. "Chết / lần" là tỉ lệ chết MỖI lần bị chặn, trộn theo \`AMBUSH_TIER_WEIGHTS\` (${AMBUSH_TIERS.map((t) => `${TIER_VI[t]} ${AMBUSH_TIER_WEIGHTS[t]}`).join(" / ")}); "chết >= 1 lần / ngày" là xác suất chết ít nhất một lần trong ${ASSUME_AMBUSH.sensitivity.dayCap} lần chặn (mức tối đa mỗi ngày, các lần độc lập: 1 - (1 - p)^${ASSUME_AMBUSH.sensitivity.dayCap}), tới cùng / biết bỏ chạy. Cách "tới cùng" là cận TRÊN của tỉ lệ chết; cách "biết bỏ chạy" của mô hình bấm Bỏ chạy ĐÚNG lúc khí huyết < ${ASSUME_AMBUSH.fleeBelow * 100}% rồi sống qua giây vận nên là cận DƯỚI (người chơi thật nằm giữa: bấm trễ hoặc không bấm); cái giá của cận dưới là cột "Thoát / lần" (mỗi lần thoát trả tu vi hoặc Linh thạch). Thua = chết thật nên con số "chết >= 1 lần / ngày" đáng chú ý hơn tỉ lệ từng lần.
+
+| Đồ | Hồi Huyết Đan | Chết / lần (tới cùng) | Chết / lần (biết bỏ chạy) | Thoát / lần (biết bỏ chạy) | Chết >= 1 lần / ngày (tới cùng / biết bỏ chạy) | Bầy thắng dưới mục tiêu | Bầy chết nhiều nhất (tới cùng) |
+|---|--:|--:|--:|--:|---|--:|---|
+${sensTable}
+
+${cautiousText}
 
 ${violations.length === 0 ? `**Không vi phạm bất biến nào** (mọi bầy thắng >= ${AMBUSH_TIERS.map((t) => `${pct(ASSUME_AMBUSH.targets.winRate[t])} ${TIER_VI[t]}`).join(" / ")}, giá bỏ chạy và thời gian trận xem cảnh báo bên dưới).` : `**VI PHẠM (${violations.length}):**\n\n${violations.map((v) => `- ${v}`).join("\n")}`}
 ${warnings.length === 0 ? "" : `\nCảnh báo (không chặn):\n\n${warnings.map((v) => `- ${v}`).join("\n")}\n`}`;

@@ -1024,6 +1024,21 @@ Theo từng cảnh giới (thưởng và giá tính bằng phút săn của bậ
 
 Giá bỏ chạy bằng tu vi: 2 phút (hộp thoại) / 3 phút (giữa trận); thưởng tu vi thắng: thường 4 phút / tinh anh 6 phút / kẻ cầm đầu 10 phút (phút săn của bậc người chơi; bảng tu vi / phút săn `AMBUSH_HUNT_EXP_PER_MIN` sinh từ mô phỏng). Giá bị kẹp bởi tu vi đang có trong thanh (không bao giờ rớt cảnh giới).
 
+### 4. Độ nhạy theo giả định (Hồi Huyết Đan, đồ)
+
+Bảng 1-3 đo ở giả định CHUẨN (8 đan + đồ tốt nhất đủ bậc). Người chơi thật thường mang ít đan hơn hoặc chưa lên đồ, nên bảng này đo lại CÙNG 24 bầy (ở bậc `minStep`, mỗi bầy 48 trận, hạt giống 1..48: ít nhiễu hơn bảng 1-3 vốn 8 trận) với từng tổ hợp số đan x có đồ hay không. "Chết / lần" là tỉ lệ chết MỖI lần bị chặn, trộn theo `AMBUSH_TIER_WEIGHTS` (thường 70 / tinh anh 25 / kẻ cầm đầu 5); "chết >= 1 lần / ngày" là xác suất chết ít nhất một lần trong 12 lần chặn (mức tối đa mỗi ngày, các lần độc lập: 1 - (1 - p)^12), tới cùng / biết bỏ chạy. Cách "tới cùng" là cận TRÊN của tỉ lệ chết; cách "biết bỏ chạy" của mô hình bấm Bỏ chạy ĐÚNG lúc khí huyết < 25% rồi sống qua giây vận nên là cận DƯỚI (người chơi thật nằm giữa: bấm trễ hoặc không bấm); cái giá của cận dưới là cột "Thoát / lần" (mỗi lần thoát trả tu vi hoặc Linh thạch). Thua = chết thật nên con số "chết >= 1 lần / ngày" đáng chú ý hơn tỉ lệ từng lần.
+
+| Đồ | Hồi Huyết Đan | Chết / lần (tới cùng) | Chết / lần (biết bỏ chạy) | Thoát / lần (biết bỏ chạy) | Chết >= 1 lần / ngày (tới cùng / biết bỏ chạy) | Bầy thắng dưới mục tiêu | Bầy chết nhiều nhất (tới cùng) |
+|---|--:|--:|--:|--:|---|--:|---|
+| đồ tốt nhất đủ bậc | 8 (chuẩn) | 0,3% | 0% | 3,9% | 3% / 0% | 0 / 24 | lac_ha_soi_tinh_anh (chết 6%) |
+| đồ tốt nhất đủ bậc | 2 (thận trọng) | 3,7% | 0% | 8,6% | 36% / 0% | 1 / 24 | am_suong_quy_doi (chết 73%) |
+| đồ tốt nhất đủ bậc | 0 | 25,1% | 0% | 40,3% | 97% / 0% | 7 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
+| KHÔNG đồ | 8 | 18,1% | 0% | 37,6% | 91% / 0% | 5 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
+| KHÔNG đồ | 2 | 22,8% | 0% | 37,9% | 96% / 0% | 6 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
+| KHÔNG đồ | 0 | 49,4% | 0% | 62,8% | 100% / 0% | 13 / 24 | lac_ha_soi_tinh_anh (chết 100%) |
+
+Ở giả định thận trọng (2 đan + đồ đúng bậc) còn **1 / 24 bầy dưới mục tiêu thắng**: CHƯA đặt nó làm giả định chuẩn được cho tới khi E / G chỉnh các bầy đó (tên ở cảnh báo bên dưới).
+
 **Không vi phạm bất biến nào** (mọi bầy thắng >= 90% thường / 80% tinh anh / 60% kẻ cầm đầu, giá bỏ chạy và thời gian trận xem cảnh báo bên dưới).
 
 Cảnh báo (không chặn):
@@ -1050,6 +1065,8 @@ Cảnh báo (không chặn):
 - bầy han_van_nha_gio: trận 12 giây (khung 30-70 giây)
 - bầy han_van_soi_tuyet: trận 8 giây (khung 30-70 giây)
 - bầy han_van_yeu_vuong: trận 10 giây (khung 30-70 giây)
+- bầy lac_ha_soi_tinh_anh (lac_ha, bậc 4, elite): chết 6% "tới cùng" / 0% "biết bỏ chạy" ở giả định thận trọng (2 đan + đồ đúng bậc, 48 trận), vượt 5%
+- bầy am_suong_quy_doi (am_suong, bậc 13, normal): chết 73% "tới cùng" / 0% "biết bỏ chạy" ở giả định thận trọng (2 đan + đồ đúng bậc, 48 trận), vượt 5%
 
 
 ## Cân bằng chiêu thức, ngũ hành và trạng thái (M7, #510)
