@@ -26,6 +26,7 @@ import {
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 import { applyStaticHeaders } from "./static-headers";
+import { loadPrivatePacks, mountPrivatePacks, privatePacksNotice } from "./private-packs";
 import { bossMovesNotice } from "./systems/boss-config";
 import { ambushNotice } from "./systems/ambush-config";
 import { worldBossNotice, worldBossOn } from "./systems/world-boss-config";
@@ -118,6 +119,12 @@ async function main() {
   );
   // Dọn phiên hết hạn mỗi giờ (unref: không giữ tiến trình sống)
   if (auth) setInterval(() => void auth.sweep().catch(() => {}), 3_600_000).unref();
+
+  // Gói tài nguyên RIÊNG (mục 63, cấm phân phối lại; KHÔNG nằm trong repo): `ASSETS_PRIVATE_DIR` rỗng = tắt, `/assets-private/*` luôn 404 sạch (không rơi xuống index.html). Gắn SAU Origin / khung, TRƯỚC trang tĩnh
+  const privatePacks = loadPrivatePacks(process.env.ASSETS_PRIVATE_DIR);
+  for (const w of privatePacks.warnings) console.warn(`[CẢNH BÁO] ${w}`);
+  console.log(privatePacksNotice(privatePacks));
+  mountPrivatePacks(app, privatePacks.table);
 
   // Production: phục vụ luôn bản build của client (client/dist) từ cùng server
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");
