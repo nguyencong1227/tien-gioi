@@ -255,6 +255,11 @@ describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)",
     expect(spawnZoneViolations(mapWith([]))).toEqual([]);
   });
 
+  it("vùng chồng MỘT PHẦN lên khối đá hoặc lên khu an toàn vẫn hợp lệ: đá / trấn bị lọc, không bị tính là túi kín", () => {
+    expect(spawnZoneViolations(mapWith([zone("lang", 28, 28, 10, 10)]))).toEqual([]); // quanh khối đá
+    expect(spawnZoneViolations(mapWith([zone("lang", 6, 6, 24, 8)]))).toEqual([]); // vắt qua trấn (10, 10)
+  });
+
   it("loài không có trong monsterCap bị báo; trùm của lịch thế giới ở bản đồ này thì được", () => {
     const m = mapWith([zone("ho", 18, 18, 8, 8)], { lang: 5 });
     expect(spawnZoneViolations(m).join("\n")).toMatch(/\(ho\): loài này không có trong monsterCap/);
@@ -264,6 +269,12 @@ describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)",
     expect(spawnZoneViolations(boss, [slot])).toEqual([]);
     // lịch của bản đồ KHÁC không tính
     expect(spawnZoneViolations(boss, [{ ...slot, mapId: "han_van" }]).length).toBeGreaterThan(0);
+  });
+
+  it(`ngưỡng đúng ${MIN_ZONE_SPOTS} chỗ: khung 2 x 1 ô có đúng ${MIN_ZONE_SPOTS} điểm lưới thì qua, bớt nửa ô thì còn 6 và bị báo`, () => {
+    expect(spawnZoneViolations(mapWith([zone("lang", 18, 18, 2, 1)]))).toEqual([]);
+    const narrow: SpawnZoneDef = { ...zone("lang", 18, 18, 2, 1), w: 2 * TILE - 16 };
+    expect(spawnZoneViolations(mapWith([narrow])).join("\n")).toMatch(/chỉ có 6 chỗ sinh hợp lệ/);
   });
 
   it("vùng nằm trọn trên đá hoặc trong khu an toàn: không có chỗ sinh nào", () => {
@@ -293,6 +304,40 @@ describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)",
     const bad = spawnZoneViolations(mapWith([z], { lang: 5 }, pocket));
     expect(bad.join("\n")).toMatch(/túi kín/);
     expect(spawnZoneViolations(mapWith([z], { lang: 5 }))).toEqual([]);
+  });
+
+  it("vùng gọn trong túi kín: các chỗ trong túi KHÔNG được tính là chỗ sinh hợp lệ (0 chỗ) và báo túi kín", () => {
+    const ring = (t: Uint8Array) => {
+      for (let i = 20; i <= 25; i++) {
+        t[38 * SIDE + i] = T.Rock;
+        t[43 * SIDE + i] = T.Rock;
+        t[(38 + (i - 20)) * SIDE + 20] = T.Rock;
+        t[(38 + (i - 20)) * SIDE + 25] = T.Rock;
+      }
+    };
+    const errs = spawnZoneViolations(mapWith([zone("lang", 21, 39, 4, 4)], { lang: 5 }, ring)).join(
+      "\n",
+    );
+    expect(errs).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    expect(errs).toMatch(/túi kín/);
+  });
+
+  it("hình elip loại bốn góc khung: túi kín nằm ở góc khung (ngoài elip) không bị tính; cùng khung dạng chữ nhật thì bị báo", () => {
+    // túi (ô trong 4..5 x 28..29, vòng đá 3..6 x 27..30) ở góc trên-trái của khung 4..20 x 28..44, xa trấn (10, 10) hơn 200 px
+    const ring = (t: Uint8Array) => {
+      for (let i = 3; i <= 6; i++) {
+        t[27 * SIDE + i] = T.Rock;
+        t[30 * SIDE + i] = T.Rock;
+      }
+      for (let y = 27; y <= 30; y++) {
+        t[y * SIDE + 3] = T.Rock;
+        t[y * SIDE + 6] = T.Rock;
+      }
+    };
+    const ell = zone("lang", 4, 28, 16, 16, { shape: "ellipse" });
+    expect(spawnZoneViolations(mapWith([ell], { lang: 5 }, ring))).toEqual([]);
+    const rect = { ...ell, shape: "rect" as const };
+    expect(spawnZoneViolations(mapWith([rect], { lang: 5 }, ring)).join("\n")).toMatch(/túi kín/);
   });
 
   it("trùm: vùng sát đá (mọi chỗ trong 62 px quanh đá) không có chỗ `bossSpawnOk`; quái thường cùng vùng thì qua", () => {
