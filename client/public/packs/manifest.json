@@ -26,6 +26,58 @@
         }
       ],
       "bytes": 83976
+    },
+    {
+      "id": "map:am_suong",
+      "kind": "map",
+      "mapId": "am_suong",
+      "files": [
+        {
+          "path": "map-am_suong/visual.json",
+          "bytes": 114965,
+          "sha256": "f282ad304832a40814a43c517f322ec2096d40fd90f64cda3721276ea608fd61"
+        }
+      ],
+      "bytes": 114965
+    },
+    {
+      "id": "map:hac_phong",
+      "kind": "map",
+      "mapId": "hac_phong",
+      "files": [
+        {
+          "path": "map-hac_phong/visual.json",
+          "bytes": 99822,
+          "sha256": "b912ec750b1081fc1e12f746e33edd4f3aae09dfe450a35726d817f7765c251f"
+        }
+      ],
+      "bytes": 99822
+    },
+    {
+      "id": "map:han_van",
+      "kind": "map",
+      "mapId": "han_van",
+      "files": [
+        {
+          "path": "map-han_van/visual.json",
+          "bytes": 131449,
+          "sha256": "a0928d567be0c3db2c5c900b6ebe87bb411c02e95ee519a99b26325775e3ce91"
+        }
+      ],
+      "bytes": 131449
+    },
+    {
+      "id": "map:lac_ha",
+      "kind": "map",
+      "mapId": "lac_ha",
+      "files": [
+        {
+          "path": "map-lac_ha/visual.json",
+          "bytes": 74528,
+          "sha256": "2736bd802c60ffa29551a23723240e2eb922fec2d1d5d50de7b5d51aca7f0334"
+        }
+      ],
+      "bytes": 74528
     }
   ]
 }
