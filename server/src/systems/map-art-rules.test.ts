@@ -168,6 +168,19 @@ describe("Quy tắc lớp hình bản đồ Tiled (S4b, Issue #1222)", () => {
       }
     });
 
+    it("mặt nạ `resolveTreeCanopies` KHỚP lớp `over` của builder trên 4 bản đồ thật, cả hai chế độ (một luật viết hai nơi)", () => {
+      for (const mapId of ["lac_ha", "hac_phong", "am_suong", "han_van"]) {
+        const map = loadMapTiles(mapId);
+        for (const mode of ["legacy", "cluster_top"] as const) {
+          const over = buildVisualLayersFromLogic(map.tiles, map.width, map.height, {
+            treeCanopyMode: mode,
+          }).over.data as number[];
+          const mask = resolveTreeCanopies(map.tiles, map.width, map.height, mode);
+          expect(over.map((g) => (g !== 0 ? 1 : 0))).toEqual(Array.from(mask));
+        }
+      }
+    });
+
     it("chế độ mặc định 'legacy' giữ nguyên 100% tương thích với bản Tiled S4", () => {
       const map = loadMapTiles("lac_ha");
       const layersDefault = buildVisualLayersFromLogic(map.tiles, map.width, map.height);
@@ -187,12 +200,12 @@ describe("Quy tắc lớp hình bản đồ Tiled (S4b, Issue #1222)", () => {
       const h = 5;
       const tiles = new Uint8Array(w * h).fill(T.Grass);
 
-      // Dải dọc: (1, 1), (1, 2), (1, 3)
+      // Dải dọc: (1, 1), (1, 2), (1, 3) (x, y)
       tiles[1 * w + 1] = T.Sand;
       tiles[2 * w + 1] = T.Sand;
       tiles[3 * w + 1] = T.Sand;
 
-      // Dải ngang: (3, 1), (3, 2), (3, 3) -> y=3: x=1,2,3 là Sand
+      // Dải ngang: (1, 3), (2, 3), (3, 3) -> y=3: x=1,2,3 là Sand
       tiles[3 * w + 1] = T.Sand;
       tiles[3 * w + 2] = T.Sand;
       tiles[3 * w + 3] = T.Sand;
@@ -205,8 +218,8 @@ describe("Quy tắc lớp hình bản đồ Tiled (S4b, Issue #1222)", () => {
       const horizontal = res.narrowCells.filter((c) => c.direction === "horizontal");
       const isolated = res.narrowCells.filter((c) => c.direction === "isolated");
 
-      expect(vertical.length).toBe(2); // (1, 1) và (1, 2) là dải dọc (ô 1, 3 giao với dải ngang)
-      expect(horizontal.length).toBe(2); // (3, 2) và (3, 3) là dải ngang
+      expect(vertical.length).toBe(2); // (1, 1) và (1, 2) là dải dọc (ô (1, 3) giao với dải ngang)
+      expect(horizontal.length).toBe(2); // (2, 3) và (3, 3) là dải ngang (x, y)
       expect(isolated.length).toBe(1); // (4, 4)
     });
   });

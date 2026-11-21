@@ -12,7 +12,7 @@ import {
   type TiledTileset,
 } from "@tien-gioi/shared";
 import { neighborMaskClamped, resolveAutotile, toTileGid } from "@tien-gioi/shared/src/autotile";
-import { type TreeCanopyMode } from "./map-art-rules";
+import { resolveTreeCanopies, type TreeCanopyMode } from "./map-art-rules";
 
 export * from "./map-art-rules";
 
@@ -87,6 +87,7 @@ export function buildVisualLayersFromLogic(
   const decorData = new Array<number>(size).fill(0); // 0 = trong suốt
   const overData = new Array<number>(size).fill(0); // 0 = trong suốt
   const canopyMode = options.treeCanopyMode ?? "legacy";
+  const canopyMask = resolveTreeCanopies(tiles, width, height, canopyMode);
 
   // Helper lấy ô logic có kẹp mép
   const tileAt = (x: number, y: number): number => {
@@ -167,16 +168,9 @@ export function buildVisualLayersFromLogic(
       }
 
       // 3. LỚP PHỦ TRÊN ĐẦU (over)
-      // Tán cây phủ trên đầu nhân vật: nếu ô bên dưới (x, y + 1) là Tree, ô (x, y) nhận tán cây
-      if (y + 1 < height && tiles[(y + 1) * width + x] === T.Tree) {
-        if (canopyMode === "cluster_top") {
-          // Chỉ đặt tán nếu ô hiện tại (x, y) KHÔNG phải là Tree để tránh đè lên thân cây khác
-          if (t !== T.Tree) {
-            overData[idx] = GID_TREE_CANOPY;
-          }
-        } else {
-          overData[idx] = GID_TREE_CANOPY;
-        }
+      // Tán cây phủ trên đầu nhân vật sinh từ hàm quy hoạch resolveTreeCanopies duy nhất
+      if (canopyMask[idx] === 1) {
+        overData[idx] = GID_TREE_CANOPY;
       }
     }
   }
