@@ -942,6 +942,13 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 **Không vi phạm bất biến nào** (mọi đòn <= ngưỡng, bot né hoàn hảo không bị trúng, bot đứng yên bị trúng).
 
 
+## Trùm thế giới: máu nhân `hpMult` (M9.10 #1029, mục 59)
+
+> Phần này sinh từ `server/src/balance/trum-the-gioi.ts` (chạy bộ thực thi trùm thật `fightBossMoves`, máu = `worldBossHpOf`). Hai cận cho cùng một khung giờ: **né hoàn hảo** (không ai chết; thời gian = máu thật / (số người x DPS mỗi người x 0.6)) và **không né** (đứng đánh thường, uống đan, trùm trúng mọi đòn; chết là chết THẬT ở bản đồ thường). Người chơi thật nằm giữa. DPS mỗi người đo từ đội 5 người hạ trùm ở máu gốc (8 trận đạt). Thưởng (`WorldBossReward` là MỘT quỹ chia theo tỉ lệ đóng góp) quy ra phút săn quái tốt nhất cùng bậc cho một người trong đội 10 người (mục tiêu 12-25; bí cảnh 15-20). Mục tiêu: số người tối thiểu hạ được trong thời lượng là 4-8 (cộng đồng nhỏ vẫn hạ được, không một mình), đội 50 người không dưới 3 phút.
+
+**Chưa có khung giờ nào** (`WORLD_BOSS_SCHEDULE` rỗng, #1029): chưa có gì để đo; lịch rỗng thì tính năng không chạy. Khi có lịch, chạy lại `npm run can-bang -w server`.
+
+
 ## Chặn đường: tỉ lệ chết khi chọn Chiến (mục 52 / 59, CD6 #1066)
 
 > Phần này sinh từ `server/src/balance/chan-duong.ts`: chạy ĐẤU TRƯỜNG THẬT (`createArena` + `tickWorld`, thưởng `payRewards`) trên `AMBUSH_FOES` thật, nên thêm / sửa bầy là báo cáo đổi theo (chạy lại `npm run can-bang -w server`).
