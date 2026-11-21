@@ -31,6 +31,7 @@ import {
 } from "./ambush";
 import { arenaJoined, createArena, onAmbushFlee, tickArena, type AmbushTicket } from "./arena";
 import { assertNotProd } from "../../scripts/assert-not-prod";
+import { measureSyncStepMs } from "../perf/bench";
 
 const DEFAULT_MAP = getMap(DEFAULT_MAP_ID)!;
 const ARENA_MAP = getMap(arenaMapIdOf(DEFAULT_MAP_ID))!;
@@ -222,10 +223,13 @@ describe("CD9: Bot chặn đường (Issue #1069)", () => {
     // Đo thời gian tick khi 100 bot cùng đang mở hộp thoại
     const tickDurations: number[] = [];
     for (let t = 0; t < 50; t++) {
-      const t0 = performance.now();
-      w.now += TICK_MS;
-      tickWorld(w, TICK_MS);
-      tickDurations.push(performance.now() - t0);
+      // CPU của chính luồng, không đồng hồ tường (#1215)
+      tickDurations.push(
+        measureSyncStepMs(() => {
+          w.now += TICK_MS;
+          tickWorld(w, TICK_MS);
+        }),
+      );
     }
     const avgTickMs = tickDurations.reduce((a, b) => a + b, 0) / tickDurations.length;
     expect(avgTickMs).toBeLessThan(10); // Ngân sách < 10 ms/tick
