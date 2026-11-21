@@ -8,7 +8,8 @@ import {
   type WorldBossSlot,
 } from "@tien-gioi/shared";
 import { ASSUME_DUNGEON } from "./dungeon";
-import { ASSUME_BOSS, fightBossMoves } from "./trum";
+import { bestOption, expectedTotalCoin } from "./simulate";
+import { ASSUME_BOSS, bossStep, fightBossMoves } from "./trum";
 import {
   ASSUME_WORLD_BOSS,
   measureSlot,
@@ -76,23 +77,6 @@ describe("measureSlot", () => {
     expect(huge.noDodge[50]!.winRate).toBe(0);
     expect(huge.noDodge[50]!.deaths).toBe(50);
     expect(huge.noDodge[50]!.minutes).toBeNull();
-  });
-
-  it("không né: `minutes` là phút THẬT = giây mô phỏng TB của trận thắng / uptime / 60 (không phải giây, không bỏ uptime)", () => {
-    const row = measureSlot(slot({ hpMult: undefined }));
-    const def = BOSSES.find((b) => b.kind === base.boss)!;
-    const limit = base.durationMin * 60 * ASSUME_DUNGEON.bossUptime;
-    let sec = 0;
-    let wins = 0;
-    for (let seed = 1; seed <= ASSUME_WORLD_BOSS.runs; seed++) {
-      const f = fightBossMoves(def, 5, seed, 1, Math.min(limit, ASSUME_BOSS.maxSeconds * 4));
-      if (f.killed) {
-        wins++;
-        sec += f.seconds;
-      }
-    }
-    expect(wins).toBeGreaterThan(0);
-    expect(row.noDodge[5]!.minutes).toBeCloseTo(sec / wins / ASSUME_DUNGEON.bossUptime / 60, 6);
   });
 
   it("loài không có bộ chiêu: ném lỗi rõ ràng", () => {
@@ -186,37 +170,72 @@ describe("LỊCH THẬT (WORLD_BOSS_SCHEDULE)", () => {
   });
 });
 
-describe("worldBossBalanceViolations: biên của mục tiêu (hàng dựng tay, không chạy mô phỏng)", () => {
-  const row = (over: Partial<WorldBossRow>): WorldBossRow => ({
-    slot: base,
-    hp: 1_000_000,
-    dpsPerPlayer: 400,
-    dodgeMinutes: { 5: 40, 20: 10, 50: 4 },
-    minPlayers: 6,
-    huntExpPerMin: 400,
-    huntCoinPerMin: 300,
-    // thưởng đúng giữa khoảng mục tiêu (17,5 phút ở đội điển hình): các ca biên dưới đây không bị lẫn vi phạm thưởng
-    expEquivMinutes: { 5: 35, 10: 17.5, 20: 8.75, 50: 3.5 },
-    coinEquivMinutes: { 5: 35, 10: 17.5, 20: 8.75, 50: 3.5 },
-    noDodge: {},
-    ...over,
-  });
-  const bad = (over: Partial<WorldBossRow>) => worldBossBalanceViolations([row(over)]);
-
-  it("số người tối thiểu: đúng 4 và đúng 8 ĐẠT; 3 và 9 vi phạm (biên hai đầu)", () => {
-    expect(bad({})).toEqual([]);
-    expect(bad({ minPlayers: 4 })).toEqual([]);
-    expect(bad({ minPlayers: 8 })).toEqual([]);
-    expect(bad({ minPlayers: 3 })).toHaveLength(1);
-    expect(bad({ minPlayers: 9 })).toHaveLength(1);
+describe("đơn vị và biên của số đo (bản vá B, review #1238)", () => {
+  it("không né: `minutes` là phút THẬT = giây mô phỏng TB của trận thắng / uptime / 60 (không phải giây, không bỏ uptime)", () => {
+    const row = measureSlot(slot({ hpMult: undefined }));
+    const def = BOSSES.find((b) => b.kind === base.boss)!;
+    const limit = base.durationMin * 60 * ASSUME_DUNGEON.bossUptime;
+    let sec = 0;
+    let wins = 0;
+    for (let seed = 1; seed <= ASSUME_WORLD_BOSS.runs; seed++) {
+      const f = fightBossMoves(def, 5, seed, 1, Math.min(limit, ASSUME_BOSS.maxSeconds * 4));
+      if (f.killed) {
+        wins++;
+        sec += f.seconds;
+      }
+    }
+    expect(wins).toBeGreaterThan(0);
+    expect(row.noDodge[5]!.minutes).toBeCloseTo(sec / wins / ASSUME_DUNGEON.bossUptime / 60, 6);
   });
 
-  it("hạ quá nhanh: chỉ xét đội ĐÔNG NHẤT (50): đúng 3 phút đạt, 2,99 vi phạm; đội 5 / 20 hạ nhanh thì không sao", () => {
-    expect(bad({ dodgeMinutes: { 5: 0.5, 20: 0.5, 50: 3 } })).toEqual([]);
-    expect(bad({ dodgeMinutes: { 5: 40, 20: 10, 50: 2.99 } })).toHaveLength(1);
+  it("Linh thạch / phút săn = tổng Linh thạch kỳ vọng một con / giây mỗi con x 60 (đơn vị phút); quỹ Linh thạch / số người / giá trị đó", () => {
+    const row = measureSlot(slot({ hpMult: 35 }));
+    const def = BOSSES.find((b) => b.kind === base.boss)!;
+    const { realm, tier } = bossStep(def);
+    const opt = bestOption(realm, tier);
+    expect(opt.source).not.toBe("đả tọa"); // đối chứng: ở bậc này săn quái tốt hơn đả tọa, nên có Linh thạch
+    expect(row.huntCoinPerMin).toBeCloseTo(
+      (expectedTotalCoin(opt.source) / opt.secPerKill) * 60,
+      6,
+    );
+    expect(row.huntCoinPerMin).toBeGreaterThan(100); // đo ~295 Linh thạch / phút ở bậc 18 (không phải ~5 của "quên nhân 60")
+    expect(row.huntCoinPerMin).toBeLessThan(900);
   });
 
-  it("không đo được DPS: vi phạm (không có cơ sở chọn hệ số)", () => {
-    expect(bad({ dpsPerPlayer: null, minPlayers: null })).toHaveLength(1);
+  describe("worldBossBalanceViolations: biên của mục tiêu (hàng dựng từ số đo thật, ghi đè từng trường)", () => {
+    const real = measureSlot(slot({ hpMult: 35 }));
+    const bad = (over: Partial<WorldBossRow>) => worldBossBalanceViolations([{ ...real, ...over }]);
+    const eq10 = (m: number) => ({
+      ...real.expEquivMinutes,
+      [ASSUME_WORLD_BOSS.typicalPlayers]: m,
+    });
+
+    it("số liệu thật của khung x35 đạt (nền đối chứng cho các ca dưới)", () => {
+      expect(bad({})).toEqual([]);
+    });
+
+    it("số người tối thiểu: đúng 4 và đúng 8 ĐẠT; 3 và 9 vi phạm", () => {
+      expect(bad({ minPlayers: 4 })).toEqual([]);
+      expect(bad({ minPlayers: 8 })).toEqual([]);
+      expect(bad({ minPlayers: 3 })).toHaveLength(1);
+      expect(bad({ minPlayers: 9 })).toHaveLength(1);
+    });
+
+    it("hạ quá nhanh: chỉ xét đội ĐÔNG NHẤT: đúng 3 phút đạt, 2,99 vi phạm; đội nhỏ hạ nhanh thì không sao", () => {
+      expect(bad({ dodgeMinutes: { 5: 0.5, 20: 0.5, 50: 3 } })).toEqual([]);
+      expect(bad({ dodgeMinutes: { 5: 40, 20: 10, 50: 2.99 } })).toHaveLength(1);
+    });
+
+    it("thưởng tu vi của MỘT người trong đội điển hình: đúng 12 và đúng 25 phút săn ĐẠT; 11,99 và 25,01 vi phạm; chỉ xét đội điển hình", () => {
+      expect(bad({ expEquivMinutes: eq10(12) })).toEqual([]);
+      expect(bad({ expEquivMinutes: eq10(25) })).toEqual([]);
+      expect(bad({ expEquivMinutes: eq10(11.99) })).toHaveLength(1);
+      expect(bad({ expEquivMinutes: eq10(25.01) })).toHaveLength(1);
+      expect(bad({ expEquivMinutes: { ...eq10(17), 5: 1, 20: 99, 50: 99 } })).toEqual([]);
+    });
+
+    it("không đo được DPS: vi phạm (không có cơ sở chọn hệ số)", () => {
+      expect(bad({ dpsPerPlayer: null, minPlayers: null })).toHaveLength(1);
+    });
   });
 });
