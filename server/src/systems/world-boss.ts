@@ -28,7 +28,7 @@ import { bossDespawnAdds } from "./boss-state";
 import { titleOf } from "./chat-title";
 import { giveItem } from "./inventory";
 import { spawnLoot } from "./loot";
-import { bossSpawnOk } from "./monsters";
+import { bossSpawnOk, zoneSpawnSpot } from "./monsters";
 import { placeMonster } from "./monster-place";
 import { gainExp } from "./progression";
 import { onMonsterKilled } from "./quests";
@@ -65,6 +65,9 @@ function targetWorld(hub: Hub, mapId: string): World | undefined {
 /** Tìm chỗ sinh đủ rộng, xa khu an toàn (như trùm thường: thử chặt trước, không được thì nới); `null` nếu bản đồ không có chỗ nào. */
 function findSpot(w: World, def: MonsterKind): { x: number; y: number } | null {
   const map = w.map;
+  // Bản đồ khai vùng sinh cho loài trùm này (S5): chỉ sinh trong vùng, bỏ `max` của vùng (trùm thế giới là thêm); không khai thì cách cũ
+  const zones = map.spawnZonesOf(def.id);
+  if (zones.length > 0) return zoneSpawnSpot(w, def, zones, { ignoreMax: true });
   for (const strict of [true, false]) {
     for (let i = 0; i < (strict ? 200 : 60); i++) {
       const x = rand(64, map.worldW - 64);
