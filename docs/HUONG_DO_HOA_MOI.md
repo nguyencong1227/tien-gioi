@@ -131,6 +131,7 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 
 - **Ảnh 1** `docs/art/huong-moi/01-nhan-vat-quai-do.png`: nhân vật (5 cảnh giới), hoạt hoạ hướng xuống, quái, biểu tượng vật phẩm, bảng màu đạo bào. Trái = hiện tại, phải = gói.
 - **Ảnh 2** `docs/art/huong-moi/02-canh-truoc-sau.png`: cùng một bố cục 16x9 ô ở bốn bản: TRƯỚC; SAU A (nguyên màu gói); SAU B (bảng "tu tiên"); SAU C (nền gói + nhân vật / quái hiện tại).
+- **Ảnh 3-4: BẢN ĐỒ THẬT ở 6 cỡ màn hình** (360x640, 412x915, 915x412, 550x900, 1366x768, 1920x1080; yêu cầu tiêu chí 4 của #1196). Lưới ô lấy từ `getMap("lac_ha")` (`npx tsx client/scripts/art/xuat-luoi-ban-do.ts lac_ha > lac_ha.json`, rồi `python3 -I client/scripts/art/mau-huong-moi.py --grid lac_ha.json`); vùng nhìn cắt theo đúng `fitZoom` của game (zoom 0,75 / 0,83 / 0,75 / 0,86 / 1,20 / 1,30); TRƯỚC = tileset + atlas hiện tại, SAU = gói + bảng "tu tiên" (SAU B). `03-lac-ha-tran-6-khung.jpg` và `03-vung-san-6-khung.jpg`: tờ tổng hợp 6 khung (Lạc Hà Trấn ở cổng trấn; một vùng săn cách trấn ~30 ô chọn tất định theo độ đa dạng địa hình); `04-*-412x915.jpg` (hai bản cạnh nhau) và `04-*-1366x768.jpg` (xếp dọc) là độ phân giải thật. **Chưa có HUD** (giai đoạn 1 không đổi HUD; UI là bước 4) và **chưa phải ảnh chụp trong game**; lọc ảnh dùng song tuyến cho cả hai bản vì lọc thật của game chưa kiểm.
 
 **Nhận xét thẳng của B khi xem ảnh:**
 
@@ -138,6 +139,13 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 - Nhân vật của gói: dễ thương nhưng **kém "tu sĩ"** so với đạo sĩ áo trắng cầm kiếm hiện tại; NPC của gói (1 hình) không thay được 15 vai. Ảnh 1 hàng "Quái": 2 loài của gói vs 14 loài hiện tại.
 - Cây to gấp ~2 lần so với người (đúng phong cách gói): cảnh có cảm giác "rừng" hơn nhưng che khuất nhiều hơn; cần kiểm tầm nhìn khi đánh quái trong rừng.
 - SAU C (pha trộn) dùng được nhưng **hai mật độ điểm ảnh khác nhau** hiện rõ: nhân vật tinh hơn nền. Chấp nhận được nếu người dùng thích hướng này; nếu không, cần thay nhân vật.
+
+**Điều ảnh 3-4 (bản đồ thật) cho thấy thêm:**
+
+- **Rừng quá dày nếu vẽ mỗi ô `T.Tree` một cây của gói** (như ảnh vùng săn): các tán 2 ô chồng lên nhau, nhân vật đứng giữa cụm bị tán vây quanh. Cần một bước **xếp cây** (mỗi khối 2x2 ô cây một cây, ô thừa là bụi / gốc), tán chỉ phủ phần trên thân và mờ khi người chơi ở dưới (mục 7); đây là việc của Bước 2 (và `map:build` S4), không phải của hình gói.
+- **Dải 1 ô (bờ cát quanh ao, đường đất hẹp) bị ghép góc rách:** bộ 56 ô ghép góc là kiểu blob, đẹp với mảng từ 2 ô trở lên; dải 1 ô nên dựng bằng ô viền riêng hoặc làm rộng 2 ô khi dựng bản đồ (S4 / S6).
+- **Độ đọc nhân vật phụ thuộc zoom:** ở 360x640 và 915x412 (zoom 0,75) nhân vật gói cao ~24 px màn hình (16 px x2 x 0,75) so với ~29 px hiện tại (39 px x 0,75), đầu to và tối hơn nền; đó là lý do đề xuất giữ nhân vật hiện tại ở hướng C và thêm viền / hào quang vẽ bằng mã nếu thay.
+- Nước của gói trong ảnh là khối băng đổi màu (mục 2): sáng và nhạt hơn nước hiện tại; nên chọn lại màu khi có tileset nước thật.
 
 ## 7. Rủi ro kỹ thuật và ngân sách
 

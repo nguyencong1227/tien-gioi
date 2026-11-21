@@ -7,6 +7,7 @@ Chỉ để NGƯỜI DÙNG DUYỆT HƯỚNG, không đi vào bản chạy: đọ
 Chạy:  python3 -I client/scripts/art/mau-huong-moi.py [--src THU_MUC_GOI] [--out THU_MUC_RA]
 
 Ảnh 1 (`01-nhan-vat-quai-do.png`): nhân vật + bảng màu cảnh giới, hoạt hoạ, quái, vật phẩm, UI.
+Ảnh 3-4 (`03-*-6-khung.jpg`, `04-*-<khung>.jpg`, cần `--grid`): BẢN ĐỒ THẬT (Lạc Hà Trấn + một vùng săn) ở 6 cỡ màn hình, zoom theo `fitZoom`.
 Ảnh 2 (`02-canh-truoc-sau.png`): CÙNG một bố cục 16x9 ô, "trước" vẽ bằng tileset / atlas hiện tại, "sau" bằng ô Ninja Adventure
 16 px phóng 2 lần nguyên số (= ô 32 px của game), dùng bộ ghép góc tự động (autotile) đọc từ `tileset.tres` của gói.
 Đây là ảnh GHÉP NGOÀI GAME (chưa có hạt, sương, nhãn tên, HUD): ảnh chụp thật từng cỡ màn hình làm ở bước sau.
@@ -348,10 +349,190 @@ def compose_sheet(out, src, at):
     canvas.crop((0, 0, width, y + 56)).convert("RGB").save(out, optimize=True)
 
 
+# ---------------------------------------------------------------- ảnh 3-6: BẢN ĐỒ THẬT ở 6 cỡ màn hình (issue #1196, tiêu chí 4)
+VIEWPORTS = [(360, 640), (412, 915), (915, 412), (550, 900), (1366, 768), (1920, 1080)]
+VIEW_MAX_W, VIEW_MAX_H = 1900, 1100  # gfx/scale.ts: vùng nhìn tối đa của server (VIEW_ENTER = 1100 px)
+T_GRASS, T_TALL, T_DIRT, T_WATER, T_TREE, T_ROCK, T_STONE, T_SAND = range(8)
+SAND_TONES = {"#d3865f": "#dccfa6", "#bd7959": "#c7b88c"}  # đổi màu đất của khối ghép góc thành cát (đã theo bảng tu tiên)
+
+
+def fit_zoom(w, h):
+    """Bản Python của `fitZoom` (gfx/scale.ts): zoom theo cạnh ngắn, kẹp 0,75-1,3, nâng để vùng nhìn nằm trong vùng nhìn của server."""
+    min_zoom = max(0.75, w / VIEW_MAX_W, h / VIEW_MAX_H)
+    base = min(1.3, max(0.75, min(w, h) / 640))
+    return max(base, min_zoom)
+
+
+class RealMap:
+    def __init__(self, path):
+        d = json.load(open(path))
+        self.id, self.w, self.h, self.town = d["id"], d["w"], d["h"], d["town"]
+        self.tiles = d["tiles"]
+
+    def t(self, x, y):  # kẹp mép như lưới tìm hàng xóm của autotile
+        return self.tiles[min(max(y, 0), self.h - 1) * self.w + min(max(x, 0), self.w - 1)]
+
+    def walkable(self, x, y):
+        return self.t(x, y) not in (T_WATER, T_TREE, T_ROCK)
+
+    def nearest_walkable(self, x, y):
+        """Ô đi được gần (x, y) nhất (xoắn ốc), để nhân vật / quái trong ảnh mẫu không đứng trên cây, đá, nước."""
+        for r in range(0, 12):
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if max(abs(dx), abs(dy)) == r and self.walkable(x + dx, y + dy):
+                        return x + dx, y + dy
+        return x, y
+
+    def hunting_spot(self):
+        """Cửa sổ 28x20 ô cách trấn 28-40 ô có nhiều loại địa hình nhất (nước + cây + đất + cát): tất định, để ảnh 'vùng săn' có đủ thứ để so."""
+        best, score = (self.town["cx"] + 30, self.town["cy"]), -1
+        for cy in range(12, self.h - 12, 2):
+            for cx in range(16, self.w - 16, 2):
+                d = ((cx - self.town["cx"]) ** 2 + (cy - self.town["cy"]) ** 2) ** 0.5
+                if not 28 <= d <= 40:
+                    continue
+                cnt = [0] * 8
+                for y in range(cy - 10, cy + 10):
+                    for x in range(cx - 14, cx + 14):
+                        cnt[self.t(x, y)] += 1
+                if cnt[T_ROCK] > 40:  # tránh vách đá bao quanh
+                    continue
+                sc = min(cnt[T_WATER], 60) + min(cnt[T_TREE], 60) + min(cnt[T_DIRT], 40) + min(cnt[T_SAND], 40)
+                if sc > score:
+                    best, score = (cx, cy), sc
+        return best
+
+
+def window_truoc(rm, at, x0, y0, ww, hh, actors):
+    im = Image.new("RGBA", (ww * 32, hh * 32))
+    for y in range(hh):
+        for x in range(ww):
+            im.paste(at.tile(rm.t(x0 + x, y0 + y)), (x * 32, y * 32))
+    for name, tx, ty in actors:
+        fr = at.get(name)
+        im.alpha_composite(fr, ((tx - x0) * 32 + 16 - fr.width // 2, (ty - y0) * 32 + 32 - fr.height))
+    return im
+
+
+def window_sau(rm, src, x0, y0, ww, hh, actors, grade=True):
+    """Ảnh 'sau' của cửa sổ: lớp nền ghép góc (cỏ + đất, cát, nước), sàn trấn, cây / đá / bụi cỏ bằng sprite của gói, rồi đổi màu theo bảng
+    tu tiên (chỉ môi trường); nhân vật / quái vẽ sau cùng. Ô 16 px của gói, phóng x2 ở cuối."""
+    floor = load(src + "/content/map/tileset_floor.png")
+    village = load(src + "/content/map/tileset_village_abandoned.png")
+    interior = load(src + "/content/map/tileset_interior_floor.png")
+    terr = parse_terrain_tiles(src)
+    m = 1  # lề 1 ô để hàng xóm ở mép cửa sổ đúng
+
+    def grid(pred):
+        return [[1 if pred(rm.t(x0 + x, y0 + y)) else 0 for x in range(-m, ww + m)] for y in range(-m, hh + m)]
+
+    def crop_m(im):
+        return im.crop((m * 16, m * 16, (ww + m) * 16, (hh + m) * 16))
+    base = crop_m(autotile(grid(lambda t: t == T_DIRT), terr, floor, (0, 1)))
+    sand = recolor(autotile(grid(lambda t: t == T_SAND), terr, floor, (0, 1)), SAND_TONES)
+    sand = crop_m(sand)
+    cobble = interior.crop((6 * 16, 14 * 16, 7 * 16, 15 * 16))
+    for y in range(hh):
+        for x in range(ww):
+            t = rm.t(x0 + x, y0 + y)
+            if t == T_SAND:
+                base.alpha_composite(sand.crop((x * 16, y * 16, x * 16 + 16, y * 16 + 16)), (x * 16, y * 16))
+            elif t == T_STONE:
+                base.alpha_composite(cobble, (x * 16, y * 16))
+    wl = autotile(grid(lambda t: t == T_WATER), terr, floor, (0, 3))
+    px = wl.load()
+    for yy in range(wl.height):
+        for xx in range(wl.width):
+            r, g, b, a = px[xx, yy]
+            if a and (r, g, b) == (255, 255, 255):
+                px[xx, yy] = (0, 0, 0, 0)
+    base.alpha_composite(recolor(crop_m(wl), {"#b8dce5": "#8bbccd", "#f2eaf1": "#d9edf2"}))
+    tree = trim(village.crop((64, 96, 96, 136)))
+    rocks = [trim(village.crop((32, 48, 48, 96))), trim(village.crop((48, 56, 64, 96)))]
+    bush = trim(load(src + "/content/destroyable/grass.png"))
+    props = []  # (y, sprite, tx, ty) để vẽ theo thứ tự chiều sâu
+    for y in range(hh):
+        for x in range(ww):
+            t = rm.t(x0 + x, y0 + y)
+            if t == T_TREE:
+                props.append((y, tree, x, y))
+            elif t == T_ROCK:
+                props.append((y, rocks[(x * 7 + y * 3) % 2], x, y))
+            elif t == T_TALL:
+                base.alpha_composite(bush, (x * 16, y * 16))
+    for _, spr, x, y in sorted(props, key=lambda p: p[0]):
+        base.alpha_composite(spr, (x * 16 + 8 - spr.width // 2, y * 16 + 16 - spr.height))
+    if grade:
+        base = recolor(base, TU_TIEN_ENV)
+    for name, tx, ty in actors:
+        fr = name
+        base.alpha_composite(fr, ((tx - x0) * 16 + 8 - fr.width // 2, (ty - y0) * 16 + 16 - fr.height))
+    return up(base, GAME)
+
+
+def crop_viewport(win, x0, y0, cx, cy, vw, vh, scale_world=32):
+    """Cắt đúng vùng nhìn (vw x vh px CSS) của camera đặt tâm ở ô (cx, cy), zoom = fitZoom, rồi đổi cỡ về vw x vh (lọc song tuyến cho cả hai
+    bản: lọc thật của game chưa kiểm, nên so công bằng)."""
+    z = fit_zoom(vw, vh)
+    wpx, hpx = vw / z, vh / z
+    ccx, ccy = (cx - x0 + 0.5) * scale_world, (cy - y0 + 0.5) * scale_world
+    box = (ccx - wpx / 2, ccy - hpx / 2, ccx + wpx / 2, ccy + hpx / 2)
+    if box[0] < 0 or box[1] < 0 or box[2] > win.width or box[3] > win.height:
+        raise ValueError(f"cửa sổ dựng quá nhỏ cho {vw}x{vh}: cần {box}, có {win.size}")
+    return win.resize((vw, vh), Image.BILINEAR, box=box)
+
+
+def compose_viewports(out_dir, src, at, grid_path):
+    rm = RealMap(grid_path)
+    town = rm.town
+    spots = [("lac-ha-tran", "Lạc Hà Trấn (cổng trấn)", (town["cx"], town["cy"] + 4)), ("vung-san", "Vùng săn (cách trấn ~30 ô)", rm.hunting_spot())]
+    me_after = trim(frame16(samurai_for("Luyện Khí", src), 0, 0))
+    pig = load(src + "/content/character/pig/pig.png")
+    mons_after = [trim(pig.crop((0, 0, 16, 16))), trim(pig.crop((16, 0, 32, 16)))]
+    f = label_font(20)
+    for slug, title, (cx, cy) in spots:
+        ww, hh = 66, 40  # đủ cho vùng nhìn lớn nhất (1900 x 1100 px thế giới = 60 x 35 ô)
+        x0, y0 = cx - ww // 2, cy - hh // 2
+        cx, cy = rm.nearest_walkable(cx, cy)
+        off = [(-3, 2, "tho"), (4, 3, "lang"), (-6, -3, "ho")]
+        mpos = [rm.nearest_walkable(cx + dx, cy + dy) for dx, dy, _ in off]
+        a_truoc = [("me-idle-down", cx, cy)] + [(f"mon-{m}", mx, my) for (mx, my), (_, _, m) in zip(mpos, off)]
+        a_sau = [(me_after, cx, cy)] + [(mons_after[i % 2], mx, my) for i, (mx, my) in enumerate(mpos)]
+        win_t = window_truoc(rm, at, x0, y0, ww, hh, a_truoc)
+        win_s = window_sau(rm, src, x0, y0, ww, hh, a_sau, grade=True)
+        shots = {vp: (crop_viewport(win_t, x0, y0, cx, cy, *vp), crop_viewport(win_s, x0, y0, cx, cy, *vp)) for vp in VIEWPORTS}
+        # tờ tổng hợp: 6 khung, trên = TRƯỚC, dưới = SAU, mỗi ảnh cạnh dài <= 380 px
+        thumb, pad, head = 380, 14, 46
+        cols, rows = 3, 2
+        cw, ch = thumb + pad * 2, thumb * 2 + pad * 3 + 54
+        sheet = Image.new("RGB", (cols * cw, rows * ch + head), (28, 26, 32))
+        d = ImageDraw.Draw(sheet)
+        d.text((pad, 12), f"{title}: TRƯỚC (trên) / SAU (dưới, bảng tu tiên); bản đồ thật, chưa HUD, lọc song tuyến", fill=(235, 235, 240), font=label_font(20))
+        for i, vp in enumerate(VIEWPORTS):
+            cxp, cyp = (i % cols) * cw, (i // cols) * ch + head
+            d.text((cxp + pad, cyp + 6), f"{vp[0]}x{vp[1]}  (zoom {fit_zoom(*vp):.2f})", fill=(255, 220, 140), font=f)
+            for j, im in enumerate(shots[vp]):
+                k = thumb / max(im.size)
+                th = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
+                sheet.paste(th, (cxp + pad, cyp + 32 + j * (thumb + pad)))
+        sheet.save(os.path.join(out_dir, f"03-{slug}-6-khung.jpg"), quality=80, optimize=True)
+        # hai khung ĐỦ ĐỘ PHÂN GIẢI: điện thoại dọc (xếp cạnh nhau) và máy tính (xếp dọc)
+        for vp, tag, side in (((412, 915), "412x915", True), ((1366, 768), "1366x768", False)):
+            a, b = shots[vp]
+            gap = 12
+            im = Image.new("RGB", (a.width * 2 + gap, a.height) if side else (a.width, a.height * 2 + gap), (28, 26, 32))
+            im.paste(a.convert("RGB"), (0, 0))
+            im.paste(b.convert("RGB"), (a.width + gap, 0) if side else (0, a.height + gap))
+            im.save(os.path.join(out_dir, f"04-{slug}-{tag}.jpg"), quality=78, optimize=True)
+
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=SRC_DEFAULT)
     ap.add_argument("--out", default=os.path.join(ROOT, "docs/art/huong-moi"))
+    ap.add_argument("--grid", help="JSON lưới ô thật (npx tsx client/scripts/art/xuat-luoi-ban-do.ts lac_ha): dựng thêm ảnh 03-06 ở 6 cỡ màn hình")
     a = ap.parse_args()
     if not os.path.isdir(a.src):
         sys.exit(f"Không thấy gói Ninja Adventure ở {a.src} (git clone https://github.com/pixel-boy/NinjaAdventure vào đó)")
@@ -359,6 +540,8 @@ def main():
     at = Atlas()
     compose_sheet(os.path.join(a.out, "01-nhan-vat-quai-do.png"), a.src, at)
     compose_scene(os.path.join(a.out, "02-canh-truoc-sau.png"), a.src, at)
+    if a.grid:
+        compose_viewports(a.out, a.src, at, a.grid)
     print("xong:", a.out)
 
 
