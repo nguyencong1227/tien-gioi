@@ -89,6 +89,7 @@ import {
   SKILL_MSG,
   type FxMsg,
 } from "@tien-gioi/shared";
+import { adoptTiledMapFiles } from "@tien-gioi/shared/src/map-files";
 import { WorldState, Player } from "../schema";
 import {
   hashSecret,
@@ -1534,6 +1535,8 @@ export async function ensureWorldBossRooms(): Promise<void> {
  * Dùng chung cho `index.ts` và test tích hợp để cấu hình không lệch nhau.
  */
 export function defineRooms(gameServer: Server) {
+  // Bốn bản đồ thường đọc từ TỆP Tiled (shared/maps, docs/THIET_KE_BAN_DO_TILED.md): nhận TRƯỚC khi đăng ký phòng / dựng `World` đầu tiên (lát cắt S2)
+  adoptTiledMapFiles();
   for (const m of MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });
   // Bí cảnh: có tên phòng nhưng client không tạo được (`onCreate` đòi `runId` hợp lệ do server cấp); vào bằng `joinById`
   for (const m of DUNGEON_MAPS) gameServer.define(roomNameOf(m.id), WorldRoom, { mapId: m.id });

@@ -4,7 +4,7 @@
 //
 // Định dạng tối thiểu (đọc docs mục 4):
 //  - `orientation: "orthogonal"`, `infinite: false`, `tilewidth == tileheight`, `width` x `height` ô (<= TILED_MAX_SIDE), dữ liệu ô là MẢNG số (không nén).
-//  - thuộc tính bản đồ: `schema` (= TILED_SCHEMA), `id`, `name`, tuỳ chọn `townName`, `wildName`, `monsterCap` (chuỗi JSON `{"id_quai": số}`), `kind` (chỉ `"world"`).
+//  - thuộc tính bản đồ: `schema` (= TILED_SCHEMA), `id`, `name`, tuỳ chọn `townName`, `wildName`, `monsterCap` (chuỗi JSON `{"id_quai": số}`), `seed` (số nguyên: hạt giống TRANG TRÍ tất định của client, vd bố trí sương mù; không sinh ô), `kind` (chỉ `"world"`).
 //  - lớp ô `logic`: mỗi ô là `firstgid + T` của tileset tên `logic` (8 ô, theo thứ tự enum `T` của map.ts); 0 (ô trống) và cờ lật KHÔNG hợp lệ. Các lớp hình khác bị bỏ qua ở đây (client dùng, S3).
 //  - lớp đối tượng `objects`: MỘT `town`, tối đa MỘT `lair` (điểm đặt trong ô tâm, thuộc tính `r` tính bằng ô) và các `portal` (điểm đặt ở tâm cổng; `id`, `name`, `toMap`, `toPortal`, `r`, `safeR`, `spawnX`, `spawnY`
 //    tính bằng px CỦA TỆP: nhân `tile / tilewidth` ra px thế giới). Đối tượng loại khác bị bỏ qua (dành cho `spawnZone` ở S5).
@@ -67,6 +67,8 @@ export interface ParsedTiled {
   name: string;
   townName?: string;
   wildName?: string;
+  /** Hạt giống trang trí tất định (client); 0 nếu tệp không khai */
+  seed: number;
   w: number;
   h: number;
   /** Loại ô logic (giá trị enum `T`), đúng `w * h` */
@@ -207,6 +209,10 @@ function analyze(json: unknown): Analysis {
     }
   }
 
+  const seedRaw = mapProps.get("seed");
+  if (seedRaw !== undefined && !isInt(seedRaw))
+    errors.push(`${at}: thuộc tính 'seed' phải là số nguyên`);
+
   const layers = Array.isArray(json.layers) ? json.layers.filter(isRec) : [];
   if (!Array.isArray(json.layers)) errors.push(`${at}: thiếu layers`);
 
@@ -316,6 +322,7 @@ function analyze(json: unknown): Analysis {
           typeof mapProps.get("townName") === "string"
             ? (mapProps.get("townName") as string)
             : undefined,
+        seed: isInt(seedRaw) ? seedRaw : 0,
         wildName:
           typeof mapProps.get("wildName") === "string"
             ? (mapProps.get("wildName") as string)
@@ -364,13 +371,13 @@ export function parseTiledMap(json: unknown, tile: number): ParsedTiled {
   };
 }
 
-/** `MapDef` dựng từ tệp (đưa thẳng cho `new GameMap`): `tiles` dựng sẵn nên `GameMap` không sinh theo seed (seed = 0 chỉ để đủ kiểu). */
+/** `MapDef` dựng từ tệp (đưa thẳng cho `new GameMap`): `tiles` dựng sẵn nên `GameMap` không sinh ô theo `seed`; `seed` còn lại chỉ là hạt giống trang trí tất định của client (0 nếu tệp không khai). */
 export function mapDefFromTiled(json: unknown, tile: number): MapDef {
   const p = parseTiledMap(json, tile);
   return {
     id: p.id,
     name: p.name,
-    seed: 0,
+    seed: p.seed,
     w: p.w,
     h: p.h,
     town: p.town,

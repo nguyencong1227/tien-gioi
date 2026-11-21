@@ -8,3 +8,6 @@ app/android/
 
 # Tệp SINH tự động từ node_modules (client/scripts/gen-notices.mjs): định dạng của máy sinh, không qua Prettier (credits-ui.test.ts giữ khớp bản sinh)
 client/public/notices.html
+
+# Tệp SINH bởi `npm run map:bake -w server` (shared/src/tiled-bake.ts `formatTiledJson`: mỗi hàng ô logic một dòng); `tiled-maps.test.ts` giữ khớp bản sinh
+shared/maps/
