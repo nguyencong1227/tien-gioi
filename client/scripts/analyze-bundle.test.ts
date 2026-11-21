@@ -5,6 +5,7 @@ import {
   classifyModules,
   formatConsoleReport,
   formatMarkdownReport,
+  splitCodeAndMapData,
 } from "./analyze-bundle.mjs";
 
 describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript)", () => {
@@ -157,5 +158,85 @@ describe("M7.15: analyze-bundle (Phân tích thành phần gói tải JavaScript
     expect(mdReport).toContain("# Báo cáo Phân tích Thành phần Gói tải Client");
     expect(mdReport).toContain("## 1. Cơ cấu theo Nhóm thành phần");
     expect(mdReport).toContain("## 4. Quyết định & Đề xuất Kiến trúc cho Nhóm");
+  });
+  it("splitCodeAndMapData (#1283): chỉ tách `map-files-<băm>.js` KHI ngân sách khai báo trần riêng; tên Rollup có tiền tố `assets/`", () => {
+    const chunks = [
+      { fileName: "assets/index-DMwuQVDW.js" },
+      { fileName: "assets/map-files-Ab1_-x.js" },
+      { fileName: "assets/map-files.js" }, // không băm: KHÔNG được miễn
+      { fileName: "assets/mapfiles-x.js" },
+      { fileName: "assets/xmap-files-a.js" },
+      { fileName: "assets/WorldScene-ceN6fDXA.js" },
+    ];
+    const r = splitCodeAndMapData(chunks, 48);
+    expect(r.data.map((c) => c.fileName)).toEqual(["assets/map-files-Ab1_-x.js"]);
+    expect(r.code).toHaveLength(5);
+    expect(r.code.map((c) => c.fileName)).toContain("assets/map-files.js");
+    expect(r.code.map((c) => c.fileName)).toContain("assets/xmap-files-a.js");
+
+    // chưa khai báo trần riêng (hoặc sai kiểu): KHÔNG miễn trừ ai, như `checkTotalJsGzip`
+    for (const limit of [undefined, "48", null]) {
+      const none = splitCodeAndMapData(chunks, limit as unknown as number | undefined);
+      expect(none.data).toEqual([]);
+      expect(none.code).toHaveLength(6);
+    }
+    // không có chunk nào khớp: không ai bị miễn
+    expect(splitCodeAndMapData([{ fileName: "assets/index-a.js" }], 48).data).toEqual([]);
+  });
+
+  it("báo cáo (#1283): dư địa tính trên MÃ và có dòng dữ liệu bản đồ; báo cáo cũ thiếu trường mới vẫn in được", () => {
+    const base = {
+      chunkFileName: "6 chunk JS (khởi động: assets/index-x.js)",
+      startupGzipKb: 195.77,
+      rawBytes: 2000000,
+      rawKb: 1953.12,
+      gzipBytes: 560000,
+      gzipKb: 545.88,
+      gzipDefaultBytes: 570000,
+      viteRawKb: 2000,
+      viteGzipKb: 562.3,
+      viteRemainingBudgetKb: -0.75,
+      budgetMaxGzipKb: 548,
+      remainingBudgetKb: 14.52,
+      breakdown: {
+        totalRenderedLength: 0,
+        totalMinBytes: 0,
+        totalModules: 0,
+        categories: [],
+        topModules: [],
+      },
+      uiPanels: UI_PANEL_SECTIONS,
+      lazyOptimization: {
+        totalPanelRawBytes: 0,
+        totalPanelRawKb: 0,
+        totalPanelMinBytes: 0,
+        totalPanelMinKb: 0,
+        estGzipSavedBytes: 0,
+        estGzipSavedKb: 0,
+        projectedInitialGzipKb: 0,
+        projectedRemainingBudgetKb: 0,
+        projectedViteGzipKb: 0,
+      },
+    };
+    const withData = {
+      ...base,
+      codeGzipKb: 533.48,
+      viteCodeGzipKb: 548.75,
+      mapFilesGzipKb: 12.4,
+      mapFilesLimitKb: 48,
+    };
+    const c = formatConsoleReport(withData);
+    expect(c).toContain("Ngân sách CI     : 533.48 / 548 KiB (Dư: 14.52 KiB) [chỉ mã]");
+    expect(c).toContain("Dữ liệu bản đồ   : 12.4 / 48 KiB (trần riêng, không tính vào trần mã)");
+    const md = formatMarkdownReport(withData);
+    expect(md).toContain("cho MÃ JS (chưa tính dữ liệu bản đồ)");
+    expect(md).toContain("**12.4 KiB** / trần riêng **48 KB**");
+
+    // báo cáo cũ (không có trường mới): số tổng mọi chunk, không có dòng dữ liệu bản đồ
+    const old = formatConsoleReport(base);
+    expect(old).toContain("Ngân sách CI     : 545.88 / 548 KiB (Dư: 14.52 KiB)");
+    expect(old).not.toContain("[chỉ mã]");
+    expect(old).not.toContain("Dữ liệu bản đồ");
+    expect(formatMarkdownReport(base)).not.toContain("trần riêng");
   });
 });
