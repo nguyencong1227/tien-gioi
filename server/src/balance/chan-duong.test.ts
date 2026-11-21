@@ -151,6 +151,20 @@ describe("summarizeGroup / realmRows", () => {
     expect(rows[1]!.worst.group.id).toBe("mau_kho");
     expect(rows[0]!.toEnd.won).toBe(1);
   });
+
+  it("realmRows: nhiều bầy cùng (cảnh giới, mức) -> trung bình các bầy + chỉ ra bầy TỆ NHẤT (chết nhiều nhất)", () => {
+    const heavy = group("mau_nang", 5, "normal", [{ kind: "ho", count: 3 }]);
+    const a = summarizeGroup(EASY, 2);
+    const b = summarizeGroup(heavy, 2);
+    expect(b.toEnd.lost).toBeGreaterThan(0.5); // ba Hắc Hổ thường vẫn hạ được người bậc 5
+    const [row] = realmRows([a, b]);
+    expect(row!.groups).toBe(2);
+    expect(row!.worst.group.id).toBe("mau_nang");
+    expect(row!.toEnd.lost).toBeCloseTo((a.toEnd.lost + b.toEnd.lost) / 2, 9);
+    expect(row!.realSeconds).toBeCloseTo((a.realSeconds + b.realSeconds) / 2, 9);
+    // thứ tự đầu vào không đổi kết quả
+    expect(realmRows([b, a])[0]!.worst.group.id).toBe("mau_nang");
+  });
 });
 
 describe("bất biến cân bằng", () => {
