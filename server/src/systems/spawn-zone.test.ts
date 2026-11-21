@@ -17,6 +17,7 @@ import { makeWorld, addMonster } from "./test-helpers";
 import { bossSpawnOk, spawnInitial, spawnMonster, topUpMonsters, zoneSpawnSpot } from "./monsters";
 import { tickWorldBoss } from "./world-boss";
 import { MIN_ZONE_SPOTS, spawnZoneViolations } from "./map-checks";
+import { inMainRegion } from "./nav";
 
 const SIDE = 48;
 
@@ -52,6 +53,47 @@ function mapWith(
     spawnZones: zones,
   });
 }
+
+/**
+ * Bản đồ rộng 80 x 32 với một trấn bán kính 15 ô ở giữa (50, 16) chạm gần hết chiều cao: với LƯỚI CỦA QUÁI (khu an toàn là tường) trấn cắt bản đồ làm hai nửa không qua lại được (nửa trái lớn = vùng chính,
+ * nửa phải nhỏ), còn người chơi đi qua trấn được. Giống Âm Sương Trạch (B đo ở review #1214: nửa nhỏ ~20 % diện tích tách vì trấn).
+ */
+function townSplitMap(zones: SpawnZoneDef[]): GameMap {
+  const w = 80;
+  const h = 32;
+  const t = new Uint8Array(w * h).fill(T.Grass);
+  for (let x = 0; x < w; x++) {
+    t[x] = T.Rock;
+    t[(h - 1) * w + x] = T.Rock;
+  }
+  for (let y = 0; y < h; y++) {
+    t[y * w] = T.Rock;
+    t[y * w + w - 1] = T.Rock;
+  }
+  return new GameMap({
+    id: "thu_rong",
+    name: "Thử Rộng",
+    seed: 1,
+    w,
+    h,
+    town: { cx: 50, cy: 16, r: 15 },
+    monsterCap: { lang: 5 },
+    tiles: t,
+    spawnZones: zones,
+  });
+}
+
+/** Vòng đá bao kín (các ô x0..x1 x y0..y1, chỉ viền) để dựng phòng kín. */
+const ringOf = (x0: number, y0: number, x1: number, y1: number) => (t: Uint8Array) => {
+  for (let i = x0; i <= x1; i++) {
+    t[y0 * SIDE + i] = T.Rock;
+    t[y1 * SIDE + i] = T.Rock;
+  }
+  for (let j = y0; j <= y1; j++) {
+    t[j * SIDE + x0] = T.Rock;
+    t[j * SIDE + x1] = T.Rock;
+  }
+};
 
 /** Khung (đơn vị Ô) -> vùng (px thế giới). */
 function zone(
@@ -239,6 +281,14 @@ describe("spawnZone: trùm", () => {
     expect(inSpawnZone(z, b.x, b.y), `${b.x},${b.y}`).toBe(true);
   });
 
+  it("trùm thế giới KHÔNG chiếm chỗ `max` của vùng (như `topUpMonsters`): sinh thường cùng loài vẫn còn chỗ", () => {
+    const z = zone("thien_han_vuong", 18, 18, 10, 10, { max: 1 });
+    const w = runNoon(z);
+    expect(w.wbossId).not.toBeNull();
+    expect(of(w, "thien_han_vuong")).toHaveLength(1); // chỉ có trùm thế giới
+    expect(zoneSpawnSpot(w, HAN, w.map.spawnZonesOf("thien_han_vuong"))).not.toBeNull();
+  });
+
   it("trùm thế giới BỎ `max` của vùng: vùng đã đủ một con cùng loài vẫn sinh được (trùm thế giới là thêm)", () => {
     const z = zone("thien_han_vuong", 18, 18, 10, 10, { max: 1 });
     const w = runNoon(z, (x) => addMonster(x, "thien_han_vuong", z.x + z.w / 2, z.y + z.h / 2));
@@ -338,6 +388,34 @@ describe("spawnZoneViolations: kiểm vùng sinh trên dữ liệu (mục 5.5)",
     expect(spawnZoneViolations(mapWith([ell], { lang: 5 }, ring))).toEqual([]);
     const rect = { ...ell, shape: "rect" as const };
     expect(spawnZoneViolations(mapWith([rect], { lang: 5 }, ring)).join("\n")).toMatch(/túi kín/);
+  });
+
+  it("trấn CẮT bản đồ làm đôi (lưới quái coi trấn là tường): vùng trong nửa nhỏ vẫn HỢP LỆ vì người chơi đi qua trấn tới được (B đo Âm Sương ở review #1214)", () => {
+    const lang = MONSTER_BY_ID.lang!;
+    const right = zone("lang", 70, 8, 8, 16); // nửa phải (nhỏ), ngoài đệm an toàn 160 px của trấn
+    const m = townSplitMap([right]);
+    // tiền đề: với LƯỚI CỦA QUÁI hai nửa tách nhau (nửa phải KHÔNG thuộc vùng chính), nên luật cũ `inMainRegion` sẽ báo nhầm "túi kín"
+    expect(inMainRegion(m, lang.radius * 0.8, 74 * TILE, 16 * TILE)).toBe(false);
+    expect(inMainRegion(m, lang.radius * 0.8, 10 * TILE, 16 * TILE)).toBe(true);
+    expect(spawnZoneViolations(m)).toEqual([]);
+    const left = zone("lang", 5, 8, 8, 16);
+    expect(spawnZoneViolations(townSplitMap([left]))).toEqual([]);
+  });
+
+  it("phòng BAO KÍN LỚN (hơn 400 nút: vượt ngưỡng nhỏ tuỳ ý) vẫn là túi kín: người chơi không tới được dù đi qua trấn", () => {
+    // vòng đá 20..33 x 20..33, ô trong 21..32 (12 x 12 ô = 24 x 24 nút): phòng rộng, nhưng bao kín hoàn toàn
+    const room = zone("lang", 22, 22, 8, 8);
+    const errs = spawnZoneViolations(mapWith([room], { lang: 5 }, ringOf(20, 20, 33, 33)));
+    expect(errs.join("\n")).toMatch(/túi kín/);
+    expect(errs.join("\n")).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    // bỏ vòng đá: cùng vùng hợp lệ
+    expect(spawnZoneViolations(mapWith([room], { lang: 5 }))).toEqual([]);
+    // chừa một khe 1 ô trên vòng (thân quái lọt): tới được nên hợp lệ
+    const gap = (t: Uint8Array) => {
+      ringOf(20, 20, 33, 33)(t);
+      t[20 * SIDE + 26] = T.Grass;
+    };
+    expect(spawnZoneViolations(mapWith([room], { lang: 5 }, gap))).toEqual([]);
   });
 
   it("trùm: vùng sát đá (mọi chỗ trong 62 px quanh đá) không có chỗ `bossSpawnOk`; quái thường cùng vùng thì qua", () => {

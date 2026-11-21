@@ -107,11 +107,12 @@ function zoneArea(z: SpawnZoneDef): number {
   return z.shape === "rect" ? z.w * z.h : (Math.PI / 4) * z.w * z.h;
 }
 
-/** Số con CÙNG loài đang đứng trong vùng `z` (để áp `max` của vùng). */
+/** Số con CÙNG loài đang đứng trong vùng `z` (để áp `max` của vùng). Trùm thế giới (M9.4) là THÊM, không chiếm chỗ `max` (như `topUpMonsters`). */
 function countInZone(w: World, z: SpawnZoneDef): number {
   let n = 0;
-  for (const m of w.state.monsters.values())
-    if (m.kind === z.monster && inSpawnZone(z, m.x, m.y)) n++;
+  w.state.monsters.forEach((m, id) => {
+    if (id !== w.wbossId && m.kind === z.monster && inSpawnZone(z, m.x, m.y)) n++;
+  });
   return n;
 }
 

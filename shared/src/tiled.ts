@@ -8,7 +8,7 @@
 //  - lớp ô `logic`: mỗi ô là `firstgid + T` của tileset tên `logic` (8 ô, theo thứ tự enum `T` của map.ts); 0 (ô trống) và cờ lật KHÔNG hợp lệ. Các lớp hình khác bị bỏ qua ở đây (client dùng, S3).
 //  - lớp đối tượng `objects`: MỘT `town`, tối đa MỘT `lair` (điểm đặt trong ô tâm, thuộc tính `r` tính bằng ô) và các `portal` (điểm đặt ở tâm cổng; `id`, `name`, `toMap`, `toPortal`, `r`, `safeR`, `spawnX`, `spawnY`
 //    tính bằng px CỦA TỆP: nhân `tile / tilewidth` ra px thế giới). Đối tượng loại khác bị bỏ qua.
-//  - `spawnZone` (S5): hình CHỮ NHẬT hoặc ELIP (không phải điểm / đa giác), thuộc tính `monster` (id quái) và tuỳ chọn `max`; `x, y` là góc trên trái của khung như Tiled ghi.
+//  - `spawnZone` (S5): hình CHỮ NHẬT hoặc ELIP THẲNG (không phải điểm / đa giác, không xoay, không `gid`), thuộc tính `monster` (id quái) và tuỳ chọn `max`; `x, y` là góc trên trái của khung như Tiled ghi; khung >= một ô và nằm trong bản đồ bỏ viền một ô.
 import type { MapDef, PortalDef, SpawnZoneDef } from "./map";
 
 export const TILED_SCHEMA = 1;
@@ -286,6 +286,15 @@ function analyze(json: unknown): Analysis {
           );
           continue;
         }
+        // Tiled cho XOAY chữ nhật / elip quanh góc trên trái và cho "đối tượng ô" (`gid`, khi đó `x, y` là góc DƯỚI trái): đọc như chưa xoay / như khung thường thì vùng lệch IM LẶNG (B bắt ở review #1214). Chỉ nhận khung thẳng.
+        if (o.rotation !== undefined && (!isNum(o.rotation) || o.rotation !== 0)) {
+          errors.push(`${oAt}: không được xoay (rotation phải bằng 0)`);
+          continue;
+        }
+        if (o.gid !== undefined) {
+          errors.push(`${oAt}: không được là đối tượng ô (gid): chỉ chữ nhật / elip thường`);
+          continue;
+        }
         const zp = propsOf(o, oAt, errors);
         const monster = needStr(zp, "monster", oAt, errors);
         const maxRaw = zp.get("max");
@@ -299,9 +308,11 @@ function analyze(json: unknown): Analysis {
           errors.push(`${oAt}: ellipse phải là true / false`);
           continue;
         }
-        // Khung nằm trong bản đồ: toạ độ tính theo px của tệp, nên so với `w * tilewidth`
-        if (o.x < 0 || o.y < 0 || o.x + o.width > w * tw || o.y + o.height > h * tw)
-          errors.push(`${oAt}: khung nằm ngoài bản đồ`);
+        // Khung nằm trong bản đồ, bỏ viền núi MỘT ô (cùng luật của `GameMap.checkSpawnZones`, để lỗi gom một chỗ ở `errors` thay vì ném lúc dựng): toạ độ tính theo px của tệp
+        if (o.width < tw || o.height < tw)
+          errors.push(`${oAt}: khung phải rộng / cao ít nhất một ô (${tw} px)`);
+        if (o.x < tw || o.y < tw || o.x + o.width > (w - 1) * tw || o.y + o.height > (h - 1) * tw)
+          errors.push(`${oAt}: khung nằm ngoài bản đồ hoặc đè viền núi một ô`);
         rawZones.push({
           monster,
           shape: o.ellipse === true ? "ellipse" : "rect",

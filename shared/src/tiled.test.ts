@@ -375,6 +375,21 @@ describe("spawnZone (S5): vùng sinh quái theo dữ liệu", () => {
     ]);
   });
 
+  it("`rotation: 0` (Tiled ghi mặc định mọi đối tượng) và khung SÁT viền trong (cách mép đúng một ô) vẫn được nhận", () => {
+    const m = withZones();
+    Object.assign(objects(m).at(-2)!, {
+      rotation: 0,
+      x: TW,
+      y: TW,
+      width: 14 * TW,
+      height: 14 * TW,
+    });
+    Object.assign(objects(m).at(-1)!, { rotation: 0 });
+    expect(tiledViolations(m)).toEqual([]);
+    expect(parseTiledMap(m, TILE).spawnZones[0]).toMatchObject({ x: TILE, y: TILE, w: 14 * TILE });
+    expect(() => new GameMap(mapDefFromTiled(m, TILE))).not.toThrow(); // khớp luật của `GameMap`
+  });
+
   it("`MapDef` / `GameMap`: không khai vùng thì không có khoá `spawnZones`; có vùng thì tra theo loài", () => {
     expect("spawnZones" in mapDefFromTiled(clone(), TILE)).toBe(false);
     const map = new GameMap(mapDefFromTiled(withZones(), TILE));
@@ -424,6 +439,51 @@ describe("spawnZone (S5): vùng sinh quái theo dữ liệu", () => {
       /ellipse phải là true/,
     ],
     ["thiếu x", (m) => Object.assign(objects(m).at(-2)!, { x: undefined }), /thiếu x \/ y/],
+    // Tiled cho xoay hình / đối tượng ô: đọc như khung thẳng thì vùng lệch im lặng (B bắt ở review #1214)
+    [
+      "chữ nhật xoay 45 độ",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: 45 }),
+      /không được xoay/,
+    ],
+    [
+      "chữ nhật xoay 90 độ",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: 90 }),
+      /không được xoay/,
+    ],
+    [
+      "elip xoay -30 độ",
+      (m) => Object.assign(objects(m).at(-1)!, { rotation: -30 }),
+      /không được xoay/,
+    ],
+    [
+      "rotation không phải số",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: "0" }),
+      /không được xoay/,
+    ],
+    [
+      "rotation = NaN",
+      (m) => Object.assign(objects(m).at(-2)!, { rotation: NaN }),
+      /không được xoay/,
+    ],
+    [
+      "đối tượng ô (gid)",
+      (m) => Object.assign(objects(m).at(-2)!, { gid: 5 }),
+      /đối tượng ô \(gid\)/,
+    ],
+    // viền núi một ô: lỗi gom ở `errors`, không đợi `GameMap` ném lúc dựng
+    ["đè viền núi (x = 0)", (m) => (objects(m).at(-2)!.x = 0), /đè viền núi/],
+    ["đè viền núi (y = 0)", (m) => (objects(m).at(-2)!.y = 0), /đè viền núi/],
+    [
+      "chạm viền dưới (y + height = height của bản đồ)",
+      (m) => Object.assign(objects(m).at(-2)!, { y: 13 * TW, height: 3 * TW }),
+      /đè viền núi/,
+    ],
+    [
+      "chạm viền phải (x + width = width của bản đồ)",
+      (m) => Object.assign(objects(m).at(-2)!, { x: 12 * TW, width: 4 * TW }),
+      /đè viền núi/,
+    ],
+    ["khung hẹp hơn một ô", (m) => (objects(m).at(-2)!.width = TW / 2), /ít nhất một ô/],
   ];
   for (const [label, mutate, re] of bad) {
     it(`bắt: ${label}`, () => {

@@ -12,7 +12,7 @@ import {
   type WorldBossSlot,
 } from "@tien-gioi/shared";
 import { bossSpawnOkOn } from "./monsters";
-import { NAV_CELL, inMainRegion, navClassOf, squareFree } from "./nav";
+import { NAV_CELL, navClassOf, squareFree } from "./nav";
 
 /** Loang (8 hướng, không cắt góc) trên lưới nút nửa ô cho thân cỡ `cls`; trả mặt nạ nút đã tới được từ nút gần (x, y) nhất. */
 function flood(
@@ -59,6 +59,21 @@ function flood(
   return { reach, cols, rows, ok: true };
 }
 
+type Flood = ReturnType<typeof flood>;
+
+/** Điểm (x, y) có nút lưới (trong ±1 nút quanh điểm) đã loang tới không. */
+function reached(f: Flood, x: number, y: number): boolean {
+  const ci = Math.round(x / NAV_CELL);
+  const cj = Math.round(y / NAV_CELL);
+  for (let dj = -1; dj <= 1; dj++)
+    for (let di = -1; di <= 1; di++) {
+      const i = ci + di;
+      const j = cj + dj;
+      if (i >= 0 && j >= 0 && i < f.cols && j < f.rows && f.reach[j * f.cols + i]) return true;
+    }
+  return false;
+}
+
 /**
  * Lỗi liên thông của `map` cho người chơi (rỗng = hợp lệ): tâm trấn phải đứng được; tâm cổng, chỗ xuất hiện của mọi cổng và tâm hang (nếu có) phải TỚI ĐƯỢC từ tâm trấn.
  * (Nút lưới gần điểm nhất trong ±1 nút; điểm đặt ở tâm hai ô nên luôn có nút kề.)
@@ -81,16 +96,7 @@ export function reachabilityViolations(map: GameMap): string[] {
   }
   if (map.lairPx) spots.push({ what: "tâm hang", x: map.lairPx.x, y: map.lairPx.y });
   for (const s of spots) {
-    const ci = Math.round(s.x / NAV_CELL);
-    const cj = Math.round(s.y / NAV_CELL);
-    let hit = false;
-    for (let dj = -1; dj <= 1 && !hit; dj++)
-      for (let di = -1; di <= 1 && !hit; di++) {
-        const i = ci + di;
-        const j = cj + dj;
-        if (i >= 0 && j >= 0 && i < f.cols && j < f.rows && f.reach[j * f.cols + i]) hit = true;
-      }
-    if (!hit)
+    if (!reached(f, s.x, s.y))
       errs.push(
         `bản đồ ${id}: ${s.what} (${Math.round(s.x)}, ${Math.round(s.y)}) không tới được từ tâm trấn (người chơi)`,
       );
@@ -115,6 +121,7 @@ export function spawnZoneViolations(
 ): string[] {
   const errs: string[] = [];
   const id = map.def.id;
+  const floods = new Map<number, Flood>();
   map.spawnZones.forEach((z, i) => {
     const at = `bản đồ ${id}: vùng sinh #${i + 1} (${z.monster})`;
     const def = Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, z.monster)
@@ -126,6 +133,18 @@ export function spawnZoneViolations(
       errs.push(
         `${at}: loài này không có trong monsterCap của bản đồ và không phải trùm thế giới của lịch ở đây`,
       );
+    // Tới được = loang từ TÂM TRẤN theo cỡ thân quái, KHÔNG loại khu an toàn (người chơi đi qua trấn được). Lưới của quái coi trấn là tường nên trấn có thể cắt bản đồ làm hai nửa quái không qua lại được:
+    // nửa nhỏ vẫn là đất MỞ (quái đi lại thoải mái, người chơi tới bằng cách đi qua trấn), chỉ khoảng đất BAO KÍN thật mới là túi kín (B đo ở review #1214: Âm Sương có nửa ~20 % diện tích tách vì trấn).
+    const cls = navClassOf(def.radius * 0.8);
+    let f = floods.get(cls);
+    if (!f) {
+      f = flood(map, cls, map.townPx.x, map.townPx.y);
+      floods.set(cls, f);
+    }
+    if (!f.ok) {
+      errs.push(`${at}: tâm trấn không đứng được cho cỡ thân loài này, không kiểm được liên thông`);
+      return;
+    }
     let ok = 0;
     let isolated = 0;
     const x1 = z.x + z.w;
@@ -134,7 +153,7 @@ export function spawnZoneViolations(
       for (let x = z.x + NAV_CELL / 2; x < x1; x += NAV_CELL) {
         if (!inSpawnZone(z, x, y)) continue;
         if (map.inSafe(x, y, 160) || map.circleBlocked(x, y, def.radius)) continue;
-        if (!inMainRegion(map, def.radius * 0.8, x, y)) {
+        if (!reached(f, x, y)) {
           isolated++;
           continue;
         }
@@ -144,7 +163,7 @@ export function spawnZoneViolations(
       errs.push(`${at}: chỉ có ${ok} chỗ sinh hợp lệ (cần >= ${MIN_ZONE_SPOTS})`);
     if (isolated > 0)
       errs.push(
-        `${at}: ${isolated} chỗ đứng được nằm trong túi kín (không thuộc vùng chính của bản đồ cho cỡ thân loài này)`,
+        `${at}: ${isolated} chỗ đứng được nằm trong túi kín (không tới được từ tâm trấn, kể cả đi qua khu an toàn, cho cỡ thân loài này)`,
       );
   });
   // tổng `max` so với monsterCap, mỗi loài một lần
