@@ -46,11 +46,12 @@ const put = (rel: string, data: Buffer | string) => {
 
 function manifestOf(): PrivatePackManifest {
   return {
-    version: 1,
     packs: [
       {
         id: "cainos",
         title: "Cainos Top Down Basic",
+        url: "https://cainos.itch.io/pixel-art-top-down-basic",
+        license: "Miễn phí, dùng trong game, cấm phân phối lại",
         files: [
           { path: "atlas.png", bytes: PNG.length, sha256: sha(PNG) },
           { path: "tiles/a.webp", bytes: WEBP.length, sha256: sha(WEBP) },
@@ -123,7 +124,6 @@ describe("loadPrivatePacks", () => {
     expect(notJson.warnings.join("\n")).toMatch(/không đọc được/);
     const badRule = loadPrivatePacks(
       freshDist("t-luat", {
-        version: 1,
         packs: [
           {
             id: "x",
@@ -135,13 +135,11 @@ describe("loadPrivatePacks", () => {
     );
     expect(badRule.table).toBeNull();
     expect(badRule.warnings.join("\n")).toMatch(/manifest không hợp lệ/);
-    expect(
-      loadPrivatePacks(freshDist("t-hoa", { version: 1, packs: [], extra: 1 })).table,
-    ).toBeNull();
+    expect(loadPrivatePacks(freshDist("t-hoa", { packs: [], extra: 1 })).table).toBeNull();
   });
 
   it("manifest quá lớn bị từ chối", () => {
-    const big = `{"version":1,"packs":[],"pad":"${"x".repeat(1024 * 1024 + 10)}"}`;
+    const big = `{"packs":[],"pad":"${"x".repeat(1024 * 1024 + 10)}"}`;
     const r = loadPrivatePacks(freshDist("t-lon", big));
     expect(r.table).toBeNull();
     expect(r.warnings.join("\n")).toMatch(/quá lớn/);
@@ -169,12 +167,31 @@ describe("loadPrivatePacks", () => {
     expect(privatePacksNotice(r)).toMatch(/BẬT, 2 gói \/ 3 tệp/);
   });
 
+  it("url / license của gói đi qua vào manifest lọc; manifest có url xấu (javascript:) thì TẮT", () => {
+    const t = loadPrivatePacks(dist).table!;
+    expect(t.manifest.packs[0]).toMatchObject({
+      url: "https://cainos.itch.io/pixel-art-top-down-basic",
+      license: "Miễn phí, dùng trong game, cấm phân phối lại",
+    });
+    expect(t.manifest.packs[1]).not.toHaveProperty("url"); // gói tiny không khai
+    const bad = manifestOf();
+    bad.packs[0]!.url = "javascript:alert(1)";
+    const r = loadPrivatePacks(
+      freshDist("t-url", bad, {
+        "cainos/atlas.png": PNG,
+        "cainos/tiles/a.webp": WEBP,
+        "tiny/ui.json": JSON_UI,
+      }),
+    );
+    expect(r.table).toBeNull();
+    expect(r.warnings.join("\n")).toMatch(/manifest không hợp lệ/);
+  });
+
   it("tệp thiếu / lệch byte / là thư mục / symlink thoát gốc bị LOẠI riêng (cảnh báo nêu tên), tệp tốt còn; gói hết tệp thì biến mất khỏi manifest lọc", () => {
     const good = Buffer.from("tốt".padEnd(50, "g"));
     const dir = freshDist(
       "t-loc",
       {
-        version: 1,
         packs: [
           {
             id: "g1",
@@ -312,14 +329,15 @@ describe("route /assets-private/* (máy chủ express thật, yêu cầu thô)",
     expect(plain.headers["content-length"]).toBe(String(PNG.length));
     expect(plain.headers["x-content-type-options"]).toBe("nosniff");
     expect(plain.headers["cache-control"]).toBe("no-cache");
-    const good = await req(port, `/assets-private/cainos/atlas.png?v=${sha(PNG).slice(0, 8)}`);
+    const good = await req(port, `/assets-private/cainos/atlas.png?v=${sha(PNG).slice(0, 12)}`);
     expect(good.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
     for (const q of [
       "?v=deadbeef",
       "?v=",
       "?v=zzzzzzzz",
-      `?v=${sha(PNG).slice(0, 7)}`,
-      `?x=${sha(PNG).slice(0, 8)}`,
+      `?v=${sha(PNG).slice(0, 8)}`, // 8 hex: độ dài CŨ, không còn được nhận
+      `?v=${sha(PNG).slice(0, 11)}`,
+      `?x=${sha(PNG).slice(0, 12)}`,
     ]) {
       const r = await req(port, `/assets-private/cainos/atlas.png${q}`);
       expect(r.status, q).toBe(200);
@@ -428,12 +446,18 @@ describe("route /assets-private/* (máy chủ express thật, yêu cầu thô)",
     expect((await req(port, "/assets-private/cainos/atlas.png")).status).toBe(200);
   });
 
-  it("TẮT (bảng rỗng): mọi yêu cầu dưới /assets-private/ là 404 sạch, KHÔNG phải trang SPA (client đọc manifest thấy 404 chứ không phải HTML); phương thức lạ vẫn 405", async () => {
+  it("TẮT (bảng rỗng): manifest vẫn 200 { packs: [] } (không 404 đỏ ở DevTools, không phải HTML SPA); MỌI thứ khác dưới /assets-private/ là 404 sạch, không rơi xuống SPA; phương thức lạ vẫn 405", async () => {
+    const m = await req(offPort, "/assets-private/manifest.json");
+    expect(m.status).toBe(200);
+    expect(JSON.parse(m.body.toString())).toEqual({ packs: [] });
+    expect(m.headers["content-type"]).toMatch(/application\/json/);
+    expect(m.headers["cache-control"]).toBe("no-cache");
+    expect(m.headers["x-content-type-options"]).toBe("nosniff");
     for (const p of [
-      "/assets-private/manifest.json",
       "/assets-private/cainos/atlas.png",
       "/assets-private/",
       "/assets-private",
+      "/assets-private/cainos/",
     ]) {
       const r = await req(offPort, p);
       expect(r.status, p).toBe(404);
@@ -468,7 +492,6 @@ describe("công cụ manifest / check", () => {
     writeFileSync(path.join(dir, ".git", "x.png"), "G");
     const m = buildPrivatePackManifest(dir, { g1: "Gói Một" });
     expect(m).toEqual({
-      version: 1,
       packs: [
         {
           id: "g1",
@@ -490,10 +513,35 @@ describe("công cụ manifest / check", () => {
   it("ghi manifest ra tệp rồi `check` khớp (không lỗi, không tệp thừa); tệp thừa được liệt kê nhưng KHÔNG là lỗi", () => {
     const dir = mk("tool-2");
     writePrivatePackManifest(dir);
-    expect(JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8")).version).toBe(1);
+    expect(Object.keys(JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8")))).toEqual([
+      "packs",
+    ]);
     expect(checkPrivatePackManifest(dir)).toEqual({ errors: [], extra: [] });
     writeFileSync(path.join(dir, "g1", "moi.png"), "N");
     expect(checkPrivatePackManifest(dir)).toEqual({ errors: [], extra: ["g1/moi.png"] });
+  });
+
+  it("tên hiển thị / url / giấy phép đi vào manifest (CLI: --title --url --license); url không phải https hoặc giấy phép sai thì sinh manifest NÉM lỗi", () => {
+    const dir = mk("tool-5");
+    const m = buildPrivatePackManifest(
+      dir,
+      { g1: "Gói Một" },
+      { urls: { g1: "https://itch.io/g1" }, licenses: { g1: "CC0" } },
+    );
+    expect(m.packs[0]).toMatchObject({
+      id: "g1",
+      title: "Gói Một",
+      url: "https://itch.io/g1",
+      license: "CC0",
+    });
+    expect(m.packs[1]).not.toHaveProperty("url"); // gói không khai thì KHÔNG có khoá (không phải undefined)
+    expect(m.packs[1]).not.toHaveProperty("license");
+    expect(() =>
+      buildPrivatePackManifest(dir, {}, { urls: { g1: "javascript:alert(1)" } }),
+    ).toThrow(/không hợp lệ/);
+    expect(() =>
+      buildPrivatePackManifest(dir, {}, { licenses: { g1: " có khoảng trắng đầu" } }),
+    ).toThrow(/không hợp lệ/);
   });
 
   it("`check` bắt: thiếu tệp, lệch byte, lệch SHA-256 (cùng độ dài), thiếu / hỏng manifest, manifest sai luật", () => {
@@ -512,7 +560,7 @@ describe("công cụ manifest / check", () => {
     writeFileSync(path.join(dir, "manifest.json"), "{ không");
     expect(checkPrivatePackManifest(dir).errors.join("\n")).toMatch(/không phải JSON/);
     writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ version: 9, packs: [] }));
-    expect(checkPrivatePackManifest(dir).errors.join("\n")).toMatch(/version/);
+    expect(checkPrivatePackManifest(dir).errors.join("\n")).toMatch(/trường lạ/);
   });
 
   it("sinh manifest ném lỗi khi có tệp vượt trần dung lượng (không âm thầm tạo manifest sai luật)", () => {

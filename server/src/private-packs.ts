@@ -23,7 +23,7 @@ import path from "node:path";
 import type { Express, Request, Response } from "express";
 import {
   PRIVATE_PACK_FILE_MAX_BYTES,
-  PRIVATE_PACK_MANIFEST_VERSION,
+  PRIVATE_PACK_EMPTY_MANIFEST,
   PRIVATE_PACK_MIME,
   PRIVATE_PACK_URL_PREFIX,
   isSafePrivatePackPath,
@@ -130,10 +130,17 @@ export function loadPrivatePacks(dir: string | undefined): LoadResult {
         );
       }
     }
-    if (kept.length > 0) packs.push({ id: pack.id, title: pack.title, files: kept });
+    if (kept.length > 0)
+      packs.push({
+        id: pack.id,
+        title: pack.title,
+        ...(pack.url !== undefined ? { url: pack.url } : {}),
+        ...(pack.license !== undefined ? { license: pack.license } : {}),
+        files: kept,
+      });
   }
   return {
-    table: { files, manifest: { version: PRIVATE_PACK_MANIFEST_VERSION, packs } },
+    table: { files, manifest: { packs } },
     warnings,
   };
 }
@@ -176,16 +183,19 @@ export function mountPrivatePacks(app: Express, table: PrivatePackTable | null):
       res.setHeader("Allow", "GET, HEAD");
       return void res.status(405).type("text/plain").send("Method not allowed");
     }
-    if (!table) return NOT_FOUND(res);
     // `req.url` trong `app.use(prefix)` đã bỏ tiền tố: "/manifest.json?x=1", "/gói/tệp.png?v=..."
     const [rawPath = "", rawQuery = ""] = req.url.split("?", 2);
     const after = rawPath.startsWith("/") ? rawPath.slice(1) : rawPath;
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
     if (after === "manifest.json") {
+      // TẮT hoặc manifest hỏng: vẫn 200 `{ packs: [] }` (không 404 đỏ ở DevTools mỗi lần vào game; client coi là không có gói). Tệp riêng lẻ vẫn 404.
       res.setHeader("Cache-Control", "no-cache");
-      return void res.type("application/json").send(JSON.stringify(table.manifest));
+      return void res
+        .type("application/json")
+        .send(JSON.stringify(table ? table.manifest : PRIVATE_PACK_EMPTY_MANIFEST));
     }
+    if (!table) return NOT_FOUND(res);
     const key = privatePackLookupKey(after);
     const entry = key === null ? undefined : table.files.get(key); // `Map`: không có chuỗi nào của người dùng thành thuộc tính nguyên mẫu
     if (!entry) return NOT_FOUND(res);
@@ -237,6 +247,10 @@ function walk(dir: string, rel = ""): string[] {
 export function buildPrivatePackManifest(
   distDir: string,
   titles: Readonly<Record<string, string>> = {},
+  extra: {
+    urls?: Readonly<Record<string, string>>;
+    licenses?: Readonly<Record<string, string>>;
+  } = {},
 ): PrivatePackManifest {
   const root = path.resolve(distDir);
   const packs: PrivatePackManifest["packs"] = [];
@@ -249,9 +263,17 @@ export function buildPrivatePackManifest(
         const full = path.join(abs, ...p.split("/"));
         return { path: p, bytes: statSync(full).size, sha256: sha256Of(full) };
       });
-    packs.push({ id: name, title: titles[name] ?? name, files });
+    const url = extra.urls?.[name];
+    const license = extra.licenses?.[name];
+    packs.push({
+      id: name,
+      title: titles[name] ?? name,
+      ...(url !== undefined ? { url } : {}),
+      ...(license !== undefined ? { license } : {}),
+      files,
+    });
   }
-  const m: PrivatePackManifest = { version: PRIVATE_PACK_MANIFEST_VERSION, packs };
+  const m: PrivatePackManifest = { packs };
   const bad = privatePackViolations(m);
   if (bad.length > 0)
     throw new Error(`manifest sinh ra không hợp lệ: ${bad.slice(0, 5).join("; ")}`);
@@ -262,8 +284,9 @@ export function buildPrivatePackManifest(
 export function writePrivatePackManifest(
   distDir: string,
   titles?: Readonly<Record<string, string>>,
+  extra?: { urls?: Readonly<Record<string, string>>; licenses?: Readonly<Record<string, string>> },
 ): PrivatePackManifest {
-  const m = buildPrivatePackManifest(distDir, titles);
+  const m = buildPrivatePackManifest(distDir, titles, extra);
   writeFileSync(
     path.join(path.resolve(distDir), "manifest.json"),
     `${JSON.stringify(m, null, 2)}\n`,

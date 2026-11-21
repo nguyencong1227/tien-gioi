@@ -4,7 +4,11 @@ import {
   PRIVATE_PACK_EXTENSIONS,
   PRIVATE_PACK_FILE_MAX_BYTES,
   PRIVATE_PACK_MANIFEST_URL,
-  PRIVATE_PACK_MANIFEST_VERSION,
+  PRIVATE_PACK_EMPTY_MANIFEST,
+  PRIVATE_PACK_LICENSE_MAX_LEN,
+  PRIVATE_PACK_URL_MAX_LEN,
+  PRIVATE_PACK_VERSION_HEX,
+  isSafePrivatePackUrl,
   PRIVATE_PACK_MAX_FILES,
   PRIVATE_PACK_MAX_PACKS,
   PRIVATE_PACK_MIME,
@@ -33,7 +37,6 @@ const pack = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 const manifest = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
-  version: PRIVATE_PACK_MANIFEST_VERSION,
   packs: [pack()],
   ...over,
 });
@@ -42,7 +45,6 @@ describe("hằng số", () => {
   it("đường dẫn gói nằm dưới /assets-private/, manifest ở /assets-private/manifest.json", () => {
     expect(PRIVATE_PACK_URL_PREFIX).toBe("/assets-private/");
     expect(PRIVATE_PACK_MANIFEST_URL).toBe("/assets-private/manifest.json");
-    expect(PRIVATE_PACK_MANIFEST_VERSION).toBe(1);
   });
   it("danh sách trắng phần mở rộng KHÔNG có đuôi chạy mã / script (html, js, svg, mjs, xml)", () => {
     for (const ext of ["html", "htm", "js", "mjs", "svg", "xml", "php", "exe", "sh"])
@@ -128,11 +130,12 @@ describe("privatePackViolations", () => {
   it("manifest hợp lệ (một gói một tệp, nhiều gói nhiều tệp, gói rỗng) -> không vi phạm", () => {
     expect(privatePackViolations(manifest())).toEqual([]);
     const m: PrivatePackManifest = {
-      version: 1,
       packs: [
         {
           id: "tiny-swords",
           title: "Tiny Swords",
+          url: "https://example.itch.io/tiny-swords",
+          license: "Miễn phí, được dùng trong game, cấm phân phối lại",
           files: [
             { path: "atlas.png", bytes: 10, sha256: SHA },
             { path: "ui/frame.webp", bytes: PRIVATE_PACK_FILE_MAX_BYTES, sha256: SHA },
@@ -142,19 +145,23 @@ describe("privatePackViolations", () => {
       ],
     };
     expect(privatePackViolations(m)).toEqual([]);
-    expect(privatePackViolations({ version: 1, packs: [] })).toEqual([]);
+    expect(privatePackViolations({ packs: [] })).toEqual([]);
+    expect(privatePackViolations(PRIVATE_PACK_EMPTY_MANIFEST)).toEqual([]);
   });
 
-  it("không phải đối tượng / sai version / packs không phải mảng", () => {
+  it("manifest RỖNG chuẩn: đóng băng, không gói nào", () => {
+    expect(PRIVATE_PACK_EMPTY_MANIFEST).toEqual({ packs: [] });
+    expect(Object.isFrozen(PRIVATE_PACK_EMPTY_MANIFEST)).toBe(true);
+  });
+
+  it("không phải đối tượng / packs thiếu hoặc không phải mảng / trường `version` cũ bị coi là trường lạ", () => {
     for (const bad of [null, undefined, 3, "x", [], true])
       expect(privatePackViolations(bad).join("\n"), String(bad)).toMatch(/không phải đối tượng/);
-    expect(privatePackViolations(manifest({ version: 2 })).join("\n")).toMatch(/version/);
-    expect(privatePackViolations(manifest({ version: "1" })).join("\n")).toMatch(/version/);
-    expect(privatePackViolations({ packs: [] }).join("\n")).toMatch(/version/);
-    expect(privatePackViolations({ version: 1 }).join("\n")).toMatch(/packs phải là mảng/);
-    expect(privatePackViolations({ version: 1, packs: {} }).join("\n")).toMatch(
-      /packs phải là mảng/,
-    );
+    expect(privatePackViolations({}).join("\n")).toMatch(/packs phải là mảng/);
+    expect(privatePackViolations({ packs: {} }).join("\n")).toMatch(/packs phải là mảng/);
+    // manifest KHÔNG có `version` (dạng `{ packs }` như PackManifest của client): `version` là trường lạ
+    expect(privatePackViolations({ version: 1, packs: [] }).join("\n")).toMatch(/trường lạ/);
+    expect(privatePackViolations(manifest({ version: 2 })).join("\n")).toMatch(/trường lạ/);
   });
 
   it("trường LẠ ở bất kỳ tầng nào là vi phạm (không nhét đường dẫn qua trường khác)", () => {
@@ -262,13 +269,13 @@ describe("privatePackViolations", () => {
 
   it("không ném lỗi với đầu vào độc (nguyên mẫu, kiểu lạ), và mỗi lỗi nêu đúng chỗ", () => {
     const evil = JSON.parse(
-      '{"version":1,"packs":[{"id":"x","title":"ab","files":[{"__proto__":{"a":1},"path":"a.png","bytes":1,"sha256":"' +
+      '{"packs":[{"id":"x","title":"ab","files":[{"__proto__":{"a":1},"path":"a.png","bytes":1,"sha256":"' +
         SHA +
         '"}]}]}',
     );
     expect(() => privatePackViolations(evil)).not.toThrow();
     expect(() =>
-      privatePackViolations({ version: 1, packs: [{ files: [{ path: Symbol.iterator }] }] }),
+      privatePackViolations({ packs: [{ files: [{ path: Symbol.iterator }] }] }),
     ).not.toThrow();
   });
 });
@@ -278,12 +285,12 @@ describe("privatePackKey / privatePackUrl / privatePackVersionMatches", () => {
     expect(privatePackKey("cainos_basic", "tiles/a.png")).toBe("cainos_basic/tiles/a.png");
   });
 
-  it("URL: tiền tố + gói + đường dẫn; có ?v= (8 hex đầu) khi có hash hợp lệ", () => {
+  it("URL: tiền tố + gói + đường dẫn; có ?v= (12 hex đầu, như /packs/) khi có hash hợp lệ", () => {
     expect(privatePackUrl("cainos_basic", "atlas.png")).toBe(
       "/assets-private/cainos_basic/atlas.png",
     );
     expect(privatePackUrl("cainos_basic", "tiles/a.webp", SHA)).toBe(
-      `/assets-private/cainos_basic/tiles/a.webp?v=${SHA.slice(0, 8)}`,
+      `/assets-private/cainos_basic/tiles/a.webp?v=${SHA.slice(0, PRIVATE_PACK_VERSION_HEX)}`,
     );
     // hash rác thì KHÔNG gắn ?v= (không có cache dài trên giá trị bịa)
     for (const bad of ["abc", "g".repeat(64), SHA.toUpperCase(), ""])
@@ -298,18 +305,70 @@ describe("privatePackKey / privatePackUrl / privatePackVersionMatches", () => {
     expect(() => privatePackUrl("g", "a.html")).toThrow();
   });
 
-  it("?v= khớp: đúng 8 hex đầu của sha256 hợp lệ; sai / thiếu / rác / sha rác thì không", () => {
-    expect(privatePackVersionMatches(SHA.slice(0, 8), SHA)).toBe(true);
-    expect(privatePackVersionMatches("deadbeef", SHA)).toBe(false);
-    expect(privatePackVersionMatches(SHA.slice(0, 7), SHA)).toBe(false);
-    expect(privatePackVersionMatches(SHA.slice(0, 9), SHA)).toBe(false);
-    // 8 hex đầu của SHA toàn chữ số nên viết hoa không đổi: dùng hash bắt đầu bằng chữ để kiểm "hoa thường"
-    const SHA_LETTERS = `abcdef12${"0".repeat(56)}`;
-    expect(privatePackVersionMatches("abcdef12", SHA_LETTERS)).toBe(true);
-    expect(privatePackVersionMatches("ABCDEF12", SHA_LETTERS)).toBe(false);
-    for (const bad of [undefined, null, 5, {}, ["01234567"], ""])
+  it("?v= khớp: đúng 12 hex đầu của sha256 hợp lệ; sai độ dài (8, 11, 13) / rác / sha rác / hoa thường thì không", () => {
+    expect(PRIVATE_PACK_VERSION_HEX).toBe(12);
+    expect(privatePackVersionMatches(SHA.slice(0, 12), SHA)).toBe(true);
+    expect(privatePackVersionMatches("deadbeefdead", SHA)).toBe(false);
+    for (const n of [8, 11, 13, 64])
+      expect(privatePackVersionMatches(SHA.slice(0, n), SHA), String(n)).toBe(false);
+    // 12 hex đầu của SHA toàn chữ số nên viết hoa không đổi: dùng hash bắt đầu bằng chữ để kiểm "hoa thường"
+    const SHA_LETTERS = `abcdef123456${"0".repeat(52)}`;
+    expect(privatePackVersionMatches("abcdef123456", SHA_LETTERS)).toBe(true);
+    expect(privatePackVersionMatches("ABCDEF123456", SHA_LETTERS)).toBe(false);
+    for (const bad of [undefined, null, 5, {}, ["012345678901"], ""])
       expect(privatePackVersionMatches(bad, SHA), String(bad)).toBe(false);
     // sha256 của bảng không hợp lệ thì không bao giờ khớp (dù tiền tố trùng)
-    expect(privatePackVersionMatches("abcdef12", "abcdef12")).toBe(false);
+    expect(privatePackVersionMatches("abcdef123456", "abcdef123456")).toBe(false);
+  });
+
+  it("url của gói: chỉ https có tên miền; javascript: / data: / http: / khoảng trắng / ký tự HTML / user:pass / quá dài thì không; <= 200 ký tự", () => {
+    for (const ok of [
+      "https://itch.io/packs/x",
+      "https://cainos.itch.io/pixel-art-top-down-basic",
+      "https://a.example/p?x=1#y",
+    ])
+      expect(isSafePrivatePackUrl(ok), ok).toBe(true);
+    for (const bad of [
+      "http://itch.io/x",
+      "javascript:alert(1)",
+      "data:text/html,<script>",
+      "//itch.io/x",
+      "https://",
+      "https://localhost/x",
+      "https://user:pw@itch.io/x",
+      "https://itch.io/a b",
+      "https://itch.io/<x>",
+      'https://itch.io/"x',
+      "https://itch.io/\\x",
+      "https://itch.io/x\n",
+      `https://itch.io/${"a".repeat(PRIVATE_PACK_URL_MAX_LEN)}`,
+      "",
+      5,
+      null,
+    ])
+      expect(isSafePrivatePackUrl(bad), JSON.stringify(bad)).toBe(false);
+    const atMax = `https://itch.io/${"a".repeat(PRIVATE_PACK_URL_MAX_LEN - "https://itch.io/".length)}`;
+    expect(atMax).toHaveLength(PRIVATE_PACK_URL_MAX_LEN);
+    expect(isSafePrivatePackUrl(atMax)).toBe(true);
+  });
+
+  it("manifest: url / license tuỳ chọn nhưng KHI CÓ phải hợp lệ", () => {
+    const one = (extra: Record<string, unknown>) =>
+      privatePackViolations(manifest({ packs: [pack(extra)] })).join("\n");
+    expect(one({ url: "https://itch.io/x", license: "CC0" })).toBe("");
+    expect(one({})).toBe("");
+    expect(one({ url: "javascript:alert(1)" })).toMatch(/url phải là https/);
+    expect(one({ url: 5 })).toMatch(/url phải là https/);
+    for (const license of [
+      "",
+      "x".repeat(PRIVATE_PACK_LICENSE_MAX_LEN + 1),
+      "hai\ndòng",
+      " đầu",
+      "cuối ",
+      5,
+      null,
+    ])
+      expect(one({ license }), JSON.stringify(license)).toMatch(/license/);
+    expect(one({ license: "x".repeat(PRIVATE_PACK_LICENSE_MAX_LEN) })).toBe("");
   });
 });
