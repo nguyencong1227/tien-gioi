@@ -4,7 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import http from "node:http";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -185,6 +193,12 @@ describe("loadPrivatePacks", () => {
       { "g1/ok.png": good, "g1/lech.png": "abc" },
     );
     mkdirSync(path.join(dir, "g1", "thumuc.png"));
+    // khai số byte ĐÚNG BẰNG kích thước mục thư mục để chỉ nhánh "phải là tệp thường" mới loại được nó
+    const m0 = JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8"));
+    m0.packs[0].files.find((f: { path: string }) => f.path === "thumuc.png").bytes = statSync(
+      path.join(dir, "g1", "thumuc.png"),
+    ).size;
+    writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(m0));
     writeFileSync(path.join(outside, "leak.png"), "BÍ MẬT NGOÀI GỐC");
     symlinkSync(path.join(outside, "leak.png"), path.join(dir, "g1", "link.png"));
     const r = loadPrivatePacks(dir);
@@ -196,6 +210,7 @@ describe("loadPrivatePacks", () => {
     for (const name of ["thieu.png", "lech.png", "thumuc.png", "link.png", "chet.png"])
       expect(w, name).toContain(name);
     expect(w).toMatch(/lệch số byte/);
+    expect(w).toMatch(/không phải tệp thường/);
     expect(w).toMatch(/ngoài thư mục gốc/);
   });
 });
@@ -505,6 +520,27 @@ describe("công cụ manifest / check", () => {
     mkdirSync(path.join(dir, "g1"), { recursive: true });
     writeFileSync(path.join(dir, "g1", "lon.png"), Buffer.alloc(PRIVATE_PACK_FILE_MAX_BYTES + 1));
     expect(() => buildPrivatePackManifest(dir)).toThrow(/không hợp lệ/);
+  });
+});
+
+describe("nối vào index.ts", () => {
+  const src = readFileSync(
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), "index.ts"),
+    "utf8",
+  );
+
+  it("`mountPrivatePacks` gọi SAU originGuardMiddleware + frameGuardMiddleware và TRƯỚC express.static / SPA (Origin lạ bị 403, 404 không rơi xuống index.html); đọc ASSETS_PRIVATE_DIR", () => {
+    const at = (needle: string) => {
+      const i = src.indexOf(needle);
+      expect(i, needle).toBeGreaterThan(-1);
+      return i;
+    };
+    const mount = at("mountPrivatePacks(app, privatePacks.table)");
+    expect(at("app.use(frameGuardMiddleware)")).toBeLessThan(mount);
+    expect(at("app.use(originGuardMiddleware(")).toBeLessThan(mount);
+    expect(mount).toBeLessThan(at("express.static("));
+    expect(mount).toBeLessThan(at('app.get("*"'));
+    expect(at("loadPrivatePacks(process.env.ASSETS_PRIVATE_DIR)")).toBeLessThan(mount);
   });
 });
 
