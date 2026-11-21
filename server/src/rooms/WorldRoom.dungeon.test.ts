@@ -628,8 +628,10 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
       "HUD thắng",
     );
     // hồ sơ: lượt ngày ghi vào file ở lần lưu tới; đồ và tiền cùng bản ghi
+    // So sánh với GIỜ của máy chủ (`w.now`), KHÔNG phải giờ tường (`Date.now()`): `dungeonDaily.day` do code ghi bằng `dayKey(w.now)`,
+    // còn `w.now` bị đóng băng từ lúc dựng phòng trong khi `Date.now()` vẫn trôi — gần nửa đêm hai mốc lọt hai phía ngày → chập chờn (issue #1125)
     await (serverRoom(t.ra) as any).saveAll();
-    expect(saveOf(t.a.name).dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(saveOf(t.a.name).dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 1 });
     expect(saveOf(t.a.name).coin).toBeGreaterThanOrEqual(LINH_HU.reward.coin);
     expect(saveOf(t.b.name).dungeonDaily).toBeUndefined();
     expect(saveOf(t.a.name).mapId).toBe(DEFAULT_MAP_ID); // vẫn ghi Lạc Hà
@@ -647,7 +649,8 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
   it("đã nhận đủ 3 lượt hôm nay (hồ sơ): vẫn thắng nhưng `daily_limit`, không thêm thưởng, bộ đếm giữ nguyên; hồ sơ bộ đếm hỏng thì coi như chưa dùng", async () => {
     const t = await inside();
     const wa = t.world.ctrl.get(t.ra.sessionId);
-    wa.save.dungeonDaily = { day: dayKey(Date.now()), rewards: 3 };
+    // Ngày phải lấy theo GIỜ máy chủ (`w.now`) để code coi là "hôm nay" thật; lấy `Date.now()` thì gần nửa đêm lệch ngày → điều kiện "đã dùng 3 lượt" bị coi là ngày khác (mất hiệu lực)
+    wa.save.dungeonDaily = { day: dayKey(t.world.now), rewards: 3 };
     const wb = t.world.ctrl.get(t.rb.sessionId);
     wb.save.dungeonDaily = { day: "khong-phai-ngay", rewards: 99 }; // hỏng
     const mc = t.world.mctrl.get(t.bossId);
@@ -660,10 +663,10 @@ describe("thắng bí cảnh: hạ trùm, thưởng, lượt mỗi ngày (4c)", 
     expect(ea).toMatchObject({ result: "won", noReward: "daily_limit", rewardsLeft: 0 });
     expect(ea.reward).toBeUndefined();
     expect(wa.coin).toBeGreaterThanOrEqual(coinA); // chỉ tiền rơi từ xác trùm (nếu có), không có thưởng hoàn thành
-    expect(wa.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 3 });
+    expect(wa.save.dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 3 });
     expect(eb.reward!.coin).toBe(LINH_HU.reward.coin);
     expect(eb.rewardsLeft).toBe(2);
-    expect(wb.save.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(wb.save.dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 1 });
   });
 });
 
@@ -715,7 +718,7 @@ describe("gục trong bí cảnh: không mất kiếp (quyết định 11/11)", 
     expect([rec.realm, rec.tier]).toEqual([1, 8]);
     expect(rec.lifeId).toBe(lifeId);
     expect(rec.mapId).toBe(DEFAULT_MAP_ID);
-    expect(rec.dungeonDaily).toEqual({ day: dayKey(Date.now()), rewards: 1 });
+    expect(rec.dungeonDaily).toEqual({ day: dayKey(t.world.now), rewards: 1 });
     expect(ctrlA.soul.kiep).toBe(kiep);
     expect(t.a.limbos).toBe(0);
 
