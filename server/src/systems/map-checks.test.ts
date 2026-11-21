@@ -115,10 +115,10 @@ function withZone(
       id: 99,
       name: "vung_thu",
       class: "spawnZone",
-      x: z.tx * 16,
-      y: z.ty * 16,
-      width: z.tw * 16,
-      height: z.th * 16,
+      x: z.tx * json.tilewidth,
+      y: z.ty * json.tilewidth,
+      width: z.tw * json.tilewidth,
+      height: z.th * json.tilewidth,
       properties: [
         { name: "monster", value: z.monster },
         ...(z.max !== undefined ? [{ name: "max", value: z.max }] : []),
@@ -163,6 +163,11 @@ describe("spawnZoneViolations trên bản đồ thật (lưới an toàn cho S6)
       monster: "lang",
     });
     expect(spawnZoneViolations(onTown).join("\n")).toMatch(/chỉ có 0 chỗ sinh hợp lệ/);
+    // trùm ở NỬA NHỎ do trấn cắt Âm Sương, nhiều cây: mọi chỗ ứng viên vừa sát cây / đá vừa ngoài vùng chính (B đo ở review #1218); cả hai lý do phải được báo, không chỉ "sát cây"
+    const half = withZone("am_suong", { tx: 97, ty: 61, tw: 4, th: 4, monster: "hac_giao" });
+    const why = spawnZoneViolations(half).join("\n");
+    expect(why).toMatch(/\d+ chỗ sát cây \/ đá/);
+    expect(why).toMatch(/\d+ chỗ ngoài vùng chính của lưới quái cho trùm/);
     // loài không có ở bản đồ này (Lạc Hà không sinh Hắc Giao): báo
     const wrong = withZone("lac_ha", { ...g, tw: 6, th: 6, monster: "hac_giao" });
     expect(spawnZoneViolations(wrong).join("\n")).toMatch(/không có trong monsterCap/);
