@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRIVATE_PACK_MANIFEST_URL } from "@tien-gioi/shared";
 import {
+  MAP_PACK_TIMEOUT_MS,
   MAX_ATTEMPTS,
   PRIVATE_MANIFEST_TIMEOUT_MS,
   createPacks,
@@ -53,9 +54,12 @@ interface Opts {
   wrongSize?: boolean;
   native?: boolean;
   throwText?: boolean;
+  /** Treo việc tải tệp của gói riêng cho tới khi gọi `release()` (thử chờ cùng gói bản đồ). */
+  holdPrivate?: boolean;
 }
 function fake(o: Opts = {}) {
   const log = { texts: [] as string[], bytes: [] as string[], warns: [] as string[] };
+  const gate = { release: [] as (() => void)[] };
   const privateText = o.privateText === undefined ? JSON.stringify(MANIFEST) : o.privateText;
   const env: PacksEnv = {
     async fetchText(url) {
@@ -69,6 +73,8 @@ function fake(o: Opts = {}) {
     },
     async fetchBytes(url) {
       log.bytes.push(url);
+      if (o.holdPrivate && url.startsWith("/assets-private/"))
+        await new Promise<void>((r) => gate.release.push(r));
       if (o.failBytes?.(url, log.bytes.length)) throw new Error("tải lỗi");
       if (o.wrongSize) return 1;
       const path =
@@ -86,7 +92,7 @@ function fake(o: Opts = {}) {
     idle: (cb) => cb(),
     warn: (m) => log.warns.push(m),
   };
-  return { env, log };
+  return { env, log, gate };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -165,6 +171,7 @@ describe("gói riêng: CÓ gói", () => {
     const a = fake();
     const pa = createPacks(a.env, {});
     expect(await pa.ensure("map:lac_ha")).toBe("loaded");
+    await new Promise((r) => setTimeout(r, 5)); // qua một lượt macrotask: không có việc tải ngầm nào của manifest riêng
     expect(a.log.texts).toEqual(["/packs/manifest.json"]); // KHÔNG xin /assets-private/manifest.json
     expect(a.log.bytes.every((u) => u.startsWith("/packs/"))).toBe(true);
     const b = fake();
@@ -243,6 +250,32 @@ describe("gói riêng: gắn vào bản đồ (chờ cùng hạn với gói bả
     expect(p.state("map:lac_ha")).toBe("ready");
     expect(p.state("private:cainos")).toBe("ready");
     expect(log.bytes.some((u) => u.startsWith("/assets-private/cainos/"))).toBe(true);
+  });
+
+  it("takeMapWait CHỜ gói riêng thật: chưa về thì chưa resolve; về rồi mới resolve; treo mãi thì tới hạn của gói bản đồ vẫn resolve với kết quả gói bản đồ", async () => {
+    const h = fake({ holdPrivate: true });
+    const p = createPacks(h.env, { lac_ha: ["cainos"] });
+    let done: string | null = null;
+    void p.takeMapWait("lac_ha").then((r) => (done = r));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(h.gate.release.length).toBeGreaterThan(0); // việc tải tệp riêng đang treo
+    expect(done).toBeNull(); // gói bản đồ đã xong nhưng còn chờ gói riêng
+    expect(p.state("map:lac_ha")).toBe("ready");
+    for (let i = 0; i < 5 && done === null; i++) {
+      h.gate.release.splice(0).forEach((r) => r());
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(done).toBe("loaded");
+    expect(p.state("private:cainos")).toBe("ready");
+
+    // treo mãi: tới hạn của gói bản đồ thì vẫn resolve (không chặn vào game), kết quả là của gói bản đồ
+    vi.useFakeTimers();
+    const h2 = fake({ holdPrivate: true });
+    const p2 = createPacks(h2.env, { lac_ha: ["cainos"] });
+    const r2 = p2.takeMapWait("lac_ha");
+    await vi.advanceTimersByTimeAsync(MAP_PACK_TIMEOUT_MS + 10);
+    expect(await r2).toBe("loaded");
+    expect(p2.state("private:cainos")).toBe("loading"); // vẫn tải tiếp; về muộn thì onReady báo để dựng lại
   });
 
   it("thiếu gói riêng (manifest riêng 404): vào bản đồ KHÔNG hỏng, kết quả gói bản đồ giữ nguyên", async () => {
