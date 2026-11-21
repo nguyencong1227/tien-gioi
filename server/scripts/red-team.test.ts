@@ -9,11 +9,18 @@
 // 6. Rate-limit: người gửi spam bị ngắt đúng với mã 4429.
 
 import { describe, expect, it } from "vitest";
+import { MAX_TRACKED_TYPES, MESSAGE_TYPE_HEADROOM } from "../src/rate-limit";
 import { EXPECTED_MESSAGE_TYPES, buildBadPayloads, runRedTeam } from "./red-team";
 
 describe("Red Team Server Messages (#252)", () => {
   it("danh sách EXPECTED_MESSAGE_TYPES bao phủ đủ 64 loại tin nhắn hợp lệ của WorldRoom", () => {
     expect(EXPECTED_MESSAGE_TYPES.length).toBe(64);
+  });
+
+  it("#1250: số loại tin đã đăng ký còn dư địa dưới trần theo dõi của RateLimiter (thêm loại tin mới không làm phiên dùng đủ loại thấy loại cuối bị bỏ như spam)", () => {
+    expect(EXPECTED_MESSAGE_TYPES.length + MESSAGE_TYPE_HEADROOM).toBeLessThanOrEqual(
+      MAX_TRACKED_TYPES,
+    );
   });
 
   it("tập payload xấu buildBadPayloads phủ đủ các nhóm nguy hiểm", () => {
