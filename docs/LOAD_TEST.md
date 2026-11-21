@@ -2153,9 +2153,10 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 (Máy chủ con tự động chạy với `AMBUSH=on` và `AMBUSH_BOTS=on`).
 
 ### 40.3. Kết quả đo đạc thực tế (Lượt chạy 10 phút ngày 22/11/2026 - CD10b mục 2)
-- **Tệp mẫu nhật ký:** `server/soak-ambush.json` (sinh từ `soak-2026-11-21T22-13-41-530Z`)
+- **Tệp mẫu nhật ký:** `server/soak-ambush.json` (tệp cục bộ trên máy dev, không commit repo theo `.gitignore`).
 - **Thời lượng:** 10.0 phút (600 giây, 60 mẫu lấy mỗi 10 giây).
 - **Số bot:** 100 khởi tạo -> 100 kết thúc (tỉ lệ rớt: 0%).
+- **Cấu hình bot:** `--ambush` mặc định gieo 50% bot mang 0 đan và 50% bot mang 5 đan, ưu tiên chọn "Chiến" 75% để thử tải đấu trường solo (có cả thắng và thua thay vì chỉ người chơi bình thường).
 
 | Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Ngân sách | Đánh giá |
 |---|---|---:|---:|:---:|
@@ -2183,7 +2184,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | | Lỗi gọi `/metrics` | 0 | 0 | **ĐẠT** |
 | | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
 | | Tệp hỏng (`*.hong-*`) | 0 | 0 | **ĐẠT** |
-| | Bảo toàn Linh thạch | ĐẠT (Trần 10.060, Thực tế 429, Lệch ví: 0) | ĐẠT | **ĐẠT** |
+| | Bảo toàn Linh thạch | Ban đầu 10000 + Thả ra 60 - Tiêu 9691 = Trần 10060 \| Thực tế: Ví 429 + Kho 0 = 429 (Lệch ví: 0) *(lưu ý: ví thấp do ~34 lần chết ngoài hoang dã)* | ĐẠT | **ĐẠT** |
 
 ### 40.4. Nhận xét & Giới hạn
 - Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục (CD10b mục 2) chứng minh:
@@ -2193,8 +2194,8 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
   - **Hiệu năng nhịp tick:** Tick p95 trung bình 4.46 ms (max 5.99 ms <= 10.0 ms), 0 overruns. *(Lưu ý kỹ thuật theo review của Dev A và Dev B: Tick p95 được theo dõi riêng trên từng phòng Colyseus qua WorldState, bắt được trường hợp một phòng bị chậm, không phải là độ trễ vòng lặp sự kiện của cả tiến trình khi 20 phòng cùng chạy).*
   - **Toàn vẹn dữ liệu:** `kiem-save` 100 nhân vật / 100 chân linh báo 0 lỗi, bảo toàn Linh thạch lệch ví 0.
 
-### 40.5. Khẳng định cơ chế AMBUSH_MIN_POTIONS=2 (Lượt chạy 5 phút ngày 22/11/2026 - CD10b mục 3)
-- **Tệp mẫu nhật ký:** `server/soak-potions.json`
+### 40.5. Đo đạc thực tế cơ chế AMBUSH_MIN_POTIONS=2 (Lượt chạy 5 phút ngày 22/11/2026 - CD10b mục 3)
+- **Tệp mẫu nhật ký:** `server/soak-potions.json` (tệp cục bộ trên máy dev, không commit repo theo `.gitignore`).
 - **Thời lượng:** 5.0 phút (300 giây, 30 mẫu lấy mỗi 10 giây).
 - **Cấu hình:** `AMBUSH_MIN_POTIONS=2 AMBUSH_SPLIT_POTIONS=1`
 - **Phân bổ bot (100 bot đi hoang):**
@@ -2204,7 +2205,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Tiêu chuẩn | Đánh giá |
 |---|---|---:|---:|:---:|
 | **Khẳng định đan dược** | **Số hộp thoại bot 1 đan nhận (50 bot)** | **0 hộp thoại** | = 0 (`pot1OffersTotal = 0`) | **ĐẠT** |
-| | **Số hộp thoại bot 5 đan nhận (50 bot)** | **1 hộp thoại** | >= 0 (`pot5OffersTotal = 1`) | **ĐẠT** |
+| | **Số hộp thoại bot 5 đan nhận (50 bot)** | **1 hộp thoại** | Mẫu thực tế (`pot5OffersTotal = 1`) | Ghi nhận |
 | **Phòng đấu trường** | **Số phòng cuối cùng khi dừng** | **0 phòng** | = 0 | **ĐẠT** |
 | | Số phòng tối đa đồng thời | 1 phòng | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
 | | Lượt qua cổng vào / ra đấu trường | 1 lượt vào `arena_lac_ha`, 1 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
@@ -2219,8 +2220,8 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | | Độ trễ vòng lặp p99 | 25.4 ms | <= 100 ms | **ĐẠT** |
 | **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 | **ĐẠT** |
 | | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
-| | Bảo toàn Linh thạch | ĐẠT (Trần 10.000, Thực tế 3.800, Lệch ví: 0) | ĐẠT | **ĐẠT** |
+| | Bảo toàn Linh thạch | Ban đầu 10000 + Thả ra 0 - Tiêu 6200 = Trần 10000 \| Thực tế: Ví 3800 + Kho 0 = 3800 (Lệch ví: 0) *(lưu ý: ~49 lần chết ngoài hoang dã)* | ĐẠT | **ĐẠT** |
 
-- **Kết luận:** Cơ chế `AMBUSH_MIN_POTIONS=2` hoạt động hoàn toàn chính xác theo thiết kế CD6c: người chơi mang dưới 2 Hồi Huyết Đan được nhánh `potion` bảo vệ tuyệt đối, không bao giờ nhận hộp thoại gặp chặn đường hay bị đưa vào đấu trường sinh tử; trong khi nhóm người chơi mang đủ đan vẫn kích hoạt tính năng bình thường.
+- **Kết luận:** Trong lượt chạy 5 phút với 100 bot đi hoang, ghi nhận mẫu n = 1 hộp thoại chặn đường (thuộc về nhóm 5 đan, nhóm 1 đan nhận 0 hộp thoại). Mẫu thực tế này nhất quán và không mâu thuẫn với cơ chế chặn người ít đan của `AMBUSH_MIN_POTIONS=2`. Bằng chứng quyết định tính đúng đắn tuyệt đối của cổng logic này đã được bảo vệ độc lập bởi các bộ unit test tất định (`WorldRoom.ambush-potions.test.ts` và `server/src/systems/ambush.test.ts`).
 
 
