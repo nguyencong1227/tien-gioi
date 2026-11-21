@@ -41,7 +41,7 @@
    - **Trang Điều khoản sử dụng & Bản quyền mới trong game (`terms.html`):** Bổ sung trang pháp lý `terms.html` (chống sao chép, quy định dùng máy chủ, điều khoản tài khoản); tích hợp liên kết tại chân trang màn hình đăng nhập và trong bảng Cài đặt ("Giới thiệu và ghi công").
 2. **Thay đổi kiến trúc hạ tầng (Người chơi KHÔNG thấy đổi gì về hình ảnh hay gameplay):**
    - **Chuyển đổi hệ thống bản đồ sang Tiled (S1 / S2 / S3a / S5):** Bốn bản đồ thường (`lac_ha`, `hac_phong`, `am_suong`, `han_van`) nay là tệp JSON tĩnh do máy chủ đọc và client nạp qua chunk `map-files-*.js`, khớp từng byte với bản đồ sinh theo seed cũ (0 spawnZone). `DEFAULT_MAP` chuyển sang đánh dấu `@deprecated` tại `shared/src/map.ts:776` và cấm import trực tiếp ngoài `shared/`; lưới tiếp cận va chạm `walk-reach` được dựng độc lập lúc tạo phòng.
-   - **Cơ chế phục hồi vị trí lưu rơi vào ô vật cản (#1213, #1220):** Nếu vị trí lưu của nhân vật rơi vào ô bị chặn (ví dụ do chỉnh sửa địa hình bản đồ), máy chủ tự động đặt nhân vật vào vị trí di chuyển hợp lệ gần nhất trong bán kính an toàn thay vì kéo giật lùi về trấn Lạc Hà.
+   - **Cơ chế phục hồi vị trí lưu rơi vào ô vật cản (#1213, #1220):** Nếu vị trí lưu của nhân vật rơi vào ô bị chặn (ví dụ do chỉnh sửa địa hình bản đồ), máy chủ tự động đặt nhân vật vào vị trí di chuyển hợp lệ gần nhất trong bán kính an toàn thay vì kéo giật lùi về điểm sinh ngẫu nhiên trong khu an toàn / trấn của chính bản đồ đó.
 3. **Chỉ xuất hiện khi bật cờ tính năng (Bản chạy thật đang TẮT nên người chơi chưa thấy):**
    - **Cảnh báo túi đan trong hộp thoại Chặn đường (CHỈ KHI `AMBUSH=on`):** Hộp thoại chủ động nhắc: *Túi không có đan hồi huyết: nên mang ít nhất 2.* hoặc *Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.*
    - **Khung ghi công tài nguyên riêng (CHỈ KHI CÓ GÓI):** Nằm trong mục "Giới thiệu và ghi công" của bảng Cài đặt (`client/src/private-credits.ts`), tự động ẩn khi máy chủ chưa cấu hình gói tài nguyên riêng.
@@ -63,12 +63,12 @@
      - *Cảnh báo vận hành (`server/src/systems/world-boss-config.ts`):* Trùm thế giới sinh ở bản đồ thường, người chơi bị hạ trong sự kiện là chết thật (qua luân hồi).
    - **Mặc định đổi chiều:** Trên `v0.5.2`, mã nguồn mặc định BẬT (`WORLD_BOSS !== "off"`, nhưng lúc đó lịch rỗng nên trùm không sinh); trên `main`, mã nguồn mặc định **TẮT** (chỉ kích hoạt khi có cờ `WORLD_BOSS=on`).
    - **Hành động:** Người Dùng kiểm tra `.env.production` thật: nếu đang có `WORLD_BOSS=on`, trùm thế giới sẽ xuất hiện thật vào 2 khung giờ trên ngay sau khi nâng cấp. Nếu chưa muốn kích hoạt, đảm bảo không đặt `WORLD_BOSS=on`.
-3. **Thành Tựu & Cấp Bù Duyên (`ACHIEVEMENTS`):**
+3. **Thành Tựu & Danh Hiệu (`ACHIEVEMENTS`):**
    - Mặc định mã nguồn: TẮT (`ACHIEVEMENTS=off`), không đổi so với `v0.5.2`.
-   - Bản chạy thật có thể ĐÃ ĐƯỢC BẬT theo quyết định M3 mục 55-56. Người Dùng kiểm tra `.env.production`: giữ nguyên cấu hình hiện tại của bản production, không tự ý tắt nếu đã bật.
+   - Bản chạy thật có thể ĐÃ ĐƯỢC BẬT theo quyết định M3 mục 57 khoản 2 (cấp bù Duyên cho người chơi cũ). Người Dùng kiểm tra `.env.production`: giữ nguyên cấu hình hiện tại của bản production, không tự ý tắt nếu đã bật.
 4. **Gặp Chặn Đường (`AMBUSH` & `AMBUSH_MIN_POTIONS`):**
    - Mặc định: TẮT (`AMBUSH=off`). Giữ nguyên trạng thái TẮT chờ Người Dùng duyệt 5 câu hỏi phát hành ở issue #1070.
-   - Nếu Người Dùng quyết định bật: thêm `AMBUSH=on` và bắt buộc khuyến nghị kèm `AMBUSH_MIN_POTIONS=2`.
+   - Nếu Người Dùng quyết định bật: thêm `AMBUSH=on`, khuyến nghị kèm `AMBUSH_MIN_POTIONS=2` (mặc định mã nguồn là 0; câu hỏi về việc có chặn người chơi thiếu đan hay không vẫn đang mở tại `questions.md`).
 5. **Cập nhật mẫu Docker Compose (`deploy/docker-compose.prod.yml`):**
    - Tệp mẫu compose có thêm cấu hình:
      - Biến môi trường: `ASSETS_PRIVATE_DIR=/assets-private`
@@ -92,10 +92,10 @@
      # hoặc: ./prod.sh up 0.5.2
      ```
 3. **Tính tương thích dữ liệu khi nâng cấp và lùi bản (Upgrade & Rollback Compatibility):**
-   - **Thực nghiệm nâng cấp v0.5.2 -> main (Mục 2, Refs #1290, comment 7070961872):** Đã kiểm chứng độc lập trên dữ liệu thật sinh từ `v0.5.2` (30 bot, 30 chân linh, 2 tông môn) nạp trên `main`: 30/30 bot đăng nhập thành công, nạp và ghi lưu an toàn, `kiem-save` 100% sạch (30 nhân vật, 30 chân linh, 2 tông môn), 0 tệp `*.hong-*`, bảo toàn ví (10.971 = 10.971)/tu vi/túi/trang bị/chiêu thức.
-   - **Thực nghiệm lùi bản main -> v0.5.2 (Mục 2b, Refs #1290, comment 7071033214):** Khởi động máy chủ `v0.5.2` trên BẢN SAO dữ liệu đã được `main` ghi lại: 30/30 bot đăng nhập thành công vào `v0.5.2`, ghi lưu an toàn; công cụ `audit-saves.ts` của `v0.5.2` đạt 30/30 nhân vật sạch, 30/30 chân linh sạch, 2/2 tông môn sạch, 0 tệp `*.hong-*`; snapshot trước và sau khi lùi bản khớp 100%.
+   - **Thực nghiệm nâng cấp v0.5.2 -> main (Mục 2, Refs #1290, comment 7070961872 trên PR #1291):** Đã kiểm chứng độc lập trên dữ liệu thật sinh từ `v0.5.2` (30 bot, 30 chân linh, 2 tông môn) nạp trên `main`: 30/30 bot đăng nhập thành công, nạp và ghi lưu an toàn, `kiem-save` 100% sạch (30 nhân vật, 30 chân linh, 2 tông môn), 0 tệp `*.hong-*`, bảo toàn ví (10.971 = 10.971)/tu vi/túi/trang bị/chiêu thức (Dev A xác nhận số đo thô tại comment 7071057361 trên PR #1291).
+   - **Thực nghiệm lùi bản main -> v0.5.2 (Mục 2b, Refs #1290, comment 7071033214 trên PR #1291):** Khởi động máy chủ `v0.5.2` trên BẢN SAO dữ liệu đã được `main` ghi lại: 30/30 bot đăng nhập thành công vào `v0.5.2`, ghi lưu an toàn; công cụ `audit-saves.ts` của `v0.5.2` đạt 30/30 nhân vật sạch, 30/30 chân linh sạch, 2/2 tông môn sạch, 0 tệp `*.hong-*`; 30/30 tệp nhân vật chỉ khác đúng `updatedAt` và `life.playMs` (toàn bộ thuộc tính, tu vi, ví tiền, trang bị, chiêu thức, chân linh, tông môn đều khớp nguyên vẹn - Dev A đối chiếu độc lập từ dữ liệu thô xác nhận tại comment 7071057361 trên PR #1291).
    - **Cơ sở cấu trúc:** Do khuôn tệp lưu trữ không thêm trường mới nào từ `v0.5.2` (`git diff` rỗng ở `store.ts`, `soul.ts`, `sect-store.ts`, `account-store.ts`, `pg/`), việc lùi bản từ `main` về `v0.5.2` không làm bản cũ ghi đè hay làm mất các trường dữ liệu cốt lõi.
-   - **Tự động hoá:** Quy trình kiểm tra nâng cấp và lùi bản đã được thực nghiệm thành công hai chiều trên môi trường và cổng cách ly (ghi nhận tại comment 7070961872 và 7071033214 trên issue #1290); việc đóng gói thành script kiểm thử tự động độc lập sẽ được đưa vào PR riêng.
+   - **Công cụ tự động hoá:** Việc đóng gói kịch bản kiểm tra nâng cấp / lùi bản thành công cụ tự động chạy bằng script độc lập sẽ được xem xét và gửi trong PR riêng sau khi rà soát độ an toàn của việc dọn dẹp thư mục tạm.
 
 4. **6 Giới hạn cần nhớ khi đọc số đo thực nghiệm:**
    1. *Hiệu lực commit:* Kết quả thực nghiệm chỉ có hiệu lực với đúng đầu commit `b007b456`; khi nhánh `main` có commit mới phải thực hiện lại quy trình kiểm tra nâng cấp.
