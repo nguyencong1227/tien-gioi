@@ -208,12 +208,12 @@ describe("spawnZone: trùm", () => {
     expect(zoneSpawnSpot(w, HAN, zones, { ignoreMax: true })).not.toBeNull();
   });
 
-  it("trùm thế giới theo giờ sinh TRONG vùng của bản đồ", () => {
-    const z = zone("thien_han_vuong", 18, 18, 10, 10);
+  /** Chạy bộ lập lịch qua 12:00 ở bản đồ tự dựng `thu_vung` (lịch mẫu, trùm Thiên Hàn Vương); `pre` đặt quái trước khi tới giờ. */
+  function runNoon(z: SpawnZoneDef, pre?: (w: ReturnType<typeof makeWorld>["w"]) => void) {
     const hub = new Hub();
-    const slot = { ...sampleWorldBossSchedule()[0]!, mapId: "thu_vung" };
-    hub.worldBoss.slots = [slot];
+    hub.worldBoss.slots = [{ ...sampleWorldBossSchedule()[0]!, mapId: "thu_vung" }];
     const { w } = makeWorld(mapWith([z], { lang: 4 }), hub);
+    pre?.(w);
     const day0 = Date.UTC(2026, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
     for (
       let t = day0 + 11 * 3600_000 + 59 * 60_000;
@@ -223,9 +223,24 @@ describe("spawnZone: trùm", () => {
       w.now = t;
       tickWorldBoss(w);
     }
+    return w;
+  }
+
+  it("trùm thế giới theo giờ sinh TRONG vùng của bản đồ", () => {
+    const z = zone("thien_han_vuong", 18, 18, 10, 10);
+    const w = runNoon(z);
     expect(w.wbossId).not.toBeNull();
     const b = w.state.monsters.get(w.wbossId!)!;
     expect(b.kind).toBe("thien_han_vuong");
     expect(inSpawnZone(z, b.x, b.y), `${b.x},${b.y}`).toBe(true);
+  });
+
+  it("trùm thế giới BỎ `max` của vùng: vùng đã đủ một con cùng loài vẫn sinh được (trùm thế giới là thêm)", () => {
+    const z = zone("thien_han_vuong", 18, 18, 10, 10, { max: 1 });
+    const w = runNoon(z, (x) => addMonster(x, "thien_han_vuong", z.x + z.w / 2, z.y + z.h / 2));
+    expect(w.wbossId).not.toBeNull();
+    const b = w.state.monsters.get(w.wbossId!)!;
+    expect(inSpawnZone(z, b.x, b.y), `${b.x},${b.y}`).toBe(true);
+    expect(of(w, "thien_han_vuong")).toHaveLength(2); // con thường đứng sẵn + trùm thế giới
   });
 });
