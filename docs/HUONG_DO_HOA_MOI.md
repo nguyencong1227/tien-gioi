@@ -185,3 +185,32 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 - **Bước 1 ở mục 9 (nền ghép góc dựng ở client từ `tileAt`) là CẦU NỐI tạm:** chạy được ngay, không cần bản đồ Tiled, đo được ngân sách và ảnh trước / sau. Khi S3 / S4 của giai đoạn 2 xong, lớp hình bo góc được nướng sẵn vào `visual.json` (gói `map:<id>` của M7.15) và bộ ghép góc ở client được gỡ; bảng ô terrain đọc từ `tileset.tres` (56 ô, mục 2) là dữ liệu dùng chung cho cả hai.
 - **Số đo cho ngân sách (B đo bằng 4 bản đồ hiện có):** lớp logic `firstgid + T` tổng 104,6 KB raw / **11,6 KB gzip** (nhập tĩnh được); lớp hình có nhiều gid gzip 10-18 KB MỖI lớp mỗi bản đồ nên PHẢI đi qua gói tải theo nhu cầu, không vào gói khởi động (`startupGzipKb 220`).
 - **Yêu cầu cho lớp hình (chi tiết ở nhận xét của B trên #1201):** tileset NHÚNG (Phaser không đọc tileset ngoài), ĐÙN MÉP 1 px + `roundPixels` (zoom lẻ), MỘT ảnh tileset gộp (giữ `drawCalls`), tán cây ở lớp `over` chỉ phần trên thân và mờ khi người chơi ở dưới (tránh che màn chơi khi đánh quái trong rừng).
+
+## 11. Gói tài nguyên RIÊNG (mục 63): so khớp KỸ THUẬT để người dùng chọn gói thử (B, 22/11/2026)
+
+> Giấy phép từng gói: `docs/GIAY_PHEP_TAI_NGUYEN_RIENG.md` (PR #1275, A). Cơ chế phục vụ / nạp: `docs/THIET_KE_GOI_TAI_NGUYEN_RIENG.md`, `client/src/gfx/private-art.ts` (bảng khoá, hiện RỖNG). **Mục này chỉ nói điều KIỂM ĐƯỢC từ trang công khai và từ mã của repo (cỡ ô, mật độ điểm ảnh, nội dung nêu trên trang, đường ống kỹ thuật). B chưa tải và chưa xem ảnh của gói nào (quy tắc Asset nguồn 4: agent không tự tải), nên KHÔNG kết luận gì về thẩm mỹ hay độ hợp tông "tu tiên" (mục 4): đó là việc của người dùng sau khi xem ảnh trên trang gói.**
+
+**Số liệu từ trang (đọc 22/11/2026 bằng tác tử đọc trang, chưa phải người đọc bằng mắt):**
+
+| Gói (bản được phép) | Ô gốc | Nội dung nêu trên trang | Tệp tải |
+|---|---|---|---|
+| A. Cainos, Pixel Art Top Down - Basic | **32x32 px** (tileset cỏ / đá 256x256, tường 512x512) | 48 vật trang trí, 15 loại cỏ, 3 cây; trang không nêu nhân vật hay quái | 2,5 MB |
+| B. Pixel Frog, Tiny Swords (Free) | **64x64 px** ("Tilemap grid: 64x64 pixels") | nhiều đơn vị, cây, đá, cỏ nhiều màu, bụi cây hoạt hình; trạng thái "In development" | (trang không nêu gọn) |
+| D. Daniel Diggle, Sunnyside World (Free) | **16x16 px** | 20 hành động nhân vật (người và yêu tinh), 11 loại cây trồng 5 giai đoạn, 7 kiểu tóc | ~10 MB mỗi gói |
+| (C. Kenmi, bản Free: KHÔNG dùng, phi thương mại) | 16x16 px | | |
+
+**So khớp với hạ tầng của Tiên Giới (`TILE = 32`; nhân vật `me` 32x40, quái 32x32, NPC 36x42 vẽ 1x, mục 1):**
+
+| Gói | Tỉ lệ để ra `TILE` 32 | Mật độ điểm ảnh so với sprite hiện tại | Hệ quả kỹ thuật |
+|---|---|---|---|
+| Cainos (32 px) | **x1, nguyên bản** | **Cùng mật độ**: nền / cây / vật trang trí hợp với nhân vật, quái, NPC đang có; nhược điểm "nền thô hơn nhân vật" của hướng C (mục 3) KHÔNG xảy ra | không cần `setScale`, đùn mép vẫn cần khi zoom lẻ (mục 7.1); `private-art` cùng lưới ô với hình thay thế 32 px mà không phải nướng x2 |
+| Sunnyside (16 px) | x2 nguyên số | Mỗi điểm ảnh gói = 2x2 điểm ảnh màn hình, **to gấp đôi sprite hiện tại**: đúng hướng C của mục 3 (nền thô hơn nhân vật) nếu giữ nhân vật cũ; nhân vật 16 px của gói có nguy cơ khó đọc cảnh giới như mục 0.3 (suy ra từ cỡ ô, CHƯA xem ảnh Sunnyside) | cùng đường ống với Ninja Adventure (mục 3 hướng A, mục 10): `layer.setScale(TILE / tilewidth)`, lọc gần nhất, `roundPixels` |
+| Tiny Swords (64 px) | **x0,5** | Thu nhỏ một nửa: lọc gần nhất làm mất / chập điểm ảnh; hoặc một ô gói = 2x2 ô game (đổi nghĩa lưới bản đồ, KHÔNG làm vì `shared/`) | **ít hợp nhất** về kỹ thuật; thêm rủi ro `repackage` của giấy phép (GIAY_PHEP mục B) |
+
+**Gợi ý của B (kỹ thuật, KHÔNG phải thẩm mỹ):** nếu người dùng chỉ muốn tải MỘT gói để thử, **Cainos** là gói khớp lưới và mật độ điểm ảnh nhất, giấy phép rõ (A nói "Dùng được"); **Sunnyside** là phương án thứ hai (cùng đường x2 đã chuẩn bị cho Ninja Adventure, nhưng có nhân vật 16 px); **Tiny Swords** để sau. Gói Basic của Cainos chỉ nêu nền / vật trang trí / cây: nhân vật, quái, NPC, trùm vẫn phải giữ như hiện tại hoặc lấy ở nguồn khác (mục 0, hướng C).
+
+**Việc B làm NGAY SAU KHI người dùng đã chọn gói và tự tải vào `/mnt/data/assets-private/src/` (kèm `SOURCES.md`):**
+1. Dựng ảnh mẫu trước / sau (như mục 6) **ngoài git**: ảnh mẫu từ gói riêng là tác phẩm đã chỉnh / ghép nên **KHÔNG vào repo** (khác ảnh mẫu Ninja Adventure CC0 ở `docs/art/huong-moi/`); lưu ở `/mnt/data/assets-private/work/` và gửi đường dẫn cho người dùng xem.
+2. Sau khi người dùng duyệt hình: chọn khoá và lưới ô, điền `PRIVATE_ART` / `PRIVATE_MAP_PACKS` (`privateArtViolations` đối chiếu với lưới của hình thay thế), đóng gói bằng `npm run assets-private:manifest -w server -- <dist> --strict --title ... --url ... --license ...` (gói itch.io hay có tên tệp chứa khoảng trắng: phải đổi tên tay, `manifest` in `BỎ QUA`), khởi động lại máy chủ.
+3. Bước 1 của mục 9 (nền ghép góc) chạy với hình riêng khi có gói, hình thay thế khi thiếu: CI và máy dev không có gói vẫn chạy đủ.
+4. Ghi công: màn Ghi công ở Cài đặt hiện `title` + `url` + `license` của gói đang dùng (`PackController.privateCredits()`); `CREDITS.md` chỉ ghi tên gói + link + "tệp không nằm trong repo".
