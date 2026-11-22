@@ -1925,16 +1925,27 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
       ["Hong Rac", { realm: "abc", tier: null, exp: "x" }],
       ["Hong Qua", { realm: 999, tier: 999 }],
     ];
+    // chân linh mới được tạo ở `onAuth` (`soulOf`) từ cảnh giới đã làm sạch: xoá chân linh để buộc tạo lại, rồi kiểm `best`
+    const soulPath = (n: string) =>
+      path.join(
+        dataDir,
+        "souls",
+        `${createHash("sha1").update(n.normalize("NFC").toLowerCase()).digest("hex")}.json`,
+      );
     for (const [name, patch] of cases) {
       await seedSave(name, patch);
+      rmSync(soulPath(name), { force: true });
       const b = await join(name);
       const me = b.me();
-      expect([me.realm, me.tier], name).toEqual(
+      const want =
         name === "Hong Qua"
           ? [REALMS.length - 1, REALMS[REALMS.length - 1].tiers.length - 1]
-          : [0, 0],
-      );
+          : [0, 0];
+      expect([me.realm, me.tier], name).toEqual(want);
       expect(me.exp, name).toBeGreaterThanOrEqual(0);
+      const soul = JSON.parse(readFileSync(soulPath(name), "utf8"));
+      expect([soul.best.realm, soul.best.tier], `${name}: chân linh`).toEqual(want);
+      expect(Number.isInteger(soul.best.step) && soul.best.step >= 0, `${name}: step`).toBe(true);
       await b.room.leave(true);
       rooms.splice(rooms.indexOf(b.room), 1);
     }
