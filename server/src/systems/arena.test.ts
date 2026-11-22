@@ -11,6 +11,7 @@ import {
   TICK_MS,
   arenaMapIdOf,
   ambushRewardCoin,
+  ambushRewardExp,
   getMap,
   type AmbushFoeGroup,
   type AmbushTier,
@@ -285,9 +286,28 @@ describe("thắng: hạ hết bầy", () => {
     expect(s.c.coin - coin0).toBe(end.rewards!.coin);
     expect(order).toHaveLength(1); // đã lưu (sau khi cộng thưởng) rồi mới báo
     expect(end.rewards!.items).toEqual([]);
-    // CD6b PR2: thưởng Linh thạch theo PHÚT SĂN của bậc người chơi (bậc 3) x mức, KHÔNG còn rollCoin x ARENA_REWARD_MULT
-    expect(end.rewards!.coin).toBe(ambushRewardCoin(3, "normal"));
   });
+
+  it.each(["normal", "elite", "leader"] as const)(
+    "thắng ở mức %s: thưởng THẬT của payRewards = ambushRewardExp / ambushRewardCoin của bậc 3 x mức (KHÔNG còn rollCoin x ARENA_REWARD_MULT)",
+    async (tier) => {
+      // CÙNG người chơi (bậc 3) thắng CÙNG bầy `tho x2` (sống qua đòn vì quái thường), chỉ khác MỨC vé — thưởng phải theo mức đó, ba mức ra ba số khác nhau.
+      // Đột biến M1 (payRewards dùng `"normal"` thay `a.ticket.tier`): mức elite / leader sai -> ĐỎ (chặn việc thưởng theo mức vé).
+      const s = setup(group(tier, [{ kind: "tho", count: 2 }]));
+      act(s);
+      for (const id of s.a.foes) killMonster(s.w, id, s.w.mctrl.get(id)!);
+      s.w.now += TICK_MS;
+      tickArena(s.w);
+      expect(s.a.result).toBe("won");
+      await Promise.resolve();
+      await Promise.resolve();
+      const end = s.ambushEnds.at(-1)!.msg;
+      expect(end.result).toBe("won");
+      expect(end.rewards!.exp).toBe(ambushRewardExp(3, tier));
+      expect(end.rewards!.coin).toBe(ambushRewardCoin(3, tier));
+      expect(end.rewards!.items).toEqual([]);
+    },
+  );
 
   it("thắng chỉ MỘT lần: tick thêm không thưởng thêm", async () => {
     const s = setup(group("normal", [{ kind: "tho", count: 1 }]));
