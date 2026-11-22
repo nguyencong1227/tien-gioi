@@ -18,6 +18,8 @@ describe("chiêu nhóm Mộc + Thủy (CT7 #1052)", () => {
       "thiem_to_cong",
       "doan_truong_chi_phap",
       "kho_moc_phung_xuan_quyet",
+      "man_da_hoa_kinh",
+      "me_hon_huong_quyet",
     ];
     expect(SKILLS_MOC_THUY.map((s) => s.id).sort()).toEqual([...expectIds].sort());
     expect(new Set(SKILLS_MOC_THUY.map((s) => s.id)).size).toBe(SKILLS_MOC_THUY.length);

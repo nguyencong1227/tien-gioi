@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.5.3
 
+### Máy chủ
+- **Chiêu thức: 2 CHIÊU MỘC MỚI (QUYET_DINH_M3 mục 51, CT17 #1187 lát 2, Dev G; tiếp v0.5.3: 57 -> 59 chiêu học được):** Mê Hồn Hương (mộc, thúc linh lực thành làn hương hoa hợp hoan làm chân tay bủn rủn, áo giáp lỏng ra — cone khống chế suy yếu + vỡ giáp, Trúc Cơ, Huyền phẩm) và Mạn Đà Hoa Vũ (mộc, phất tay áo cả vạt hoa mạn đà la trắng bay ra như tuyết, mùi ngọt ngấm vào máu — cone độc rộng, Nguyên Anh, Địa phẩm); dữ liệu `shared/src/skills-moc-thuy.ts` (nguồn Vạn Kiếp, MỖI chiêu một dòng ở `docs/NGUON_NOI_DUNG.md` mục 3, không có tên riêng của họ), kinh quyển dựng tự động, hai icon, atlas 488 -> 490 khung. Cả hai rarity >= 2 nên CHỈ rơi, KHÔNG bán: Mê Hồn Hương rơi 0,6 % từ Xích Mãng (trùm Trúc Cơ), Mạn Đà Hoa Vũ rơi 0,8 % từ Phong Nha (trùm Nguyên Anh) — KHÔNG đụng Hắc Hổ nên `balance/dungeon.test.ts` không đổi. Cả hai qua bộ kiểm DPS CT10 (khung 1,10-1,60 lần chỉ chém), `skill-kit` (cast thật mọi chiêu) và `skillViolations`; `docs/CAN_BANG.md` sinh lại.
+
 ## [0.5.3] — 22/11/2026: +4 chiêu Kim / Thổ, 3 việc phụ Âm Sương Trạch, chống dùng ké máy chủ (chặn đường, trùm thế giới và gói tài nguyên riêng vẫn TẮT)
 
 Bản phát hành đã nghiệm thu bằng hồ sơ `docs/UNG_VIEN_PHAT_HANH.md` và `docs/LOAD_TEST.md` mục 41 (QUYET_DINH_M3 mục 65: người dùng đồng ý, cắt từ `main` sau khi nightly e2e + bench xanh trên đúng đầu này). Không đổi giao thức (`PROTOCOL_VERSION` giữ 6), không đổi định dạng lưu (nhân vật / chân linh / tông môn / tài khoản / PostgreSQL).
