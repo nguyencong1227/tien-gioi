@@ -9,16 +9,13 @@ import fs from "node:fs";
 import zlib from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { LEARNABLE_SKILLS, bookIdOf } from "@tien-gioi/shared";
-import {
-  MAX_LIT,
-  MAX_RUN,
-  MIN_LIT,
-  SIGIL_SIZE,
-  hash32,
-  sigilGrid,
-  sigilRows,
-  sigilValid,
-} from "./book-marks.mjs";
+import { hash32, sigilGrid, sigilRows, sigilValid } from "./book-marks.mjs";
+
+// Luật của ấn ghi CỨNG ở đây (không import từ `book-marks.mjs`): nới hằng trong mã mà test vẫn xanh là test vô dụng; đổi luật phải cố ý sửa cả hai.
+const SIGIL_SIZE = 7;
+const MIN_LIT = 14;
+const MAX_LIT = 28;
+const MAX_RUN = 3;
 
 // ---------------------------------------------------------------- (1) hàm thuần
 
