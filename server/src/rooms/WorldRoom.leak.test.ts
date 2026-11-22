@@ -73,7 +73,7 @@ const roundName = () => `Leak ${++nameSeq}`;
 
 /** Phòng thật phía server, để truy cập sổ nội bộ (World, ghost phòng…) khi phòng còn sống. */
 function serverRoom(room: Room) {
-  return matchMaker.getLocalRoomById(room.roomId) as WorldRoomClass;
+  return matchMaker.getLocalRoomById(room.roomId) as InstanceType<typeof WorldRoomClass>;
 }
 
 async function join(name: string): Promise<Room> {
@@ -175,39 +175,13 @@ function snapshot(): Snap {
 // nối lại. Test ĐỎ ở đây là đúng — đây là bug cần Dev A sửa (mở issue `dev-a`, KHÔNG sửa mã trò chơi trong test này).
 const FIRST_INIT_KEYS = new Set<keyof Snap>(["worlds", "chatSinks"]);
 
-/**
- * Trả khóa + giá trị đầu tiên KHÁC nhau (loại khởi tạo hợp lệ lần đầu) giữa hai snapshot, hoặc `null` nếu mọi thứ hợp lệ.
- * Bao quanh toàn bộ test (beforeTest/afterTest): mọi sổ + players/ctrl/worldGhosts/worldShielded phải VỀ ĐÚNG MỨC.
- * worldGhosts / players / ctrl là RÒ TÍCH LŨY — xét TRƯỚC FIRST_INIT_KEYS để rò ghost KHÔNG bị `worlds: 0→1` che mất.
- */
-const LEAK_FIRST_KEYS: (keyof Snap)[] = ["worldGhosts", "players", "ctrl", "worldShielded"];
-
-/** Chỉ xét các khóa rò tích lũy (worldGhosts/players/ctrl/worldShielded + mọi sổ chung), KHÔNG xét FIRST_INIT_KEYS. */
-function leakOnlyDiff(a: Snap, b: Snap): string | null {
-  const keys = Object.keys(a) as (keyof Snap)[];
-  for (const k of keys) {
-    if (FIRST_INIT_KEYS.has(k)) continue; // khởi tạo hợp lệ lần đầu (vòng đầu tạo phòng) — KHÔNG phải rò tích lũy
-    if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
-  }
-  return null;
-}
-
 /** Trả MỌI khóa rò tích lũy (KHÔNG xét FIRST_INIT_KEYS), để rò ghost KHÔNG bị rò shielded khác che — báo đầy đủ cho Dev A. */
 function leakList(a: Snap, b: Snap): string[] {
   const keys = Object.keys(a) as (keyof Snap)[];
   const out: string[] = [];
-  for (const k of keys) if (!FIRST_INIT_KEYS.has(k) && a[k] !== b[k]) out.push(`${k}: ${a[k]} → ${b[k]}`);
+  for (const k of keys)
+    if (!FIRST_INIT_KEYS.has(k) && a[k] !== b[k]) out.push(`${k}: ${a[k]} → ${b[k]}`);
   return out;
-}
-
-function diffSnap(a: Snap, b: Snap): string | null {
-  for (const k of LEAK_FIRST_KEYS) if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
-  const keys = Object.keys(a) as (keyof Snap)[];
-  for (const k of keys) {
-    if (FIRST_INIT_KEYS.has(k) && a[k] === 0 && b[k] === 1) continue; // khởi tạo hợp lệ lần đầu (vòng đầu tạo phòng)
-    if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
-  }
-  return null;
 }
 
 /**
@@ -227,62 +201,59 @@ describe("rò rỉ sổ Hub / phòng sau nhiều vòng đời (#1105)", () => {
       ? (globalThis as unknown as { gc: () => void }).gc
       : undefined;
 
-  it(
-    "vào-thoát × N: mọi sổ về mức gốc + đo bộ nhớ mềm",
-    { timeout: 120_000 },
-    async () => {
-      const N = 14;
-      const heap: number[] = [];
-      const beforeTest = snapshot(); // snapshot TRƯỚC khi vào vòng nào: mọi sổ + players/ctrl/ghosts ở mức gốc
-      for (let i = 0; i < N; i++) {
-        const room = await join(roundName());
-        await leaveAndClear(room);
-        if (gc) gc();
-        heap.push(process.memoryUsage().heapUsed);
-      }
-      // Sau N vòng vào-thoát: mọi sổ dùng chung + players/ctrl/ghosts/phòng/phòng-sống/chat-sink HỒI VỀ ĐÚNG MỨC.
-      // Rò (players/ctrl/ghosts/phòng sót) sẽ PHỒNG theo số vòng → snapshot sau khác trước. leakList liệt kê MỌI rò.
-      const afterTest = snapshot();
-      const leaks = leakList(beforeTest, afterTest);
-      expect(leaks, "rò rỉ sau N vòng vào-thoát:\n" + leaks.map((l) => "  " + l).join("\n")).toEqual([]);
-      // Bộ nhớ MỀM: chỉ in + dán PR; đỏ CHỈ khi --expose-gc có sẵn và tăng > 50% (rò thật).
-      const first = heap[0]!;
-      const last = heap[heap.length - 1]!;
-      const growPct = ((last - first) / Math.max(1, first)) * 100;
-      // Tăng ở nửa cuối (ổn định): delta giữa vòng áp-t้าย và vòng cuối, loại nhiễu rác đầu.
-      const base = heap[Math.floor(N * 0.5) - 1]!;
-      const steadyPct = ((last - base) / Math.max(1, base)) * 100;
-      console.log(
-        `[leak] heapUsed: đầu ${Math.round(first / 1048576)}MB → cuối ${Math.round(last / 1048576)}MB ` +
-          `(tăng ${growPct.toFixed(1)}%${gc ? "" : "; KHÔNG có --expose-gc nên gồm rác"}), ` +
-          `tăng ổn định nửa cuối ${steadyPct.toFixed(1)}%`,
-      );
-      if (gc) expect(growPct, "bộ nhớ mềm tăng > 50%: có rò rỉ").toBeLessThanOrEqual(50);
-    },
-  );
+  it("vào-thoát × N: mọi sổ về mức gốc + đo bộ nhớ mềm", { timeout: 120_000 }, async () => {
+    const N = 14;
+    const heap: number[] = [];
+    const beforeTest = snapshot(); // snapshot TRƯỚC khi vào vòng nào: mọi sổ + players/ctrl/ghosts ở mức gốc
+    for (let i = 0; i < N; i++) {
+      const room = await join(roundName());
+      await leaveAndClear(room);
+      if (gc) gc();
+      heap.push(process.memoryUsage().heapUsed);
+    }
+    // Sau N vòng vào-thoát: mọi sổ dùng chung + players/ctrl/ghosts/phòng/phòng-sống/chat-sink HỒI VỀ ĐÚNG MỨC.
+    // Rò (players/ctrl/ghosts/phòng sót) sẽ PHỒNG theo số vòng → snapshot sau khác trước. leakList liệt kê MỌI rò.
+    const afterTest = snapshot();
+    const leaks = leakList(beforeTest, afterTest);
+    expect(leaks, "rò rỉ sau N vòng vào-thoát:\n" + leaks.map((l) => "  " + l).join("\n")).toEqual(
+      [],
+    );
+    // Bộ nhớ MỀM: chỉ in + dán PR; đỏ CHỈ khi --expose-gc có sẵn và tăng > 50% (rò thật).
+    const first = heap[0]!;
+    const last = heap[heap.length - 1]!;
+    const growPct = ((last - first) / Math.max(1, first)) * 100;
+    // Tăng ở nửa cuối (ổn định): delta giữa vòng áp-t้าย và vòng cuối, loại nhiễu rác đầu.
+    const base = heap[Math.floor(N * 0.5) - 1]!;
+    const steadyPct = ((last - base) / Math.max(1, base)) * 100;
+    console.log(
+      `[leak] heapUsed: đầu ${Math.round(first / 1048576)}MB → cuối ${Math.round(last / 1048576)}MB ` +
+        `(tăng ${growPct.toFixed(1)}%${gc ? "" : "; KHÔNG có --expose-gc nên gồm rác"}), ` +
+        `tăng ổn định nửa cuối ${steadyPct.toFixed(1)}%`,
+    );
+    if (gc) expect(growPct, "bộ nhớ mềm tăng > 50%: có rò rỉ").toBeLessThanOrEqual(50);
+  });
 
-  it(
-    "rớt-nối lại × N: net-guard không rò sổ Hub / phòng",
-    { timeout: 120_000 },
-    async () => {
-      const N = 8;
-      const beforeTest = snapshot(); // snapshot TRƯỚC khi vào vòng nào: mọi sổ + players/ctrl/ghosts ở mức gốc
-      for (let i = 0; i < N; i++) {
-        const a = await join(roundName());
-        const sid = a.sessionId;
-        dropConnection(a);
-        await waitFor(() => !a.connection.isOpen, 5000);
-        // Chờ server giữ chỗ nối lại (onLeave đã gọi allowReconnection): token chỉ hợp lệ từ lúc này.
-        await waitFor(() => (serverRoom(a) as any).ghosts.has(sid), 5000);
-        const r2 = await reconnectTo(a);
-        await waitFor(() => (r2.state as any).players.get(r2.sessionId), 5000);
-        await leaveAndClear(r2);
-      }
-      // Sau N vòng rớt-nối lại-thoát: mọi sổ + players/ctrl/ghosts/phòng HỒI VỀ ĐÚNG MỨC. Rò (ghost sót, players/ctrl/phòng
-      // phình) sẽ tích lũy → snapshot sau khác trước. leakList liệt kê MỌI rò (ghost KHÔNG bị shielded che).
-      const afterTest = snapshot();
-      const leaks = leakList(beforeTest, afterTest);
-      expect(leaks, "rò rỉ sau N vòng rớt-nối lại:\n" + leaks.map((l) => "  " + l).join("\n")).toEqual([]);
-    },
-  );
+  it("rớt-nối lại × N: net-guard không rò sổ Hub / phòng", { timeout: 120_000 }, async () => {
+    const N = 8;
+    const beforeTest = snapshot(); // snapshot TRƯỚC khi vào vòng nào: mọi sổ + players/ctrl/ghosts ở mức gốc
+    for (let i = 0; i < N; i++) {
+      const a = await join(roundName());
+      const sid = a.sessionId;
+      dropConnection(a);
+      await waitFor(() => !a.connection.isOpen, 5000);
+      // Chờ server giữ chỗ nối lại (onLeave đã gọi allowReconnection): token chỉ hợp lệ từ lúc này.
+      await waitFor(() => (serverRoom(a) as any).ghosts.has(sid), 5000);
+      const r2 = await reconnectTo(a);
+      await waitFor(() => (r2.state as any).players.get(r2.sessionId), 5000);
+      await leaveAndClear(r2);
+    }
+    // Sau N vòng rớt-nối lại-thoát: mọi sổ + players/ctrl/ghosts/phòng HỒI VỀ ĐÚNG MỨC. Rò (ghost sót, players/ctrl/phòng
+    // phình) sẽ tích lũy → snapshot sau khác trước. leakList liệt kê MỌI rò (ghost KHÔNG bị shielded che).
+    const afterTest = snapshot();
+    const leaks = leakList(beforeTest, afterTest);
+    expect(
+      leaks,
+      "rò rỉ sau N vòng rớt-nối lại:\n" + leaks.map((l) => "  " + l).join("\n"),
+    ).toEqual([]);
+  });
 });
