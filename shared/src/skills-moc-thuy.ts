@@ -176,7 +176,7 @@ export const SKILLS_MOC_THUY: readonly SkillDef[] = [
     style: "chuong",
     grade: 2,
   },
-  // CT17 lát 2 (G): Mộc Trúc Cơ (reqRealm 2, Huyền phẩm) — khống chế: hương hoa làm suy yếu + vỡ giáp. Nguồn `khong_che`: `sunder 2 turns 0,1 / 0,5` (weaken thêm theo mô tả verbatim "chân tay bủn rủn", KHÔNG có ma_hoa trong nguồn); mult 1,6 như cam_long_khau (khống chế cùng bậc); `hoi 1` -> cd 5000; `phi 2` -> mpPct 0,1.
+  // CT17 lát 2 (G): Mộc Trúc Cơ (reqRealm 2, Huyền phẩm) — khống chế: hương hoa làm suy yếu + vỡ giáp. Nguồn `khong_che`: `sunder 2 turns 0,1 / 0,5` (weaken thêm theo mô tả verbatim "chân tay bủn rủn"; nguồn CÓ `chieu.ma_hoa: true` + `chieu.controlChance: 0,65`, nhưng engine chưa có hiệu ứng tương ứng nên bỏ — KHÔNG phải "không có trong nguồn"); mult 1,6 như cam_long_khau (khống chế cùng bậc); `hoi 1` -> cd 5000; `phi 2` -> mpPct 0,1.
   {
     id: "me_hon_huong_quyet",
     name: "Mê Hồn Hương",
