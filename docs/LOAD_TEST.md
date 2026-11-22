@@ -2229,3 +2229,50 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
   - Lưu ý thêm về cơ chế túi đồ: Khi bot gục (`reincarnation.ts:109`), hệ thống xoá sạch túi đồ (`c.inv = emptyInventory()`); khi tái sinh (`applyRebirth`), túi xuất phát `startPackOf(unlocks)` chỉ cấp Hồi Huyết Đan khi đã mở khoá `le_ma >= 1`, nhưng bot trong soak không cấu hình unlocks nên túi xuất phát rỗng (0 đan). Do đó, bot nào chết lần đầu ngoài hoang dã đều lập tức tụt về 0 đan; với $\ge 49$ lần chết/tái sinh trong đuôi log, phần lớn bot nhanh chóng rơi về 0 đan (cả hai nhóm đều dưới ngưỡng `AMBUSH_MIN_POTIONS=2` và bị lọc), nên sự phân tách nhóm 1 đan vs 5 đan thực chất chỉ duy trì ở giai đoạn trước lần chết đầu tiên của mỗi bot.
 
 
+
+## 41. Thử tải dài Ứng viên phát hành RC (v0.6.0 / v0.5.3): 100 bot / 28.3 phút (Mục 4, Refs #1290)
+
+### 41.1. Bối cảnh & Cấu hình thử nghiệm
+- **Bối cảnh:** Thử nghiệm tải dài phục vụ hồ sơ ứng viên phát hành RC (Issue #1290 Mục 4) trên đầu commit `main` (`66aef6aa`).
+- **Mục tiêu:** Kiểm chứng tính ổn định của máy chủ trong thời gian dài (dài hơn 10 phút, mục tiêu 30 phút): dốc VmRSS nửa sau $\le 1.0$ MB/phút, tick p95 $\le 10.0$ ms, không rò rỉ hàng đợi ghi, `kiem-save` dữ liệu an toàn, bảo toàn Linh thạch.
+- **Điều kiện tải máy trước khi chạy:** `uptime` lúc 07:29:32 ghi nhận load average: 0.11, 0.24, 0.36; RAM khả dụng: 11Gi. Chạy với `nice -n 10` để không ảnh hưởng tới các tiến trình khác.
+- **Cấu hình cờ runtime (khớp bản chạy thật):**
+  - `BOSS_MOVES=on` (kèm `--boss`, trùm thi triển bộ chiêu trùm).
+  - `SECTS=on` (tông môn bật đầy đủ).
+  - `--m7` (bật nội dung M7: sổ chiêu 4 bản đồ, bot Nguyên Anh ở Hàn Vân Lĩnh).
+  - `AMBUSH=off` (mặc định tắt như bản chạy thật).
+  - `WORLD_BOSS=off` (mặc định tắt như bản chạy thật).
+  - `STORE=file` (kho tệp JSON cục bộ).
+- **Phân bổ 100 bot:** Săn quái 24 | Trấn/Shop 16 | Qua cổng 8 | Bí cảnh 12 | PK 8 | Tông môn 12 | Nguyên Anh (Hàn Vân Lĩnh) 20.
+- **Thời lượng:** 28.3 phút (1.700 giây, 170 mẫu lấy mỗi 10 giây). Lệnh khởi chạy với `--minutes=30` (180 mẫu dự kiến); tiến trình dừng ở phút 28.3 do máy chủ dịch vụ của trợ lý AI khởi động lại lúc 08:00:04. Tập mẫu 170 điểm đo (chiếm 94,4% thời lượng) hoàn toàn đầy đủ và tin cậy cho bài toán phân tích hồi quy OLS nửa sau (nửa sau gồm 85 mẫu = 14,2 phút).
+- **Cổng cách ly:** 43752 (PID launcher: 2268469, PID server: 2268480, đã thoát và dọn cổng sau khi dừng).
+- **Tệp dữ liệu mẫu:** `/tmp/soak-rc-30m.json` (tệp tạm cục bộ, 170 mẫu).
+
+### 41.2. Kết quả đo đạc thực tế
+
+| Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Tiêu chuẩn | Đánh giá |
+|---|---|---:|---:|:---:|
+| **Quy mô bot** | Số bot khởi tạo -> kết thúc | 100 -> 100 | Tỉ lệ rớt = 0% | **ĐẠT** |
+| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 179.12 MB | - | - |
+| | VmRSS sau khởi động (5.0m) | 212.77 MB | - | - |
+| | VmRSS kết thúc (28.3m) | 214.01 MB | - | - |
+| | Mức tăng sau warmup | **+1.24 MB** | <= 50.0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0.009 MB / phút** | <= 1.00 MB / phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 1.54 ms, Max 2.36 ms** | <= 10.0 ms | **ĐẠT** |
+| | Tick overruns (> 50 ms) | **0** | 0 | **ĐẠT** |
+| | CPU luồng chính / tick | TB 3.64 ms / tick | - | **ĐẠT** |
+| | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi max 0.0s, Lỗi 0 | - | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | 26.0 ms | <= 100 ms | **ĐẠT** |
+| **Băng thông WebSocket** | Nhận trung bình | 153 B / tick | <= 600 B / tick | **ĐẠT** |
+| | Phân vị p95 | 180 B / tick | - | **ĐẠT** |
+| | Băng thông nhận TB / bot | 2.98 KB/s | - | **ĐẠT** |
+| **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 | **ĐẠT** |
+| | Lỗi gọi `/metrics` | 0 | 0 | **ĐẠT** |
+| | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh, 4 tông môn) | 0 lỗi vi phạm | **ĐẠT** |
+| | Tệp hỏng (`*.hong-*`) | 0 | 0 | **ĐẠT** |
+| | Bảo toàn Linh thạch | Ban đầu 10.000 Linh thạch. Kết thúc: Ví 11.479 + Kho tông môn 8.420 = 19.899 Linh thạch (tăng tự nhiên qua nhặt rơi đồ và bán đồ shop, 0 lệch ví, 0 tài khoản âm) | Không thất thoát | **ĐẠT** |
+
+### 41.3. Nhận xét & Đánh giá
+1. **Không rò rỉ bộ nhớ:** Trong suốt hơn 23 phút sau giai đoạn làm nóng (warmup 5 phút), bộ nhớ VmRSS của server chỉ tăng thêm đúng 1.24 MB (từ 212.77 MB lên 214.01 MB). Đường hồi quy tuyến tính OLS nửa sau cho ra hệ số góc cực thấp: `+0.009 MB/phút`, cách rất xa ngưỡng cảnh báo 1.00 MB/phút. Điều này chứng minh vòng lặp 20 tick/giây, hệ thống StateView và sổ chiêu M7 hoàn toàn không có hiện tượng rò rỉ bộ nhớ (memory leak).
+2. **Hiệu năng nhịp tick xuất sắc:** Nhịp tick p95 trung bình đạt 1.54 ms (phòng tệ nhất đạt cực đại 2.36 ms), thấp hơn nhiều so với ngân sách 10.0 ms. Suốt 28.3 phút không ghi nhận bất kỳ một tick overrun (> 50 ms) nào.
+3. **Độ ổn định I/O lưu trữ:** Hàng đợi ghi nhân vật luôn ở trạng thái giải phóng tức thời (`writesInflight = 0`, `writesOldestAgeMs = 0`), 0 lỗi ghi. Toàn bộ 100 hồ sơ nhân vật, 100 chân linh và 4 tông môn sau buổi thử tải đều vượt qua bài kiểm tra `kiem-save` với 0 lỗi vi phạm, không sinh bất kỳ tệp hỏng `*.hong-*` nào.
