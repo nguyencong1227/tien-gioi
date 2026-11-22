@@ -2267,7 +2267,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | | Tick overruns (> 50 ms) | **0** | 0 | **ĐẠT** |
 | | CPU luồng chính / tick | TB 3.64 ms / tick | - | **ĐẠT** |
 | | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi max 0.0s, Lỗi 0 | - | **ĐẠT** |
-| | Độ trễ vòng lặp p99 | 26.0 ms | <= 100 ms | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | tối đa 26.0 ms | <= 100 ms | **ĐẠT** |
 | **Băng thông WebSocket** | Nhận trung bình | 153 B / tick | <= 600 B / tick | **ĐẠT** |
 | | Phân vị p95 | 180 B / tick | - | **ĐẠT** |
 | | Băng thông nhận TB / bot | 2.98 KB/s | - | **ĐẠT** |
@@ -2280,5 +2280,5 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 ### 41.3. Nhận xét & Đánh giá
 1. **Không rò rỉ bộ nhớ:** Trong suốt hơn 23 phút sau giai đoạn làm nóng (warmup 5 phút), bộ nhớ VmRSS của server chỉ tăng thêm đúng 1.24 MB (từ 212.77 MB lên 214.01 MB). Đường hồi quy tuyến tính OLS nửa sau cho ra hệ số góc cực thấp: `+0.009 MB/phút`, cách rất xa ngưỡng cảnh báo 1.00 MB/phút. Điều này cho thấy không có dấu hiệu rò rỉ bộ nhớ trong điều kiện thử nghiệm với vòng lặp 20 tick/giây, hệ thống StateView và sổ chiêu M7.
 2. **Hiệu năng nhịp tick ổn định:** Nhịp tick p95 trung bình đạt 1.54 ms (phòng tệ nhất đạt cực đại 2.36 ms), thấp hơn nhiều so với ngân sách 10.0 ms. Suốt 28.3 phút không ghi nhận bất kỳ một tick overrun (> 50 ms) nào.
-3. **Độ ổn định I/O lưu trữ:** Hàng đợi ghi nhân vật luôn ở trạng thái giải phóng tức thời (`writesInflight = 0`, `writesOldestAgeMs = 0`), 0 lỗi ghi. Toàn bộ 100 hồ sơ nhân vật, 100 chân linh và 4 tông môn sau buổi thử tải đều vượt qua bài kiểm tra `kiem-save` với 0 lỗi vi phạm, không sinh bất kỳ tệp hỏng `*.hong-*` nào. Dữ liệu khi bị ngắt máy chủ đột ngột vẫn giữ được tính toàn vẹn 100%, không phát sinh tệp cách ly.
+3. **Độ ổn định I/O lưu trữ:** Hàng đợi ghi nhân vật luôn ở trạng thái giải phóng tức thời (`writesInflight = 0`, `writesOldestAgeMs = 0`), 0 lỗi ghi. Toàn bộ 100 hồ sơ nhân vật, 100 chân linh và 4 tông môn sau buổi thử tải đều vượt qua bài kiểm tra `kiem-save` với 0 lỗi vi phạm, không sinh bất kỳ tệp hỏng `*.hong-*` nào. kiem-save sạch (0 lỗi, 0 *.hong-*) sau khi tiến trình bị dừng từ bên ngoài; không rõ tín hiệu nên KHÔNG kết luận về tính nhất quán khi sập.
 4. **Lưu ý về đánh giá:** Các kết luận ĐẠT trong bảng là kết quả đối chiếu số đo thô với ngưỡng ngân sách của quy chuẩn (do harness thử tải bị ngắt ngoài ý muốn trước bước in bảng tổng kết tự động).
