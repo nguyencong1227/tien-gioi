@@ -182,6 +182,24 @@ const FIRST_INIT_KEYS = new Set<keyof Snap>(["worlds", "chatSinks"]);
  */
 const LEAK_FIRST_KEYS: (keyof Snap)[] = ["worldGhosts", "players", "ctrl", "worldShielded"];
 
+/** Chỉ xét các khóa rò tích lũy (worldGhosts/players/ctrl/worldShielded + mọi sổ chung), KHÔNG xét FIRST_INIT_KEYS. */
+function leakOnlyDiff(a: Snap, b: Snap): string | null {
+  const keys = Object.keys(a) as (keyof Snap)[];
+  for (const k of keys) {
+    if (FIRST_INIT_KEYS.has(k)) continue; // khởi tạo hợp lệ lần đầu (vòng đầu tạo phòng) — KHÔNG phải rò tích lũy
+    if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
+  }
+  return null;
+}
+
+/** Trả MỌI khóa rò tích lũy (KHÔNG xét FIRST_INIT_KEYS), để rò ghost KHÔNG bị rò shielded khác che — báo đầy đủ cho Dev A. */
+function leakList(a: Snap, b: Snap): string[] {
+  const keys = Object.keys(a) as (keyof Snap)[];
+  const out: string[] = [];
+  for (const k of keys) if (!FIRST_INIT_KEYS.has(k) && a[k] !== b[k]) out.push(`${k}: ${a[k]} → ${b[k]}`);
+  return out;
+}
+
 function diffSnap(a: Snap, b: Snap): string | null {
   for (const k of LEAK_FIRST_KEYS) if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
   const keys = Object.keys(a) as (keyof Snap)[];
@@ -263,12 +281,10 @@ describe("rò rỉ sổ Hub / phòng sau nhiều vòng đời (#1105)", () => {
         await leaveAndClear(r2);
       }
       // Sau N vòng rớt-nối lại-thoát: mọi sổ + players/ctrl/ghosts/phòng HỒI VỀ ĐÚNG MỨC. Rò (ghost sót, players/ctrl/phòng
-      // phình) sẽ tích lũy → snapshot sau khác trước.
+      // phình) sẽ tích lũy → snapshot sau khác trước. leakList liệt kê MỌI rò (ghost KHÔNG bị shielded che).
       const afterTest = snapshot();
-      expect(
-        diffSnap(beforeTest, afterTest),
-        "rò rỉ sau N vòng rớt-nối lại: " + diffSnap(beforeTest, afterTest),
-      ).toBeNull();
+      const leaks = leakList(beforeTest, afterTest);
+      expect(leaks, "rò rỉ sau N vòng rớt-nối lại:\n" + leaks.map((l) => "  " + l).join("\n")).toEqual([]);
     },
   );
 });
