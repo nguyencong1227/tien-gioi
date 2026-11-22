@@ -39,7 +39,11 @@ const DISPLAY_FIELDS = new Set([
   "note",
 ]);
 
-/** Nhặt MỌI chữ hiển thị từ một bảng (mảng object), giống `collectDisplay` của ngon-ngu. */
+/**
+ * Nhặt MỌI chữ hiển thị từ một bảng (mảng object), giống `collectDisplay` của `ngon-ngu.test.ts`.
+ * QUAN TRỌNG: mảng của MỘT trường hiển thị (`dialog` / `talk.offer|progress|complete`: string[]) — MỖI phần tử là chữ hiển thị,
+ * PHẢI nhặt (đừng gắn `field[i]` rồi bỏ vì `field[i]` không có trong DISPLAY_FIELDS — lỗi đã từng bỏ sót 307 chuỗi lời thoại).
+ */
 function displayStrings<T>(arr: readonly T[]): string[] {
   const out: string[] = [];
   const walk = (value: unknown, field: string): void => {
@@ -47,7 +51,15 @@ function displayStrings<T>(arr: readonly T[]): string[] {
       if (DISPLAY_FIELDS.has(field)) out.push(value);
       return;
     }
-    if (Array.isArray(value)) return value.forEach((el, i) => walk(el, `${field}[${i}]`));
+    if (Array.isArray(value)) {
+      // Mảng của trường hiển thị: mỗi phần tử string là chữ hiển thị (bắt từng cái, báo đúng cha).
+      if (DISPLAY_FIELDS.has(field))
+        value.forEach((el) => {
+          if (typeof el === "string") out.push(el);
+        });
+      else value.forEach((el) => walk(el, field)); // mảng thường: vẫn đi sâu (có thể là object chứa trường hiển thị)
+      return;
+    }
     if (value && typeof value === "object")
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) walk(v, k);
   };
@@ -110,14 +122,19 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
     expect(glossaryViolations("hạng Truc Co.")).toContain("thấy 'Truc Co' -> dùng 'Trúc Cơ'");
   });
 
-  it("hệ Mộc/Thủy/Lôi/Vô sắc: thiếu dấu bị bắt, dạng đúng KHÔNG báo oan", () => {
-    // Chỉ 4 hệ được thêm: bóc dấu KHÔNG đụng chữ khác đang có (Hỏa/Thổ/Băng/Âm bị trễ, xem glossary.ts khối `he`).
+  it("hệ Mộc/Thủy/Vô sắc: thiếu dấu bị bắt, dạng đúng KHÔNG báo oan", () => {
+    // Chỉ 3 hệ được thêm: bóc dấu KHÔNG đụng chữ khác đang có (Hỏa/Thổ/Băng/Âm/LÔI bị trễ — Lôi ≡ Lối, xem glossary.ts khối `he`).
     expect(glossaryViolations("chiêu hệ Moc mạnh.")).toContain("thấy 'Moc' -> dùng 'Mộc'");
     expect(glossaryViolations("chiêu hệ Thuy mạnh.")).toContain("thấy 'Thuy' -> dùng 'Thủy'");
-    expect(glossaryViolations("chiêu hệ Loi mạnh.")).toContain("thấy 'Loi' -> dùng 'Lôi'");
     expect(glossaryViolations("chiêu hệ Vo sac.")).toContain("thấy 'Vo sac' -> dùng 'Vô sắc'");
     // dạng ĐÚNG (có dấu) KHÔNG báo oan — kể cả "Vô sắc" hai chữ:
-    expect(glossaryViolations("chiêu hệ Mộc, Thủy, Lôi và Vô sắc.")).toEqual([]);
+    expect(glossaryViolations("chiêu hệ Mộc, Thủy và Vô sắc.")).toEqual([]);
+  });
+
+  it("Lôi KHÔNG có trong từ điển: 'Lối' (con đường) KHÔNG bị báo oan thành 'Lôi' (hệ)", () => {
+    // Đột biến chứng minh: nếu ai đó thêm he.loi, ca này NGAY LẬP TỨC đỏ (báo oan "Lối núi").
+    expect(glossaryViolations("Lối núi vẫn chưa yên, chưa đủ số.")).toEqual([]);
+    expect(glossaryViolations("chờ tìm lối ra.")).toEqual([]);
   });
 
   it("dạng NFD của chữ ĐÚNG không bị báo oan (matcher NFC hóa trước; quy tắc NFC của `ngon-ngu` lo phần dấu tách rời)", () => {
@@ -152,6 +169,21 @@ describe("glossaryViolations — dữ liệu thật KHÔNG vi phạm (không bá
       if (typeof v === "string")
         for (const reason of glossaryViolations(v)) loi.push(`SECT_TERMS.${k} — ${reason}`);
     expect(loi, `chữ hiển thị vi phạm từ điển:\n${loi.join("\n") || "không có"}`).toEqual([]);
+  });
+
+  it("displayStrings nhặt CẢ lời thoại mảng (talk.offer/progress/complete, dialog): không bỏ sót (đột biến: walk cũ bỏ field[i] => đỏ)", () => {
+    const fake = [
+      { id: "q", title: "Việc", talk: { offer: ["Câu một."], complete: ["Câu hai."] } },
+      { id: "n", name: "NPC", dialog: ["Chào người lữ khách."] },
+    ];
+    const got = displayStrings(fake);
+    // Mảng của trường hiển thị (talk.offer/complete, dialog) PHẢI được nhặt — đây là chỗ walk cũ bỏ sót 307 chuỗi.
+    expect(got).toContain("Câu một.");
+    expect(got).toContain("Câu hai.");
+    expect(got).toContain("Chào người lữ khách.");
+    // id / khoá KHÔNG phải chữ hiển thị:
+    expect(got).not.toContain("q");
+    expect(got).not.toContain("n");
   });
 });
 
