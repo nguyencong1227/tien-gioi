@@ -4,9 +4,11 @@
 // KHÁC `ngon-ngu.test.ts` (rule (d) "Linh thạch" viết tay): đây là BẢNG dữ liệu tổng quát — thêm thuật ngữ chỉ cần thêm dòng,
 // không đụng logic kiểm. `glossaryViolations` thuần hàm, KHÔNG đọc tệp, KHÔNG import dữ liệu từ nơi nào khác (chỉ kiểu).
 //
-// LUẬT KHớp: mỗi biến thể `wrong` khớp CHUỖI TỪ (bao quanh bởi ranh giới chữ, không dính chữ khác hai bên),
-// KHÔNG phân biệt dấu thanh (để bắt "Truc Co" thiếu dấu) NHƯNG phân biệt HOA / THƯỜNG (để "Trúc Cơ" đúng KHÔNG bị báo oan,
-// còn "trúc cơ" viết thường thì báo). Một khớp mà chữ gốc TRÙNG HẲN `canonical` thì bỏ qua (đó là cách viết đúng).
+// LUẬT KHớp (đúng hợp đồng issue #1198, A chốt review #1318): mỗi biến thể `wrong` khớp CHÍNH XÁC — CHUỖI TỪ (bao quanh bởi
+// ranh giới chữ, không dính chữ khác hai bên) + PHÂN BIỆT dấu thanh + PHÂN BIỆT hoa / thường. Biến thể sai liệt kê TƯỜNG MINH
+// trong `wrong` (vd "Truc Co" thiếu dấu, "truc co" thường, "Linh thach" hoa L thiếu dấu). Trùng hệt `canonical` thì bỏ qua.
+// KHÔNG bóc dấu (NFKD): hết lệch tọa độ với ký tự kéo dài (vd "…"), và "Lối" ≠ "Loi" (không nhập nhằng) => thêm được mọi hệ.
+// Đánh đổi: dạng thiếu dấu MỘT PHẦN ("Trúc Co") không bắt nếu không liệt kê — lỗi thật của agent là bỏ HẾT dấu hoặc sai hoa thường, đều liệt kê được.
 
 export type GlossaryGroup =
   "canh-gioi" | "he" | "pham-cap" | "tien-te" | "khai-niem" | "dia-danh" | "nhan-vat";
@@ -18,7 +20,7 @@ export interface GlossaryTerm {
   group: GlossaryGroup;
   /** Cách viết chuẩn (đúng hoa / thường). */
   canonical: string;
-  /** Biến thể SAI hay gặp. Khớp không phân biệt dấu nhưng phân biệt hoa thường (xem luật trên). */
+  /** Biến thể SAI hay gặp, khớp CHÍNH XÁC (phân biệt dấu + hoa thường — xem luật trên). Liệt kê tường minh mọi dạng sai: thiếu dấu, sai hoa thường. */
   wrong: readonly string[];
   /** Quy tắc kèm (khi nào viết hoa, lưu ý dễ lẫn...). */
   note?: string;
@@ -27,8 +29,8 @@ export interface GlossaryTerm {
 /**
  * BẢNG TỪ ĐIỂN. Dữ liệu điền từ CHÍNH mã nguồn (realms.ts / map.ts / items.ts / ambush.ts / reincarnation.ts...), KHÔNG bịa.
  * CHƯA phủ hết: tên trùm / NPC thường (cần xử lý riêng), một số khái niệm (Duyên dễ lẫn "cơ duyên") — bổ sung các lượt sau.
- * HỆ: chỉ thêm 3 hệ bóc dấu KHÔNG đụng chữ khác (Mộc/Thủy/Vô sắc); Hỏa/Thổ/Băng/Âm/Lôi TRỄ vì bóc dấu trùng chữ đang có (Lôi ≡ Lối — xem khối `he` dưới);
- * Kim/Phong KHÔNG dấu; casing (hoa/thường) của MỌI hệ để Dev G chốt ở #1199 — nên các term hệ CHỈ có wrong thiếu dấu, KHÔNG có wrong hoa/thường.
+ * HỆ: matcher khớp CHÍNH XÁC (không bóc dấu) nên KHÔNG nhập nhằng ("Lôi" ≠ "Lối") => có thể thêm đủ 10 hệ. Casing (hoa/thường) của MỌI hệ để Dev G chốt ở #1199 —
+ * nên các term hệ CHỈ có wrong thiếu dấu (vd "Loi", "Hoa", "Bang"), KHÔNG có wrong hoa/thường cho tới khi G chốt. Kim/Phong KHÔNG dấu → bỏ wrong.
  */
 export const GLOSSARY: readonly GlossaryTerm[] = [
   // --- Cảnh giới (realms.ts: REALMS) ---
@@ -105,7 +107,7 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     id: "dia-danh.hac-phong-coc",
     group: "dia-danh",
     canonical: "Hắc Phong Cốc",
-    wrong: ["Hack Phong Coc", "hack phong coc"],
+    wrong: ["Hac Phong Coc", "hack phong coc"],
   },
   {
     id: "dia-danh.am-suong-trach",
@@ -143,9 +145,9 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     id: "tien-te.linh-thach",
     group: "tien-te",
     canonical: "Linh thạch",
-    // Matcher KHÔNG phân biệt dấu nên chỉ cần liệt kê các biến thể KHÁC chữ hoa/thường; thiếu dấu tự động bắt.
-    wrong: ["linh thạch", "Linh Thạch", "LINH THẠCH"],
-    note: "Chỉ chữ cái đầu 'L' hoa, 'thạch' thường (nhất quán rule (d) của ngon-ngu). Viết thường hết / hoa cả hai / in hoa hết đều sai.",
+    // Matcher khớp CHÍNH XÁC nên PHẢI liệt kê tường minh MỌI dạng sai: sai hoa thường VÀ thiếu dấu (không tự động bắt nữa).
+    wrong: ["linh thạch", "Linh Thạch", "LINH THẠCH", "Linh thach", "linh thach"],
+    note: "Chỉ chữ cái đầu 'L' hoa, 'thạch' thường (nhất quán rule (d) của ngon-ngu). Viết thường hết / hoa cả hai / in hoa hết / thiếu dấu đều sai.",
   },
 
   // --- Phẩm cấp (items.ts: RARITY_NAMES) ---
@@ -160,7 +162,7 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     id: "khai-niem.hoang-thuyen",
     group: "khai-niem",
     canonical: "Hoàng Tuyền",
-    wrong: ["Hoang Thuyen", "hoang thuyen"],
+    wrong: ["Hoang Tuyen", "hoang thuyen"],
     note: "Chết thật (mất kiếp), KHÔNG viết 'Hoànguyền'.",
   },
   {
@@ -201,11 +203,6 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
   },
 ];
 
-/** Bóc dấu thanh (NFKD + bỏ dấu kết hợp U+0300–U+036F) để khớp KHÔNG phân biệt dấu, nhưng GIỮ HOA / THƯỜNG. */
-function stripDia(s: string): string {
-  return s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-}
-
 /** Là chữ (Unicode letter, kể cả tiếng Việt có dấu) — dùng kiểm ranh giới từ. */
 function isLetter(ch: string | undefined): boolean {
   return ch !== undefined && /\p{L}/u.test(ch);
@@ -213,28 +210,28 @@ function isLetter(ch: string | undefined): boolean {
 
 /**
  * Tìm mọi vi phạm thuật ngữ trong `text`. Trả danh sách lý do dạng `thấy '<biến thể sai>' -> dùng '<chuẩn>'` (rỗng = sạch).
- * Khớp từ (ranh giới chữ hai bên), KHÔNG phân biệt dấu nhưng PHÂN BIỆT hoa thường; khớp trùng hệt `canonical` thì bỏ qua.
+ * Khớp CHÍNH XÁC (xem LUẬT KHớp trên): NFC + ranh giới chữ hai bên + PHÂN BIỆT dấu thanh + PHÂN BIỆT hoa / thường;
+ * khớp trùng hệt `canonical` thì bỏ qua. KHÔNG bóc dấu => hết lệch tọa độ với ký tự kéo dài ("…") và "Lối" ≠ "Lôi".
  */
 export function glossaryViolations(text: string): string[] {
   const out: string[] = [];
-  // Chuẩn NFC trước: tiếng Việt precomposed nên bóc dấu (NFKD) bảo đảm 1 chữ = 1 đơn vị mã,
-  // giữ cho tọa độ folded khớp tọa độ gốc (khi kiểm ranh giới từ / cắt chuỗi). Quy tắc NFC của `ngon-ngu` lo phần chữ tách rời.
+  // Chuẩn NFC: tiếng Việt precomposed nên 1 chữ = 1 đơn vị mã, tọa độ cắt chuỗi khớp gốc (không cần folded nữa).
   const src = text.normalize("NFC");
-  const folded = stripDia(src);
   for (const term of GLOSSARY) {
-    for (const w of term.wrong) {
-      const fw = stripDia(w);
-      if (!fw) continue;
+    const canonical = term.canonical.normalize("NFC");
+    for (const rawW of term.wrong) {
+      const w = rawW.normalize("NFC");
+      if (!w) continue;
       let from = 0;
       for (;;) {
-        const idx = folded.indexOf(fw, from);
+        const idx = src.indexOf(w, from);
         if (idx < 0) break;
-        const end = idx + fw.length;
+        const end = idx + w.length;
         const atWordStart = idx === 0 || !isLetter(src[idx - 1]);
         const atWordEnd = end >= src.length || !isLetter(src[end]);
-        if (atWordStart && atWordEnd) {
-          const span = src.slice(idx, idx + w.length);
-          if (span !== term.canonical) out.push(`thấy '${span}' -> dùng '${term.canonical}'`);
+        // Trùng hệt canonical (cùng chữ, cùng dấu, cùng hoa thường) thì KHÔNG báo.
+        if (atWordStart && atWordEnd && src.slice(idx, end) !== canonical) {
+          out.push(`thấy '${w}' -> dùng '${term.canonical}'`);
         }
         from = end;
       }

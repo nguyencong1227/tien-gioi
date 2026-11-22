@@ -11,14 +11,17 @@
 
 - **Thuật ngữ chuẩn**: cách viết ĐÚNG (đúng hoa / thường) — luôn dùng cái này.
 - **Biến thể sai**: cách viết hay nhầm bị công cụ bắt (thiếu dấu, sai hoa / thường).
-  Công cụ khớp **từ** (ranh giới chữ hai bên), **không phân biệt dấu thanh** (nên
-  "Truc Co" thiếu dấu vẫn bị bắt) **nhưng phân biệt hoa / thường** (nên "Trúc Cơ"
-  đúng KHÔNG bị báo, còn "trúc cơ" viết thường thì báo).
+  Công cụ khớp **CHÍNH XÁC** — **từ** (ranh giới chữ hai bên) + **phân biệt dấu
+  thanh** + **phân biệt hoa / thường**. Nên: "Trúc Cơ" đúng KHÔNG bị báo, "trúc cơ"
+  viết thường thì báo, "Truc Co" thiếu dấu thì báo (vì được **liệt kê tường minh**
+  trong `wrong`, KHÔNG phải do bỏ qua dấu). Dạng đủ dấu nhưng khác dấu thanh (vd
+  "Móc" so với hệ "Moc") KHÔNG bị báo oan.
 - **Ghi chú**: lưu ý dễ lẫn (vd "Đại Thừa" — "Thừa" KHÔNG phải "Thăng").
-- Hệ (Mộc / Thủy / ...) hiện chỉ phủ biến thể **thiếu dấu**; hoa / thường của mọi
-  hệ để Dev G chốt ở #1199. Hỏa / Thổ / Băng / Âm / Lôi **chưa đưa vào** vì bóc dấu
-  trùng chữ khác đang có (vd "Lôi" ≡ "Lối" con đường) — cần cơ chế khử nhập nhằng
-  theo pha / ngữ cảnh mới thêm được.
+- Vì khớp CHÍNH XÁC (không bóc dấu) nên KHÔNG nhập nhằng: "Lối" (con đường) ≠ "Lôi"
+  (hệ), "Móc" ≠ "Moc" — đây là lý do có thể thêm đủ các hệ còn lại. Hỏa / Thổ / Băng
+  / Âm / Lôi **sẽ thêm các lượt sau**: mỗi hệ cần quét chữ hiển thị thật để chắc biến
+  thể thiếu dấu của nó KHÔNG bám vào chữ trần hợp lệ đang có (vd wrong "Hoa" của Hỏa
+  sẽ bám "Hoa" trong "Băng Hoa Loạn"). Hoa / thường của mọi hệ để Dev G chốt ở #1199.
 
 ---
 
@@ -47,7 +50,9 @@
 | Thủy | Thuy | |
 | Vô sắc | Vo sac | Hệ id `none` (không khắc / không bị khắc); KHÔNG phải chữ "vô sắc" thường. |
 
-> Hỏa / Thổ / Băng / Âm / Lôi chưa đưa vào (xem phần "Cách đọc bảng"). Kim / Phong
+> Hỏa / Thổ / Băng / Âm / Lôi chưa đưa vào — sẽ thêm các lượt sau khi quét chữ hiển
+> thị thật (xem phần "Cách đọc bảng": khớp CHÍNH XÁC nên không còn nhập nhằng do bóc
+> dấu, nhưng biến thể thiếu dấu vẫn phải tránh bám chữ trần hợp lệ). Kim / Phong
 > không dấu nên không có biến thể thiếu dấu.
 
 ### Phẩm cấp
@@ -64,7 +69,7 @@
 
 | Thuật ngữ chuẩn | Biến thể sai | Ghi chú |
 |---|---|---|
-| Linh thạch | linh thạch, Linh Thạch, LINH THẠCH | Chỉ chữ cái đầu "L" hoa, "thạch" thường. Viết thường hết / hoa cả hai / in hoa hết đều sai. |
+| Linh thạch | linh thạch, Linh Thạch, LINH THẠCH, Linh thach, linh thach | Chỉ chữ cái đầu "L" hoa, "thạch" thường. Viết thường hết / hoa cả hai / in hoa hết / thiếu dấu đều sai. |
 
 ### Khái niệm
 
@@ -81,7 +86,7 @@
 | Thuật ngữ chuẩn | Biến thể sai | Ghi chú |
 |---|---|---|
 | Lạc Hà Trấn | Lac Ha Tran, lac ha tran | Trấn trung tâm, bản đồ mặc định. |
-| Hắc Phong Cốc | Hack Phong Coc, hack phong coc | |
+| Hắc Phong Cốc | Hac Phong Coc, hack phong coc | |
 | Âm Sương Trạch | Am Suong Trach, am suong trach | |
 | Hàn Vân Lĩnh | Han Van Linh, han van linh | |
 
