@@ -4,7 +4,7 @@
 
 ## 1. Mục tiêu và phạm vi
 - Thêm nhịp bất ngờ khi đi đường: bị chặn -> chọn Chiến / Bỏ chạy -> nếu Chiến thì đấu **một mình** trong đấu trường nhỏ riêng -> thắng nhận thưởng khá, thua / bỏ chạy mất một cái giá **hiện rõ trước khi bấm**.
-- **Tái dùng tối đa** hạ tầng bí cảnh (phòng Colyseus tạm do server tạo, sổ `Hub.runs`, `handOff` lưu chỗ cũ, gục không mất kiếp, ví qua `wallet`, thưởng) thay vì viết lại. Chiến đấu, kỹ năng, di chuyển giữ nguyên.
+- **Tái dùng tối đa** hạ tầng bí cảnh (phòng Colyseus tạm do server tạo, sổ `Hub.runs`, `handOff` lưu chỗ cũ, gục không mất kiếp (đúng cho bí cảnh; RIÊNG đấu trường chặn đường: thua = chết thật, mục 6.3), ví qua `wallet`, thưởng) thay vì viết lại. Chiến đấu, kỹ năng, di chuyển giữ nguyên.
 - Ngoài phạm vi (đợt 1): chặn đường nhiều người / theo đội, nhiều vòng, chọn kẻ địch, kẻ chặn đường đuổi theo qua bản đồ, thương lượng bằng lời (nguồn Vạn Kiếp Tu Tiên có nhánh "check chỉ số"; Tiên Giới chỉ Chiến / Bỏ chạy), PK người chơi với nhau.
 
 ## 2. Hiện trạng đã đọc mã (cái để tái dùng)
@@ -19,7 +19,7 @@
 3. **Bỏ chạy** lúc này: trừ giá (giá "trước trận", thấp), lưu, hộp thoại đóng, đi tiếp như chưa có gì (hồi tối thiểu bắt đầu tính).
 4. **Chiến**: server tạo **đấu trường** (phòng tạm một người, mục 5), lưu nhân vật ở chỗ cũ, gửi `travelTo` + `roomId`; client vào bằng `joinById`. Đấu trường nhỏ trang trí theo vùng, chỉ có người chơi + kẻ chặn đường. HUD: thanh máu kẻ địch, đồng hồ `AMBUSH_TIME_MS`, nút **Bỏ chạy** (giá "giữa trận", CAO hơn, mục 6).
 5. **Thắng** (hạ hết kẻ chặn đường): phát thưởng (mục 7), `AMBUSH_EXIT_MS` (4 giây) xem kết quả, rồi đưa về **đúng chỗ cũ** trên bản đồ gốc, có `AMBUSH_RETURN_GRACE_MS` (5 giây) bảo hộ.
-6. **Thua** (bị hạ khi đang đánh) = **CHẾT THẬT** theo luật luân hồi (mục 6.3; người dùng quyết 17/11, `QUYET_DINH_M3` mục 53; KHÔNG giống bí cảnh). **Hết giờ** / **bỏ chạy giữa trận** / **rời phòng hoặc rớt mạng quá hạn**: mất giá "giữa trận" (tu vi), về chỗ cũ như trên, KHÔNG mất kiếp.
+6. **Thua** (bị hạ khi đang đánh) = **CHẾT THẬT** theo luật luân hồi (mục 6.3; người dùng quyết 17/11, `QUYET_DINH_M3` mục 53; KHÔNG giống bí cảnh). **Hết giờ** / **bỏ chạy giữa trận** / **rời phòng hoặc rớt mạng quá hạn**: mất giá "giữa trận" (mục 6.1: Linh thạch HOẶC tu vi khi chủ động bỏ chạy; tu vi khi hết giờ / rời phòng / rớt mạng quá hạn), về chỗ cũ như trên, KHÔNG mất kiếp.
 7. Đội: người trong đội gặp chặn đường vẫn đấu SOLO; đồng đội nhận dòng thông báo đội ("X bị chặn đường"), không vào được.
 
 ## 4. Kích hoạt (server quyết định; client không có tin nào để "xin" hay "né")
