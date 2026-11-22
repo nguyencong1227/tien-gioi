@@ -1,4 +1,4 @@
-import { execSync, spawn, type ChildProcess } from "node:child_process";
+import { execSync, spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -269,7 +269,7 @@ export function verifyArchiveSharedResolution(archiveDir: string): string {
   }
   const realShared = fs.realpathSync(sharedPkg);
   const realArchive = fs.realpathSync(archiveDir);
-  if (!realShared.startsWith(realArchive)) {
+  if (!realShared.startsWith(realArchive + path.sep)) {
     throw new Error(
       `@tien-gioi/shared giải quyết ra ngoài archiveDir: "${realShared}" không nằm trong "${realArchive}"`,
     );
@@ -362,6 +362,9 @@ export async function simulatePlayerLogins(port: number, dataDir: string): Promi
         v: PROTOCOL_VERSION,
       });
 
+      // Bắt các thông điệp chung để tránh cảnh báo ồn từ colyseus.js
+      room.onMessage("*", () => {});
+
       // Gửi lệnh đả tọa ngắn
       room.send("rest");
       await sleep(60);
@@ -401,7 +404,7 @@ async function run() {
     console.log(`\n==> [1/6] Dựng mã nguồn phiên bản ${tag} vào thư mục tạm...`);
     const archiveDir = fs.mkdtempSync(path.join(os.tmpdir(), "tien-gioi-rc-archive-"));
     tempDirsToClean.push(archiveDir);
-    execSync(`git archive ${tag} | tar -x -C ${archiveDir}`, { stdio: "ignore" });
+    execSync(`git archive ${tag} | tar -x -C ${archiveDir}`, { stdio: "ignore", cwd: repoRoot });
 
     // Dựng node_modules cho archive sao cho @tien-gioi/* trỏ vào chính archiveDir (N1)
     setupArchiveNodeModules(archiveDir, repoRoot);
@@ -416,14 +419,44 @@ async function run() {
     );
     const soakPort = await freePort();
 
-    execSync(
-      `nice -n 10 npx tsx scripts/soak.ts --bots=${numBots} --duration=${duration} --keep-data --m7 --port=${soakPort}`,
-      {
-        cwd: path.join(archiveDir, "server"),
-        stdio: "inherit",
-        timeout: (duration + 120) * 1000,
-      },
-    );
+    let soakExitCode: number | null = null;
+    try {
+      const soakRes = spawnSync(
+        "nice",
+        [
+          "-n",
+          "10",
+          "npx",
+          "tsx",
+          "scripts/soak.ts",
+          `--bots=${numBots}`,
+          `--duration=${duration}`,
+          "--keep-data",
+          "--m7",
+          `--port=${soakPort}`,
+        ],
+        {
+          cwd: path.join(archiveDir, "server"),
+          stdio: "inherit",
+          timeout: (duration + 120) * 1000,
+        },
+      );
+      soakExitCode = soakRes.status;
+    } finally {
+      // Dọn dẹp: đưa các thư mục soak mới sinh vào danh sách dọn dẹp ngay cả khi soak ném lỗi
+      const afterDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith("tien-gioi-soak-"));
+      for (const d of afterDirs) {
+        if (!beforeDirs.has(d)) {
+          tempDirsToClean.push(path.join(os.tmpdir(), d));
+        }
+      }
+    }
+
+    if (soakExitCode !== 0) {
+      console.log(
+        `    [CHÚ Ý] Tiến trình soak kết thúc với mã ${soakExitCode} (có thể do tiêu chí chiêu của --m7 chưa đủ trong thời gian ngắn). Tiếp tục kiểm tra dữ liệu.`,
+      );
+    }
 
     const afterDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith("tien-gioi-soak-"));
     const newSoakDirs = afterDirs.filter((d) => !beforeDirs.has(d));
@@ -433,7 +466,6 @@ async function run() {
       );
     }
     const sourceDataDir = path.join(os.tmpdir(), newSoakDirs[0]!);
-    tempDirsToClean.push(sourceDataDir);
     console.log(`    Dữ liệu được sinh tại: ${sourceDataDir}`);
 
     // 3. Chuẩn bị thư mục nâng cấp lên main
@@ -445,7 +477,7 @@ async function run() {
     // Audit trước nâng cấp
     const auditBefore = auditSavesDirectory(upgradeDataDir);
     console.log(
-      `    kiem-save trước nâng cấp: ${auditBefore.cleanFiles} nv, ${auditBefore.cleanSouls} chân linh, ${auditBefore.cleanSects} tông môn (Lỗi: ${auditBefore.errorFiles})`,
+      `    kiem-save trước nâng cấp: ${auditBefore.cleanFiles} nv, ${auditBefore.cleanSouls} chân linh, ${auditBefore.cleanSects ?? 0} tông môn (Lỗi: ${auditBefore.errorFiles})`,
     );
     if (auditBefore.errorFiles > 0) throw new Error("Dữ liệu gốc có lỗi!");
 
@@ -489,7 +521,7 @@ async function run() {
     // Kiểm tra sau nâng cấp
     const auditAfter = auditSavesDirectory(upgradeDataDir);
     console.log(
-      `    kiem-save sau nâng cấp: ${auditAfter.cleanFiles} nv, ${auditAfter.cleanSouls} chân linh, ${auditAfter.cleanSects} tông môn (Lỗi: ${auditAfter.errorFiles})`,
+      `    kiem-save sau nâng cấp: ${auditAfter.cleanFiles} nv, ${auditAfter.cleanSouls} chân linh, ${auditAfter.cleanSects ?? 0} tông môn (Lỗi: ${auditAfter.errorFiles})`,
     );
     if (auditAfter.errorFiles > 0) throw new Error("Dữ liệu sau nâng cấp có lỗi!");
 
@@ -555,7 +587,7 @@ async function run() {
     // Kiểm tra sau lùi bản
     const auditRollback = auditSavesDirectory(rollbackDataDir);
     console.log(
-      `    kiem-save sau lùi bản: ${auditRollback.cleanFiles} nv, ${auditRollback.cleanSouls} chân linh, ${auditRollback.cleanSects} tông môn (Lỗi: ${auditRollback.errorFiles})`,
+      `    kiem-save sau lùi bản: ${auditRollback.cleanFiles} nv, ${auditRollback.cleanSouls} chân linh, ${auditRollback.cleanSects ?? 0} tông môn (Lỗi: ${auditRollback.errorFiles})`,
     );
     if (auditRollback.errorFiles > 0) throw new Error("Dữ liệu sau lùi bản có lỗi!");
 

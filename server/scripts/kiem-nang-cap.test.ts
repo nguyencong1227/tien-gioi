@@ -271,6 +271,33 @@ describe("kiem-nang-cap: verifyPhase", () => {
     expect(res.errors).toHaveLength(0);
   });
 
+  it("ĐẠT khi chỉ riêng updatedAt mới hơn (chuỗi ISO) trong khi life.playMs giữ nguyên", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 100,
+          realm: 1,
+          updatedAt: "2026-11-21T15:05:16.688Z", // tăng
+          life: { playMs: 10000 }, // giữ nguyên
+        },
+      ],
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(true);
+    expect(res.errors).toHaveLength(0);
+  });
+
   it("ĐẠT khi updatedAt bằng nhau nhưng life.playMs tăng", () => {
     const after = new Map<string, Record<string, any>>([
       [
@@ -296,6 +323,89 @@ describe("kiem-nang-cap: verifyPhase", () => {
 
     expect(res.valid).toBe(true);
     expect(res.errors).toHaveLength(0);
+  });
+
+  it("ĐẠT khi updatedAt kiểu số tăng trong khi life.playMs giữ nguyên", () => {
+    const numBefore = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        { name: "Bot 001", coin: 100, realm: 1, updatedAt: 1000, life: { playMs: 500 } },
+      ],
+    ]);
+    const numAfter = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        { name: "Bot 001", coin: 100, realm: 1, updatedAt: 1500, life: { playMs: 500 } },
+      ],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: numBefore,
+      snapshotAfter: numAfter,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(true);
+    expect(res.errors).toHaveLength(0);
+  });
+
+  it("Ca âm 0a: thất bại nếu updatedAt cũ hơn (chuỗi ISO) và life.playMs không tăng", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 100,
+          realm: 1,
+          updatedAt: "2026-11-21T15:03:00.000Z", // cũ hơn
+          life: { playMs: 10000 }, // không tăng
+        },
+      ],
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("không có bằng chứng được server ghi lại"))).toBe(
+      true,
+    );
+  });
+
+  it("Ca âm 0b: thất bại nếu updatedAt kiểu số bị giảm và life.playMs không tăng", () => {
+    const numBefore = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        { name: "Bot 001", coin: 100, realm: 1, updatedAt: 1000, life: { playMs: 500 } },
+      ],
+    ]);
+    const numAfter = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        { name: "Bot 001", coin: 100, realm: 1, updatedAt: 800, life: { playMs: 500 } },
+      ],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: numBefore,
+      snapshotAfter: numAfter,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("không có bằng chứng được server ghi lại"))).toBe(
+      true,
+    );
   });
 
   it("Ca âm 1: thất bại nếu số bot đăng nhập không đạt expectedLogins", () => {
