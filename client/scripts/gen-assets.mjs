@@ -1012,6 +1012,11 @@ const BOOKS = {
   kinh_cam_long_khau: [0x7d8590, 0xdde4ec],
   kinh_hoa_huyet_phe_nguyen: [0x8c7f88, 0xeadde6],
   kinh_long_tuong_ho_the: [0xa89c78, 0xf4ecd0],
+  // Kim / Thổ (CT17 lát 1, G): bìa theo hệ (kim 0xc8ccd4, thổ 0xa8803a)
+  kinh_kim_thoa_xuyen_tam: [0xc8ccd4, 0xf2e6a0],
+  kinh_thuc_giap_phi_tan: [0xc8ccd4, 0x8a93a0],
+  kinh_thiet_sa_chuong: [0xa8803a, 0xe6c98a],
+  kinh_chuong_vu_phong_lam: [0xa8803a, 0xd8cc9a],
 };
 
 /**

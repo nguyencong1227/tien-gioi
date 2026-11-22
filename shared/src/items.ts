@@ -918,6 +918,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Trùm Trúc Cơ rơi kinh quyển chiêu cao cấp (M7.4): phần thưởng của việc hạ trùm
     { itemId: bookIdOf("thanh_tung_phi_cham"), chance: 0.25, min: 1, max: 1 },
     { itemId: bookIdOf("cuu_cung_khon_sat"), chance: 0.25, min: 1, max: 1 },
+    // Kim Trúc Cơ, Huyền phẩm (CT17 lát 1, G): rơi hiếm từ Xích Mãng (trùm Trúc Cơ, giữ nguyên số Linh thạch / giờ mục 30)
+    { itemId: bookIdOf("thuc_giap_phi_tan"), chance: 0.01, min: 1, max: 1 },
     // Vô sắc Trúc Cơ, Huyền phẩm (CT8 lát 3, A): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ vì bí cảnh đòi thưởng >= 15 phút săn quái tốt nhất cùng bậc (`balance/dungeon.test.ts` đỏ ở 14,86 khi thêm 0,3 % x 2 vào Hắc Hổ)
     { itemId: bookIdOf("su_tu_hong"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("cam_long_khau"), chance: 0.006, min: 1, max: 1 },
@@ -979,6 +981,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("bang_hoa_loan"), chance: 0.02, min: 1, max: 1 },
     { itemId: bookIdOf("han_quang_tien"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("van_kiem_quy_tong"), chance: 0.008, min: 1, max: 1 }, // Kim, Địa phẩm (CT6 lát 1)
+    // Thổ Nguyên Anh, Địa phẩm (CT17 lát 1, G): rơi hiếm từ Phong Nha. Đặt ở bậc Trung/Hậu kỳ (nguồn tu vi của hai bậc này) để thu nhập
+    // bán sách nâng hai bậc, giữ đường thu nhập Nguyên Anh không tụt quá 5% giữa các bậc; đặt ở Cốt Tượng (nguồn Sơ kỳ) sẽ đẩy tier[0] vượt ngưỡng.
+    { itemId: bookIdOf("chuong_vu_phong_lam"), chance: 0.008, min: 1, max: 1 },
     { itemId: bookIdOf("thien_la_loi_cam"), chance: 0.006, min: 1, max: 1 }, // Lôi gắn dấu, Địa phẩm (CT8 lát 2)
     { itemId: bookIdOf("chuong_tam_loi_bao"), chance: 0.006, min: 1, max: 1 }, // Lôi kích dấu (CT8 lát 2)
     { itemId: bookIdOf("bach_thu_khieu_phong"), chance: 0.006, min: 1, max: 1 }, // Phong tăng tốc đồng đội (CT8 lát 2)
