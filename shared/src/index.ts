@@ -28,6 +28,7 @@ export * from "./bosses";
 export * from "./net-guard";
 export * from "./protocol";
 export * from "./heartbeat";
+export * from "./glossary";
 export * from "./tiled-bake";
 export * from "./map-checks";
 export * from "./private-pack";
