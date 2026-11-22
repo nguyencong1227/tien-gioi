@@ -929,6 +929,9 @@ export class WorldRoom extends Room<WorldState> {
     this.state.online = this.state.players.size;
     this.world.interest.leave(sid);
     this.world.ctrl.delete(sid);
+    // Hộ thể (nối lại, hộp thoại chặn đường, đấu trường): `tickNetGuard` chỉ gỡ cho người CÒN trong `state.players`, nên rời / qua cổng khi còn hộ thể mà không gỡ ở đây thì sessionId nằm mãi trong
+    // tập (phòng thường không tự đóng): rò tích luỹ theo số vòng nối lại (#1292)
+    this.world.shielded.delete(sid);
     this.limiters.delete(sid);
     forgetTarget(this.world, sid);
     releaseLootOwner(this.world, sid);
