@@ -90,7 +90,7 @@ số đo trong lúc chạy, chụp ảnh, tự phát hiện finding. Hiện có 
 1. `action`: Nhấn phím thật qua CDP để mở bảng, đợi modal xuất hiện (`modalShown`) và đợi 2 khung hình để render ổn định.
 2. Chụp ảnh: `runStep` kiểm tra chắc chắn bảng vẫn đang hiển thị ngay trước `tab.shot` rồi mới ghi hình (tránh chụp màn chơi rỗng).
 3. `after`: Nhấn Esc để đóng bảng và kiểm tra `closedFailFinding` xem bảng có đóng thật hay không.
-*Lưu ý ở khung cảm ứng (360x640, 915x412):* Bộ chơi thử AI hiện mở bảng thông qua sự kiện phím CDP để kiểm tra độ vừa vặn và bố cục của bảng trên màn hình nhỏ; kiểm tra thao tác bấm nút menu cảm ứng / chạm tay là phạm vi của các kịch bản E2E cảm ứng riêng.
+*Lưu ý ở khung cảm ứng (360x640, 915x412):* Bộ chơi thử AI hiện mở bảng thông qua sự kiện phím CDP để kiểm tra độ vừa vặn và bố cục của bảng trên màn hình nhỏ; **đường nút menu cảm ứng (nút ☰ / hàng nút HUD) CHƯA được kiểm trong bộ này** (kiểm tra thao tác chạm nút menu / chạm tay là phạm vi của các kịch bản E2E cảm ứng riêng).
 
 ---
 

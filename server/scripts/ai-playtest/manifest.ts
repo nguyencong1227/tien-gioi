@@ -37,8 +37,9 @@ export interface StepViewportSpec {
 /**
  * Chọn danh sách viewport cho một bước chạy:
  * - Nếu người dùng truyền filter (vd: --viewports 412x915,1366x768): lọc `allViewports` theo `vpFilterIds`.
+ *   Nếu toàn bộ ID filter đều lạ (không khớp khung nào): ném lỗi rõ để tránh chạy 0 bước trong im lặng.
  * - Nếu không truyền filter (hoặc mảng filter rỗng): dùng danh sách viewports mặc định của bước (`step.viewports`).
- * - Nếu ID trong `step.viewports` không khớp bất kỳ viewport nào trong `allViewports`, an toàn bỏ qua.
+ *   Nếu `step.viewports` không khớp bất kỳ khung nào: ném lỗi rõ để tránh cấu hình sai chạy ngầm.
  */
 export function pickViewports(
   step: StepViewportSpec,
@@ -46,12 +47,23 @@ export function pickViewports(
   allViewports: readonly Viewport[] = DEFAULT_VIEWPORTS,
 ): Viewport[] {
   if (vpFilterIds && vpFilterIds.length > 0) {
-    return allViewports.filter((v) => vpFilterIds.includes(v.id));
+    const filtered = allViewports.filter((v) => vpFilterIds.includes(v.id));
+    if (filtered.length === 0) {
+      throw new Error(
+        `Không tìm thấy khung màn hình nào khớp với --viewports: [${vpFilterIds.join(", ")}]. Khung hợp lệ: [${allViewports.map((v) => v.id).join(", ")}]`,
+      );
+    }
+    return filtered;
   }
   const matched = step.viewports
     .map((id) => allViewports.find((v) => v.id === id))
     .filter((v): v is Viewport => v != null);
-  return matched.length > 0 ? matched : [...allViewports];
+  if (matched.length === 0) {
+    throw new Error(
+      `Bước không khai báo khung màn hình hợp lệ trong step.viewports: [${step.viewports.join(", ")}]. Khung hợp lệ: [${allViewports.map((v) => v.id).join(", ")}]`,
+    );
+  }
+  return matched;
 }
 
 /** Loại kết luận tự động (detection) mà bộ chạy gắn cho một bước. */

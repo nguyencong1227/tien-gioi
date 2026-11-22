@@ -632,11 +632,17 @@ async function main() {
   const outShots = path.join(outDir, "shots");
   mkdirSync(outShots, { recursive: true });
 
+  const steps = only.length > 0 ? STEPS.filter((s) => only.includes(s.id)) : STEPS;
+  // Kiểm tra trước viewports filter để fail-fast ngay lập tức nếu ID không hợp lệ
+  if (vpFilter) {
+    for (const step of steps) {
+      pickViewports(step, vpFilter);
+    }
+  }
+
   const startedAt = new Date().toISOString();
   const server = await spawnPlaytestServer({ pickPort, ambush: runArgs.ambush });
   const chrome = launchChrome();
-  const tabs: PlayTab[] = [];
-  const steps = only.length > 0 ? STEPS.filter((s) => only.includes(s.id)) : STEPS;
 
   let manifest: Manifest;
   try {
@@ -655,6 +661,11 @@ async function main() {
             `  ${r.ok ? "✓" : "✗"} fps ${r.metrics.fps.min}/${r.metrics.fps.avg} | findings ${r.findings.length} | console ${r.consoleErrors.length}`,
           );
         } finally {
+          try {
+            await tab.ev("window.__scene?.room?.leave?.(); 1");
+          } catch {
+            /* bỏ qua nếu trang đã đóng hoặc ngắt kết nối */
+          }
           tab.close();
         }
       }
@@ -678,7 +689,6 @@ async function main() {
       `\n✓ manifest hợp lệ: ${results.length} bước, ${failed} lỗi, ${findings} findings → ${path.relative(repoRoot, outDir)}`,
     );
   } finally {
-    for (const t of tabs) t.close();
     killChrome(chrome.proc);
     await server.close();
     await removeTmpDirs(chrome.chromeDir);

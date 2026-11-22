@@ -236,12 +236,22 @@ describe("pickViewports — chọn khung hình cho bước chạy", () => {
     expect(vps.map((v) => v.id)).toEqual(["915x412", "1920x1080"]);
   });
 
-  it("filter ID lạ: lọc an toàn, trả về mảng rỗng không ném lỗi", () => {
-    const vps = pickViewports(dummyStep, ["unknown_viewport"]);
-    expect(vps).toEqual([]);
+  it("filter toàn ID lạ: ném lỗi rõ ràng, không để chạy 0 bước trong im lặng", () => {
+    expect(() => pickViewports(dummyStep, ["unknown_viewport", "la_lung"])).toThrow(
+      /Không tìm thấy khung màn hình nào khớp với --viewports/,
+    );
   });
 
-  it("step.viewports chứa ID không tồn tại: bỏ qua phần tử không khớp", () => {
+  it("step.viewports rỗng hoặc toàn ID không tồn tại: ném lỗi rõ ràng, không chạy ngầm", () => {
+    expect(() => pickViewports({ viewports: [] })).toThrow(
+      /Bước không khai báo khung màn hình hợp lệ/,
+    );
+    expect(() => pickViewports({ viewports: ["khong_co_that"] })).toThrow(
+      /Bước không khai báo khung màn hình hợp lệ/,
+    );
+  });
+
+  it("step.viewports chứa một phần ID không tồn tại: chỉ lấy các ID hợp lệ", () => {
     const vps = pickViewports({ viewports: ["360x640", "khong_co_that"] });
     expect(vps.map((v) => v.id)).toEqual(["360x640"]);
   });
