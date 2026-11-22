@@ -266,7 +266,7 @@ Chỉ có một bí cảnh hiện nay: **Linh Hư Bí Cảnh**.
 - Mở cho người từ **Luyện Khí Tầng 9** đến **Trúc Cơ Hậu kỳ**.
 - Mỗi lượt giới hạn **12 phút**; hôm nay nhận thưởng hoàn thành tối đa **3 lượt**.
 - Trong trận: một trùm và nhiều quái con. Hoàn thành cho Linh thạch và đan dược, đồ rơi nhặt trong 60 giây.
-- **Gục trong bí cảnh KHÔNG mất kiếp:** bạn hồi về cổng sau vài giây với 30% máu và mất một lượt thưởng trong ngày. Chỉ chết do quái ở bản đồ thường mới vào Hoàng Tuyền (xem bên dưới).
+- **Gục trong bí cảnh KHÔNG mất kiếp:** bạn hồi về cổng sau vài giây với 30% máu và mất một lượt thưởng trong ngày. Chết do quái ở bản đồ thường, hoặc thua trong đấu trường của Gặp chặn đường, mới vào Hoàng Tuyền (xem bên dưới).
 
 > **Mẹo:** Bí cảnh là "bao máu" — trận dài, sát thương nhẹ nhưng liên tục. Mang đủ đan và đánh đều, đừng tham đuổi quái xa khỏi đội.
 
@@ -333,7 +333,7 @@ Chi tiết thiết kế: [docs/THIET_KE_CHAN_DUONG.md](THIET_KE_CHAN_DUONG.md).
 
 Đây là cơ chế quan trọng nhất cần hiểu rõ:
 
-> **CHẾT DO YÊU THÚ = MẤT MỘT KIẾP.** Khi nhân vật bị quái giết, chân linh của bạn đầu thai sang kiếp mới. **Chỉ chết do quái ở bản đồ thường mới tính là mất kiếp** — chết trong bí cảnh hay trong quyết đấu **không** tính.
+> **CHẾT DO YÊU THÚ = MẤT MỘT KIẾP.** Khi nhân vật bị quái giết, chân linh của bạn đầu thai sang kiếp mới. **Chết do quái ở bản đồ thường, hoặc thua trong đấu trường của Gặp chặn đường (xem mục Gặp chặn đường ở trên), đều tính là mất kiếp** — chết trong bí cảnh hay trong quyết đấu **không** tính.
 
 Khi đầu thai:
 
