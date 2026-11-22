@@ -22,6 +22,7 @@ import zlib from "node:zlib";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { transformSync } from "esbuild";
+import { MAP_FILES_CHUNK_RE } from "./check-perf-budget.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -283,6 +284,43 @@ export function classifyModules(modules, totalGzipSize) {
 }
 
 /**
+ * Tách các chunk JS thành MÃ và DỮ LIỆU bản đồ Tiled (#1283), cùng luật với `checkTotalJsGzip` của `check-perf-budget.mjs`: chỉ tách khi ngân sách khai báo `mapFilesGzipKb` (số),
+ * và chỉ chunk khớp CHẶT `MAP_FILES_CHUNK_RE` (`map-files-<băm>.js`). Số "dư địa ngân sách" của báo cáo so với trần MÃ (`totalJsGzipKb`) phải trừ dữ liệu bản đồ, nếu không báo cáo
+ * nói còn dư ít hơn thật và lệch với cổng CI (`npm run check:budget`).
+ * @template {{ fileName: string }} T
+ * @param {T[]} chunks
+ * @param {number | undefined} mapFilesLimitKb `static.mapFilesGzipKb` của perf-budget.json
+ * @returns {{ code: T[], data: T[] }}
+ */
+export function splitCodeAndMapData(chunks, mapFilesLimitKb) {
+  const declared = typeof mapFilesLimitKb === "number";
+  const isData = (c) => declared && MAP_FILES_CHUNK_RE.test(path.basename(c.fileName));
+  return { code: chunks.filter((c) => !isData(c)), data: chunks.filter(isData) };
+}
+
+/**
+ * Số liệu ngân sách của báo cáo (#1283): dư địa so với trần MÃ (`totalJsGzipKb`) chỉ tính chunk mã, dữ liệu bản đồ báo riêng. `CI` = gzip mức 9 theo KiB (như `check:budget`),
+ * `Vite` = gzip mức mặc định theo KB thập phân (như log của Vite).
+ * @param {Array<{ fileName: string, code: string }>} jsChunks
+ * @param {number} budgetMaxGzipKb trần tổng MÃ
+ * @param {number | undefined} mapFilesLimitKb trần riêng của dữ liệu bản đồ
+ */
+export function budgetFigures(jsChunks, budgetMaxGzipKb, mapFilesLimitKb) {
+  const { code, data } = splitCodeAndMapData(jsChunks, mapFilesLimitKb);
+  const gz9 = (list) => list.reduce((a, c) => a + zlib.gzipSync(c.code, { level: 9 }).length, 0);
+  const gzDefault = (list) => list.reduce((a, c) => a + zlib.gzipSync(c.code).length, 0);
+  const codeGzipKb = Number((gz9(code) / 1024).toFixed(2));
+  const viteCodeGzipKb = Number((gzDefault(code) / 1000).toFixed(2));
+  return {
+    codeGzipKb,
+    viteCodeGzipKb,
+    mapFilesGzipKb: Number((gz9(data) / 1024).toFixed(2)),
+    remainingBudgetKb: Number((budgetMaxGzipKb - codeGzipKb).toFixed(2)),
+    viteRemainingBudgetKb: Number((budgetMaxGzipKb - viteCodeGzipKb).toFixed(2)),
+  };
+}
+
+/**
  * Phân tích bundle client bằng cách gọi Vite build
  * @param {{ clientDir?: string, logLevel?: 'silent' | 'info' }} [options]
  * @returns {Promise<object>}
@@ -345,7 +383,9 @@ export async function analyzeClientBundle(options = {}) {
   const breakdown = classifyModules(mainChunk.modules, gzipBytes);
 
   // Đọc giới hạn ngân sách tĩnh để so sánh
-  let budgetMaxGzipKb = 540; // trần TỔNG JS (`totalJsGzipKb`)
+  let budgetMaxGzipKb = 540; // trần TỔNG MÃ JS (`totalJsGzipKb`)
+  /** @type {number | undefined} */
+  let mapFilesLimitKb; // trần RIÊNG của dữ liệu bản đồ (`mapFilesGzipKb`, #1283)
   const budgetPath = path.resolve(clientDir, "perf-budget.json");
   if (fs.existsSync(budgetPath)) {
     try {
@@ -355,18 +395,22 @@ export async function analyzeClientBundle(options = {}) {
       } else if (budget.mainJsGzipMaxKb) {
         budgetMaxGzipKb = budget.mainJsGzipMaxKb;
       }
+      if (typeof budget.static?.mapFilesGzipKb === "number") {
+        mapFilesLimitKb = budget.static.mapFilesGzipKb;
+      }
     } catch {
       // Dùng mặc định
     }
   }
 
+  // Dữ liệu bản đồ có trần riêng (#1283): số dư địa so với trần MÃ chỉ tính chunk mã, đúng như `check:budget`
+  const { codeGzipKb, viteCodeGzipKb, mapFilesGzipKb, remainingBudgetKb, viteRemainingBudgetKb } =
+    budgetFigures(jsChunks, budgetMaxGzipKb, mapFilesLimitKb);
   const totalGzipKb = Number((gzipBytes / 1024).toFixed(2));
-  const remainingBudgetKb = Number((budgetMaxGzipKb - totalGzipKb).toFixed(2));
 
   // Kích thước hiển thị dạng thập phân (decimal KB) như Vite build log
   const viteRawKb = Number((rawBytes / 1000).toFixed(2));
   const viteGzipKb = Number((gzipDefaultBytes / 1000).toFixed(2));
-  const viteRemainingBudgetKb = Number((budgetMaxGzipKb - viteGzipKb).toFixed(2));
 
   // Tính tiềm năng tiết kiệm khi tách các bảng UI
   let lazyCandidatesRawBytes = 0;
@@ -397,6 +441,10 @@ export async function analyzeClientBundle(options = {}) {
     viteRemainingBudgetKb,
     budgetMaxGzipKb,
     remainingBudgetKb,
+    codeGzipKb,
+    viteCodeGzipKb,
+    mapFilesGzipKb,
+    mapFilesLimitKb,
     breakdown,
     uiPanels: UI_PANEL_SECTIONS,
     lazyOptimization: {
@@ -408,7 +456,7 @@ export async function analyzeClientBundle(options = {}) {
       estGzipSavedKb: lazyEstGzipKb,
       projectedInitialGzipKb: Number((totalGzipKb - lazyEstGzipKb).toFixed(2)),
       projectedRemainingBudgetKb: Number(
-        (budgetMaxGzipKb - (totalGzipKb - lazyEstGzipKb)).toFixed(2),
+        (budgetMaxGzipKb - (codeGzipKb - lazyEstGzipKb)).toFixed(2),
       ),
       projectedViteGzipKb: Number((viteGzipKb - lazyEstGzipKb * 1.024).toFixed(2)),
     },
@@ -434,12 +482,20 @@ export function formatConsoleReport(report) {
     );
   }
   lines.push(`Theo chuẩn Vite  : ${report.viteRawKb} KB thô, ${report.viteGzipKb} KB gzip`);
+  // Từ #1283 trần tổng chỉ tính MÃ (dữ liệu bản đồ có trần riêng): báo cáo cũ (thiếu `codeGzipKb`) rơi về tổng mọi chunk
+  const usedCi = report.codeGzipKb ?? report.gzipKb;
+  const usedVite = report.viteCodeGzipKb ?? report.viteGzipKb;
   lines.push(
-    `Ngân sách CI     : ${report.gzipKb} / ${report.budgetMaxGzipKb} KiB (Dư: ${report.remainingBudgetKb} KiB)`,
+    `Ngân sách CI     : ${usedCi} / ${report.budgetMaxGzipKb} KiB (Dư: ${report.remainingBudgetKb} KiB)${report.codeGzipKb !== undefined ? " [chỉ mã]" : ""}`,
   );
   lines.push(
-    `Ngân sách Vite   : ${report.viteGzipKb} / ${report.budgetMaxGzipKb} KB (Dư: ${report.viteRemainingBudgetKb} KB)`,
+    `Ngân sách Vite   : ${usedVite} / ${report.budgetMaxGzipKb} KB (Dư: ${report.viteRemainingBudgetKb} KB)${report.viteCodeGzipKb !== undefined ? " [chỉ mã]" : ""}`,
   );
+  if (report.mapFilesLimitKb !== undefined) {
+    lines.push(
+      `Dữ liệu bản đồ   : ${report.mapFilesGzipKb} / ${report.mapFilesLimitKb} KiB (trần riêng, không tính vào trần mã)`,
+    );
+  }
   lines.push("");
   lines.push("1. CƠ CẤU THEO NHÓM THÀNH PHẦN:");
   lines.push(
@@ -533,8 +589,13 @@ export function formatMarkdownReport(report) {
     `> Gói JS chính: \`${report.chunkFileName}\` — **${report.rawKb} KiB** thô, **${report.gzipKb} KiB** gzip level 9 (hoặc **${report.viteGzipKb} KB** theo log của Vite).`,
   );
   lines.push(
-    `> Ngân sách tối đa: **${report.budgetMaxGzipKb} KB** (Khoảng đệm an toàn hiện tại: **${report.remainingBudgetKb} KiB** / **${report.viteRemainingBudgetKb} KB**).`,
+    `> Ngân sách tối đa: **${report.budgetMaxGzipKb} KB** ${report.codeGzipKb !== undefined ? "cho MÃ JS (chưa tính dữ liệu bản đồ) " : ""}(Khoảng đệm an toàn hiện tại: **${report.remainingBudgetKb} KiB** / **${report.viteRemainingBudgetKb} KB**).`,
   );
+  if (report.mapFilesLimitKb !== undefined) {
+    lines.push(
+      `> Dữ liệu bản đồ Tiled (\`map-files-*.js\`): **${report.mapFilesGzipKb} KiB** / trần riêng **${report.mapFilesLimitKb} KB** (#1283).`,
+    );
+  }
   lines.push("");
   lines.push("## 1. Cơ cấu theo Nhóm thành phần");
   lines.push("");

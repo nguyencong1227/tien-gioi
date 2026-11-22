@@ -202,28 +202,67 @@ export function checkBundleGzip(distDir, limitKb) {
 }
 
 /**
+ * Chunk DỮ LIỆU bản đồ Tiled (JSON biên dịch thành module JS: `shared/src/map-files`, nhập động ở `game-modules.ts`, #1283): Vite đặt tên `map-files-<băm>.js`. Dữ liệu này tăng theo
+ * từng bản đồ mới nên KHÔNG tính vào trần TỔNG JS (trần đó chặn việc "giấu" MÃ vào chunk tải sau, #1097) mà có trần riêng `static.mapFilesGzipKb`.
+ * Khớp CHẶT (neo hai đầu, bắt buộc có đoạn băm): `map-files.js` (không băm), `mapfiles-x.js`, `xmap-files-a.js` KHÔNG được miễn.
+ */
+export const MAP_FILES_CHUNK_RE = /^map-files-[\w-]+\.js$/;
+
+/**
  * Kiểm tra TỔNG JS (mọi tệp `.js` trong dist/assets, gzip mức 9 từng tệp): chặn việc "giấu" mã vào chunk tải sau để né trần gói khởi động (#1097).
+ * Khi truyền `mapFilesLimitKb` (số, `static.mapFilesGzipKb`), các chunk dữ liệu bản đồ (`MAP_FILES_CHUNK_RE`) được TÁCH khỏi tổng và kiểm riêng với trần đó (`mapFiles`, #1283).
+ * FAIL-SAFE: không truyền `mapFilesLimitKb` (ngân sách chưa khai báo trần riêng) hoặc không thấy chunk nào khớp (đổi tên / gộp chunk) thì KHÔNG miễn trừ gì: mọi JS tính vào tổng,
+ * để đổi tên chunk không mở lỗ hổng "giấu mã"; trường hợp thứ hai kèm `warning`.
  * @param {string} distDir
  * @param {number} limitKb
- * @returns {{ files: Array<{ file: string, gzipKb: number }>, gzipBytes: number, gzipKb: number, limitKb: number, ok: boolean }}
+ * @param {number} [mapFilesLimitKb]
+ * @returns {{ files: Array<{ file: string, gzipKb: number }>, gzipBytes: number, gzipKb: number, limitKb: number, ok: boolean,
+ *   mapFiles: { files: Array<{ file: string, gzipKb: number }>, gzipBytes: number, gzipKb: number, limitKb: number, ok: boolean } | null, warning: string | null }}
  */
-export function checkTotalJsGzip(distDir, limitKb) {
+export function checkTotalJsGzip(distDir, limitKb, mapFilesLimitKb) {
   const assetsDir = path.join(distDir, "assets");
   if (!fs.existsSync(assetsDir)) {
     throw new Error(
       `Thư mục dist/assets không tồn tại tại: ${assetsDir}. Cần chạy 'npm run build' trước.`,
     );
   }
-  const files = [];
-  let gzipBytes = 0;
+  const all = [];
   for (const f of fs.readdirSync(assetsDir).sort()) {
     if (!f.endsWith(".js")) continue;
     const bytes = zlib.gzipSync(fs.readFileSync(path.join(assetsDir, f)), { level: 9 }).length;
-    gzipBytes += bytes;
-    files.push({ file: f, gzipKb: Number((bytes / 1024).toFixed(2)) });
+    all.push({ file: f, bytes });
   }
-  const gzipKb = Number((gzipBytes / 1024).toFixed(2));
-  return { files, gzipBytes, gzipKb, limitKb, ok: gzipKb <= limitKb };
+  const declared = typeof mapFilesLimitKb === "number";
+  const isData = (f) => declared && MAP_FILES_CHUNK_RE.test(f.file);
+  const data = all.filter(isData);
+  const code = all.filter((f) => !isData(f));
+  const toKb = (b) => Number((b / 1024).toFixed(2));
+  const sum = (list) => list.reduce((a, f) => a + f.bytes, 0);
+  const view = (list) => list.map((f) => ({ file: f.file, gzipKb: toKb(f.bytes) }));
+  const gzipBytes = sum(code);
+  const gzipKb = toKb(gzipBytes);
+  const mapFiles = declared
+    ? {
+        files: view(data),
+        gzipBytes: sum(data),
+        gzipKb: toKb(sum(data)),
+        limitKb: mapFilesLimitKb,
+        ok: toKb(sum(data)) <= mapFilesLimitKb,
+      }
+    : null;
+  const warning =
+    declared && data.length === 0
+      ? `Không thấy chunk dữ liệu bản đồ nào khớp ${MAP_FILES_CHUNK_RE} (đổi tên / gộp chunk?): KHÔNG miễn trừ gì, mọi JS tính vào tổng ${limitKb} KB.`
+      : null;
+  return {
+    files: view(code),
+    gzipBytes,
+    gzipKb,
+    limitKb,
+    ok: gzipKb <= limitKb,
+    mapFiles,
+    warning,
+  };
 }
 
 /**
@@ -794,7 +833,7 @@ export function checkWorstCaseTextureMemoryByTier({
 /**
  * Kiểm tra toàn bộ ngân sách tĩnh so với perf-budget.json
  * @param {{ budgetPath?: string, distDir?: string, assetsDir?: string, packsDir?: string, manifestPath?: string }} [opts]
- * @returns {{ ok: boolean, bundle: any, totalJs: any, atlas: any, texture: any, packs: any, worstCaseTexture: any, errors: string[] }}
+ * @returns {{ ok: boolean, bundle: any, totalJs: any, atlas: any, texture: any, packs: any, worstCaseTexture: any, errors: string[], warnings: string[] }}
  */
 export function checkPerfBudget(opts = {}) {
   const budgetPath = opts.budgetPath || BUDGET_FILE;
@@ -823,13 +862,19 @@ export function checkPerfBudget(opts = {}) {
   }
   const totalJs =
     typeof budget.static.totalJsGzipKb === "number"
-      ? checkTotalJsGzip(distDir, budget.static.totalJsGzipKb)
+      ? checkTotalJsGzip(distDir, budget.static.totalJsGzipKb, budget.static.mapFilesGzipKb)
       : null;
   if (totalJs && !totalJs.ok) {
     errors.push(
       `Tổng JS (${totalJs.files.length} tệp) nén gzip ${totalJs.gzipKb} KB vượt ngân sách ${totalJs.limitKb} KB!`,
     );
   }
+  if (totalJs?.mapFiles && !totalJs.mapFiles.ok) {
+    errors.push(
+      `Dữ liệu bản đồ (${totalJs.mapFiles.files.map((f) => f.file).join(", ")}) nén gzip ${totalJs.mapFiles.gzipKb} KB vượt ngân sách riêng ${totalJs.mapFiles.limitKb} KB!`,
+    );
+  }
+  const warnings = totalJs?.warning ? [totalJs.warning] : [];
 
   // 2. Kiểm tra Atlas + Tileset
   const atlas = checkAtlasTileset(assetsDir, budget.static.atlasTilesetKb);
@@ -892,6 +937,7 @@ export function checkPerfBudget(opts = {}) {
     packs,
     worstCaseTexture,
     errors,
+    warnings,
   };
 }
 
@@ -909,8 +955,17 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     );
     if (res.totalJs) {
       console.log(
-        `   ${res.totalJs.ok ? "✓" : "✗"} Tổng JS (${res.totalJs.files.length} tệp) - ${res.totalJs.gzipKb} KB / Ngân sách: <= ${res.totalJs.limitKb} KB`,
+        `   ${res.totalJs.ok ? "✓" : "✗"} Tổng JS (${res.totalJs.files.length} tệp${res.totalJs.mapFiles ? ", chưa tính dữ liệu bản đồ" : ""}) - ${res.totalJs.gzipKb} KB / Ngân sách: <= ${res.totalJs.limitKb} KB`,
       );
+      if (res.totalJs.mapFiles) {
+        const m = res.totalJs.mapFiles;
+        console.log(
+          `   ${m.ok ? "✓" : "✗"} Dữ liệu bản đồ (${m.files.length} tệp) - ${m.gzipKb} KB / Ngân sách riêng: <= ${m.limitKb} KB`,
+        );
+      }
+    }
+    for (const w of res.warnings) {
+      console.log(`   ⚠ ${w}`);
     }
 
     console.log(`\n2. Atlas & Tileset:`);

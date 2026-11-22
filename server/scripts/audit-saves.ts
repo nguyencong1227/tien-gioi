@@ -22,6 +22,7 @@ import {
   LEARNABLE_SLOTS,
   slotOpen,
   getMap,
+  isArenaMap,
   isDungeonMap,
   UNLOCK_BY_ID,
   originOf,
@@ -272,10 +273,10 @@ export function auditPlayerSaveData(rawText: string, byteLength: number): AuditE
         code: "invalid_map_id",
         message: `Mã bản đồ ${show(data.mapId)} không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
       });
-    } else if (isDungeonMap(data.mapId)) {
+    } else if (isDungeonMap(data.mapId) || isArenaMap(data.mapId)) {
       errors.push({
         code: "invalid_map_id",
-        message: `Mã bản đồ ${show(data.mapId)} là bản đồ bí cảnh, không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
+        message: `Mã bản đồ ${show(data.mapId)} là bản đồ ${isArenaMap(data.mapId) ? "đấu trường" : "bí cảnh"}, không tồn tại trong MAPS (server sẽ đưa về lac_ha)`,
       });
     } else {
       targetMap = m;
