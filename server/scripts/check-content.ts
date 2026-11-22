@@ -11,21 +11,15 @@
 //                   sách) — thêm vào đây khi có.
 //   Phần 3 (sau):   kiểm THUẬT NGỮ theo từ điển (`glossary.ts` / `glossary-banned.ts` của E / G) — thêm khi hai
 //                   tệp đó vào main; khung gọi sẵn bằng `try` để không chặn nếu chưa có.
-//   Các bộ kiểm chạy dưới dạng test (KHÔNG phải hàm thuần), vẫn chạy trong `npm test`, được GỌI GIÁN TIẾP ở đây:
-//     - Ngôn ngữ hiển thị: `shared/src/ngon-ngu.test.ts` (CJK / khoảng trắng / NFC / "Linh thạch" / lộ id / dấu
-//       câu lời thoại) và `server/scripts/no-cjk.test.ts` (CJK trong toàn mã nguồn).
-//     - `check:credits` (client/scripts/check-credits.mjs) — ghi nguồn tài nguyên.
-//     - Cân bằng dữ liệu: `server/src/balance/*.test.ts` (bossBalanceViolations, sectBalanceViolations,
-//       ambushBalanceViolations / ambushSensitivityViolations, worldBossBalanceViolations).
-//     - Độ phủ chặn đường (`ambushCoverageViolations`): KHÔNG bắt buộc từng PR (tài liệu thiết kế: hộp thoại có
-//       nơi chưa dựng được chỉ là lỗ hổng nội dung, KHÔNG phải lỗi dữ liệu); dữ liệu hiện còn `lac_ha/leader` chưa
-//       phủ. GIỮ trong `shared/src/ambush-data.test.ts` (chạy trong `npm test`), KHÔNG đưa vào `check:content`.
-//     - Gói tài nguyên riêng: manifest KHÔNG ở trong repo (nằm ngoài ở `/mnt/data/assets-private/`, đọc từ đĩa lúc
-//       chạy), nên kiểm ở server runtime (`server/src/private-packs.ts` gọi `privatePackViolations`); KHÔNG gom vào
-//       đây vì không có bản manifest tĩnh để kiểm.
+//   Các bộ kiểm KHÔNG gom vào đây (lý do kèm, xem docs/RA_SOAT_NOI_DUNG.md): chạy dưới dạng test trong `npm test`
+//   (ngôn ngữ `ngon-ngu.test.ts` / `no-cjk.test.ts`, cân bằng `balance/*.test.ts`, ...), KHÔNG có bảng thật để gọi
+//   (`tiledViolations`, `privatePackViolations`), hoặc KHÔNG bắt buộc từng PR (`ambushCoverageViolations`).
+//   Mọi hàm `*Violations` trong `shared/src` PHẢI nằm trong CHECKS hoặc EXCLUDED_VIOLATION_FUNCS — test
+//   `check-content.test.ts` quét và khẳng định điều đó (chống mục nát danh sách).
 //   Liệt kê đầy đủ ở docs/RA_SOAT_NOI_DUNG.md.
 
 import process from "node:process";
+import { fileURLToPath } from "node:url";
 import {
   achievementViolations,
   ambushViolations,
@@ -40,6 +34,8 @@ import {
 } from "@tien-gioi/shared";
 
 interface Check {
+  /** Tên hàm kiểm `*Violations` trong `shared/` — test chống mục nát đối chiếu với mọi hàm export ở shared/src. */
+  func: string;
   /** Tên nhóm in ra (để biết lỗi thuộc bảng nào). */
   name: string;
   /** Tệp nguồn của hàm kiểm (in kèm lỗi). */
@@ -48,71 +44,127 @@ interface Check {
   run: () => string[];
 }
 
-const CHECKS: readonly Check[] = [
+export const CHECKS: readonly Check[] = [
   {
+    func: "skillViolations",
     name: "chiêu thức (LEARNABLE_SKILLS)",
     file: "shared/src/skill-violations.ts",
     run: () => skillViolations(),
   },
-  { name: "trùm (BOSSES)", file: "shared/src/bosses.ts", run: () => bossViolations() },
   {
+    func: "bossViolations",
+    name: "trùm (BOSSES)",
+    file: "shared/src/bosses.ts",
+    run: () => bossViolations(),
+  },
+  {
+    func: "ambushViolations",
     name: "chặn đường cảnh + bầy (AMBUSH_SCENES / AMBUSH_FOES)",
     file: "shared/src/ambush-data.ts",
     run: () => ambushViolations(),
   },
   {
+    func: "sectQuestViolations",
     name: "nhiệm vụ tông (SECT_QUESTS)",
     file: "shared/src/sect-depth.ts",
     run: () => sectQuestViolations(),
   },
   {
+    func: "sectShopViolations",
     name: "cửa hàng tông môn (SECT_SHOP)",
     file: "shared/src/sect-depth.ts",
     run: () => sectShopViolations(),
   },
   {
+    func: "portalLinkViolations",
     name: "cổng giữa các bản đồ (MAPS)",
     file: "shared/src/map-checks.ts",
     run: () => portalLinkViolations(MAPS),
   },
   {
+    func: "worldBossViolations",
     name: "trùm thế giới (WORLD_BOSS_SCHEDULE)",
     file: "shared/src/social.ts",
     run: () => worldBossViolations(),
   },
   {
+    func: "achievementViolations",
     name: "thành tựu (ACHIEVEMENTS)",
     file: "shared/src/social.ts",
     run: () => achievementViolations(),
   },
-  { name: "danh hiệu (TITLES)", file: "shared/src/social.ts", run: () => titleViolations() },
+  {
+    func: "titleViolations",
+    name: "danh hiệu (TITLES)",
+    file: "shared/src/social.ts",
+    run: () => titleViolations(),
+  },
 ];
 
-function main(): number {
+/**
+ * Mọi hàm `*Violations` trong `shared/src` KHÔNG gọi được trong `check:content`, kèm lý do. Test
+ * `check-content.test.ts` quét `export function \w+Violations` ở `shared/src/*.ts` (trừ `*.test.ts`) và khẳng
+ * định mỗi tên hoặc ở `CHECKS` hoặc ở đây — để hàm kiểm mới của D / E / G KHÔNG lọt khỏi `check:content` mà không ai biết.
+ */
+export const EXCLUDED_VIOLATION_FUNCS: ReadonlyArray<{ func: string; why: string }> = [
+  {
+    func: "ambushCoverageViolations",
+    why: "độ phủ chặn đường KHÔNG bắt buộc từng PR (hộp thoại chưa dựng được là lỗ hổng nội dung, KHÔNG phải lỗi dữ liệu); dữ liệu hiện còn lac_ha/leader chưa phủ; giữ trong shared/src/ambush-data.test.ts",
+  },
+  {
+    func: "privatePackViolations",
+    why: "manifest gói tài nguyên riêng KHÔNG ở trong repo (ở /mnt/data/assets-private/, đọc từ đĩa lúc chạy); kiểm ở server runtime server/src/private-packs.ts, không có bản manifest tĩnh để gọi",
+  },
+  {
+    func: "tiledViolations",
+    why: "nhận JSON Tiled thô (json: unknown), KHÔNG có bảng dữ liệu game thật để gọi; kiểm tệp Tiled ở server/scripts/map-build.ts + map-check.ts (lát cắt S2) và shared/src/tiled.ts",
+  },
+];
+
+export interface CheckResult {
+  /** Mã thoát: 0 = sạch, 1 = có lỗi. */
+  code: number;
+  /** Các dòng đã in (để test khẳng định đúng nhóm / tệp / id được báo). */
+  lines: string[];
+}
+
+/**
+ * Chạy mọi bộ kiểm trong `CHECKS`, thu kết quả. THUẦN (KHÔNG in, KHÔNG `process.exit`) để test mã thoát + dòng báo.
+ * Một hàm kiểm ném (dữ liệu sai kiểu nghiêm trọng) cũng là lỗi: báo gọn, không đổ stack.
+ */
+export function runChecks(checks: readonly Check[] = CHECKS): CheckResult {
+  const lines: string[] = [];
   let total = 0;
   const failed: string[] = [];
-  for (const c of CHECKS) {
+  for (const c of checks) {
     let errs: string[];
     try {
       errs = c.run();
     } catch (e) {
-      // Một hàm kiểm ném (vd dữ liệu sai kiểu nghiêm trọng) cũng là lỗi: báo gọn, không đổ stack.
       errs = [`hàm kiểm BỊ NÉM: ${(e as Error).message}`];
     }
     if (errs.length === 0) continue;
     total += errs.length;
     failed.push(c.name);
-    console.error(`✗ ${c.name} — ${c.file} (${errs.length} lỗi):`);
-    for (const line of errs) console.error(`    · ${line}`);
+    lines.push(`✗ ${c.name} — ${c.file} (${errs.length} lỗi):`);
+    for (const line of errs) lines.push(`    · ${line}`);
   }
   if (total === 0) {
-    console.log(`✓ check:content: ${CHECKS.length} bộ kiểm dữ liệu cấu trúc đều sạch.`);
-    return 0;
+    lines.push(`✓ check:content: ${checks.length} bộ kiểm dữ liệu cấu trúc đều sạch.`);
+    return { code: 0, lines };
   }
-  console.error(
-    `\n✗ check:content: ${total} lỗi ở ${failed.length}/${CHECKS.length} bộ kiểm (${failed.join(", ")}).`,
+  lines.push(
+    `\n✗ check:content: ${total} lỗi ở ${failed.length}/${checks.length} bộ kiểm (${failed.join(", ")}).`,
   );
-  return 1;
+  return { code: 1, lines };
 }
 
-process.exit(main());
+function main(): number {
+  const { code, lines } = runChecks();
+  for (const line of lines) (code === 0 ? console.log : console.error)(line);
+  return code;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  process.exit(main());
+}

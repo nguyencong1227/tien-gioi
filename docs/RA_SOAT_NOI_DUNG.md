@@ -50,6 +50,10 @@ từng PR; giữ trong test suite (đỏ khi dữ liệu sai), KHÔNG đưa vào
 - **Khả năng đạt nhiệm vụ tông** — `sectQuestFeasibleViolations` (`shared/src/sect-quest-feasible.test.ts`).
 - **Bản đồ (liên thông / vùng sinh)** — `reachabilityViolations` / `spawnZoneViolations`
   (`server/src/systems/map-checks.test.ts`, `spawn-zone.test.ts`); `portalLinkViolations` đã gom ở trên.
+- **Tệp bản đồ Tiled** — `tiledViolations` (`shared/src/tiled.ts`): nhận JSON Tiled thô (`json: unknown`),
+  KHÔNG có bảng dữ liệu game tĩnh để gọi lúc kiểm nội dung; kiểm cấu trúc tệp Tiled chạy ở
+  `server/scripts/map-build.ts` + `map-check.ts` (lát cắt S2, trên tệp thật) và trong test `tiled.test.ts`.
+  Ghi nhận trong `EXCLUDED_VIOLATION_FUNCS` của `check-content.ts`; test chống mục nát kiểm tra điều đó.
 - **Kinh tế kim đan** — `server/src/balance/kim-dan-kinh-te.test.ts`.
 - **Gói tài nguyên riêng** — manifest KHÔNG ở trong repo (nằm ngoài ở `/mnt/data/assets-private/`, đọc từ đĩa
   lúc chạy), nên kiểm ở server runtime: `server/src/private-packs.ts` gọi `privatePackViolations`
