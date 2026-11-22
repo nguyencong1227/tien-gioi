@@ -472,6 +472,23 @@ describe("rớt mạng và nối lại (#116)", () => {
     }
   });
 
+  it("nối lại rồi thoát chủ động khi còn hộ thể thì World.shielded không rò (#1292)", async () => {
+    const a = await join("Ho The Ro");
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    dropConnection(a.room);
+    await waitGhost(a);
+    const r2 = await reconnectTo(a.room);
+    // Nối lại thì được hộ thể (`reconnected` -> `grantShield`). Kéo hạn dài để `tickNetGuard` KHÔNG kịp gỡ trước khi rời: ca này chỉ đo việc dọn khi rời phòng, không phụ thuộc tải máy
+    expect(sr.world.shielded.has(sid)).toBe(true);
+    sr.world.ctrl.get(sid).shieldUntil = sr.world.now + 600_000;
+    await r2.room.leave(true);
+    await waitFor(() => !sr.state.players.has(sid), 3000);
+    // `tickNetGuard` chỉ chạy cho người CÒN trong state.players: rời rồi thì không ai gỡ, nên `dropPlayer` phải gỡ (nếu không, rò mãi: phòng thường không tự đóng)
+    expect(sr.world.shielded.has(sid)).toBe(false);
+    expect(sr.world.shielded.size).toBe(0);
+  });
+
   it("thoát chủ động và bị ngắt vì spam thì không giữ chỗ chờ", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const a = await join();
