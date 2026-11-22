@@ -9,6 +9,7 @@ import {
   verifyArchiveSharedResolution,
   setupArchiveNodeModules,
   takeDirectorySnapshot,
+  pickSoakDir,
 } from "./kiem-nang-cap";
 
 describe("kiem-nang-cap: deepCompareEntities", () => {
@@ -184,6 +185,23 @@ describe("kiem-nang-cap: N1 - Archive Node Modules & Shared Resolution", () => {
     } finally {
       fs.rmSync(tmpArchive, { recursive: true, force: true });
       fs.rmSync(outsideShared, { recursive: true, force: true });
+    }
+  });
+
+  it("f2: ném lỗi nếu @tien-gioi/shared giải quyết tới thư mục anh em có chung tiền tố tên (archive-evil)", () => {
+    const tmpArchive = fs.mkdtempSync(path.join(os.tmpdir(), "test-archive-"));
+    const evilShared = fs.mkdtempSync(tmpArchive + "-evil");
+    try {
+      const scopeDir = path.join(tmpArchive, "node_modules", "@tien-gioi");
+      fs.mkdirSync(scopeDir, { recursive: true });
+      fs.symlinkSync(evilShared, path.join(scopeDir, "shared"), "dir");
+
+      expect(() => verifyArchiveSharedResolution(tmpArchive)).toThrow(
+        /giải quyết ra ngoài archiveDir/,
+      );
+    } finally {
+      fs.rmSync(tmpArchive, { recursive: true, force: true });
+      fs.rmSync(evilShared, { recursive: true, force: true });
     }
   });
 
@@ -534,6 +552,31 @@ describe("kiem-nang-cap: verifyPhase", () => {
     expect(res.valid).toBe(false);
     expect(res.errors.some((e) => e.includes("không có bằng chứng được server ghi lại"))).toBe(
       true,
+    );
+  });
+});
+
+describe("kiem-nang-cap: N9 - pickSoakDir & cách ly thư mục dữ liệu soak", () => {
+  it("chọn đúng thư mục soak duy nhất trong thư mục tạm", () => {
+    const soakTmp = "/tmp/tien-gioi-rc-soaktmp-xyz123";
+    const entries = ["tien-gioi-soak-abc456", "some-other-file.log"];
+    const picked = pickSoakDir(soakTmp, entries);
+    expect(picked).toBe(path.join(soakTmp, "tien-gioi-soak-abc456"));
+  });
+
+  it("ném lỗi nếu không tìm thấy thư mục tien-gioi-soak-* nào", () => {
+    const soakTmp = "/tmp/tien-gioi-rc-soaktmp-xyz123";
+    const entries = ["not-a-soak-dir", "random.json"];
+    expect(() => pickSoakDir(soakTmp, entries)).toThrow(
+      /Kỳ vọng đúng 1 thư mục soak trong .* nhưng tìm thấy 0/,
+    );
+  });
+
+  it("ném lỗi nếu có nhiều hơn 1 thư mục tien-gioi-soak-*", () => {
+    const soakTmp = "/tmp/tien-gioi-rc-soaktmp-xyz123";
+    const entries = ["tien-gioi-soak-111", "tien-gioi-soak-222"];
+    expect(() => pickSoakDir(soakTmp, entries)).toThrow(
+      /Kỳ vọng đúng 1 thư mục soak trong .* nhưng tìm thấy 2/,
     );
   });
 });

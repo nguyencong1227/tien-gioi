@@ -261,6 +261,17 @@ export function setupArchiveNodeModules(archiveDir: string, rootDir: string): vo
   verifyArchiveSharedResolution(archiveDir);
 }
 
+/** Chọn thư mục dữ liệu soak từ thư mục tạm riêng (N9) */
+export function pickSoakDir(soakTmp: string, entries: string[]): string {
+  const soakDirs = entries.filter((d) => d.startsWith("tien-gioi-soak-"));
+  if (soakDirs.length !== 1) {
+    throw new Error(
+      `Kỳ vọng đúng 1 thư mục soak trong ${soakTmp}, nhưng tìm thấy ${soakDirs.length}: ${soakDirs.join(", ")}`,
+    );
+  }
+  return path.join(soakTmp, soakDirs[0]!);
+}
+
 /** Chốt chặn kiểm tra đường dẫn giải quyết của @tien-gioi/shared */
 export function verifyArchiveSharedResolution(archiveDir: string): string {
   const sharedPkg = path.join(archiveDir, "node_modules", "@tien-gioi", "shared");
@@ -414,58 +425,46 @@ async function run() {
 
     // 2. Chạy soak mã cũ để sinh dữ liệu
     console.log(`\n==> [2/6] Chạy soak sinh dữ liệu ${tag} (${numBots} bot, ${duration}s)...`);
-    const beforeDirs = new Set(
-      fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith("tien-gioi-soak-")),
-    );
+    const soakTmp = fs.mkdtempSync(path.join(os.tmpdir(), "tien-gioi-rc-soaktmp-"));
+    tempDirsToClean.push(soakTmp);
     const soakPort = await freePort();
 
-    let soakExitCode: number | null = null;
-    try {
-      const soakRes = spawnSync(
-        "nice",
-        [
-          "-n",
-          "10",
-          "npx",
-          "tsx",
-          "scripts/soak.ts",
-          `--bots=${numBots}`,
-          `--duration=${duration}`,
-          "--keep-data",
-          "--m7",
-          `--port=${soakPort}`,
-        ],
-        {
-          cwd: path.join(archiveDir, "server"),
-          stdio: "inherit",
-          timeout: (duration + 120) * 1000,
-        },
-      );
-      soakExitCode = soakRes.status;
-    } finally {
-      // Dọn dẹp: đưa các thư mục soak mới sinh vào danh sách dọn dẹp ngay cả khi soak ném lỗi
-      const afterDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith("tien-gioi-soak-"));
-      for (const d of afterDirs) {
-        if (!beforeDirs.has(d)) {
-          tempDirsToClean.push(path.join(os.tmpdir(), d));
-        }
-      }
-    }
+    const soakRes = spawnSync(
+      "nice",
+      [
+        "-n",
+        "10",
+        "npx",
+        "tsx",
+        "scripts/soak.ts",
+        `--bots=${numBots}`,
+        `--duration=${duration}`,
+        "--keep-data",
+        "--m7",
+        `--port=${soakPort}`,
+      ],
+      {
+        cwd: path.join(archiveDir, "server"),
+        stdio: "inherit",
+        timeout: (duration + 120) * 1000,
+        env: { ...process.env, TMPDIR: soakTmp },
+      },
+    );
 
-    if (soakExitCode !== 0) {
+    if (soakRes.error) {
+      throw new Error(`Tiến trình soak gặp lỗi: ${soakRes.error.message}`);
+    }
+    if (soakRes.signal) {
+      throw new Error(`Tiến trình soak bị ngắt bởi tín hiệu: ${soakRes.signal}`);
+    }
+    if (typeof soakRes.status === "number" && soakRes.status !== 0) {
       console.log(
-        `    [CHÚ Ý] Tiến trình soak kết thúc với mã ${soakExitCode} (có thể do tiêu chí chiêu của --m7 chưa đủ trong thời gian ngắn). Tiếp tục kiểm tra dữ liệu.`,
+        `    [CHÚ Ý] Tiến trình soak kết thúc với mã ${soakRes.status} (có thể do tiêu chí chiêu của --m7 chưa đủ trong thời gian ngắn). Tiếp tục kiểm tra dữ liệu.`,
       );
     }
 
-    const afterDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith("tien-gioi-soak-"));
-    const newSoakDirs = afterDirs.filter((d) => !beforeDirs.has(d));
-    if (newSoakDirs.length !== 1) {
-      throw new Error(
-        `Kỳ vọng đúng 1 thư mục soak mới, nhưng tìm thấy ${newSoakDirs.length}: ${newSoakDirs.join(", ")}`,
-      );
-    }
-    const sourceDataDir = path.join(os.tmpdir(), newSoakDirs[0]!);
+    const soakEntries = fs.readdirSync(soakTmp);
+    const sourceDataDir = pickSoakDir(soakTmp, soakEntries);
     console.log(`    Dữ liệu được sinh tại: ${sourceDataDir}`);
 
     // 3. Chuẩn bị thư mục nâng cấp lên main
