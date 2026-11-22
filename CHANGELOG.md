@@ -4,6 +4,8 @@
 
 ## [Chưa phát hành] — sau v0.5.3
 
+- **Chặn đường: thưởng Linh thạch thắng theo PHÚT SĂN của bậc người chơi, KHÔNG còn xúc xắc (CD6b PR2, `Refs #1066`; Dev D; xếp chồng lên PR1 #1316):** `payRewards` (`server/src/systems/arena.ts`) trả thưởng Linh thạch bằng `ambushRewardCoin(step, mức)` — cùng khuôn PHÚT SĂN của bậc người chơi như thưởng tu vi (`ambushRewardExp`), nên thưởng cố định theo bậc (giống hệt mọi người chơi cùng bậc) và KHÔNG còn `ARENA_REWARD_MULT` (đã xoá) cũng KHÔNG còn xúc xắc (`Math.random` ra khỏi đường thưởng). Giá bỏ chạy Linh thạch (`ambushCoinPrice`) giữ nguyên ở PR1. `docs/CAN_BANG.md` sinh lại: cột thưởng Linh thạch là số cố định theo bậc (vd Lạc Hà Sỏi Lệ bậc 0 thường `120 + 72`, Hắc Phong Yêu Vương bậc 11 `1.390 + 860`), mọi hàng giữ "thưởng thắng > giá bỏ chạy". `chan-duong.test.ts` khoá cả hai phía TU VI / LINH THẠCH độc lập (đột biến lẫn) + DỮ LIỆU THẬT (mọi bầy: giá bỏ chạy Linh thạch < thưởng thắng); `arena.test.ts` khoá `payRewards` trả đúng `ambushRewardCoin`. CHƯA bật `AMBUSH` ở bản chạy thật (chờ PR1 + PR2 hợp nhất + Dev A).
+
 ## [0.5.3] — 22/11/2026: +4 chiêu Kim / Thổ, 3 việc phụ Âm Sương Trạch, chống dùng ké máy chủ (chặn đường, trùm thế giới và gói tài nguyên riêng vẫn TẮT)
 
 Bản phát hành đã nghiệm thu bằng hồ sơ `docs/UNG_VIEN_PHAT_HANH.md` và `docs/LOAD_TEST.md` mục 41 (QUYET_DINH_M3 mục 65: người dùng đồng ý, cắt từ `main` sau khi nightly e2e + bench xanh trên đúng đầu này). Không đổi giao thức (`PROTOCOL_VERSION` giữ 6), không đổi định dạng lưu (nhân vật / chân linh / tông môn / tài khoản / PostgreSQL).
