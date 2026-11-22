@@ -51,6 +51,11 @@ const KEY = {
   s: { key: "s", code: "KeyS", vk: 83 },
   d: { key: "d", code: "KeyD", vk: 68 },
   b: { key: "b", code: "KeyB", vk: 66 }, // túi đồ
+  c: { key: "c", code: "KeyC", vk: 67 }, // nhân vật
+  n: { key: "n", code: "KeyN", vk: 78 }, // sổ nhiệm vụ
+  g: { key: "g", code: "KeyG", vk: 71 }, // tông môn
+  m: { key: "m", code: "KeyM", vk: 77 }, // bản đồ
+  e: { key: "e", code: "KeyE", vk: 69 }, // cài đặt
   escape: { key: "Escape", code: "Escape", vk: 27 },
 } as const;
 
@@ -89,7 +94,7 @@ class PlayTab {
             .map((a: any) => a.value ?? a.description ?? "")
             .join(" ");
           if (type === "error") this.errors.push(`CONSOLE ERROR: ${text.slice(0, 300)}`);
-          // Mất tin đăng ký handler lúc vào phòng (colyseus.js) = lỗi同步 thật, không bỏ như e2e thường lệ.
+          // Mất tin đăng ký handler lúc vào phòng (colyseus.js) = lỗi đồng bộ thật, không bỏ như e2e thường lệ.
           else if (type === "warning" && text.includes("onMessage() not registered"))
             this.errors.push(`CONSOLE WARN: ${text.slice(0, 300)}`);
         }
@@ -323,6 +328,34 @@ async function detectStuck(
 const modalShown = (id: string) =>
   `(() => { const e = document.getElementById(${JSON.stringify(id)}); if (!e || e.hidden || !e.checkVisibility({ checkVisibilityCSS: true })) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()`;
 
+/**
+ * Các bảng core mở bằng phím trực tiếp (nhóm 3, mục 60.1). Mỗi bảng có nút `.modal-close` nên `focusModal`
+ * rơi focus vào nút đóng (KHÔNG vào ô chữ) → Esc đóng được (kiểm tra index.html + a11y.ts). ĐỪNG đổi
+ * `modal` khi đã merge — đây là id thật trong index.html.
+ */
+const PANELS = [
+  { key: KEY.b, modal: "inv-modal", title: "Túi đồ" },
+  { key: KEY.c, modal: "char-modal", title: "Nhân vật" },
+  { key: KEY.n, modal: "quest-modal", title: "Sổ nhiệm vụ" },
+  { key: KEY.g, modal: "sect-modal", title: "Tông môn" },
+  { key: KEY.m, modal: "map-modal", title: "Bản đồ" },
+  { key: KEY.e, modal: "settings-modal", title: "Cài đặt" },
+] as const;
+
+/** Mở bảng bằng phím thật, chờ thấy, chụp (trong action), Esc đóng, kiểm bảng đóng thật (closed-fail). */
+async function openClosePanel(tab: PlayTab, spec: (typeof PANELS)[number]): Promise<Finding[]> {
+  const findings: Finding[] = [];
+  await tab.press(spec.key);
+  await tab.waitFor(modalShown(spec.modal), `${spec.title} mở`, 4000);
+  await tab.waitFrames(2);
+  await tab.press(KEY.escape);
+  await sleep(300);
+  const stillOpen = await tab.ev(modalShown(spec.modal));
+  const f = closedFailFinding(stillOpen);
+  if (f) findings.push(f);
+  return findings;
+}
+
 // ---------------------------------------------------------------------------
 // Kịch bản. Mỗi bước: chạy hành động (phím / mở bảng), lấy mẫu số đo, chụp ảnh,
 // phát hiện finding. Nhóm 1-6 đầy đủ bổ sung sau; lõi này chứng minh bộ chạy.
@@ -337,6 +370,16 @@ interface StepDef {
   /** Chạy hành động của bước (đã sẵn sàng trong game). Trả findings tự phát hiện (drift...). */
   action: (tab: PlayTab) => Promise<Finding[]>;
 }
+
+/** Nhóm 3 (mục 60.1): một bước cho MỖI bảng core — mở bằng phím, chụp, Esc đóng, kiểm đóng thật. */
+const PANEL_STEPS: StepDef[] = PANELS.map((p) => ({
+  id: `panel-${p.modal.replace("-modal", "")}`,
+  scenario: "panels",
+  title: `Bảng: mở ${p.title} (${p.key.code.replace("Key", "")}), chụp, Esc đóng, kiểm đóng thật`,
+  input: "keyboard",
+  viewports: ["360x640", "915x412", "1366x768"],
+  action: (tab) => openClosePanel(tab, p),
+}));
 
 const STEPS: StepDef[] = [
   {
@@ -372,25 +415,7 @@ const STEPS: StepDef[] = [
       return findings;
     },
   },
-  {
-    id: "open-inv-close",
-    scenario: "panels",
-    title: "Bảng: mở túi đồ (B), chụp, Esc đóng, kiểm đóng thật",
-    input: "keyboard",
-    viewports: ["360x640", "915x412", "1366x768"],
-    action: async (tab) => {
-      const findings: Finding[] = [];
-      await tab.press(KEY.b);
-      await tab.waitFor(modalShown("inv-modal"), "túi đồ mở", 4000);
-      await tab.waitFrames(2);
-      await tab.press(KEY.escape);
-      await sleep(300);
-      const stillOpen = await tab.ev(modalShown("inv-modal"));
-      const f = closedFailFinding(stillOpen);
-      if (f) findings.push(f);
-      return findings;
-    },
-  },
+  ...PANEL_STEPS,
 ];
 
 // ---------------------------------------------------------------------------

@@ -30,7 +30,7 @@ issue `dev-a` / `dev-b` kèm cách tái hiện (đây là công cụ KIỂM TH�
 ### Lệnh
 ```bash
 npm run ai-playtest -w server            # mặc định: ra tmp/ai-playtest/<ngày>-<sha>/
-npm run ai-playtest -w server -- --only enter-game,open-inv-close   # chỉ chạy một số bước
+npm run ai-playtest -w server -- --only enter-game,panel-inv        # chỉ chạy một số bước
 npm run ai-playtest -w server -- --viewports 412x915,1366x768       # chỉ chạy một số khung
 npm run ai-playtest -w server -- --out <dir>                        # thư mục kết quả tuỳ ý
 npm run ai-playtest -w server -- --png                             # ảnh PNG thay JPEG q85
@@ -72,14 +72,19 @@ npm run ai-playtest -w server -- --ambush                          # bật AMBUS
 ## 3. Kịch bản (steps)
 
 Mỗi bước là một `StepDef`: đăng nhập một đạo hiệu thử, chạy một chuỗi hành động bằng phím thật, lấy mẫu
-số đo trong lúc chạy, chụp ảnh, tự phát hiện finding. Hiện có **3 bước đại diện** chứng minh bộ chạy;
-nhóm 1-6 đầy đủ (mục 60.1) sẽ bổ sung sau (Dev F lõi + nhóm 1-3; Dev H phần còn lại).
+số đo trong lúc chạy, chụp ảnh, tự phát hiện finding. Hiện có **nhóm vào game / di chuyển / bảng** (mục
+60.1 nhóm 1, 2, 3); các nhóm còn lại (đánh quái, cổng, trùm,…) bổ sung sau (Dev F lõi + nhóm 1-3; Dev H phần còn lại).
 
 | `id` | `scenario` | Mô tả | Khung mặc định |
 |---|---|---|---|
 | `enter-game` | `enter` | Vào game: đăng nhập + HUD + canvas Phaser sẵn sàng | 412x915, 1366x768 |
 | `move-hold-w` | `move` | Giữ W 2s rồi nhả, kiểm pred có trôi sau nhả phím không | 412x915, 1366x768 |
-| `open-inv-close` | `panels` | Mở túi đồ (B), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-inv` | `panels` | Mở túi đồ (B), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-char` | `panels` | Mở nhân vật (C), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-quest` | `panels` | Mở sổ nhiệm vụ (N), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-sect` | `panels` | Mở tông môn (G), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-map` | `panels` | Mở bản đồ (M), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-settings` | `panels` | Mở cài đặt (E), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
 
 **Nhóm kịch bản mục 60.1 (chưa đầy đủ):** (1) vào game; (2) di chuyển WASD lâu + đổi hướng nhanh;
 (3) mở / đóng MỌI bảng (túi, nhân vật, nhiệm vụ, tông môn, bản đồ M, phím tắt, cài đặt) + kiểm Esc / nút
@@ -125,12 +130,12 @@ Không phải MỌI bước × MỌI khung: mỗi bước khai khung nào chạy
   "server": { "port": 36123, "ambush": true },
   "steps": [
     {
-      "id": "open-inv-close",
+      "id": "panel-inv",
       "scenario": "panels",
       "title": "Mở túi đồ (B), chụp, Esc đóng, kiểm đóng thật",
-      "viewport": "412x915",
+      "viewport": "360x640",
       "input": "keyboard",
-      "shots": ["shots/open-inv-close-412x915.jpg"],
+      "shots": ["shots/panel-inv-360x640.jpg"],
       "ok": true,
       "metrics": { "fps": { "min": 52, "avg": 58 }, "player": [ { "t": 0, "x": 100, "y": 200 } ] },
       "consoleErrors": [],
@@ -158,7 +163,7 @@ Không phải MỌI bước × MỌI khung: mỗi bước khai khung nào chạy
 
 | Trường | Kiểu | Ghi chú |
 |---|---|---|
-| `id` | string | id ngắn ổn định của bước (vd `open-inv-close`). |
+| `id` | string | id ngắn ổn định của bước (vd `panel-inv`). |
 | `scenario` | string | Nhóm kịch bản (`enter` / `move` / `panels` / `dialogs` / `combat` / `travel` / `boss`). |
 | `title` | string | Tiêu đề tiếng Việt. |
 | `viewport` | string | Nhãn khung (thuộc `DEFAULT_VIEWPORTS`). |
