@@ -7,7 +7,7 @@
 // Chặng ba (M7.5, #506, M7.8 #509): nhân vật lưu sẵn cạnh Lăng Hàn Quan đi Âm Sương Trạch -> Hàn Vân Lĩnh -> Âm Sương Trạch bằng cổng THẬT: bản đồ thứ tư dựng đủ lớp
 // (kiểu `han_van`), chỗ xuất hiện đúng cạnh Hồi Sương Quan (cổng nam, trong khu an toàn), quay về đúng cổng bắc Âm Sương.
 // Chạy: `npm run build && npm run e2e:chuyen-canh -w server` (cần google-chrome).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -164,7 +164,7 @@ async function main() {
     );
 
     // Chẩn đoán khi đi bộ tới cổng hết giờ: vị trí đoán trước (client) VÀ vị trí thật trong World của phòng (cùng tiến trình), toạ độ cổng, cờ `nearPortal`,
-    // joystick / bộ hẹn giờ đi bộ, khung hình / giây, lỗi console. Mỗi phần tự bắt lỗi để chẩn đoán không bao giờ che lỗi gốc.
+    // joystick / bộ hẹn giờ đi bộ, khung hình / giây, tải máy + số Chrome đang chạy, lỗi console. Mỗi phần tự bắt lỗi để chẩn đoán không bao giờ che lỗi gốc.
     const walkDiag = async (id: string): Promise<string> => {
       const d: Record<string, unknown> = {};
       try {
@@ -192,6 +192,24 @@ async function main() {
           : null;
       } catch (e) {
         d.serverErr = String(e).slice(0, 120);
+      }
+      // Máy chủ: tải 1 phút / số nhân, số trình duyệt Chrome ĐANG chạy (tiến trình chính có `--remote-debugging-port` và không có `--type=`; tiến trình con của Chrome cũng mang cờ cổng nên phải loại: > 1 nghĩa là còn sót Chrome của kịch bản trước hoặc của dev khác), 3 tiến trình ngốn CPU nhất
+      try {
+        const sh = (cmd: string, args: string[]) =>
+          spawnSync(cmd, args, { encoding: "utf8", timeout: 3000 }).stdout?.trim() ?? "";
+        d.host = {
+          load1: Number(os.loadavg()[0].toFixed(1)),
+          cpus: os.cpus().length,
+          chromes: sh("ps", ["-eo", "args", "--no-headers"])
+            .split("\n")
+            .filter((l) => l.includes("--remote-debugging-port") && !l.includes("--type=")).length,
+          topCpu: sh("ps", ["-eo", "pcpu,comm", "--sort=-pcpu", "--no-headers"])
+            .split("\n")
+            .slice(0, 3)
+            .map((l) => l.trim().replace(/\s+/, " ")),
+        };
+      } catch (e) {
+        d.hostErr = String(e).slice(0, 120);
       }
       d.console = T.errors.slice(0, 4);
       delete d.sid;
