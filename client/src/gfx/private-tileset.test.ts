@@ -105,6 +105,8 @@ interface FakeOpts {
   /** Kích thước ảnh sau khi nạp; null = nạp lỗi (không có texture). */
   size?: { width: number; height: number } | null;
   throwOnImage?: boolean;
+  /** `off` KHÔNG gỡ trình nghe (mô phỏng sự kiện đến lần hai trước khi gỡ kịp). */
+  stickyHandlers?: boolean;
 }
 function fakeScene(o: FakeOpts = {}) {
   let have = o.exists ?? false;
@@ -124,6 +126,7 @@ function fakeScene(o: FakeOpts = {}) {
       handlers.set(ev, [...(handlers.get(ev) ?? []), fn]);
     }),
     off: vi.fn((ev: string, fn: (...a: unknown[]) => void) => {
+      if (o.stickyHandlers) return;
       handlers.set(
         ev,
         (handlers.get(ev) ?? []).filter((h) => h !== fn),
@@ -197,7 +200,7 @@ describe("loadPrivateTilesetTexture: nạp dải ô riêng, không bao giờ né
   });
 
   it("`complete` đến hai lần chỉ báo MỘT lần và gỡ trình nghe", () => {
-    const f = fakeScene({ size: GOOD });
+    const f = fakeScene({ size: GOOD, stickyHandlers: true });
     const done = vi.fn();
     loadPrivateTilesetTexture(f.scene, "/u", done);
     f.complete();
