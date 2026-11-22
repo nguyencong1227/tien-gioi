@@ -10,6 +10,7 @@ import {
   MAX_AMBUSH_ROOMS,
   TICK_MS,
   arenaMapIdOf,
+  ambushRewardCoin,
   getMap,
   type AmbushFoeGroup,
   type AmbushTier,
@@ -18,7 +19,6 @@ import { hurtPlayer, killMonster, tickRespawn } from "./combat";
 import { createAmbushRuntime, type AmbushOfferCtrl } from "./ambush";
 import {
   AMBUSH_TICKET_TTL_MS,
-  ARENA_REWARD_MULT,
   Ambushes,
   arenaDrop,
   arenaJoined,
@@ -285,7 +285,8 @@ describe("thắng: hạ hết bầy", () => {
     expect(s.c.coin - coin0).toBe(end.rewards!.coin);
     expect(order).toHaveLength(1); // đã lưu (sau khi cộng thưởng) rồi mới báo
     expect(end.rewards!.items).toEqual([]);
-    expect(ARENA_REWARD_MULT.normal).toBeGreaterThan(0);
+    // CD6b PR2: thưởng Linh thạch theo PHÚT SĂN của bậc người chơi (bậc 3) x mức, KHÔNG còn rollCoin x ARENA_REWARD_MULT
+    expect(end.rewards!.coin).toBe(ambushRewardCoin(3, "normal"));
   });
 
   it("thắng chỉ MỘT lần: tick thêm không thưởng thêm", async () => {

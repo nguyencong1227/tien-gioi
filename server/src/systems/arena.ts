@@ -22,9 +22,9 @@ import {
   MAX_AMBUSH_ROOMS,
   TICK_MS,
   MONSTER_BY_ID,
+  ambushRewardCoin,
   ambushRewardExp,
   parseAmbushFlee,
-  rollCoin,
   stepOf,
   type AmbushEndMsg,
   type AmbushFoeGroup,
@@ -34,7 +34,7 @@ import {
 } from "@tien-gioi/shared";
 import type { Player } from "../schema";
 import type { PlayerCtrl, World } from "../world";
-import { ELITE_COIN_MULT, canBeElite, eliteDefOf } from "./elite";
+import { canBeElite, eliteDefOf } from "./elite";
 import { placeMonster, forgetTarget } from "./monsters";
 import { savePos } from "./movement";
 import { gainExp } from "./progression";
@@ -51,17 +51,6 @@ const EXIT_RETRY_MS = 2000;
 const ACTED_MOVE_PX = 16;
 /** Chết thật trong đấu trường: chờ tối đa chừng này (ms) cho Duyên cộng xong rồi mới đưa về phòng gốc (quá thì phòng gốc tự cộng khi nạp hồ sơ Hoàng Tuyền). */
 const DIED_EXIT_PATIENCE_MS = 15_000;
-
-/**
- * Hệ số thưởng LINH THẠCH so với Linh thạch rơi thường của từng con kẻ địch. TẠM (Linh thạch chặn đường thấp hơn nhiều so với phần tu vi: một lần thắng ~ vài con quái, không phải ~5 phút săn).
- * Phần TU VI không dùng hệ số này: đi theo `ambushRewardExp` (phút săn của bậc người chơi, CD6b), vì tu vi / phút săn khác nhau tới 18 lần giữa các bậc nên hệ số nhân với `def.exp` không
- * chỉnh đều được (đo 21/11: Nguyên Anh tăng 29 -> 60-79% trong khi Luyện Khí chỉ 3-11%). Tinh anh đã nhân sẵn trong `eliteDefOf`.
- */
-export const ARENA_REWARD_MULT: Readonly<Record<AmbushTier, number>> = {
-  normal: 1.5,
-  elite: 1.5,
-  leader: 1,
-};
 
 /** Vé vào đấu trường của MỘT người (do `openTicket` lập ở phòng thường, đấu trường nhận ở `onCreate`). */
 export interface AmbushTicket {
@@ -332,8 +321,8 @@ function payLossExp(w: World, a: ArenaCtrl, p: Player, c: PlayerCtrl): number {
 }
 
 /**
- * Thưởng khi thắng. TU VI: `ambushRewardExp` (phút săn của bậc người chơi x mức kẻ địch; thuần, ở `shared/`). LINH THẠCH: theo số liệu của chính kẻ địch x `ARENA_REWARD_MULT` (TẠM).
- * Đi qua `gainExp` / `changeCoin`; đồ rơi chờ CD6 (D chốt `AMBUSH_LOOT`).
+ * Thưởng khi thắng. TU VI + LINH THẠCH đều theo PHÚT SĂN của bậc người chơi x mức kẻ địch (`ambushRewardExp` / `ambushRewardCoin`, thuần, ở `shared/`; CD6b PR2): KHÔNG còn
+ * `rollCoin` x `ARENA_REWARD_MULT` (đỡ gọi `Math.random` trong luồng tick, thưởng ổn định theo bậc chứ không theo số con / viên rơi). Đi qua `gainExp` / `changeCoin`; đồ rơi chờ CD6 (D chốt `AMBUSH_LOOT`).
  */
 function payRewards(
   w: World,
@@ -341,17 +330,9 @@ function payRewards(
   p: Player,
   a: ArenaCtrl,
 ): NonNullable<AmbushEndMsg["rewards"]> {
-  const rng = w.ambush?.random ?? Math.random;
-  const mult = ARENA_REWARD_MULT[a.ticket.tier];
-  const exp = ambushRewardExp(stepOf(p.realm, p.tier), a.ticket.tier);
-  let coin = 0;
-  for (const f of a.ticket.group.foes) {
-    const def = foeDefOf(a.ticket.tier, f.kind);
-    if (!def) continue;
-    for (let i = 0; i < f.count; i++)
-      coin += rollCoin(f.kind, rng) * (a.ticket.tier === "elite" ? ELITE_COIN_MULT : 1) * mult;
-  }
-  coin = Math.round(coin);
+  const step = stepOf(p.realm, p.tier);
+  const exp = ambushRewardExp(step, a.ticket.tier);
+  const coin = ambushRewardCoin(step, a.ticket.tier);
   if (exp > 0) gainExp(w, sid, p, exp);
   if (coin > 0) changeCoin(w, sid, coin);
   return { exp, coin, items: [] };
