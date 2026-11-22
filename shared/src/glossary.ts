@@ -150,6 +150,28 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     wrong: ["Tam Sinh Thach", "tam sinh thach"],
     note: "Bảng mở khóa lợi ích vĩnh viễn của luân hồi.",
   },
+
+  // --- Tên chính: trùm (boss-level, có chữ "Vương") — quái thường để lượt sau ---
+  {
+    id: "nhan-vat.thien-han-vuong",
+    group: "nhan-vat",
+    canonical: "Thiên Hàn Vương",
+    wrong: ["Thien Han Vuong", "thien han vuong"],
+    note: "Trùm Nguyên Anh, rơi Thiên Hàn châu.",
+  },
+  {
+    id: "nhan-vat.linh-hu-yeu-vuong",
+    group: "nhan-vat",
+    canonical: "Linh Hư Yêu Vương",
+    wrong: ["Linh Hu Yeu Vuong", "linh hu yeu vuong"],
+    note: "Trùm bí cảnh Linh Hư.",
+  },
+  {
+    id: "nhan-vat.phan-than-yeu-vuong",
+    group: "nhan-vat",
+    canonical: "Phân Thân Yêu Vương",
+    wrong: ["Phan Than Yeu Vuong", "phan than yeu vuong"],
+  },
 ];
 
 /** Bóc dấu thanh (NFKD + bỏ dấu kết hợp U+0300–U+036F) để khớp KHÔNG phân biệt dấu, nhưng GIỮ HOA / THƯỜNG. */

@@ -74,6 +74,10 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
     expect(glossaryViolations("vào Lac Ha Tran")).toContain(
       "thấy 'Lac Ha Tran' -> dùng 'Lạc Hà Trấn'",
     );
+    // tên trùm (nhan-vat): "Thiên Hàn Vương" thiếu dấu -> bắt
+    expect(glossaryViolations("đánh Thien Han Vuong")).toContain(
+      "thấy 'Thien Han Vuong' -> dùng 'Thiên Hàn Vương'",
+    );
   });
 
   it("viết thường cảnh giới bị bắt; viết đúng hoa KHÔNG báo (khớp phân biệt hoa thường)", () => {
@@ -156,9 +160,16 @@ describe("GLOSSARY — bất biến dữ liệu", () => {
       expect(glossaryViolations(t.canonical), `${t.id}: ${t.canonical}`).toEqual([]);
   });
 
-  it("đủ nhóm: canh-gioi / dia-danh / tien-te / pham-cap / khai-niem đã phủ", () => {
+  it("đủ nhóm: canh-gioi / dia-danh / tien-te / pham-cap / khai-niem / nhan-vat đã phủ", () => {
     const groups = new Set(GLOSSARY.map((t) => t.group));
-    for (const g of ["canh-gioi", "dia-danh", "tien-te", "pham-cap", "khai-niem"] as const)
+    for (const g of [
+      "canh-gioi",
+      "dia-danh",
+      "tien-te",
+      "pham-cap",
+      "khai-niem",
+      "nhan-vat",
+    ] as const)
       expect(groups.has(g), `thiếu nhóm ${g}`).toBe(true);
   });
 });
