@@ -512,14 +512,49 @@ describe("nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết; số đ
   });
 
   it("ambushPotionNote: 0 và 1 đan có lời nhắc kèm SỐ đan thật; từ 2 đan trở lên, hoặc không biết số đan: rỗng (không nói điều chưa chắc)", () => {
-    expect(ambushPotionNote(0)).toBe("Túi không có đan hồi huyết: nên mang ít nhất 2.");
+    expect(ambushPotionNote(0)).toBe("Ngươi không mang Hồi Huyết Đan: nên bỏ chạy.");
     expect(ambushPotionNote(1)).toBe("Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.");
     expect(ambushPotionNote(AMBUSH_POTION_MIN)).toBe("");
     expect(ambushPotionNote(99)).toBe("");
     expect(ambushPotionNote(undefined)).toBe("");
     expect(ambushPotionNote(Number.NaN)).toBe("");
     expect(ambushPotionNote(1.9)).toContain("còn 1 "); // làm tròn xuống
-    expect(ambushPotionNote(-4)).toContain("không có"); // số âm coi như 0
+    expect(ambushPotionNote(-4)).toContain("không mang"); // số âm coi như 0
+  });
+
+  it("ambushPotionNote (QUYET_DINH_M3 mục 64): không đan mà bỏ chạy được thì NÊN BỎ CHẠY; kẻ cầm đầu dưới 2 đan nhấn mạnh rồi cũng bỏ chạy; 1 đan kẻ thường / tinh anh giữ lời nhắc mang đan", () => {
+    const flee = { canFlee: true } as const;
+    for (const tier of ["normal", "elite"] as const) {
+      expect(ambushPotionNote(0, { tier, ...flee }), `${tier} 0 đan`).toBe(
+        "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy.",
+      );
+      expect(ambushPotionNote(1, { tier, ...flee }), `${tier} 1 đan`).toBe(
+        "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
+      );
+    }
+    expect(ambushPotionNote(0, { tier: "leader", ...flee })).toBe(
+      "Kẻ cầm đầu rất mạnh, ngươi không mang Hồi Huyết Đan: nên bỏ chạy.",
+    );
+    expect(ambushPotionNote(1, { tier: "leader", ...flee })).toBe(
+      "Kẻ cầm đầu rất mạnh, túi chỉ còn 1 đan hồi huyết: nên bỏ chạy.",
+    );
+    for (const tier of ["normal", "elite", "leader"] as const)
+      expect(ambushPotionNote(2, { tier, ...flee }), `${tier} 2 đan`).toBe("");
+  });
+
+  it("ambushPotionNote: KHÔNG trả nổi giá bỏ chạy nào thì không khuyên 'bỏ chạy' (lời khuyên không làm được): giữ lời nhắc mang đan, kể cả kẻ cầm đầu", () => {
+    for (const tier of ["normal", "elite", "leader"] as const) {
+      const ctx = { tier, canFlee: false };
+      expect(ambushPotionNote(0, ctx), `${tier} 0 đan`).toBe(
+        "Túi không có đan hồi huyết: nên mang ít nhất 2.",
+      );
+      expect(ambushPotionNote(1, ctx), `${tier} 1 đan`).toBe(
+        "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
+      );
+      expect(ambushPotionNote(2, ctx), `${tier} 2 đan`).toBe("");
+    }
+    // vắng `canFlee` = bỏ chạy được (cùng mặc định với lúc gọi không có bối cảnh)
+    expect(ambushPotionNote(0, { tier: "normal" })).toBe(ambushPotionNote(0));
   });
 
   it("view: không truyền số đan thì y như cũ (không dòng nhắc, câu đọc và aria không đổi)", () => {
@@ -535,8 +570,12 @@ describe("nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết; số đ
     const base = ambushDialogView(open(), ARMED);
     for (const have of [0, 1]) {
       const v = ambushDialogView(open(), ARMED, have);
-      expect(v.potionNote, `${have} đan`).toBe(ambushPotionNote(have));
-      expect(v.potionNote).not.toBe("");
+      // lời đề nghị mẫu: kẻ thường, trả được Linh thạch và tu vi -> có đường bỏ chạy
+      expect(v.potionNote, `${have} đan`).toBe(
+        have === 0
+          ? "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy."
+          : "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
+      );
       expect(v.announce).toContain(v.potionNote);
       expect(v.buttons[0].aria).toContain(v.potionNote);
       expect(v.deathNote).toBe(AMBUSH_DEATH_NOTE);
@@ -546,6 +585,41 @@ describe("nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết; số đ
       expect(v.buttons[1].aria).not.toContain("đan hồi huyết");
       expect(v.buttons[2].aria).not.toContain("đan hồi huyết");
     }
+  });
+
+  it("view: truyền đúng mức kẻ chặn và khả năng bỏ chạy cho dòng nhắc đan (cầm đầu nhấn mạnh; không trả nổi giá nào thì không khuyên bỏ chạy)", () => {
+    const price = (exp: number, coinPrice: number, enough: boolean) => ({
+      exp,
+      coin: { price: coinPrice, enough },
+    });
+    const note = (tier: "normal" | "elite" | "leader", p: ReturnType<typeof price>, have: number) =>
+      ambushDialogView(
+        openAmbush(null, { ...sampleAmbushOffer(tier), price: p }, T0).dialog,
+        ARMED,
+        have,
+      );
+    // cầm đầu: 0 và 1 đan đều "nên bỏ chạy" (số đo #1254: 1 đan vẫn chết 71 % ở bậc 11)
+    expect(note("leader", price(420, 60, true), 0).potionNote).toContain("nên bỏ chạy");
+    expect(note("leader", price(420, 60, true), 0).potionNote).toContain("Kẻ cầm đầu");
+    expect(note("leader", price(420, 60, true), 1).potionNote).toBe(
+      "Kẻ cầm đầu rất mạnh, túi chỉ còn 1 đan hồi huyết: nên bỏ chạy.",
+    );
+    // chỉ MỘT trong hai giá trả nổi cũng là còn đường bỏ chạy (khớp hai nút bỏ chạy)
+    expect(note("normal", price(0, 60, true), 0).potionNote).toContain("nên bỏ chạy"); // thanh tu vi trống, đủ Linh thạch
+    expect(note("normal", price(420, 60, false), 0).potionNote).toContain("nên bỏ chạy"); // thiếu Linh thạch, còn tu vi
+    // không trả nổi giá nào: hai nút bỏ chạy đều mờ, nên chỉ nhắc mang đan
+    for (const tier of ["normal", "leader"] as const) {
+      const v = note(tier, price(0, 60, false), 0);
+      expect(v.potionNote, tier).toBe("Túi không có đan hồi huyết: nên mang ít nhất 2.");
+      expect(v.buttons[1].enabled || v.buttons[2].enabled, `${tier}: hai nút bỏ chạy mờ`).toBe(
+        false,
+      );
+      expect(v.announce, tier).not.toContain("nên bỏ chạy");
+    }
+    // câu đọc + aria nút Chiến mang đúng dòng nhắc mới
+    const v = note("leader", price(420, 60, true), 0);
+    expect(v.announce).toContain(v.potionNote);
+    expect(v.buttons[0].aria).toContain(v.potionNote);
   });
 
   it("view: dòng nhắc đan hiện ở MỌI mức và mọi trạng thái (đang khoá, đã gửi, hết giờ cục bộ)", () => {

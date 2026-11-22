@@ -84,14 +84,32 @@ export function potionCountOf(
   return n;
 }
 
+/** Bối cảnh của dòng nhắc đan: mức kẻ chặn đường và việc có BỎ CHẠY được không (trả nổi Linh thạch hoặc tu vi). Vắng thì coi như kẻ thường, bỏ chạy được. */
+export interface AmbushPotionCtx {
+  tier?: AmbushTier;
+  canFlee?: boolean;
+}
+
 /**
  * Dòng nhắc ĐAN dưới nút Chiến: "" khi đủ `AMBUSH_POTION_MIN` đan hoặc không biết số đan (`undefined` / không hữu hạn: không nói điều chưa chắc).
  * Chỉ là lời nhắc: hộp thoại vẫn cho chọn như cũ (không khoá nút Chiến).
+ *
+ * Hộp thoại chỉ có 10 giây nên "nên mang ít nhất 2" lúc đó không làm được (QUYET_DINH_M3 mục 64: "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy"). Còn đường bỏ chạy (`canFlee`)
+ * thì nói thẳng việc nên làm: không đan -> "nên bỏ chạy"; kẻ CẦM ĐẦU (mạnh nhất, số đo #1254: 1 đan vẫn chết 71 % ở bậc 11) dưới 2 đan -> nhấn mạnh rồi cũng "nên bỏ chạy".
+ * Một đan, kẻ thường / tinh anh: giữ lời nhắc mang đan (chưa đến mức khuyên bỏ chạy). Không trả nổi giá bỏ chạy nào: "nên bỏ chạy" là lời khuyên không làm được -> giữ lời nhắc cũ.
  */
-export function ambushPotionNote(potions: number | undefined): string {
+export function ambushPotionNote(potions: number | undefined, ctx: AmbushPotionCtx = {}): string {
   if (potions === undefined || !isNum(potions)) return "";
   const n = Math.max(0, Math.floor(potions));
   if (n >= AMBUSH_POTION_MIN) return "";
+  const leader = ctx.tier === "leader";
+  if (ctx.canFlee !== false) {
+    if (leader) {
+      const have = n === 0 ? "ngươi không mang Hồi Huyết Đan" : `túi chỉ còn ${n} đan hồi huyết`;
+      return `Kẻ cầm đầu rất mạnh, ${have}: nên bỏ chạy.`;
+    }
+    if (n === 0) return "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy.";
+  }
   const have = n === 0 ? "Túi không có đan hồi huyết" : `Túi chỉ còn ${n} đan hồi huyết`;
   return `${have}: nên mang ít nhất ${AMBUSH_POTION_MIN}.`;
 }
@@ -300,7 +318,10 @@ function enabledOf(d: AmbushDialog, choice: AmbushChoice, now: number): boolean 
 /** View của hộp thoại tại `now` (đồng hồ máy khách); `potions` = số đan hồi khí huyết trong túi (`potionCountOf`), vắng thì không có dòng nhắc đan. */
 export function ambushDialogView(d: AmbushDialog, now: number, potions?: number): AmbushDialogView {
   const { offer } = d;
-  const potionNote = ambushPotionNote(potions);
+  const potionNote = ambushPotionNote(potions, {
+    tier: offer.foe.tier,
+    canFlee: offer.price.coin.enough || offer.price.exp > 0, // cùng điều kiện với hai nút bỏ chạy (`enabledOf`)
+  });
   const remaining = ambushRemainingMs(d, now);
   const arming = isArming(d, now);
   const busy = isBusy(d, now);
