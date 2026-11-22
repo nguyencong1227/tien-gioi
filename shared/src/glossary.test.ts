@@ -104,10 +104,20 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
   });
 
   it("khớp là TỪ (ranh giới chữ hai bên): KHÔNG bắt nhầm chữ dính trong từ khác", () => {
-    // "Mộc" là hệ, KHÔNG có trong bảng này; nhưng kiểm rằng "Phàm phẩm" KHÔNG bám vào "Phàm phẩmX"
+    // "Phàm phẩm" KHÔNG bám vào "Phàm phẩmX"
     expect(glossaryViolations("vật phẩm Phàm phamX")).toEqual([]);
     // ranh giới dấu câu: "Trúc Cơ." vẫn bắt "Truc Co." dạng thiếu dấu (dấu . sau vẫn là ranh giới từ)
     expect(glossaryViolations("hạng Truc Co.")).toContain("thấy 'Truc Co' -> dùng 'Trúc Cơ'");
+  });
+
+  it("hệ Mộc/Thủy/Lôi/Vô sắc: thiếu dấu bị bắt, dạng đúng KHÔNG báo oan", () => {
+    // Chỉ 4 hệ được thêm: bóc dấu KHÔNG đụng chữ khác đang có (Hỏa/Thổ/Băng/Âm bị trễ, xem glossary.ts khối `he`).
+    expect(glossaryViolations("chiêu hệ Moc mạnh.")).toContain("thấy 'Moc' -> dùng 'Mộc'");
+    expect(glossaryViolations("chiêu hệ Thuy mạnh.")).toContain("thấy 'Thuy' -> dùng 'Thủy'");
+    expect(glossaryViolations("chiêu hệ Loi mạnh.")).toContain("thấy 'Loi' -> dùng 'Lôi'");
+    expect(glossaryViolations("chiêu hệ Vo sac.")).toContain("thấy 'Vo sac' -> dùng 'Vô sắc'");
+    // dạng ĐÚNG (có dấu) KHÔNG báo oan — kể cả "Vô sắc" hai chữ:
+    expect(glossaryViolations("chiêu hệ Mộc, Thủy, Lôi và Vô sắc.")).toEqual([]);
   });
 
   it("dạng NFD của chữ ĐÚNG không bị báo oan (matcher NFC hóa trước; quy tắc NFC của `ngon-ngu` lo phần dấu tách rời)", () => {
@@ -160,11 +170,12 @@ describe("GLOSSARY — bất biến dữ liệu", () => {
       expect(glossaryViolations(t.canonical), `${t.id}: ${t.canonical}`).toEqual([]);
   });
 
-  it("đủ nhóm: canh-gioi / dia-danh / tien-te / pham-cap / khai-niem / nhan-vat đã phủ", () => {
+  it("đủ nhóm: canh-gioi / dia-danh / he / tien-te / pham-cap / khai-niem / nhan-vat đã phủ", () => {
     const groups = new Set(GLOSSARY.map((t) => t.group));
     for (const g of [
       "canh-gioi",
       "dia-danh",
+      "he",
       "tien-te",
       "pham-cap",
       "khai-niem",

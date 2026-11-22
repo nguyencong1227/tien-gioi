@@ -26,7 +26,9 @@ export interface GlossaryTerm {
 
 /**
  * BẢNG TỪ ĐIỂN. Dữ liệu điền từ CHÍNH mã nguồn (realms.ts / map.ts / items.ts / ambush.ts / reincarnation.ts...), KHÔNG bịa.
- * CHƯA phủ hết: hệ (casing do Dev G chốt ở #1199), tên trùm / NPC (cần xử lý riêng), một số khái niệm (Duyên dễ lẫn "cơ duyên") — bổ sung các lượt sau.
+ * CHƯA phủ hết: tên trùm / NPC thường (cần xử lý riêng), một số khái niệm (Duyên dễ lẫn "cơ duyên") — bổ sung các lượt sau.
+ * HỆ: chỉ thêm 4 hệ bóc dấu KHÔNG đụng chữ khác (Mộc/Thủy/Lôi/Vô sắc); Hỏa/Thổ/Băng/Âm TRỄ vì bóc dấu trùng chữ đang có (xem khối `he` dưới);
+ * Kim/Phong KHÔNG dấu; casing (hoa/thường) của MỌI hệ để Dev G chốt ở #1199 — nên các term hệ CHỈ có wrong thiếu dấu, KHÔNG có wrong hoa/thường.
  */
 export const GLOSSARY: readonly GlossaryTerm[] = [
   // --- Cảnh giới (realms.ts: REALMS) ---
@@ -116,6 +118,24 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     group: "dia-danh",
     canonical: "Hàn Vân Lĩnh",
     wrong: ["Han Van Linh", "han van linh"],
+  },
+
+  // --- Hệ (skills.ts: ELEMENTS — 10 hệ) ---
+  // CHỈ thêm 4 hệ mà việc bóc dấu KHÔNG đụng chữ khác đang có trong chữ hiển thị (đã quét thật, KHÔNG báo oan).
+  // TRỄ (đừng thêm khi chưa có cơ chế khử nhập nhằng — pha / ngữ cảnh):
+  //   Hỏa "Hoa" ≡ Hoa (Băng Hoa Loạn) / Hóa (Hóa Huyết, Hóa Thần) / Hòa (Hòa thượng);
+  //   Thổ "Tho" ≡ Thố·Thỏ (Linh Thố) / Thợ (Thợ rèn);  Băng "Bang" ≡ Bảng (Bảng cáo thị);  Âm "Am" ≡ Ám (Ám sát).
+  //   Matcher bóc dấu KHÔNG phân biệt được nên thêm vào sẽ BÁO OAN chữ đúng.
+  // Kim / Phong KHÔNG dấu → bỏ wrong. Casing (hoa/thường) của MỌI hệ để Dev G chốt ở #1199 → term hệ chỉ có wrong thiếu dấu.
+  { id: "he.moc", group: "he", canonical: "Mộc", wrong: ["Moc"] },
+  { id: "he.thuy", group: "he", canonical: "Thủy", wrong: ["Thuy"] },
+  { id: "he.loi", group: "he", canonical: "Lôi", wrong: ["Loi"] },
+  {
+    id: "he.vo-sac",
+    group: "he",
+    canonical: "Vô sắc",
+    wrong: ["Vo sac"],
+    note: "Hệ id 'none' (không khắc / không bị khắc); KHÔNG phải chữ 'vô sắc' thường.",
   },
 
   // --- Tiền tệ ---
