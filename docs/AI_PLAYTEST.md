@@ -79,36 +79,38 @@ số đo trong lúc chạy, chụp ảnh, tự phát hiện finding. Hiện có 
 |---|---|---|---|
 | `enter-game` | `enter` | Vào game: đăng nhập + HUD + canvas Phaser sẵn sàng | 412x915, 1366x768 |
 | `move-hold-w` | `move` | Giữ W 2s rồi nhả, kiểm pred có trôi sau nhả phím không | 412x915, 1366x768 |
-| `panel-inv` | `panels` | Mở túi đồ (B), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
-| `panel-char` | `panels` | Mở nhân vật (C), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
-| `panel-quest` | `panels` | Mở sổ nhiệm vụ (N), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
-| `panel-sect` | `panels` | Mở tông môn (G), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
-| `panel-map` | `panels` | Mở bản đồ (M), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
-| `panel-settings` | `panels` | Mở cài đặt (E), chụp, Esc đóng, kiểm bảng đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-inv` | `panels` | Mở túi đồ (B), chụp KHI ĐANG MỞ, Esc đóng, kiểm đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-char` | `panels` | Mở nhân vật (C), chụp KHI ĐANG MỞ, Esc đóng, kiểm đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-quest` | `panels` | Mở sổ nhiệm vụ (N), chụp KHI ĐANG MỞ, Esc đóng, kiểm đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-sect` | `panels` | Mở tông môn (G), chụp KHI ĐANG MỞ, Esc đóng, kiểm đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-map` | `panels` | Mở bản đồ (M), chụp KHI ĐANG MỞ, Esc đóng, kiểm đóng thật | 360x640, 915x412, 1366x768 |
+| `panel-settings` | `panels` | Mở cài đặt (E), chụp KHI ĐANG MỞ, Esc đóng, kiểm đóng thật | 360x640, 915x412, 1366x768 |
 
-**Nhóm kịch bản mục 60.1 (chưa đầy đủ):** (1) vào game; (2) di chuyển WASD lâu + đổi hướng nhanh;
-(3) mở / đóng MỌI bảng (túi, nhân vật, nhiệm vụ, tông môn, bản đồ M, phím tắt, cài đặt) + kiểm Esc / nút
-đóng đều đóng được; (4) đánh quái (J K L U I O); (5) đi qua cổng 4 bản đồ; (6) đánh 1 trùm (chụp vùng
-cảnh báo); cộng: chết → Hoàng Tuyền → đầu thai; tông môn (góp / rút); gặp chặn đường (cờ `--ambush`);
-bảng Xã hội. **Khuyến nghị thêm một lượt cảm ứng giả lập** (`input: "touch"`) cho các bước bảng/HUD.
+**Cơ chế chụp ảnh bảng (mục 60.1 / Refs #1297):** Các bước bảng tách biệt hai giai đoạn:
+1. `action`: Nhấn phím thật qua CDP để mở bảng, đợi modal xuất hiện (`modalShown`) và đợi 2 khung hình để render ổn định.
+2. Chụp ảnh: `runStep` kiểm tra chắc chắn bảng vẫn đang hiển thị ngay trước `tab.shot` rồi mới ghi hình (tránh chụp màn chơi rỗng).
+3. `after`: Nhấn Esc để đóng bảng và kiểm tra `closedFailFinding` xem bảng có đóng thật hay không.
+*Lưu ý ở khung cảm ứng (360x640, 915x412):* Bộ chơi thử AI hiện mở bảng thông qua sự kiện phím CDP để kiểm tra độ vừa vặn và bố cục của bảng trên màn hình nhỏ; kiểm tra thao tác bấm nút menu cảm ứng / chạm tay là phạm vi của các kịch bản E2E cảm ứng riêng.
 
 ---
 
 ## 4. Khung màn hình (viewports)
 
-Mặc định 6 khung (`DEFAULT_VIEWPORTS`, mục 60.1): 3 dọc, 1 cỡ người dùng nằm, 2 desktop.
+Danh sách khung màn hình được đồng bộ trực tiếp từ `VIEWPORTS` của `server/scripts/layout-kit.ts` (MỘT nguồn chuẩn duy nhất của repo).
+Ở các khung di động (`touch: true`), `PlayTab.setViewport` kích hoạt mô phỏng cảm ứng đầy đủ: `Emulation.setTouchEmulationEnabled { enabled: true }`, `mobile: true`, đợi 900ms để Scale Manager phân loại lại và thiết lập `data-input="touch"` trên `<html>` (loại bỏ dải phím gợi ý desktop trên màn hình điện thoại).
 
-| `id` | Kích thước |
-|---|---|
-| `360x640` | dọc nhỏ |
-| `412x915` | dọc |
-| `915x412` | nằm cỡ người dùng |
-| `550x900` | dọc lớn |
-| `1366x768` | desktop |
-| `1920x1080` | desktop lớn |
+| `id` | Kích thước | Chế độ | Ghi chú |
+|---|---|---|---|
+| `360x640` | 360 x 640 | Cảm ứng | điện thoại dọc nhỏ |
+| `412x915` | 412 x 915 | Cảm ứng | điện thoại dọc lớn |
+| `915x412` | 915 x 412 | Cảm ứng | điện thoại ngang |
+| `550x900` | 550 x 900 | Chuột | cửa sổ hẹp |
+| `619x900` | 619 x 900 | Chuột | hẹp nhất còn gộp menu ☰ (#684) |
+| `620x900` | 620 x 900 | Chuột | hẹp nhất hiện hàng menu (#684) |
+| `1366x768` | 1366 x 768 | Chuột | máy tính xách tay |
+| `1920x1080` | 1920 x 1080 | Chuột | máy tính để bàn |
 
-Không phải MỌI bước × MỌI khung: mỗi bước khai khung nào chạy khung đó (bảng / HUD đủ 6 khung; di chuyển
-2-3 khung). `deviceScaleFactor` cố định = 1 để so ảnh các lần chạy nhất quán (Dev B: DPR nên = 1).
+Không phải MỌI bước × MỌI khung: hàm thuần `pickViewports` áp dụng đúng danh sách khung khai báo của từng bước (`step.viewports`); khi có cờ `--viewports` sẽ lọc theo danh sách chỉ định. `deviceScaleFactor` cố định = 1 để so ảnh các lần chạy nhất quán (Dev B: DPR nên = 1).
 
 ---
 
@@ -239,6 +241,7 @@ KHÔNG commit rồi `git checkout --` khôi phục). Đã chứng minh cho #1194
 | `closedFailFinding` (`detect.ts`) | `if (stillOpen)` → `if (!stillOpen)` | 2 | đảo điều kiện |
 | `ioErrorsBlockOk` (`detect.ts`) | `> 0` → `> 1` | 3 | bỏ sót 1 lỗi |
 | `validateManifest` (`manifest.ts`) | bỏ kiểm `summary.steps !== steps.length` | 1 | summary đếm sai |
+| `pickViewports` (`manifest.ts`) | trả `allViewports` bỏ qua `step.viewports` | 2 | mã chết / sai khung |
 
 Bốn đột biến **bắt buộc** của mục 60.1 (gieo lỗi thật rồi chạy harness) — drift / stall / closed-fail /
 console-error — được chứng minh gián tiếp qua các detector thuần trên (mỗi detector là "răng" bắt đúng

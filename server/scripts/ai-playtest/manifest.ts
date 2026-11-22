@@ -8,26 +8,51 @@
 //   manifest.json            <- tệp này mô tả hợp đồng
 //   shots/<step>-<viewport>.jpg   ảnh chụp (JPEG q85 mặc định; --png → PNG)
 import { execSync } from "node:child_process";
+import { VIEWPORTS } from "../layout-kit";
 
 /** Phiên bản hợp đồng. Khi đổi hợp đồng KHÔNG tương thích ngược, tăng số này để coordinator biết. */
 export const MANIFEST_SCHEMA = "tien-gioi/ai-playtest/v1";
 
-/** Các khung màn hình mặc định (mục 60.1): 3 dọc, 1 cỡ người dùng, 2 desktop. */
+/** Các khung màn hình chuẩn lấy từ VIEWPORTS của layout-kit.ts (MỘT nguồn). */
 export interface Viewport {
   /** Nhãn ổn định dùng trong `step.viewport` và tên tệp ảnh. */
   id: string;
   width: number;
   height: number;
+  /** Giả lập thiết bị cảm ứng (điện thoại) */
+  touch: boolean;
 }
 
-export const DEFAULT_VIEWPORTS: Viewport[] = [
-  { id: "360x640", width: 360, height: 640 },
-  { id: "412x915", width: 412, height: 915 },
-  { id: "915x412", width: 915, height: 412 },
-  { id: "550x900", width: 550, height: 900 },
-  { id: "1366x768", width: 1366, height: 768 },
-  { id: "1920x1080", width: 1920, height: 1080 },
-];
+export const DEFAULT_VIEWPORTS: Viewport[] = VIEWPORTS.map((v) => ({
+  id: `${v.w}x${v.h}`,
+  width: v.w,
+  height: v.h,
+  touch: v.touch,
+}));
+
+export interface StepViewportSpec {
+  viewports: string[];
+}
+
+/**
+ * Chọn danh sách viewport cho một bước chạy:
+ * - Nếu người dùng truyền filter (vd: --viewports 412x915,1366x768): lọc `allViewports` theo `vpFilterIds`.
+ * - Nếu không truyền filter (hoặc mảng filter rỗng): dùng danh sách viewports mặc định của bước (`step.viewports`).
+ * - Nếu ID trong `step.viewports` không khớp bất kỳ viewport nào trong `allViewports`, an toàn bỏ qua.
+ */
+export function pickViewports(
+  step: StepViewportSpec,
+  vpFilterIds?: string[],
+  allViewports: readonly Viewport[] = DEFAULT_VIEWPORTS,
+): Viewport[] {
+  if (vpFilterIds && vpFilterIds.length > 0) {
+    return allViewports.filter((v) => vpFilterIds.includes(v.id));
+  }
+  const matched = step.viewports
+    .map((id) => allViewports.find((v) => v.id === id))
+    .filter((v): v is Viewport => v != null);
+  return matched.length > 0 ? matched : [...allViewports];
+}
 
 /** Loại kết luận tự động (detection) mà bộ chạy gắn cho một bước. */
 export type FindingKind = "stall" | "drift" | "stuck" | "closed-fail" | "timeout";

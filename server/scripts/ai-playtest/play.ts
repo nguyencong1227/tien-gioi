@@ -21,6 +21,7 @@ import {
   DEFAULT_VIEWPORTS,
   validateManifest,
   currentCommit,
+  pickViewports,
   type Manifest,
   type PlayerSample,
   type StepResult,
@@ -161,8 +162,14 @@ class PlayTab {
       width: v.width,
       height: v.height,
       deviceScaleFactor: 1, // cố định để so ảnh các lần chạy (B: devicePixelRatio nên = 1)
-      mobile: v.height > v.width,
+      mobile: v.touch,
     });
+    await this.send("Emulation.setTouchEmulationEnabled", { enabled: v.touch });
+    await sleep(900); // Scale Manager + lõi hiển thị (data-form / data-orient) phân loại lại
+    await this.ev(
+      `document.documentElement.setAttribute('data-input', ${JSON.stringify(v.touch ? "touch" : "mouse")}); 1`,
+    );
+    await sleep(300);
   }
 
   /** Gieo localStorage danh tính TRƯỚC khi nạp trang (legacy: không cần gõ form). */
@@ -342,15 +349,20 @@ const PANELS = [
   { key: KEY.e, modal: "settings-modal", title: "Cài đặt" },
 ] as const;
 
-/** Mở bảng bằng phím thật, chờ thấy, chụp (trong action), Esc đóng, kiểm bảng đóng thật (closed-fail). */
-async function openClosePanel(tab: PlayTab, spec: (typeof PANELS)[number]): Promise<Finding[]> {
-  const findings: Finding[] = [];
+/** Mở bảng bằng phím thật, chờ thấy, đợi 2 khung hình để render ổn định. */
+async function openPanel(tab: PlayTab, spec: (typeof PANELS)[number]): Promise<Finding[]> {
   await tab.press(spec.key);
   await tab.waitFor(modalShown(spec.modal), `${spec.title} mở`, 4000);
   await tab.waitFrames(2);
+  return [];
+}
+
+/** Esc đóng bảng sau khi đã chụp ảnh, kiểm bảng đóng thật (closed-fail). */
+async function closePanel(tab: PlayTab, spec: (typeof PANELS)[number]): Promise<Finding[]> {
+  const findings: Finding[] = [];
   await tab.press(KEY.escape);
   await sleep(300);
-  const stillOpen = await tab.ev(modalShown(spec.modal));
+  const stillOpen = Boolean(await tab.ev(modalShown(spec.modal)));
   const f = closedFailFinding(stillOpen);
   if (f) findings.push(f);
   return findings;
@@ -367,18 +379,24 @@ interface StepDef {
   input: string;
   /** Khung mặc định của bước (thuộc DEFAULT_VIEWPORTS); ghi đè bằng --viewports. */
   viewports: string[];
-  /** Chạy hành động của bước (đã sẵn sàng trong game). Trả findings tự phát hiện (drift...). */
+  /** Chạy hành động chính của bước (đã sẵn sàng trong game). Trả findings tự phát hiện (drift...). */
   action: (tab: PlayTab) => Promise<Finding[]>;
+  /** Dọn dẹp/hành động sau khi chụp ảnh (ví dụ Esc đóng modal và kiểm closed-fail). */
+  after?: (tab: PlayTab) => Promise<Finding[]>;
+  /** Id của modal cần kiểm tra đang hiển thị ngay trước khi chụp ảnh (nếu là bước bảng). */
+  modalId?: string;
 }
 
-/** Nhóm 3 (mục 60.1): một bước cho MỖI bảng core — mở bằng phím, chụp, Esc đóng, kiểm đóng thật. */
+/** Nhóm 3 (mục 60.1): một bước cho MỖI bảng core — mở bằng phím, chụp khi đang mở, Esc đóng, kiểm đóng thật. */
 const PANEL_STEPS: StepDef[] = PANELS.map((p) => ({
   id: `panel-${p.modal.replace("-modal", "")}`,
   scenario: "panels",
   title: `Bảng: mở ${p.title} (${p.key.code.replace("Key", "")}), chụp, Esc đóng, kiểm đóng thật`,
   input: "keyboard",
+  modalId: p.modal,
   viewports: ["360x640", "915x412", "1366x768"],
-  action: (tab) => openClosePanel(tab, p),
+  action: (tab) => openPanel(tab, p),
+  after: (tab) => closePanel(tab, p),
 }));
 
 const STEPS: StepDef[] = [
@@ -520,8 +538,24 @@ async function runStep(
     const metrics = await metricsP;
     findings.push(...actionFindings);
 
+    // Kiểm tra modal còn mở ngay trước khi chụp ảnh nếu bước có modalId
+    if (step.modalId) {
+      const open = Boolean(await tab.ev(modalShown(step.modalId)));
+      if (!open) {
+        findings.push({
+          kind: "closed-fail",
+          detail: `Bảng ${step.modalId} không còn hiển thị ngay trước khi chụp ảnh`,
+        });
+      }
+    }
+
     const shotFile = `${step.id}-${vp.id}.${fmt === "png" ? "png" : "jpg"}`;
     const shots = [await tab.shot(shotFile, outShots, fmt)];
+
+    if (step.after) {
+      const afterFindings = await step.after(tab);
+      findings.push(...afterFindings);
+    }
 
     consoleErrors.push(...tab.errors);
     networkErrors.push(...tab.networkErrors);
@@ -575,8 +609,10 @@ async function main() {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const viewports =
-    vpIds.length > 0 ? DEFAULT_VIEWPORTS.filter((v) => vpIds.includes(v.id)) : DEFAULT_VIEWPORTS;
+  const vpFilter = vpIds.length > 0 ? vpIds : undefined;
+  const viewports = vpFilter
+    ? DEFAULT_VIEWPORTS.filter((v) => vpFilter.includes(v.id))
+    : DEFAULT_VIEWPORTS;
   const runArgs: RunArgs = {
     out:
       argVal(args, "out") ??
@@ -607,20 +643,20 @@ async function main() {
     const wsUrl = await waitForPageWs(chrome.cdpPort);
     const results: StepResult[] = [];
     for (const step of steps) {
-      const vps =
-        viewports.length > 0
-          ? viewports
-          : step.viewports.map((id) => DEFAULT_VIEWPORTS.find((v) => v.id === id)!).filter(Boolean);
+      const vps = pickViewports(step, vpFilter);
       for (const vp of vps) {
         const name = `AI Playtest ${results.length + 1}`;
         const tab = await PlayTab.open(wsUrl); // tab mới (profile riêng trong cùng Chrome)
-        tabs.push(tab);
-        console.log(`▶ ${step.id} @ ${vp.id}`);
-        const r = await runStep(tab, step, vp, server.url, outShots, fmt, name);
-        results.push(r);
-        console.log(
-          `  ${r.ok ? "✓" : "✗"} fps ${r.metrics.fps.min}/${r.metrics.fps.avg} | findings ${r.findings.length} | console ${r.consoleErrors.length}`,
-        );
+        try {
+          console.log(`▶ ${step.id} @ ${vp.id}`);
+          const r = await runStep(tab, step, vp, server.url, outShots, fmt, name);
+          results.push(r);
+          console.log(
+            `  ${r.ok ? "✓" : "✗"} fps ${r.metrics.fps.min}/${r.metrics.fps.avg} | findings ${r.findings.length} | console ${r.consoleErrors.length}`,
+          );
+        } finally {
+          tab.close();
+        }
       }
     }
     const failed = results.filter((r) => !r.ok).length;

@@ -2,7 +2,13 @@
 // sai kiểu / sai schema / đếm summary sai. Mỗi ca là một đột biến tiềm năng: nếu bỏ một kiểm trong
 // manifest.ts, ca tương ứng chuyển đỏ (manifest sai lọt qua).
 import { describe, expect, it } from "vitest";
-import { MANIFEST_SCHEMA, type Manifest, validateManifest } from "./manifest";
+import {
+  MANIFEST_SCHEMA,
+  type Manifest,
+  validateManifest,
+  pickViewports,
+  DEFAULT_VIEWPORTS,
+} from "./manifest";
 
 /** Một manifest hợp lệ tối thiểu để làm nền; mỗi ca nhân bản rồi sửa một chỗ. */
 function good(): Manifest {
@@ -208,4 +214,35 @@ describe("validateManifest — bác manifest sai (mỗi ca = một răng của v
       expect(() => validateManifest(mutate(clone(good())))).toThrow();
     });
   }
+});
+
+describe("pickViewports — chọn khung hình cho bước chạy", () => {
+  const dummyStep = { viewports: ["360x640", "1366x768"] };
+
+  it("không có filter (--viewports): dùng đúng danh sách step.viewports", () => {
+    const vps = pickViewports(dummyStep);
+    expect(vps.map((v) => v.id)).toEqual(["360x640", "1366x768"]);
+    // Chứng minh không phải trả toàn bộ DEFAULT_VIEWPORTS (bắt mã chết)
+    expect(vps.length).toBeLessThan(DEFAULT_VIEWPORTS.length);
+  });
+
+  it("mảng filter rỗng (--viewports rỗng): dùng đúng danh sách step.viewports", () => {
+    const vps = pickViewports(dummyStep, []);
+    expect(vps.map((v) => v.id)).toEqual(["360x640", "1366x768"]);
+  });
+
+  it("có filter (--viewports): lọc theo danh sách ID người dùng chỉ định", () => {
+    const vps = pickViewports(dummyStep, ["915x412", "1920x1080"]);
+    expect(vps.map((v) => v.id)).toEqual(["915x412", "1920x1080"]);
+  });
+
+  it("filter ID lạ: lọc an toàn, trả về mảng rỗng không ném lỗi", () => {
+    const vps = pickViewports(dummyStep, ["unknown_viewport"]);
+    expect(vps).toEqual([]);
+  });
+
+  it("step.viewports chứa ID không tồn tại: bỏ qua phần tử không khớp", () => {
+    const vps = pickViewports({ viewports: ["360x640", "khong_co_that"] });
+    expect(vps.map((v) => v.id)).toEqual(["360x640"]);
+  });
 });
