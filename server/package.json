@@ -14,6 +14,7 @@
     "quest-walk": "tsx scripts/quest-walk.ts",
     "backup": "tsx scripts/backup.ts",
     "kiem-save": "tsx scripts/audit-saves.ts",
+    "kiem-nang-cap": "tsx scripts/kiem-nang-cap.ts",
     "e2e:all": "tsx scripts/e2e-all.ts",
     "e2e": "tsx scripts/e2e.ts",
     "e2e:tai-khoan": "tsx scripts/e2e-account.ts",
