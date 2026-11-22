@@ -31,10 +31,10 @@ Theo quyết định chính thức của Người Dùng (`~/TT/orchestra/QUYET_D
 
 Các số liệu được đo trực tiếp từ git (ghi kèm lệnh kiểm tra để người cắt phát hành có thể đối chiếu lại tại thời điểm cắt):
 
-| Hạng mục | Mốc `66aef6aa` (trước #1299) | Đầu `main` hiện tại (`575a3887`) | Lệnh kiểm tra |
+| Hạng mục | Mốc `66aef6aa` (trước #1299) | Đầu `main` hiện tại (`93bbe7fa` sau #1307) | Lệnh kiểm tra |
 |---|---:|---:|---|
-| **Tổng số commit sau `v0.5.2`** | 354 commit | **377 commit** | `git rev-list --count v0.5.2..<commit>` |
-| **Commit first-parent (PR merge)** | 79 commit | **86 commit** | `git rev-list --first-parent --count v0.5.2..<commit>` |
+| **Tổng số commit sau `v0.5.2`** | 354 commit | **379 commit** (tại `575a3887`: 377) | `git rev-list --count v0.5.2..<commit>` |
+| **Commit first-parent (PR merge)** | 79 commit | **87 commit** (tại `575a3887`: 86) | `git rev-list --first-parent --count v0.5.2..<commit>` |
 | **Biến động `shared/src`** | 21 tệp (+4.134 / -58) | **24 tệp (+4.243 / -62)** | `git diff --shortstat v0.5.2..<commit> -- shared/src` |
 | **Quái vật và cảnh giới mới** | 0 | **0** | `git diff v0.5.2..<commit> -- shared/src/game.ts shared/src/realms.ts` (RỖNG) |
 | **Khuôn lưu trữ dữ liệu** | Không đổi | **Không đổi** | `git diff v0.5.2..<commit> -- server/src/store.ts server/src/soul.ts server/src/sect-store.ts server/src/account-store.ts server/src/pg` (RỖNG) |
