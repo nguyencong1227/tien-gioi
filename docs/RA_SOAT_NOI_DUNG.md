@@ -1,8 +1,9 @@
 # Rà soát nội dung — bộ kiểm `npm run check:content` (Issue #1200 · mục 61.2)
 
-> Trạng thái: **Phần 1 đã xong** (F, nhánh `f/1200-check-content`). Gom MỌI bộ kiểm dữ liệu nội dung
-> (cấu trúc) hiện có thành MỘT lệnh `npm run check:content`, báo lỗi gọn theo "nhóm · tệp · id", nối CI,
-> đỏ khi dữ liệu game sai. Phần 2 (kiểm chéo bảng) và Phần 3 (thuật ngữ theo từ điển) làm sau.
+> Trạng thái: **Phần 1 + Phần 2 (nguồn vật phẩm) đã xong** (F, nhánh `f/1200-check-content`). Gom MỌI bộ kiểm
+> dữ liệu nội dung (cấu trúc) hiện có thành MỘT lệnh `npm run check:content`, báo lỗi gọn theo "nhóm · tệp · id",
+> nối CI, đỏ khi dữ liệu game sai. Phần 2 đã thêm kiểm CHÉO nguồn vật phẩm (mồ côi / nguyên liệu chết / tham chiếu
+> trỏ thật). Phần 2 còn lại (id trùng chéo bảng, sách trỏ chiêu...) và Phần 3 (thuật ngữ theo từ điển) làm sau.
 >
 > **Bắt buộc trước mọi PR nội dung** (Dev D / E / G). CI đỏ nếu dữ liệu sai. Không nới luật cho xong:
 > dữ liệu hiện phải qua sạch, hoặc mọi vi phạm thật được liệt kê cho chủ dữ liệu sửa.
@@ -25,7 +26,24 @@ Mỗi hàm trả danh sách chuỗi lỗi; in kèm tên nhóm + tệp nguồn. T
 | Thành tựu | `ACHIEVEMENTS` | `achievementViolations` | `shared/src/social.ts` |
 | Danh hiệu | `TITLES` | `titleViolations` | `shared/src/social.ts` |
 
-**Dữ liệu game hiện tại qua sạch** cả 9 bộ kiểm (chạy 2026-11-22). Thời gian < 5 giây.
+**Dữ liệu game hiện tại qua sạch** cả 10 bộ kiểm (chạy 2026-11-23). Thời gian < 5 giây.
+
+### 1b. Kiểm CHÉO nguồn vật phẩm (Phần 2 — đã làm)
+
+| Nhóm kiểm | Dữ liệu thật | Hàm kiểm | Tệp hàm |
+| --- | --- | --- | --- |
+| Nguồn vật phẩm | `ITEMS` × `DROP_TABLES` / `SHOPS` / `RECIPES` / `QUESTS` / `TRADES` / `DUNGEONS` / `SECT_SHOP` / `SECT_QUESTS` | `itemSourceViolations` | `shared/src/item-sources.ts` |
+
+Kiểm CHÉO (hàm thuần `itemSourceViolations`, dùng chung với `item-sources.test.ts` — issue #751):
+1. **Vật phẩm mồ côi** — mọi vật phẩm trong `ITEMS` có ÍT NHẤT MỘT nguồn vào (rơi / bán / chế / thưởng nhiệm
+   vụ + nhiệm vụ tông / đổi NPC / rương bí cảnh), trừ danh sách ngoại lệ `NGOAI_LE` (hiện rỗng).
+2. **Owner-gear lang thang** — `OWNER_GEAR_ITEMS` phải là vật phẩm CÓ trong `ITEMS` (kẻo lọt khỏi kiểm nguồn).
+3. **Nguyên liệu chết** — mọi vật phẩm `type: "material"` phải được ít nhất một công thức / nhiệm vụ / đổi đồ
+   DÙNG TỚI.
+4. **Tham chiếu trỏ thật** — mọi `itemId` trong các bảng nguồn phải có trong `ITEMS` (không itemId rác).
+
+Phần 2 CÒN LẠI (chưa làm, bổ sung vào `check-content.ts` sau): id không trùng chéo các bảng cùng loại; sách
+kinh quyển trỏ chiêu có thật; chiêu học được có nguồn sách; vật phẩm vừa không bán vừa không dùng được.
 
 ## 2. Các bộ kiểm KHÔNG gom vào `check:content` (vẫn chạy trong `npm test`)
 
@@ -59,15 +77,14 @@ từng PR; giữ trong test suite (đỏ khi dữ liệu sai), KHÔNG đưa vào
   lúc chạy), nên kiểm ở server runtime: `server/src/private-packs.ts` gọi `privatePackViolations`
   (manifest hợp lệ, path / url an toàn). `check:credits` (client) ghi nguồn mọi tài nguyên.
 
-## 3. Phần 2 — kiểm CHÉO giữa các bảng (chưa làm)
+## 3. Phần 2 — kiểm CHÉO giữa các bảng
 
-Bộ kiểm MỚI, thêm vào `check-content.ts` khi xong:
-- ID không trùng giữa các bảng cùng loại.
-- Nhiệm vụ / hội thoại / bảng rơi / công thức / cửa hàng / bộ chiêu trùm / sách chỉ trỏ tới vật phẩm, quái,
-  NPC, chiêu, bản đồ CÓ THẬT.
-- Mọi vật phẩm có ÍT NHẤT MỘT nguồn kiếm (rơi, bán, nhiệm vụ, chế, phần thưởng; không "mồ côi").
-- Mọi chiêu học được có nguồn sách; không vật phẩm nào vừa không bán vừa không dùng được.
-- Ngoại lệ có lý do (vật phẩm chỉ để dành cho sự kiện) khai trong MỘT danh sách ngoại lệ có chú thích.
+- ✅ **Nguồn vật phẩm** (đã làm, xem mục 1b): mồ côi / nguyên liệu chết / tham chiếu trỏ thật / owner-gear.
+- ⬜ ID không trùng giữa các bảng cùng loại.
+- ⬜ Sách kinh quyển trỏ chiêu CÓ THẬT; mọi chiêu học được có nguồn sách.
+- ⬜ Không vật phẩm nào vừa không bán vừa không dùng được.
+- Ngoại lệ có lý do (vật phẩm chỉ để dành cho sự kiện) khai trong MỘT danh sách ngoại lệ có chú thích
+  (`NGOAI_LE` trong `shared/src/item-sources.ts`).
 
 ## 4. Phần 3 — kiểm THUẬT NGỮ theo từ điển (chưa làm)
 
@@ -82,5 +99,7 @@ Làm SAU khi `shared/src/glossary.ts` (E) và `glossary-banned.ts` (G) vào main
 | --- | --- |
 | Thêm chiêu trùng id `hoa_van_kiem` vào `shared/src/skills.ts` (`LEARNABLE_SKILLS`) | ĐỎ: nhóm "chiêu thức (LEARNABLE_SKILLS)", `skill-violations.ts`, `chiêu hoa_van_kiem: trùng id`; exit 1 |
 | Đổi `itemId: "nanh_soi"` → `"zzz_khong_co"` ở `shared/src/sect-depth.ts` (`SECT_QUESTS[st_nop_thu_pham].t0`) | ĐỎ: nhóm "nhiệm vụ tông (SECT_QUESTS)", id `st_nop_thu_pham.t0: vật phẩm zzz_khong_co không tồn tại`; exit 1 |
+| Đổi `DROP_TABLES.tho[0].itemId: "long_tho"` → `"zzz_khong_co_ton_tai"` ở `shared/src/items.ts` (tham chiếu rác) | ĐỎ: nhóm "nguồn vật phẩm", `item-sources.ts`, `DROP_TABLES[tho]: vật phẩm zzz_khong_co_ton_tai lạ`; exit 1 |
+| Thêm vật phẩm mồ côi `{ id: "zzz_orphan_tmp", ... }` vào `ITEMS` (`shared/src/items.ts`) | ĐỎ: nhóm "nguồn vật phẩm", `item-sources.ts`, `vật phẩm mồ côi: zzz_orphan_tmp (không có nguồn...)`; exit 1 |
 
-Cả hai đều báo đúng nhóm + tệp + id, thoát mã 1. Đã hoàn nguyên bằng `git checkout --`.
+Cả ba đều báo đúng nhóm + tệp + id, thoát mã 1. Đã hoàn nguyên bằng `git checkout --`.

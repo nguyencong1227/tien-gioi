@@ -6,9 +6,9 @@
 //
 // PHÂN LOẠI (issue #1200):
 //   Phần 1 (ở đây): các hàm `*Violations` thuần trong `shared/` — kiểm cấu trúc / khung dữ liệu, gọi với bảng thật.
-//   Phần 2 (sau):   kiểm CHÉO giữa các bảng (id không trùng chéo, nhiệm vụ / hội thoại / rơi / công thức / cửa
-//                   hàng / bộ chiêu trùm / sách chỉ trỏ tới thực thể CÓ THẬT, vật phẩm không "mồ côi", chiêu có
-//                   sách) — thêm vào đây khi có.
+//   Phần 2 (ở đây): kiểm CHÉO giữa các bảng — `itemSourceViolations` (nguồn vật phẩm: mồ côi / nguyên liệu chết /
+//                   tham chiếu trỏ vật phẩm CÓ THẬT). Các kiểm chéo khác (id trùng chéo bảng, sách trỏ chiêu...)
+//                   bổ sung sau vào đây.
 //   Phần 3 (sau):   kiểm THUẬT NGỮ theo từ điển (`glossary.ts` / `glossary-banned.ts` của E / G) — thêm khi hai
 //                   tệp đó vào main (khi thêm, mỗi bộ kiểm là một mục CHECKS; `runChecks` đã bắt gọn hàm ném
 //                   nên một phần chưa sẵn KHÔNG chặn các phần khác — KHÔNG có khung riêng cho Phần 3).
@@ -25,6 +25,7 @@ import {
   achievementViolations,
   ambushViolations,
   bossViolations,
+  itemSourceViolations,
   MAPS,
   portalLinkViolations,
   sectQuestViolations,
@@ -99,6 +100,13 @@ export const CHECKS: readonly Check[] = [
     name: "danh hiệu (TITLES)",
     file: "shared/src/social.ts",
     run: () => titleViolations(),
+  },
+  {
+    // Phần 2 #1200: kiểm CHÉO — nguồn vật phẩm (mồ côi / nguyên liệu chết / tham chiếu trỏ thật).
+    func: "itemSourceViolations",
+    name: "nguồn vật phẩm (ITEMS / DROP_TABLES / SHOPS / RECIPES / QUESTS / TRADES / DUNGEONS / SECT_*)",
+    file: "shared/src/item-sources.ts",
+    run: () => itemSourceViolations(),
   },
 ];
 
