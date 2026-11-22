@@ -83,8 +83,13 @@ import {
 import {
   analyzeSoak,
   classifyServerLogLine,
+  computeBossHunterMinuteStatus,
   formatSoakTable,
   type AmbushSoakContext,
+  type BossCastEvent,
+  type BossHunterMinuteStatus,
+  type BossHunterSnapshotInput,
+  type BossSoakContext,
   type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
@@ -817,7 +822,45 @@ export async function main(): Promise<number> {
   const bossAbilityCastCounts: Record<string, number> = {};
   /** Mốc thi triển chiêu trùm gần nhất theo key `bossId:ability` để chống đếm trùng khi nhiều bot cùng nhận tin fx */
   const recentBossCasts = new Map<string, number>();
+  /** Dòng thời gian từng lần thi triển chiêu trùm (#1301) */
+  const bossAbilityTimeline: BossCastEvent[] = [];
+  /** Trạng thái nhóm săn trùm theo từng phút (#1301) */
+  const bossHuntersTimeline: BossHunterMinuteStatus[] = [];
+  let lastRecordedHunterMinute = -1;
+  let testStartTime = 0;
   const wsUrl = `ws://localhost:${port}`;
+
+  const collectBossHunterInputs = (): BossHunterSnapshotInput[] => {
+    const bossBots = bots.filter((b) => b.bossHunt);
+    return bossBots.map((b) => {
+      const me = b.room?.state?.players?.get(b.room?.sessionId);
+      const visibleBossIds: string[] = [];
+      if (b.map.def.id === "hac_phong") {
+        b.room?.state?.monsters?.forEach((m: any, id: string) => {
+          if (
+            m.hp > 0 &&
+            (m.kind === "mang" || m.kind === "hac_giao" || m.kind === "thien_han_vuong")
+          ) {
+            visibleBossIds.push(id);
+          }
+        });
+      }
+      return {
+        mapId: b.map.def.id,
+        resting: b.resting,
+        hp: me?.hp,
+        realm: me?.realm,
+        isConnected: b.room?.connection?.isOpen && b.closedCode === null,
+        visibleBossIds,
+      };
+    });
+  };
+
+  const recordBossHunterStatus = (min: number) => {
+    if (!args.boss) return;
+    const snap = computeBossHunterMinuteStatus(min, collectBossHunterInputs());
+    bossHuntersTimeline.push(snap);
+  };
 
   const bindBotEvents = (b: BotState, room: Room) => {
     b.room = room;
@@ -842,6 +885,20 @@ export async function main(): Promise<number> {
           if (now - last > 500) {
             recentBossCasts.set(key, now);
             bossAbilityCastCounts[msg.ability] = (bossAbilityCastCounts[msg.ability] ?? 0) + 1;
+            const elapsedSec =
+              testStartTime > 0 ? Math.floor((Date.now() - testStartTime) / 1000) : 0;
+            const minute = Math.floor(elapsedSec / 60);
+            const second = elapsedSec % 60;
+            const bossMon = b.room?.state?.monsters?.get(msg.by);
+            const bossKind =
+              bossMon?.kind ?? (typeof msg.by === "string" ? msg.by.split(":")[0] : "boss");
+            bossAbilityTimeline.push({
+              minute,
+              second,
+              ability: msg.ability,
+              bossId: msg.by,
+              bossKind,
+            });
           }
         }
       },
@@ -1738,6 +1795,7 @@ export async function main(): Promise<number> {
   let prevExecTime = readServerExecRuntimeMs(actualPid) ?? 0;
   let prevRxBytesTotal = 0;
   const startTime = Date.now();
+  testStartTime = startTime;
 
   const sampleIntervalMs = args.sampleIntervalSec * 1000;
   const totalIterations = Math.ceil(args.durationSec / args.sampleIntervalSec);
@@ -1818,6 +1876,12 @@ export async function main(): Promise<number> {
     };
     samples.push(sample);
 
+    const currentMin = Math.floor(elapsedSec / 60);
+    if (args.boss && currentMin > lastRecordedHunterMinute) {
+      lastRecordedHunterMinute = currentMin;
+      recordBossHunterStatus(currentMin);
+    }
+
     try {
       writeFileSync(outPath, JSON.stringify(samples, null, 2));
     } catch {
@@ -1834,6 +1898,10 @@ export async function main(): Promise<number> {
 
   clearInterval(botTimer);
   console.log("\nThời gian đo kết thúc. Đang dừng hành động bot để xả hết tin nhắn...");
+  const finalMin = Math.floor((Date.now() - startTime) / 1000 / 60);
+  if (args.boss && finalMin > lastRecordedHunterMinute) {
+    recordBossHunterStatus(finalMin);
+  }
   await sleep(1500);
 
   // Cảnh giới THẬT của bot lúc cuối (chết do quái thì luân hồi, cảnh giới có thể tụt so với lúc gieo): chỉ để ghi nhận, không kiểm
@@ -1983,10 +2051,25 @@ export async function main(): Promise<number> {
         skillCastCounts,
       }
     : undefined;
-  const bossContext = args.boss
+  let bossHunterStatus: BossSoakContext["bossHunterStatus"] | undefined;
+  if (args.boss) {
+    const inputs = collectBossHunterInputs();
+    const finalSnap = computeBossHunterMinuteStatus(0, inputs);
+    bossHunterStatus = {
+      totalHunters: finalSnap.totalHunters,
+      huntersInMap: finalSnap.inHacPhong,
+      huntersAlive: inputs.filter((h) => h.isConnected && (h.realm ?? 0) >= 1).length,
+      bossesVisible: finalSnap.bossesVisible,
+    };
+  }
+
+  const bossContext: BossSoakContext | undefined = args.boss
     ? {
         requiredAbilities: ["quat_duoi", "phun_doc", "cuon_minh", "goi_ran_con"],
         abilityCastCounts: bossAbilityCastCounts,
+        bossHunterStatus,
+        bossTimeline: bossAbilityTimeline,
+        bossHuntersTimeline,
       }
     : undefined;
 
@@ -2115,7 +2198,13 @@ export async function main(): Promise<number> {
       m7: args.m7,
       boss: args.boss,
       ambush: args.ambush,
-      ...(args.boss ? { bossAbilityCastCounts } : {}),
+      ...(args.boss
+        ? {
+            bossAbilityCastCounts,
+            bossAbilityTimeline,
+            bossHuntersTimeline,
+          }
+        : {}),
       ...(args.ambush ? { ambush: ambushContext } : {}),
       ...(process.env.AMBUSH_SPLIT_POTIONS === "1"
         ? {
