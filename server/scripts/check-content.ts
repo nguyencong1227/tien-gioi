@@ -10,7 +10,8 @@
 //                   hàng / bộ chiêu trùm / sách chỉ trỏ tới thực thể CÓ THẬT, vật phẩm không "mồ côi", chiêu có
 //                   sách) — thêm vào đây khi có.
 //   Phần 3 (sau):   kiểm THUẬT NGỮ theo từ điển (`glossary.ts` / `glossary-banned.ts` của E / G) — thêm khi hai
-//                   tệp đó vào main; khung gọi sẵn bằng `try` để không chặn nếu chưa có.
+//                   tệp đó vào main (khi thêm, mỗi bộ kiểm là một mục CHECKS; `runChecks` đã bắt gọn hàm ném
+//                   nên một phần chưa sẵn KHÔNG chặn các phần khác — KHÔNG có khung riêng cho Phần 3).
 //   Các bộ kiểm KHÔNG gom vào đây (lý do kèm, xem docs/RA_SOAT_NOI_DUNG.md): chạy dưới dạng test trong `npm test`
 //   (ngôn ngữ `ngon-ngu.test.ts` / `no-cjk.test.ts`, cân bằng `balance/*.test.ts`, ...), KHÔNG có bảng thật để gọi
 //   (`tiledViolations`, `privatePackViolations`), hoặc KHÔNG bắt buộc từng PR (`ambushCoverageViolations`).

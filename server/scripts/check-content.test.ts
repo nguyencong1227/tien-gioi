@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,5 +75,20 @@ describe("runChecks — mã thoát + dòng báo", () => {
     const out = r.lines.join("\n");
     expect(out).toContain("BỊ NÉM");
     expect(out).toContain("dữ liệu sai kiểu nghiêm trọng");
+  });
+});
+
+// B nit (1): đường CLI (guard process.exit) KHÔNG có test — nếu guard hỏng (vd `if (false)`) thì script im
+// lặng thoát 0 KHÔNG chạy main, các test nội tiếp (runChecks) vẫn xanh. Spawn tiến trình thật bắt lỗi này.
+describe("check:content — CLI thật (guard process.exit)", () => {
+  it("chạy tsx scripts/check-content.ts: status 0 + stdout có '✓ check:content'", () => {
+    const tsx = path.resolve(HERE, "../../node_modules/.bin/tsx");
+    const script = path.resolve(HERE, "check-content.ts");
+    const r = spawnSync(tsx, [script], { cwd: path.resolve(HERE, ".."), encoding: "utf-8" });
+    expect(
+      r.status,
+      `script CLI thoát mã khác 0 (guard có thể hỏng).\nstdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
+    ).toBe(0);
+    expect(r.stdout).toContain("✓ check:content");
   });
 });
