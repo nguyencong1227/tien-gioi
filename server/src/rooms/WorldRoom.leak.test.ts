@@ -241,12 +241,10 @@ describe("rò rỉ sổ Hub / phòng sau nhiều vòng đời (#1105)", () => {
         heap.push(process.memoryUsage().heapUsed);
       }
       // Sau N vòng vào-thoát: mọi sổ dùng chung + players/ctrl/ghosts/phòng/phòng-sống/chat-sink HỒI VỀ ĐÚNG MỨC.
-      // Rò (players/ctrl/ghosts/phòng sót) sẽ PHỒNG theo số vòng → snapshot sau khác trước.
+      // Rò (players/ctrl/ghosts/phòng sót) sẽ PHỒNG theo số vòng → snapshot sau khác trước. leakList liệt kê MỌI rò.
       const afterTest = snapshot();
-      expect(
-        diffSnap(beforeTest, afterTest),
-        "rò rỉ sau N vòng vào-thoát: " + diffSnap(beforeTest, afterTest),
-      ).toBeNull();
+      const leaks = leakList(beforeTest, afterTest);
+      expect(leaks, "rò rỉ sau N vòng vào-thoát:\n" + leaks.map((l) => "  " + l).join("\n")).toEqual([]);
       // Bộ nhớ MỀM: chỉ in + dán PR; đỏ CHỈ khi --expose-gc có sẵn và tăng > 50% (rò thật).
       const first = heap[0]!;
       const last = heap[heap.length - 1]!;
