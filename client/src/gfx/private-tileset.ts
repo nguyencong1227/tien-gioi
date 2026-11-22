@@ -75,7 +75,7 @@ export function loadPrivateTilesetTexture(
   };
   const onComplete = () => {
     if (!scene.textures.exists(PRIVATE_TILESET_KEY)) return finish(false);
-    let img: { width: number; height: number } | null = null;
+    let img: { width: number; height: number } | null;
     try {
       img = scene.textures.get(PRIVATE_TILESET_KEY).getSourceImage();
     } catch {
