@@ -219,6 +219,13 @@ export interface BossSoakContext {
   requiredAbilities?: readonly string[];
   /** Số lần thi triển theo id chiêu trùm, đếm từ tin `fx` `bossCast` */
   abilityCastCounts: Record<string, number>;
+  /** Tình trạng bot săn trùm để chẩn đoán nguyên nhân khi thiếu chiêu (#1301) */
+  bossHunterStatus?: {
+    totalHunters: number;
+    huntersInMap: number;
+    huntersAlive: number;
+    bossesAliveInMap?: number;
+  };
 }
 
 /** Kết quả phần bộ chiêu trùm trong báo cáo (chỉ có khi soak chạy với `--boss`) */
@@ -227,6 +234,8 @@ export interface BossSoakResult {
   totalAbilityCasts: number;
   requiredAbilities: string[];
   missingRequired: string[];
+  /** Gợi ý nguyên nhân khi thiếu chiêu (#1301) */
+  diagnosis?: string;
 }
 
 /** Kết quả phần nội dung M7 trong báo cáo (chỉ có khi soak chạy với `--m7`) */
@@ -536,8 +545,30 @@ export function analyzeSoak(
       missingRequired,
     };
     if (missingRequired.length > 0) {
+      let diag: string | undefined;
+      if (extra.boss.bossHunterStatus) {
+        const s = extra.boss.bossHunterStatus;
+        const hints: string[] = [];
+        if (s.huntersInMap < s.totalHunters) {
+          hints.push(
+            `${s.totalHunters - s.huntersInMap}/${s.totalHunters} bot săn trùm ở sai bản đồ (không ở Hắc Phong Cốc)`,
+          );
+        }
+        if (s.huntersAlive < s.totalHunters) {
+          hints.push(
+            `${s.totalHunters - s.huntersAlive}/${s.totalHunters} bot săn trùm đã chết/luân hồi về Phàm Nhân`,
+          );
+        }
+        if (s.bossesAliveInMap !== undefined && s.bossesAliveInMap === 0) {
+          hints.push("không còn con trùm nào sống trên bản đồ");
+        }
+        if (hints.length > 0) {
+          diag = `gợi ý nguyên nhân: ${hints.join("; ")}`;
+          boss.diagnosis = diag;
+        }
+      }
       reasons.push(
-        `Chế độ --boss: ${missingRequired.length}/${required.length} chiêu trùm không được thi triển lần nào: ${missingRequired.join(", ")}`,
+        `Chế độ --boss: ${missingRequired.length}/${required.length} chiêu trùm không được thi triển lần nào: ${missingRequired.join(", ")}${diag ? ` (${diag})` : ""}`,
       );
     }
   }
@@ -699,6 +730,9 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
       `  - Chiêu bắt buộc:        ${b.requiredAbilities.length - b.missingRequired.length}/${b.requiredAbilities.length} có lượt thi triển`,
       `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
     );
+    if (b.diagnosis) {
+      lines.push(`  - Gợi ý nguyên nhân:     ${b.diagnosis}`);
+    }
   }
 
   if (res.ambush) {

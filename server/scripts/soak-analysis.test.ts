@@ -409,6 +409,34 @@ describe("analyzeSoak", () => {
       expect(res.boss?.missingRequired).toEqual(["goi_ran_con"]);
       expect(res.reasons.some((r) => r.includes("1/4") && r.includes("goi_ran_con"))).toBe(true);
     });
+
+    it("in gợi ý nguyên nhân khi thiếu chiêu trùm và có thông tin botHunterStatus (#1301)", () => {
+      const abilityCastCounts = { quat_duoi: 0, phun_doc: 0, cuon_minh: 0, goi_ran_con: 0 };
+      const res = analyzeSoak(
+        samples,
+        {},
+        {
+          boss: {
+            requiredAbilities: required,
+            abilityCastCounts,
+            bossHunterStatus: {
+              totalHunters: 15,
+              huntersInMap: 10,
+              huntersAlive: 11,
+              bossesAliveInMap: 0,
+            },
+          },
+        },
+      );
+      expect(res.pass).toBe(false);
+      expect(res.boss?.diagnosis).toContain("5/15 bot săn trùm ở sai bản đồ");
+      expect(res.boss?.diagnosis).toContain("4/15 bot săn trùm đã chết/luân hồi về Phàm Nhân");
+      expect(res.boss?.diagnosis).toContain("không còn con trùm nào sống trên bản đồ");
+      const table = formatSoakTable(res);
+      expect(table).toContain(
+        "Gợi ý nguyên nhân:     gợi ý nguyên nhân: 5/15 bot săn trùm ở sai bản đồ",
+      );
+    });
   });
 
   describe("Chế độ thử tải Chặn đường (--ambush, CD10 #1070, #1276)", () => {

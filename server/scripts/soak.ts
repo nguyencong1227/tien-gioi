@@ -85,6 +85,7 @@ import {
   classifyServerLogLine,
   formatSoakTable,
   type AmbushSoakContext,
+  type BossSoakContext,
   type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
@@ -1258,6 +1259,202 @@ export async function main(): Promise<number> {
           }
         }
       }
+    } else if (b.bossHunt) {
+      // -----------------------------------------------------------------------
+      // BOT SĂN TRÙM (--boss): Độc lập, chuyên săn Xích Mãng tại Hắc Phong Cốc (#1001, #1301)
+      // Không bị ảnh hưởng bởi --ambush hay vai trò bot săn quái thường.
+      // -----------------------------------------------------------------------
+      if (b.map.def.id !== "hac_phong") {
+        // Bị chuyển về bản đồ khác (ví dụ Lạc Hà sau khi luân hồi): tìm cổng dẫn về Hắc Phong Cốc
+        const targetPortal = b.map.portals.find((p) => p.toMap === "hac_phong") ?? b.map.portals[0];
+        if (targetPortal && now >= b.nextTravelAt && !b.isTravelling) {
+          const dist = Math.hypot(targetPortal.x - b.predX, targetPortal.y - b.predY);
+          if (dist > targetPortal.r * 0.75) {
+            b.travelPath ??= pathToPortal(b.map, b.predX, b.predY, targetPortal) ?? [];
+            while (
+              b.travelPath.length > 1 &&
+              Math.hypot(b.travelPath[0].x - b.predX, b.travelPath[0].y - b.predY) < 24
+            ) {
+              b.travelPath.shift();
+            }
+            const wp = b.travelPath[0] ?? targetPortal;
+            const a = Math.atan2(wp.y - b.predY, wp.x - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+            followingPath = true;
+          } else {
+            b.isTravelling = true;
+            b.travelPath = null;
+            b.room.send("travel", { portalId: targetPortal.id });
+            b.nextTravelAt = now + TRAVEL_COOLDOWN_MS + 2000;
+          }
+        }
+      } else {
+        // Đang ở Hắc Phong Cốc
+        if (me) {
+          const hpRatio = me.hp / Math.max(1, me.maxHp);
+          const mpRatio = me.mp / Math.max(1, me.maxMp);
+          if (!b.resting && (hpRatio < 0.4 || mpRatio < 0.2)) {
+            b.resting = true;
+            b.huntPath = null;
+          } else if (b.resting && hpRatio >= 0.95 && mpRatio >= 0.9) {
+            b.resting = false;
+            b.huntPath = null;
+            b.room.send("meditate", { on: false });
+          }
+        }
+
+        if (b.resting) {
+          // Điểm an toàn cổng Bắc Hắc Phong Cốc (x: 2080, y: 220) để đả tọa hồi phục
+          const safeX = 2080;
+          const safeY = 220;
+          const distSafe = Math.hypot(safeX - b.predX, safeY - b.predY);
+          if (distSafe <= 80) {
+            if (now >= b.nextMeditateAt) {
+              b.room.send("meditate", { on: true });
+              b.nextMeditateAt = now + 3000;
+            }
+          } else {
+            const a = Math.atan2(safeY - b.predY, safeX - b.predX);
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+          }
+        } else {
+          // Tìm trùm hoặc rắn con trong bán kính 2500 px (tuyệt đối không nhắm sói/hổ để tránh lạc bãi)
+          let nearestMon: any = null;
+          let nearestId = "";
+          let nearestDist = Number.POSITIVE_INFINITY;
+          let bestScore = Number.POSITIVE_INFINITY;
+          b.room.state.monsters?.forEach((m: any, id: string) => {
+            if (m.hp <= 0) return;
+            const isAdd = m.kind === "ran_con";
+            const isBoss =
+              m.kind === "mang" ||
+              m.kind === "hac_giao" ||
+              m.kind === "thien_han_vuong" ||
+              m.kind === "yeu_vuong";
+            if (!isAdd && !isBoss) return;
+
+            const d = Math.hypot(m.x - b.predX, m.y - b.predY);
+            if (d > 2500) return;
+
+            const score = isAdd && d <= 350 ? d - 20000 : isBoss ? d - 10000 : d;
+            if (score < bestScore) {
+              bestScore = score;
+              nearestDist = d;
+              nearestMon = m;
+              nearestId = id;
+            }
+          });
+
+          if (nearestMon) {
+            b.campX = b.predX;
+            b.campY = b.predY;
+            const angle = Math.atan2(nearestMon.y - b.predY, nearestMon.x - b.predX);
+            const isBossTarget =
+              nearestMon.kind === "mang" ||
+              nearestMon.kind === "hac_giao" ||
+              nearestMon.kind === "thien_han_vuong" ||
+              nearestMon.kind === "yeu_vuong";
+            const wantDist = isBossTarget ? 190 : SKILLS.slash.range;
+            if (nearestDist > wantDist) {
+              let aimX = nearestMon.x;
+              let aimY = nearestMon.y;
+              if (!segmentClear(b.map, b.predX, b.predY, aimX, aimY)) {
+                if (!b.huntPath || b.huntPathMonster !== nearestId || now >= b.huntPathAt + 2000) {
+                  b.huntPath =
+                    pathToPortal(b.map, b.predX, b.predY, { x: aimX, y: aimY, r: 80 }) ?? [];
+                  b.huntPathAt = now;
+                  b.huntPathMonster = nearestId;
+                }
+                while (
+                  b.huntPath.length > 1 &&
+                  Math.hypot(b.huntPath[0].x - b.predX, b.huntPath[0].y - b.predY) < 24
+                ) {
+                  b.huntPath.shift();
+                }
+                const wp = b.huntPath[0];
+                if (wp) {
+                  aimX = wp.x;
+                  aimY = wp.y;
+                  followingPath = true;
+                }
+              } else {
+                b.huntPath = null;
+              }
+              const a = Math.atan2(aimY - b.predY, aimX - b.predX);
+              dx = Math.cos(a);
+              dy = Math.sin(a);
+            } else if (isBossTarget && nearestDist < 150) {
+              // Lùi nhẹ để giữ cự ly >= 130 px kích hoạt chiêu cuon_minh
+              const a = angle + Math.PI;
+              dx = Math.cos(a);
+              dy = Math.sin(a);
+            }
+
+            if (nearestDist <= SKILLS.slash.range + 10 && now >= b.nextSlashAt) {
+              b.room.send("attack", { angle });
+              b.nextSlashAt = now + SKILLS.slash.cooldown + 50;
+            }
+            if (b.skills && me) {
+              tryCastLearnedSkill(b, me, nearestDist, angle, now, true);
+            }
+            if (nearestDist <= SKILLS.sword.range && now >= b.nextSwordAt) {
+              b.room.send("cast", { skillId: "sword", angle });
+              b.nextSwordAt = now + SKILLS.sword.cooldown + 100;
+            }
+          } else {
+            // Không thấy trùm trong tầm: trở về điểm phục kích tại nửa phía bắc Hắc Phong Cốc
+            const assignedSpot = BOSS_HUNTER_SPOTS[(b.index - 1) % BOSS_HUNTER_SPOTS.length]!;
+            const distSpot = Math.hypot(assignedSpot.x - b.predX, assignedSpot.y - b.predY);
+            if (distSpot > 200) {
+              if (!segmentClear(b.map, b.predX, b.predY, assignedSpot.x, assignedSpot.y)) {
+                if (
+                  !b.huntPath ||
+                  b.huntPathMonster !== "boss_spot" ||
+                  now >= b.huntPathAt + 3000
+                ) {
+                  b.huntPath =
+                    pathToPortal(b.map, b.predX, b.predY, {
+                      x: assignedSpot.x,
+                      y: assignedSpot.y,
+                      r: 80,
+                    }) ?? [];
+                  b.huntPathAt = now;
+                  b.huntPathMonster = "boss_spot";
+                }
+                while (
+                  b.huntPath.length > 1 &&
+                  Math.hypot(b.huntPath[0].x - b.predX, b.huntPath[0].y - b.predY) < 24
+                ) {
+                  b.huntPath.shift();
+                }
+                const wp = b.huntPath[0] ?? assignedSpot;
+                const a = Math.atan2(wp.y - b.predY, wp.x - b.predX);
+                dx = Math.cos(a);
+                dy = Math.sin(a);
+                followingPath = true;
+              } else {
+                b.huntPath = null;
+                const a = Math.atan2(assignedSpot.y - b.predY, assignedSpot.x - b.predX);
+                dx = Math.cos(a);
+                dy = Math.sin(a);
+              }
+            } else {
+              b.huntPath = null;
+              if (now >= b.nextTurnAt) {
+                b.wanderAngle += (Math.random() - 0.5) * 0.8;
+                b.nextTurnAt = now + 1000 + Math.random() * 2000;
+              }
+              if (distSpot > 120) {
+                b.wanderAngle = Math.atan2(assignedSpot.y - b.predY, assignedSpot.x - b.predX);
+              }
+              dx = Math.cos(b.wanderAngle);
+              dy = Math.sin(b.wanderAngle);
+            }
+          }
+        }
+      }
     } else {
       switch (b.role) {
         case "na": // Nguyên Anh ở Hàn Vân Lĩnh săn như bot "hunt" (khác: cảnh giới, bản đồ, sổ chiêu và tầm tìm quái)
@@ -1281,39 +1478,11 @@ export async function main(): Promise<number> {
             break;
           }
 
-          if (b.bossHunt && b.map.def.id !== "hac_phong") {
-            // Bị chuyển về bản đồ khác (ví dụ Lạc Hà sau khi luân hồi): tìm cổng dẫn về Hắc Phong Cốc
-            const targetPortal =
-              b.map.portals.find((p) => p.toMap === "hac_phong") ?? b.map.portals[0];
-            if (targetPortal && now >= b.nextTravelAt && !b.isTravelling) {
-              const dist = Math.hypot(targetPortal.x - b.predX, targetPortal.y - b.predY);
-              if (dist > targetPortal.r * 0.75) {
-                b.travelPath ??= pathToPortal(b.map, b.predX, b.predY, targetPortal) ?? [];
-                while (
-                  b.travelPath.length > 1 &&
-                  Math.hypot(b.travelPath[0].x - b.predX, b.travelPath[0].y - b.predY) < 24
-                ) {
-                  b.travelPath.shift();
-                }
-                const wp = b.travelPath[0] ?? targetPortal;
-                const a = Math.atan2(wp.y - b.predY, wp.x - b.predX);
-                dx = Math.cos(a);
-                dy = Math.sin(a);
-                followingPath = true;
-              } else {
-                b.isTravelling = true;
-                b.travelPath = null;
-                b.room.send("travel", { portalId: targetPortal.id });
-                b.nextTravelAt = now + TRAVEL_COOLDOWN_MS + 2000;
-              }
-            }
-            break;
-          }
           // Tìm quái gần nhất trong bán kính 300px. Hàn Vân Lĩnh chỉ có 62 quái trên bản đồ 4096 x 4096, con gần trạm nhất cách ~600 px
           // (quái sinh từ `minDanger` 0,2 trở ra): bán kính 300 px thì bot Nguyên Anh đứng quanh trạm gần như không gặp quái nào (soak 10 phút
           // đầu tiên: 3 / 6 chiêu Nguyên Anh không lần nào được thi triển). Bot Nguyên Anh nhìn tới tầm thấy của vùng nhìn (VIEW_ENTER 1100 px).
           const naHunter = b.role === "na";
-          // Bot Nguyên Anh hoặc bot săn trùm thấp khí huyết / linh lực: rút về vùng an toàn đả tọa hồi phục
+          // Bot Nguyên Anh thấp khí huyết / linh lực: rút về vùng an toàn đả tọa hồi phục
           if (naHunter && me) {
             const hpRatio = me.hp / Math.max(1, me.maxHp);
             const mpRatio = me.mp / Math.max(1, me.maxMp);
@@ -1325,36 +1494,9 @@ export async function main(): Promise<number> {
               b.huntPath = null;
               b.room.send("meditate", { on: false });
             }
-          } else if (b.bossHunt && me) {
-            const hpRatio = me.hp / Math.max(1, me.maxHp);
-            const mpRatio = me.mp / Math.max(1, me.maxMp);
-            if (!b.resting && (hpRatio < 0.4 || mpRatio < 0.2)) {
-              b.resting = true;
-              b.huntPath = null;
-            } else if (b.resting && hpRatio >= 0.95 && mpRatio >= 0.9) {
-              b.resting = false;
-              b.huntPath = null;
-              b.room.send("meditate", { on: false });
-            }
           }
           if (b.resting) {
-            if (b.bossHunt) {
-              // Bot săn trùm: điểm an toàn là phía nam cổng bắc Hắc Phong Cốc (x: 2080, y: 220, safeR: 192)
-              // Điểm này nằm sâu trong vùng an toàn của cổng bắc, đồng thời y > 150 nên không bị chặn bởi isPositionSafe
-              const safeX = 2080;
-              const safeY = 220;
-              const distSafe = Math.hypot(safeX - b.predX, safeY - b.predY);
-              if (distSafe <= 80) {
-                if (now >= b.nextMeditateAt) {
-                  b.room.send("meditate", { on: true });
-                  b.nextMeditateAt = now + 3000;
-                }
-              } else {
-                const a = Math.atan2(safeY - b.predY, safeX - b.predX);
-                dx = Math.cos(a);
-                dy = Math.sin(a);
-              }
-            } else if (b.map.inTown(b.predX, b.predY)) {
+            if (b.map.inTown(b.predX, b.predY)) {
               // Trong trạm: đứng yên đả tọa (gửi lại định kỳ vì bị đánh / di chuyển là thôi đả tọa)
               if (now >= b.nextMeditateAt) {
                 b.room.send("meditate", { on: true });
@@ -1385,31 +1527,12 @@ export async function main(): Promise<number> {
           let nearestMon: any = null;
           let nearestId = "";
           let nearestDist = Number.POSITIVE_INFINITY;
-          const maxDist = naHunter ? NA_HUNT_RADIUS : b.bossHunt ? 2500 : 300;
-          let bestScore = Number.POSITIVE_INFINITY;
+          const maxDist = naHunter ? NA_HUNT_RADIUS : 300;
           b.room.state.monsters.forEach((m: any, id: string) => {
             if (m.hp <= 0) return;
             const d = Math.hypot(m.x - b.predX, m.y - b.predY);
             if (d > maxDist) return;
-            if (b.bossHunt) {
-              // Bot săn trùm:
-              // - Nếu có rắn con (ran_con) gần bot (d <= 350), ưu tiên diệt rắn con trước để bossLiveAdds < maxAdds,
-              //   giúp Xích Mãng ở Giai đoạn 2 kích hoạt chiêu "goi_ran_con".
-              const isAdd = m.kind === "ran_con" && d <= 350;
-              const isBoss =
-                m.kind === "mang" ||
-                m.kind === "hac_giao" ||
-                m.kind === "thien_han_vuong" ||
-                m.kind === "yeu_vuong";
-              const score = isAdd ? d - 20000 : isBoss ? d - 10000 : d;
-              const safe = isAdd || isBoss || isPositionSafe(b.map, m.x, m.y, 20);
-              if (score < bestScore && safe) {
-                bestScore = score;
-                nearestDist = d;
-                nearestMon = m;
-                nearestId = id;
-              }
-            } else if (d < nearestDist && isPositionSafe(b.map, m.x, m.y, 20)) {
+            if (d < nearestDist && isPositionSafe(b.map, m.x, m.y, 20)) {
               nearestDist = d;
               nearestMon = m;
               nearestId = id;
@@ -1418,21 +1541,12 @@ export async function main(): Promise<number> {
 
           if (nearestMon) {
             // Săn lang thang: bãi săn dời theo con quái đang đuổi (không thì hết quái gần là bot quay về bãi cũ rồi lại đi)
-            if (naHunter || b.bossHunt) {
+            if (naHunter) {
               b.campX = b.predX;
               b.campY = b.predY;
             }
             const angle = Math.atan2(nearestMon.y - b.predY, nearestMon.x - b.predX);
-            const isBossTarget =
-              b.bossHunt &&
-              (nearestMon.kind === "mang" ||
-                nearestMon.kind === "hac_giao" ||
-                nearestMon.kind === "thien_han_vuong" ||
-                nearestMon.kind === "yeu_vuong");
-            // Bot săn trùm giữ cự ly giao chiến ở 160-190 px: ở cự ly này bot dùng kiếm (sword, tầm 260 px)
-            // và các chiêu tầm xa. Cự ly luôn >= 130 px buộc trùm phải dùng "cuon_minh" (minDist 120 px) để lao tới áp sát,
-            // và khi trùm lao tới sát bot (< 100 px), trùm sẽ thi triển tiếp "quat_duoi" (maxDist 170 px)
-            const wantDist = isBossTarget ? 190 : SKILLS.slash.range;
+            const wantDist = SKILLS.slash.range;
             if (nearestDist > wantDist) {
               let aimX = nearestMon.x;
               let aimY = nearestMon.y;
@@ -1465,11 +1579,6 @@ export async function main(): Promise<number> {
                 b.huntPath = null;
               }
               const a = Math.atan2(aimY - b.predY, aimX - b.predX);
-              dx = Math.cos(a);
-              dy = Math.sin(a);
-            } else if (isBossTarget && nearestDist < 150) {
-              // Lùi nhẹ để giữ cự ly >= 130 px kích hoạt chiêu cuon_minh
-              const a = angle + Math.PI;
               dx = Math.cos(a);
               dy = Math.sin(a);
             }
@@ -1983,10 +2092,38 @@ export async function main(): Promise<number> {
         skillCastCounts,
       }
     : undefined;
-  const bossContext = args.boss
+  let bossHunterStatus: BossSoakContext["bossHunterStatus"] | undefined;
+  if (args.boss) {
+    const bossBots = bots.filter((b) => b.bossHunt);
+    const totalHunters = bossBots.length;
+    const huntersInMap = bossBots.filter((b) => b.map.def.id === "hac_phong").length;
+    const huntersAlive = bossBots.filter((b) => {
+      const me = b.room?.state?.players?.get(b.room?.sessionId);
+      return me && me.realm >= 1;
+    }).length;
+    const livingBossIds = new Set<string>();
+    for (const b of bossBots) {
+      if (b.map.def.id === "hac_phong") {
+        b.room?.state?.monsters?.forEach((m: any, id: string) => {
+          if (m.hp > 0 && m.kind === "mang") {
+            livingBossIds.add(id);
+          }
+        });
+      }
+    }
+    bossHunterStatus = {
+      totalHunters,
+      huntersInMap,
+      huntersAlive,
+      bossesAliveInMap: livingBossIds.size,
+    };
+  }
+
+  const bossContext: BossSoakContext | undefined = args.boss
     ? {
         requiredAbilities: ["quat_duoi", "phun_doc", "cuon_minh", "goi_ran_con"],
         abilityCastCounts: bossAbilityCastCounts,
+        bossHunterStatus,
       }
     : undefined;
 
