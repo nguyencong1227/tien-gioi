@@ -5,6 +5,7 @@ import {
   classifyServerLogLine,
   formatSoakTable,
   linearRegression,
+  type BossHunterMinuteStatus,
   type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
@@ -436,6 +437,63 @@ describe("analyzeSoak", () => {
       expect(table).toContain(
         "Gợi ý nguyên nhân:     gợi ý nguyên nhân: 5/15 bot săn trùm ở sai bản đồ",
       );
+    });
+
+    it("hiển thị dòng thời gian chiêu trùm và trạng thái nhóm săn trùm theo phút (#1301)", () => {
+      const abilityCastCounts = { quat_duoi: 2, phun_doc: 1, cuon_minh: 1, goi_ran_con: 1 };
+      const bossTimeline = [
+        { minute: 0, second: 15, ability: "phun_doc", bossKind: "mang" },
+        { minute: 0, second: 45, ability: "quat_duoi", bossKind: "mang" },
+        { minute: 1, second: 10, ability: "cuon_minh", bossKind: "mang" },
+        { minute: 1, second: 30, ability: "quat_duoi", bossKind: "mang" },
+        { minute: 2, second: 5, ability: "goi_ran_con", bossKind: "mang" },
+      ];
+      const bossHuntersTimeline: BossHunterMinuteStatus[] = [
+        {
+          minute: 0,
+          totalHunters: 15,
+          inHacPhong: 15,
+          resting: 0,
+          dead: 0,
+          byMap: { hac_phong: 15 },
+          bossesAlive: 1,
+        },
+        {
+          minute: 1,
+          totalHunters: 15,
+          inHacPhong: 14,
+          resting: 2,
+          dead: 0,
+          byMap: { hac_phong: 14, default: 1 },
+          bossesAlive: 1,
+        },
+      ];
+      const res = analyzeSoak(
+        samples,
+        {},
+        {
+          boss: {
+            requiredAbilities: required,
+            abilityCastCounts,
+            bossTimeline,
+            bossHuntersTimeline,
+          },
+        },
+      );
+      expect(res.pass).toBe(true);
+      expect(res.boss?.timeline).toEqual(bossTimeline);
+      expect(res.boss?.huntersTimeline).toEqual(bossHuntersTimeline);
+
+      const table = formatSoakTable(res);
+      expect(table).toContain("Dòng thời gian chiêu trùm theo phút:");
+      expect(table).toContain("+ Phút 00: phun_doc: 1, quat_duoi: 1");
+      expect(table).toContain("+ Phút 01: cuon_minh: 1, quat_duoi: 1");
+      expect(table).toContain("+ Phút 02: goi_ran_con: 1");
+      expect(table).toContain("Trạng thái nhóm săn trùm theo phút:");
+      expect(table).toContain(
+        "Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Bản đồ khác",
+      );
+      expect(table).toContain("default: 1");
     });
   });
 

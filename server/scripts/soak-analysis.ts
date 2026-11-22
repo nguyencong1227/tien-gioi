@@ -213,6 +213,26 @@ export interface AmbushSoakResult extends AmbushSoakContext {
   reasons: string[];
 }
 
+/** Sự kiện thi triển chiêu trùm để ghi dòng thời gian (#1301) */
+export interface BossCastEvent {
+  minute: number;
+  second: number;
+  ability: string;
+  bossId?: string;
+  bossKind?: string;
+}
+
+/** Trạng thái nhóm bot săn trùm theo từng phút để theo dõi và chẩn đoán (#1301) */
+export interface BossHunterMinuteStatus {
+  minute: number;
+  totalHunters: number;
+  inHacPhong: number;
+  resting: number;
+  dead: number;
+  byMap: Record<string, number>;
+  bossesAlive?: number;
+}
+
 /** Số đo bộ chiêu trùm của một lượt soak bật `--boss` */
 export interface BossSoakContext {
   /** Các chiêu trùm bắt buộc có ít nhất một lần thi triển */
@@ -226,6 +246,10 @@ export interface BossSoakContext {
     huntersAlive: number;
     bossesAliveInMap?: number;
   };
+  /** Dòng thời gian chiêu trùm ghi nhận trong quá trình soak (#1301) */
+  bossTimeline?: BossCastEvent[];
+  /** Trạng thái nhóm bot săn trùm theo từng phút (#1301) */
+  bossHuntersTimeline?: BossHunterMinuteStatus[];
 }
 
 /** Kết quả phần bộ chiêu trùm trong báo cáo (chỉ có khi soak chạy với `--boss`) */
@@ -236,6 +260,10 @@ export interface BossSoakResult {
   missingRequired: string[];
   /** Gợi ý nguyên nhân khi thiếu chiêu (#1301) */
   diagnosis?: string;
+  /** Dòng thời gian chiêu trùm (#1301) */
+  timeline?: BossCastEvent[];
+  /** Trạng thái nhóm bot săn trùm theo phút (#1301) */
+  huntersTimeline?: BossHunterMinuteStatus[];
 }
 
 /** Kết quả phần nội dung M7 trong báo cáo (chỉ có khi soak chạy với `--m7`) */
@@ -543,6 +571,8 @@ export function analyzeSoak(
       totalAbilityCasts,
       requiredAbilities: [...required],
       missingRequired,
+      timeline: extra.boss.bossTimeline,
+      huntersTimeline: extra.boss.bossHuntersTimeline,
     };
     if (missingRequired.length > 0) {
       let diag: string | undefined;
@@ -730,6 +760,36 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
       `  - Chiêu bắt buộc:        ${b.requiredAbilities.length - b.missingRequired.length}/${b.requiredAbilities.length} có lượt thi triển`,
       `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
     );
+    if (b.timeline && b.timeline.length > 0) {
+      lines.push("  - Dòng thời gian chiêu trùm theo phút:");
+      const castsByMin: Record<number, Record<string, number>> = {};
+      for (const ev of b.timeline) {
+        castsByMin[ev.minute] ??= {};
+        castsByMin[ev.minute][ev.ability] = (castsByMin[ev.minute][ev.ability] ?? 0) + 1;
+      }
+      for (const min of Object.keys(castsByMin)
+        .map(Number)
+        .sort((a, b) => a - b)) {
+        const detail = Object.entries(castsByMin[min])
+          .map(([ab, count]) => `${ab}: ${count}`)
+          .join(", ");
+        lines.push(`      + Phút ${String(min).padStart(2, "0")}: ${detail}`);
+      }
+    }
+    if (b.huntersTimeline && b.huntersTimeline.length > 0) {
+      lines.push("  - Trạng thái nhóm săn trùm theo phút:");
+      lines.push("      Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Bản đồ khác");
+      for (const s of b.huntersTimeline) {
+        const otherMaps = Object.entries(s.byMap)
+          .filter(([m]) => m !== "hac_phong")
+          .map(([m, count]) => `${m}: ${count}`)
+          .join(", ");
+        const otherStr = otherMaps || "0";
+        lines.push(
+          `      ${String(s.minute).padStart(4)} | ${String(s.totalHunters).padStart(8)} | ${String(s.inHacPhong).padStart(9)} | ${String(s.resting).padStart(11)} | ${String(s.dead).padStart(14)} | ${otherStr}`,
+        );
+      }
+    }
     if (b.diagnosis) {
       lines.push(`  - Gợi ý nguyên nhân:     ${b.diagnosis}`);
     }
