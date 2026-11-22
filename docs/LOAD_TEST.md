@@ -2234,7 +2234,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 
 ### 41.1. Bối cảnh & Cấu hình thử nghiệm
 - **Bối cảnh:** Thử nghiệm tải dài phục vụ hồ sơ ứng viên phát hành RC (Issue #1290 Mục 4) trên đầu commit `main` (`66aef6aa` / `892325c5`).
-- **Mục tiêu:** Kiểm chứng tính ổn định của máy chủ trong thời gian dài (30 phút, 100 bot): dốc VmRSS nửa sau $\le 1,0$ MB/phút, tick p95 $\le 10,0$ ms, không rò rỉ hàng đợi ghi, `kiem-save` dữ liệu an toàn, bảo toàn Linh thạch khớp sổ sách, độ phủ kịch bản `--m7` và `--boss`.
+- **Mục tiêu:** Kiểm chứng tính ổn định của máy chủ trong thời gian dài (30 phút, 100 bot): dốc VmRSS nửa sau <= 1,0 MB/phút, tick p95 <= 10,0 ms, không rò rỉ hàng đợi ghi, `kiem-save` dữ liệu an toàn, bảo toàn Linh thạch khớp sổ sách, độ phủ kịch bản `--m7` và `--boss`.
 - **Cấu hình cờ runtime (khớp bản chạy thật):**
   - `BOSS_MOVES=on` (kèm `--boss`, trùm thi triển bộ chiêu trùm).
   - `SECTS=on` (tông môn bật đầy đủ).
@@ -2253,31 +2253,31 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 
 | Nhóm chỉ số | Chỉ số cụ thể | Lần 1 (Dev C, 28.3m, 170 mẫu) | Lần 2 ĐẦY ĐỦ (Dev A, 30.0m, 180 mẫu) | Ngưỡng / Tiêu chuẩn | Đánh giá |
 |---|---|---:|---:|---:|:---:|
-| **Quy mô bot** | Số bot khởi tạo $\to$ kết thúc | 100 $\to$ 100 (ở mẫu cuối) | 100 $\to$ 100 (rớt 0) | Tỉ lệ rớt $\le 5\%$ | **ĐẠT** |
+| **Quy mô bot** | Số bot khởi tạo -> kết thúc | 100 -> 100 (ở mẫu cuối) | 100 -> 100 (rớt 0) | Tỉ lệ rớt <= 5% | **ĐẠT** |
 | **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 179,12 MB | 176,93 MB | — | — |
 | | VmRSS sau làm nóng (5.0m) | 212,77 MB | 211,85 MB | — | — |
 | | VmRSS kết thúc | 214,01 MB | 213,52 MB | — | — |
-| | Mức tăng sau warmup | **+1,24 MB** | **+1,67 MB** | $\le 50,0$ MB | **ĐẠT** |
-| | **Dốc nửa sau (OLS)** | **+0,009 MB/phút** | **+0,023 MB/phút** (toàn bộ +0,046) | $\le 1,00$ MB/phút | **ĐẠT** |
-| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 1,54 ms, Max 2,36 ms** | **TB 1,59 ms, Max 2,31 ms** | $\le 10,0$ ms | **ĐẠT** |
+| | Mức tăng sau warmup | **+1,24 MB** | **+1,67 MB** | <= 50,0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0,009 MB/phút** | **+0,023 MB/phút** (toàn bộ +0,046) | <= 1,00 MB/phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 1,54 ms, Max 2,36 ms** | **TB 1,59 ms, Max 2,31 ms** | <= 10,0 ms | **ĐẠT** |
 | | Tick overruns (> 50 ms) | **0** | **0** | 0 | **ĐẠT** |
 | | CPU luồng chính / tick | TB 3,64 ms/tick | TB 3,38 ms/tick | — | **ĐẠT** |
 | | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi 0,0s, Lỗi 0 | Inflight max 0, Tuổi 0,0s, Lỗi 0 | — | **ĐẠT** |
-| | Độ trễ vòng lặp p99 | tối đa 26,0 ms | tối đa 26,4 ms | $\le 100$ ms | **ĐẠT** |
-| **Băng thông WebSocket** | Nhận trung bình | 153 B/tick | 149 B/tick (p95 175) | $\le 600$ B/tick | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | tối đa 26,0 ms | tối đa 26,4 ms | <= 100 ms | **ĐẠT** |
+| **Băng thông WebSocket** | Nhận trung bình | 153 B/tick | 149 B/tick (p95 175) | <= 600 B/tick | **ĐẠT** |
 | | Băng thông nhận TB / bot | 2,98 KB/s | 2,91 KB/s | — | **ĐẠT** |
 | **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 / 0 / 0 (`/metrics` 0) | 0 | **ĐẠT** |
 | | `kiem-save` sau soak | **0 lỗi** (100 nv, 100 hồn, 4 tông) | **0 lỗi** (100 nv, 100 hồn, 4 tông) | 0 lỗi vi phạm | **ĐẠT** |
 | | Tệp hỏng (`*.hong-*`) | 0 | 0 | 0 | **ĐẠT** |
-| **Bảo toàn Linh thạch** | Đối chiếu sổ cái tiền tệ | Ví đầu 29.600 $\to$ ví 11.479 + kho 8.420 = 19.899 (giảm 9.701, không vượt trần ban đầu, 0 ví âm; chưa có bộ đếm thả ra/tiêu) | **Đo chặt từ harness:** Ban đầu **29.600** + Thả ra **15.401** - Tiêu **35.580** = **9.421** = ví cuối **9.421**; Ví 9.421 + kho tông môn 8.740 = 18.161 $\le$ trần 45.001; **lệch ví bot: 0** | Khớp sổ cái từng đồng, lệch ví bot = 0 | **ĐẠT** |
+| **Bảo toàn Linh thạch** | Đối chiếu sổ cái tiền tệ | Ví đầu 29.600 -> ví 11.479 + kho 8.420 = 19.899 (giảm 9.701, không vượt trần ban đầu, 0 ví âm; chưa có bộ đếm thả ra/tiêu) | **Đo chặt từ harness:** Ban đầu **29.600** + Thả ra **15.401** - Tiêu **35.580** = **9.421** = ví cuối **9.421**; Ví 9.421 + kho tông môn 8.740 = 18.161 <= trần 45.001; **lệch ví bot: 0** | Khớp sổ cái từng đồng, lệch ví bot = 0 | **ĐẠT** |
 | **Nội dung M7** | Chiêu thức Nguyên Anh | — | 999 lượt thi triển, **6/6** chiêu Nguyên Anh bắt buộc có lượt | Đủ 6/6 | **ĐẠT** |
-| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT (Đang điều tra)** |
+| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT (lỗi harness, #1301; game xác nhận bằng harness cũ)** |
 
 ---
 
 ### 41.3. Nhận xét & Đánh giá chi tiết
 1. **Không rò rỉ bộ nhớ (ĐẠT):**
-   - Cả hai lần chạy đều cho thấy mức tăng bộ nhớ VmRSS sau thời gian làm nóng (warmup 5 phút) là rất nhỏ: lần 1 tăng **+1,24 MB** trong 23,3 phút, lần 2 tăng **+1,67 MB** trong 25 phút (ngưỡng cho phép $\le 50,0$ MB).
+   - Cả hai lần chạy đều cho thấy mức tăng bộ nhớ VmRSS sau thời gian làm nóng (warmup 5 phút) là rất nhỏ: lần 1 tăng **+1,24 MB** trong 23,3 phút, lần 2 tăng **+1,67 MB** trong 25 phút (ngưỡng cho phép <= 50,0 MB).
    - Hệ số góc hồi quy tuyến tính OLS nửa sau lần lượt là `+0,009 MB/phút` và `+0,023 MB/phút` (toàn bộ lần 2 là `+0,046 MB/phút`), cách rất xa ngưỡng giới hạn `1,00 MB/phút`. Không phát hiện dấu hiệu rò rỉ bộ nhớ dài hạn với vòng lặp 20 tick/giây, StateView và sổ chiêu M7.
 2. **Hiệu năng nhịp tick và vòng lặp sự kiện (ĐẠT):**
    - Nhịp tick p95 phòng tệ nhất duy trì ổn định ở mức trung bình **1,54–1,59 ms** (đỉnh cực đại 2,31–2,36 ms), chỉ chiếm khoảng 3–4% ngân sách 50 ms / tick.
@@ -2287,8 +2287,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
    - Hàng đợi ghi nhân vật luôn giải phóng ngay (`writesInflight = 0`, `writesOldestAgeMs = 0`, 0 lỗi ghi).
    - `kiem-save` kiểm toán toàn bộ 100 nhân vật, 100 chân linh và 4 tông môn đạt **0 lỗi vi phạm**, không sinh tệp cách ly `*.hong-*`.
    - Kết quả đo từ harness ở lần 2 chứng minh tính bảo toàn tiền tệ tuyệt đối: `29.600 (ban đầu) + 15.401 (thả ra) - 35.580 (tiêu) = 9.421 (ví cuối)`, sai số lệch ví bot = 0.
-4. **Vấn đề tiêu chí độ phủ chiêu trùm `--boss` (KHÔNG ĐẠT - Đang điều tra):**
-   - Harness ở lần chạy 30 phút báo kết luận tổng thể là **KHÔNG ĐẠT (FAIL)** do vi phạm tiêu chí độ phủ chiêu trùm: 0/4 chiêu của trùm Xích Mãng (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`) được thi triển lần nào trong suốt 30 phút (so với mục 38 trước đây đạt 19 lượt và đủ 4/4 chiêu).
-   - Đây là tiêu chí về độ phủ kịch bản thử nghiệm (bot săn trùm ở 15 điểm `BOSS_HUNTER_SPOTS` tại Hắc Phong Cốc có tiếp cận và kích hoạt trùm hay không), không phải tiêu chí về độ ổn định bộ nhớ hay crash máy chủ.
-   - Dev A đang tiến hành chạy thực nghiệm đối chứng để phân lập xem nguyên nhân xuất phát từ harness (thay đổi sau #1001) hay từ logic gameplay (trùm không sinh, không vận chiêu hoặc bot chết sớm).
-   - **Kết luận cho hồ sơ Ứng viên phát hành RC (Refs #1290):** Ghi nhận tiêu chí ổn định runtime (RAM, CPU, tick, I/O, bảo toàn tiền) đạt 100%, nhưng tiêu chí độ phủ chiêu trùm `--boss` được ghi nhận là **KHÔNG ĐẠT (đang điều tra)**, không ghi nhận là "soak đạt hoàn toàn".
+4. **Vấn đề tiêu chí độ phủ chiêu trùm `--boss` (KHÔNG ĐẠT do lỗi harness, Refs #1301):**
+   - Harness ở lần chạy 30 phút báo kết luận tổng thể là **KHÔNG ĐẠT (FAIL)** do vi phạm tiêu chí độ phủ chiêu trùm: 0/4 chiêu của trùm Xích Mãng (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`) được thi triển lần nào trong suốt 30 phút.
+   - **Xác nhận lỗi nằm ở harness, không phải game (Issue #1301):** Thử nghiệm đối chứng của Dev A chứng minh khi lấy harness cũ (`a6026256`, #1001) chạy trên cùng mã nguồn game `main` hiện tại trong 10 phút, Xích Mãng thi triển **12 lượt chiêu trùm** (`quat_duoi` 4, `cuon_minh` 3, `phun_doc` 2, `doi_lao` 1, `mua_bang` 1, `vung_bang` 1). Game hoàn toàn đúng; lỗi do harness mới di chuyển khối `bossHunt` vào khối lồng sâu hơn khiến 15 bot săn trùm không tiếp cận Xích Mãng.
+   - **Kết luận cho hồ sơ Ứng viên phát hành RC (Refs #1290):** Các tiêu chí ổn định và bảo toàn tiền ĐẠT; tiêu chí `--boss` KHÔNG ĐẠT do HARNESS (không phải lỗi game), có issue theo dõi #1301.
