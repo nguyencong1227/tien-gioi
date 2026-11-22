@@ -533,10 +533,10 @@ describe("nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết; số đ
       );
     }
     expect(ambushPotionNote(0, { tier: "leader", ...flee })).toBe(
-      "Kẻ cầm đầu rất mạnh, ngươi không mang Hồi Huyết Đan: nên bỏ chạy.",
+      "Cầm đầu mạnh, không có đan hồi huyết: nên bỏ chạy.",
     );
     expect(ambushPotionNote(1, { tier: "leader", ...flee })).toBe(
-      "Kẻ cầm đầu rất mạnh, túi chỉ còn 1 đan hồi huyết: nên bỏ chạy.",
+      "Cầm đầu mạnh, còn 1 đan hồi huyết: nên bỏ chạy.",
     );
     for (const tier of ["normal", "elite", "leader"] as const)
       expect(ambushPotionNote(2, { tier, ...flee }), `${tier} 2 đan`).toBe("");
@@ -600,9 +600,9 @@ describe("nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết; số đ
       );
     // cầm đầu: 0 và 1 đan đều "nên bỏ chạy" (số đo #1254: 1 đan vẫn chết 71 % ở bậc 11)
     expect(note("leader", price(420, 60, true), 0).potionNote).toContain("nên bỏ chạy");
-    expect(note("leader", price(420, 60, true), 0).potionNote).toContain("Kẻ cầm đầu");
+    expect(note("leader", price(420, 60, true), 0).potionNote).toContain("Cầm đầu mạnh");
     expect(note("leader", price(420, 60, true), 1).potionNote).toBe(
-      "Kẻ cầm đầu rất mạnh, túi chỉ còn 1 đan hồi huyết: nên bỏ chạy.",
+      "Cầm đầu mạnh, còn 1 đan hồi huyết: nên bỏ chạy.",
     );
     // chỉ MỘT trong hai giá trả nổi cũng là còn đường bỏ chạy (khớp hai nút bỏ chạy)
     expect(note("normal", price(0, 60, true), 0).potionNote).toContain("nên bỏ chạy"); // thanh tu vi trống, đủ Linh thạch

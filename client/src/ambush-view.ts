@@ -95,7 +95,7 @@ export interface AmbushPotionCtx {
  * Chỉ là lời nhắc: hộp thoại vẫn cho chọn như cũ (không khoá nút Chiến).
  *
  * Hộp thoại chỉ có 10 giây nên "nên mang ít nhất 2" lúc đó không làm được (QUYET_DINH_M3 mục 64: "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy"). Còn đường bỏ chạy (`canFlee`)
- * thì nói thẳng việc nên làm: không đan -> "nên bỏ chạy"; kẻ CẦM ĐẦU (mạnh nhất, số đo #1254: 1 đan vẫn chết 71 % ở bậc 11) dưới 2 đan -> nhấn mạnh rồi cũng "nên bỏ chạy".
+ * thì nói thẳng việc nên làm: không đan -> "nên bỏ chạy"; kẻ CẦM ĐẦU (mạnh nhất, số đo #1254: 1 đan vẫn chết 71 % ở bậc 11) dưới 2 đan (0 hay 1) -> gọi tên "Cầm đầu mạnh" rồi "nên bỏ chạy".
  * Một đan, kẻ thường / tinh anh: giữ lời nhắc mang đan (chưa đến mức khuyên bỏ chạy). Không trả nổi giá bỏ chạy nào: "nên bỏ chạy" là lời khuyên không làm được -> giữ lời nhắc cũ.
  */
 export function ambushPotionNote(potions: number | undefined, ctx: AmbushPotionCtx = {}): string {
@@ -105,8 +105,9 @@ export function ambushPotionNote(potions: number | undefined, ctx: AmbushPotionC
   const leader = ctx.tier === "leader";
   if (ctx.canFlee !== false) {
     if (leader) {
-      const have = n === 0 ? "ngươi không mang Hồi Huyết Đan" : `túi chỉ còn ${n} đan hồi huyết`;
-      return `Kẻ cầm đầu rất mạnh, ${have}: nên bỏ chạy.`;
+      // "Cầm đầu" = nhãn mức đang hiện trên hộp thoại. Câu NGẮN (<= ~50 chữ) để vừa MỘT dòng ở khung điện thoại ngang thấp: dài hơn thì hộp thoại phải cuộn (`check-ambush.mjs` bắt).
+      const have = n === 0 ? "không có đan hồi huyết" : `còn ${n} đan hồi huyết`;
+      return `Cầm đầu mạnh, ${have}: nên bỏ chạy.`;
     }
     if (n === 0) return "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy.";
   }
