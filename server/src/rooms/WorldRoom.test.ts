@@ -48,6 +48,8 @@ import {
   buyPrice,
   sellPrice,
   DEFAULT_MAP_ID,
+  REALMS,
+  arenaMapIdOf,
   HAC_PHONG_ID,
   AM_SUONG_ID,
   HAN_VAN_ID,
@@ -1914,6 +1916,44 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     expect(e.code).toBe(JOIN_WRONG_MAP);
     expect(parseWrongMap(e.code, e.message)).toBe(DEFAULT_MAP_ID);
     expect(saveFileOf(name)).toBeUndefined();
+  });
+
+  it("hồ sơ hỏng (realm / tier / exp âm, thiếu, rác): vẫn vào được phòng với giá trị hợp lệ, không ném TypeError ở onAuth / onJoin", async () => {
+    // Trước đây `Math.min(save.realm, ...)` không chặn dưới / NaN nên `REALMS[realm].tiers` ném TypeError: người chơi kẹt không vào được
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ["Hong Am", { realm: -3, tier: -1, exp: -50 }],
+      ["Hong Rac", { realm: "abc", tier: null, exp: "x" }],
+      ["Hong Qua", { realm: 999, tier: 999 }],
+    ];
+    for (const [name, patch] of cases) {
+      await seedSave(name, patch);
+      const b = await join(name);
+      const me = b.me();
+      expect([me.realm, me.tier], name).toEqual(
+        name === "Hong Qua"
+          ? [REALMS.length - 1, REALMS[REALMS.length - 1].tiers.length - 1]
+          : [0, 0],
+      );
+      expect(me.exp, name).toBeGreaterThanOrEqual(0);
+      await b.room.leave(true);
+      rooms.splice(rooms.indexOf(b.room), 1);
+    }
+    // hồ sơ thiếu hẳn trường cảnh giới (xoá khỏi tệp): cũng vào được
+    const name = "Hong Thieu";
+    const full = await seedSave(name, {});
+    const j = JSON.parse(readFileSync(full, "utf8"));
+    delete j.realm;
+    delete j.tier;
+    writeFileSync(full, JSON.stringify(j));
+    const c = await join(name);
+    expect([c.me().realm, c.me().tier]).toEqual([0, 0]);
+  });
+
+  it("hồ sơ mang id đấu trường chặn đường (sửa tay / hỏng): vào phòng Lạc Hà như bí cảnh, không bị đẩy tới phòng chỉ mở cho đúng một vé (kẹt)", async () => {
+    const name = "Ket Dau Truong";
+    await seedSave(name, { mapId: arenaMapIdOf(DEFAULT_MAP_ID) });
+    const b = await join(name); // JOIN_WRONG_MAP (wrong_map:arena_lac_ha) nếu mapIdOf không loại đấu trường
+    expect(serverRoom(b.room).mapId).toBe(DEFAULT_MAP_ID);
   });
 
   it("vị trí lưu rơi vào ô chặn: vào phòng ở chỗ thoáng GẦN nhất (không bị kéo về trấn) và ghi nhật ký kiểm toán map.relocate", async () => {
