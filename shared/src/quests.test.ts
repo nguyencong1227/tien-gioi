@@ -184,7 +184,7 @@ describe("nội dung nhiệm vụ (#19)", () => {
     return out;
   };
 
-  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ các việc phụ mang_hoan, giao_hoan (trùm theo đội) và ba việc phụ ở Hàn Vân (#725); Luyện Khí kết thúc ở tầng 9", () => {
+  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ các việc phụ mang_hoan, giao_hoan (trùm theo đội), ba việc phụ ở Hàn Vân (#725) và ba việc phụ ở Âm Sương (#756); Luyện Khí kết thúc ở tầng 9", () => {
     const ids = chain();
     expect(ids).toHaveLength(23);
     // Việc phụ không có người đứng trước và không nằm trong chuỗi: hạ Xích Mãng (không an toàn khi solo) KHÔNG được chặn chuỗi chính
@@ -193,6 +193,9 @@ describe("nội dung nhiệm vụ (#19)", () => {
         ...ids,
         "mang_hoan",
         "giao_hoan",
+        "am_suong_mao_hang",
+        "am_suong_quy_cao",
+        "am_suong_doc_nang",
         "lac_ha_bong_bang",
         "lac_ha_nanh_kiem",
         "lac_ha_tru_ho",
@@ -237,6 +240,9 @@ describe("nội dung nhiệm vụ (#19)", () => {
     const inChain = new Set(chain());
     const side = QUESTS.filter((q) => !q.daily && !inChain.has(q.id));
     expect(side.map((q) => q.id).sort()).toEqual([
+      "am_suong_doc_nang",
+      "am_suong_mao_hang",
+      "am_suong_quy_cao",
       "giao_hoan",
       "lac_ha_bong_bang",
       "lac_ha_nanh_kiem",

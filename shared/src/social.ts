@@ -240,6 +240,12 @@ export interface WorldBossSlot {
   boss: string;
   /** Bản đồ thường (không phải bí cảnh) nơi trùm xuất hiện. */
   mapId: string;
+  /**
+   * Hệ số MÁU so với loài trùm (mặc định 1, tuỳ chọn). Bộ chiêu `BOSSES` của loài hiện được cân cho đội 3-4 người hạ trong 1-2 phút (`CAN_BANG.md` mục "Trùm nhiều chiêu"),
+   * quá mỏng cho một sự kiện 30 phút của cả server: trùm thế giới nhân MÁU của loài (đòn đánh, chiêu, giai đoạn giữ nguyên) để cần nhiều người và nhiều phút; hệ số do mô phỏng
+   * `can-bang` chốt (số người hạ trong `durationMin` ở 5 / 20 / 50 người). `worldBossHpOf` là cách DUY NHẤT tính máu thật.
+   */
+  hpMult?: number;
   /** Trùm tồn tại tối đa chừng này phút rồi bỏ chạy. */
   durationMin: number;
   /** Thông báo toàn server trước giờ xuất hiện chừng này phút (giảm dần, vd [10, 5, 1]). */
@@ -247,10 +253,49 @@ export interface WorldBossSlot {
   reward: WorldBossReward;
 }
 
+/** Trần `WorldBossSlot.hpMult` (chặn gõ nhầm số: máu một trùm phải còn nằm trong số nguyên an toàn của schema). */
+export const WORLD_BOSS_HP_MULT_MAX = 500;
+
+/** Máu THẬT của trùm thế giới ở khung `slot`: máu loài x `hpMult` (mặc định 1), làm tròn, >= 1. Loài lạ / hệ số hỏng thì dùng 1 (dữ liệu hỏng đã bị `worldBossViolations` bắt). Thuần. */
+export function worldBossHpOf(slot: Pick<WorldBossSlot, "boss" | "hpMult">): number {
+  const base = hasOwn(MONSTER_BY_ID, String(slot.boss)) ? MONSTER_BY_ID[slot.boss].hp : 0;
+  const m = slot.hpMult;
+  const mult = typeof m === "number" && Number.isFinite(m) && m >= 1 ? m : 1;
+  return Math.max(1, Math.round(base * Math.min(mult, WORLD_BOSS_HP_MULT_MAX)));
+}
+
 /**
- * Lịch trùm thế giới. RỖNG cho tới khi E có dữ liệu thật (M9.10): máy chủ không lập lịch khi rỗng (và `WORLD_BOSS=off`). Dữ liệu thử nghiệm: `sampleWorldBossSchedule()`.
+ * Lịch trùm thế giới (M9.10, A soạn vì E nghẽn ở CD5; số do `server/src/balance/trum-the-gioi.ts` đo, cổng `worldBossBalanceViolations` khoá ở `trum-the-gioi.test.ts`). Máy chủ chỉ chạy khi `WORLD_BOSS=on` (mặc định TẮT, `systems/world-boss-config.ts`) VÀ lịch không rỗng. Dữ liệu thử nghiệm: `sampleWorldBossSchedule()`.
  */
-export const WORLD_BOSS_SCHEDULE: readonly WorldBossSlot[] = [];
+export const WORLD_BOSS_SCHEDULE: readonly WorldBossSlot[] = [
+  // Hàn Vân Lĩnh (Nguyên Anh), 12:00: Thiên Hàn Vương nhân máu x38 (4,67 triệu). `can-bang` mục "Trùm thế giới": người tối thiểu hạ được trong 30 phút = 6 (né hoàn hảo; 5 người ~34 phút = không kịp),
+  // 20 người ~8,6 phút, 50 người ~3,4 phút (cận 3 phút của mục tiêu: x35 chỉ 3,1 phút nên chọn x38 cho dư biên). Quỹ thưởng chia theo tỉ lệ đóng góp: một người trong đội 10 người nhận ~17,4 phút
+  // săn quái tốt nhất bậc 18 (396 tu vi / phút) bằng tu vi và ~17,3 phút bằng Linh thạch (295 / phút); top 3 đóng góp thêm 3 Thượng Hồi Huyết Đan.
+  {
+    id: "han_van_trua",
+    hour: 12,
+    minute: 0,
+    boss: "thien_han_vuong",
+    mapId: "han_van",
+    hpMult: 38,
+    durationMin: 30,
+    announceMin: [10, 5, 1],
+    reward: { exp: 69_000, coin: 51_000, top: { itemId: "thuong_hoi_huyet_dan", count: 3 } },
+  },
+  // Âm Sương Trạch (Kim Đan), 21:00: Hắc Giao nhân máu x40 (3 triệu): tối thiểu 6 người, 20 người ~8,6 phút, 50 người ~3,4 phút; quỹ ~17,5 phút săn bậc 15 (536 tu vi / phút) cho một người trong đội 10
+  // người (tu vi) và ~17,6 phút (Linh thạch 279 / phút); top 3 thêm 1 Dưỡng Anh Đan (+12% xác suất đột phá Kim Đan -> Nguyên Anh).
+  {
+    id: "am_suong_toi",
+    hour: 21,
+    minute: 0,
+    boss: "hac_giao",
+    mapId: "am_suong",
+    hpMult: 40,
+    durationMin: 30,
+    announceMin: [10, 5, 1],
+    reward: { exp: 94_000, coin: 49_000, top: { itemId: "duong_anh_dan", count: 1 } },
+  },
+];
 
 /** Mẫu 2 khung giờ (12:00 và 21:00) dùng loài trùm có sẵn, cho test và giao diện thử; KHÔNG phải dữ liệu thật. */
 export function sampleWorldBossSchedule(): WorldBossSlot[] {
@@ -429,6 +474,11 @@ export function worldBossViolations(
       bad.push(`${at}: giờ phải là số nguyên 0-23`);
     if (!Number.isInteger(s.minute) || s.minute < 0 || s.minute > 59)
       bad.push(`${at}: phút phải là số nguyên 0-59`);
+    if (
+      s.hpMult !== undefined &&
+      (!Number.isFinite(s.hpMult) || s.hpMult < 1 || s.hpMult > WORLD_BOSS_HP_MULT_MAX)
+    )
+      bad.push(`${at}: hpMult phải là số 1-${WORLD_BOSS_HP_MULT_MAX} (hoặc bỏ trống = 1)`);
     if (!Number.isInteger(s.durationMin) || s.durationMin < 10 || s.durationMin > 120)
       bad.push(`${at}: thời lượng phải là số nguyên 10-120 phút`);
     else if (

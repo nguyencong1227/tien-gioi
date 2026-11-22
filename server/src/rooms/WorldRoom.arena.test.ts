@@ -63,7 +63,9 @@ async function waitFor<T>(
   ms = 6000,
   what = "điều kiện",
 ): Promise<T> {
-  const end = Date.now() + ms;
+  // Hạn tối thiểu `WAIT_FLOOR_MS`: các lời gọi ghi 3-6 giây là mức máy rảnh; máy tải cao / cả bộ `npm test` chạy song song làm tin tới muộn hàng giây ("Hết thời gian chờ: nhận ambushEnd", #1215).
+  // Chờ theo ĐIỀU KIỆN nên nâng hạn không làm test chậm đi khi tin tới đúng hạn; treo thật vẫn đỏ, chỉ muộn hơn.
+  const end = Date.now() + Math.max(ms, WAIT_FLOOR_MS);
   for (;;) {
     const v = fn();
     if (v) return v;
@@ -71,6 +73,7 @@ async function waitFor<T>(
     await sleep(20);
   }
 }
+const WAIT_FLOOR_MS = 12_000;
 
 let seq = 0;
 const secretOf = (name: string) => `secret-${name.replace(/\s/g, "")}-0123456789abcdef`;
@@ -154,7 +157,7 @@ async function spawn(prefix: string): Promise<Hero> {
 }
 
 /** Chuẩn bị bị chặn được ngay ở phòng thường (bảng cảnh + bầy nhỏ, xúc xắc luôn trúng, dọn quái, ra ngoài trấn, có tu vi + Linh thạch). */
-function prime(h: Hero, opts: { coin?: number; exp?: number } = {}) {
+function prime(h: Hero, opts: { coin?: number; exp?: number; realm?: number } = {}) {
   const w = worldOf(h.room);
   // Giữ nguyên runtime do WorldRoom dựng (đã gắn `startFight` mở đấu trường); chỉ tiêm xúc xắc + bảng nhỏ
   w.ambush.random = () => 0;
@@ -166,6 +169,10 @@ function prime(h: Hero, opts: { coin?: number; exp?: number } = {}) {
   p.x = w.map.townPx.x + w.map.townPx.r + 600;
   p.y = w.map.townPx.y;
   p.hp = p.maxHp;
+  if (opts.realm !== undefined) {
+    p.realm = opts.realm; // tầng đầu của cảnh giới: thanh tu vi đủ lớn cho thưởng theo phút săn mà không chạm đỉnh (Phàm Nhân chỉ có thanh 40)
+    p.tier = 0;
+  }
   p.exp = opts.exp ?? 400;
   p.expMax = 1000;
   c.coin = opts.coin ?? 5000;
@@ -179,7 +186,10 @@ function prime(h: Hero, opts: { coin?: number; exp?: number } = {}) {
 }
 
 /** Bị chặn -> chọn Chiến -> nhận travelTo -> vào đấu trường bằng joinById. Trả anh hùng đã ở trong đấu trường. */
-async function enterArena(prefix: string, opts: { coin?: number; exp?: number } = {}) {
+async function enterArena(
+  prefix: string,
+  opts: { coin?: number; exp?: number; realm?: number } = {},
+) {
   const h = await spawn(prefix);
   const env = prime(h, opts);
   expect(rollAmbush(env.w, env.sid, env.p, env.c)).toBe(true);
@@ -297,7 +307,8 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
   }, 30_000);
 
   it("thắng: hạ hết bầy -> ambushEnd won + thưởng (tu vi + Linh thạch cộng đúng số báo, hồ sơ đã lưu); quái chết KHÔNG tự cho tu vi; rồi về chỗ cũ", async () => {
-    const { h, hub } = await enterArena("Dau Thang", { exp: 10 }); // dưới thanh tu vi thật (nhân vật mới: Phàm Nhân, thanh 40) để thưởng không làm lên bậc giữa phép đo
+    // Luyện Khí tầng 1 (bậc 1: thanh 280, thưởng thường 4 phút x 48 = 192): tu vi 10 + 192 vẫn dưới thanh, nên thưởng không làm lên bậc giữa phép đo (Phàm Nhân chỉ có thanh 40: tu vi bị kẹp ở đỉnh)
+    const { h, hub } = await enterArena("Dau Thang", { exp: 10, realm: 1 });
     const w = worldOf(h.room);
     const sid = h.room.sessionId;
     const p = serverState(h.room).players.get(sid)!;
@@ -314,7 +325,7 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(p.exp).toBe(exp0); // giết quái đấu trường không cho tu vi
     const end = await waitFor(() => h.ends[0], 3000, "nhận ambushEnd");
     expect(end.result).toBe("won");
-    expect(end.rewards!.exp).toBeGreaterThan(0);
+    expect(end.rewards!.exp).toBe(192); // CD6b: ambushRewardExp(bậc 1, thường) = 4 phút x 48 tu vi / phút
     expect(p.exp - exp0).toBe(end.rewards!.exp);
     expect(c.coin - coin0).toBe(end.rewards!.coin);
     const saved = await loadPlayer(h.name);

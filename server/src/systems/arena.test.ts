@@ -326,9 +326,9 @@ describe("thua / hết giờ: giá giữa trận bằng tu vi", () => {
     s.w.now = s.a.deadline;
     tickArena(s.w);
     expect(s.a.acted).toBe(false);
-    const offerPrice = Math.floor(1000 * 0.05); // 5% thanh tu vi
+    const offerPrice = 108; // bậc 3: 2 phút săn x 54 tu vi / phút
     expect(s.p.exp).toBe(400 - offerPrice);
-    expect(offerPrice).toBeLessThan(Math.floor(1000 * 0.1));
+    expect(offerPrice).toBeLessThan(162); // giá giữa trận: 3 phút x 54
   });
 
   it("tu vi không đủ giá: chỉ trừ phần có (không âm, không rớt cảnh giới)", () => {
@@ -684,7 +684,7 @@ describe("thoát / rớt mạng khỏi đấu trường", () => {
 
   it("chưa hành động mà thoát: giá HỘP THOẠI (thấp hơn)", () => {
     const s = setup();
-    expect(arenaDrop(s.w, s.sid)).toBe(Math.floor(1000 * 0.05));
+    expect(arenaDrop(s.w, s.sid)).toBe(108); // giá hộp thoại: 2 phút săn x 54 tu vi / phút (bậc 3)
   });
 
   it("đã có kết cục thì thoát KHÔNG trừ thêm; đã trừ rồi (chờ lưu khi bỏ chạy) thì giữ nguyên", async () => {

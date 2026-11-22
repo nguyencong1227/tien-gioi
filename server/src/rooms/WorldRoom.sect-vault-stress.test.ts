@@ -300,9 +300,24 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     // De2 gửi góp 5 món rồi đóng kết nối ngay
     const de2Slot = ctrlOf(De2).inv.findIndex((s: any) => s?.itemId === MAT.id);
     if (de2Slot !== -1) {
+      const de2Before = countInSlots(ctrlOf(De2)?.inv ?? saveOf(De2.name)?.inventory, MAT.id);
       De2.room.send(SECT_MSG.vaultDeposit, { slot: de2Slot, qty: 5 });
       De2.room.connection.close();
-      await sleep(300);
+
+      // Chờ theo điều kiện (Issue #1266): đường góp đồ đi 'trừ túi -> LƯU hồ sơ -> kho'.
+      // Lúc máy bận hoặc đĩa chậm, lưu hồ sơ có thể mất > 300ms nên tổng tạm thời là 145 (chỉ được mất, không tăng).
+      // Chờ cho tới khi lần góp ĐÃ được xử lý (túi De2 giảm 5) VÀ kho đã cộng đủ (tổng về 150).
+      await waitFor(
+        () => {
+          const cur = countTotal();
+          // Bất biến tuyệt đối: ở MỌI lần đo trong lúc chờ, tổng đồ TUYỆT ĐỐI không bao giờ vượt INITIAL_TOTAL (chặn nhân đôi)
+          expect(cur).toBeLessThanOrEqual(INITIAL_TOTAL);
+          const de2Now = countInSlots(ctrlOf(De2)?.inv ?? saveOf(De2.name)?.inventory, MAT.id);
+          return de2Now === de2Before - 5 && cur === INITIAL_TOTAL;
+        },
+        8000,
+        `lần góp của De2 xong và tổng đồ về đủ ${INITIAL_TOTAL}`,
+      );
 
       // Kiểm tra bảo toàn đồ sau khi ngắt kết nối
       const totalAfterDisconnect = countTotal();

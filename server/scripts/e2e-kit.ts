@@ -205,7 +205,8 @@ export class Tab {
  * `server.listen(port)` mà LỖI được trả về (reject) thay vì chìm: `new Promise((r) => server.listen(port, r))` không bao giờ resolve khi cổng
  * bận (Colyseus transport chỉ in lỗi), vòng sự kiện cạn và E2E thoát mã 0 không in PASS / THẤT BẠI (false green) và sót thư mục tạm.
  * Cổng do người chạy chỉ định (`explicit`) thì lỗi bận trả thẳng; cổng NGẪU NHIÊN thì thử lại với cổng mới (`pick`) tối đa `attempts` lần.
- * Trả về cổng thực sự đang nghe.
+ * Trả về cổng thực sự đang nghe (đọc từ `server.address()`, nên `pick` có thể trả `0`: hệ điều hành chọn cổng NGUYÊN TỬ lúc nghe, không có khe hở
+ * "lấy cổng trống rồi mới `listen`" cho tệp test song song / kết nối ra của hệ điều hành chiếm mất, #1273; cổng lấy sẵn bằng `freePort()` thì vẫn có khe hở đó).
  */
 export function listenWithRetry(
   server: net.Server, // http.Server là con của net.Server: dùng được cho cả máy chủ HTTP lẫn proxy TCP
@@ -223,7 +224,8 @@ export function listenWithRetry(
       };
       const onListening = () => {
         server.off("error", onError);
-        resolve(p);
+        const addr = server.address();
+        resolve(typeof addr === "object" && addr !== null ? addr.port : p); // cổng THẬT (p có thể là 0)
       };
       server.once("error", onError);
       server.once("listening", onListening);

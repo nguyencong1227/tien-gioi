@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeSoak,
   classifyServerLogLine,
+  computeBossHunterMinuteStatus,
+  diagnoseBossDeficiency,
   formatSoakTable,
   linearRegression,
+  type BossHunterMinuteStatus,
+  type BossHunterSnapshotInput,
   type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
@@ -367,6 +371,354 @@ describe("analyzeSoak", () => {
       expect(table).toContain("6/6 có lượt thi triển");
       expect(table).toContain("Chiêu chưa thi triển:  bon_thach_quyen");
       expect(table).toContain("han_quang_tien 99");
+    });
+  });
+
+  describe("bộ chiêu trùm (--boss)", () => {
+    const samples = generateSamples(60, 10, () => 90);
+    const required = ["quat_duoi", "phun_doc", "cuon_minh", "goi_ran_con"];
+
+    it("không có boss: không có phần bộ chiêu trùm và không làm đỏ", () => {
+      const res = analyzeSoak(samples, {}, {});
+      expect(res.pass).toBe(true);
+      expect(res.boss).toBeUndefined();
+      expect(formatSoakTable(res)).not.toContain("BỘ CHIÊU TRÙM");
+    });
+
+    it("ĐẠT khi mọi chiêu trùm bắt buộc đều được thi triển", () => {
+      const abilityCastCounts = { quat_duoi: 12, phun_doc: 8, cuon_minh: 6, goi_ran_con: 4 };
+      const res = analyzeSoak(
+        samples,
+        {},
+        { boss: { requiredAbilities: required, abilityCastCounts } },
+      );
+      expect(res.pass).toBe(true);
+      expect(res.boss?.missingRequired).toEqual([]);
+      expect(res.boss?.totalAbilityCasts).toBe(30);
+      const table = formatSoakTable(res);
+      expect(table).toContain("BỘ CHIÊU TRÙM (BOSS_MOVES=on)");
+      expect(table).toContain("30 (máy chủ xác nhận qua fx bossCast)");
+      expect(table).toContain("4/4 có lượt thi triển");
+      expect(table).toContain("quat_duoi 12");
+    });
+
+    it("KHÔNG ĐẠT khi một chiêu trùm bắt buộc không được thi triển (ví dụ trùm chưa vào giai đoạn 2 để gọi rắn con)", () => {
+      const abilityCastCounts = { quat_duoi: 12, phun_doc: 8, cuon_minh: 6, goi_ran_con: 0 };
+      const res = analyzeSoak(
+        samples,
+        {},
+        { boss: { requiredAbilities: required, abilityCastCounts } },
+      );
+      expect(res.pass).toBe(false);
+      expect(res.boss?.missingRequired).toEqual(["goi_ran_con"]);
+      expect(res.reasons.some((r) => r.includes("1/4") && r.includes("goi_ran_con"))).toBe(true);
+    });
+
+    it("in gợi ý nguyên nhân khi thiếu chiêu trùm và có thông tin botHunterStatus (#1301)", () => {
+      const abilityCastCounts = { quat_duoi: 0, phun_doc: 0, cuon_minh: 0, goi_ran_con: 0 };
+      const res = analyzeSoak(
+        samples,
+        {},
+        {
+          boss: {
+            requiredAbilities: required,
+            abilityCastCounts,
+            bossHunterStatus: {
+              totalHunters: 15,
+              huntersInMap: 10,
+              huntersAlive: 11,
+              bossesVisible: 0,
+            },
+          },
+        },
+      );
+      expect(res.pass).toBe(false);
+      expect(res.boss?.diagnosis).toContain("5/15 bot săn trùm ở sai bản đồ");
+      expect(res.boss?.diagnosis).toContain("4/15 bot săn trùm đã chết/luân hồi về Phàm Nhân");
+      expect(res.boss?.diagnosis).toContain(
+        "không bot săn trùm nào THẤY trùm trong vùng quan sát (có thể trùm chết hoặc bot ở xa bãi)",
+      );
+      const table = formatSoakTable(res);
+      expect(table).toContain(
+        "Gợi ý nguyên nhân:     gợi ý nguyên nhân: 5/15 bot săn trùm ở sai bản đồ",
+      );
+    });
+
+    it("hiển thị dòng thời gian chiêu trùm và trạng thái nhóm săn trùm theo phút (#1301)", () => {
+      const abilityCastCounts = { quat_duoi: 2, phun_doc: 1, cuon_minh: 1, goi_ran_con: 1 };
+      const bossTimeline = [
+        { minute: 0, second: 15, ability: "phun_doc", bossKind: "mang" },
+        { minute: 0, second: 45, ability: "quat_duoi", bossKind: "mang" },
+        { minute: 1, second: 10, ability: "cuon_minh", bossKind: "mang" },
+        { minute: 1, second: 30, ability: "quat_duoi", bossKind: "mang" },
+        { minute: 2, second: 5, ability: "goi_ran_con", bossKind: "mang" },
+      ];
+      const bossHuntersTimeline: BossHunterMinuteStatus[] = [
+        {
+          minute: 0,
+          totalHunters: 15,
+          inHacPhong: 15,
+          resting: 0,
+          dead: 0,
+          disconnected: 0,
+          byMap: { hac_phong: 15 },
+          bossesVisible: 1,
+        },
+        {
+          minute: 1,
+          totalHunters: 15,
+          inHacPhong: 14,
+          resting: 2,
+          dead: 0,
+          disconnected: 1,
+          byMap: { hac_phong: 14, default: 1 },
+          bossesVisible: 1,
+        },
+      ];
+      const res = analyzeSoak(
+        samples,
+        {},
+        {
+          boss: {
+            requiredAbilities: required,
+            abilityCastCounts,
+            bossTimeline,
+            bossHuntersTimeline,
+          },
+        },
+      );
+      expect(res.pass).toBe(true);
+      expect(res.boss?.timeline).toEqual(bossTimeline);
+      expect(res.boss?.huntersTimeline).toEqual(bossHuntersTimeline);
+
+      const table = formatSoakTable(res);
+      expect(table).toContain("Dòng thời gian chiêu trùm theo phút:");
+      expect(table).toContain("+ Phút 00: phun_doc: 1, quat_duoi: 1");
+      expect(table).toContain("+ Phút 01: cuon_minh: 1, quat_duoi: 1");
+      expect(table).toContain("+ Phút 02: goi_ran_con: 1");
+      expect(table).toContain("Trạng thái nhóm săn trùm theo phút:");
+      expect(table).toContain(
+        "Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Mất kết nối | Trùm thấy | Bản đồ khác",
+      );
+      expect(table).toContain("default: 1");
+    });
+  });
+
+  describe("Hàm thuần tính toán trạng thái nhóm săn trùm và chẩn đoán (#1301)", () => {
+    it("computeBossHunterMinuteStatus phân tách chính xác dead, disconnected, resting và gộp bossesVisible", () => {
+      const inputs: BossHunterSnapshotInput[] = [
+        {
+          mapId: "hac_phong",
+          resting: false,
+          hp: 1000,
+          realm: 2,
+          isConnected: true,
+          visibleBossIds: ["mang_1"],
+        },
+        {
+          mapId: "hac_phong",
+          resting: true,
+          hp: 200,
+          realm: 2,
+          isConnected: true,
+          visibleBossIds: ["mang_1"],
+        }, // cùng thấy mang_1
+        {
+          mapId: "hac_phong",
+          resting: false,
+          hp: 0,
+          realm: 2,
+          isConnected: true,
+          visibleBossIds: [],
+        }, // dead do hp 0
+        {
+          mapId: "hac_phong",
+          resting: false,
+          hp: 500,
+          realm: 0,
+          isConnected: true,
+          visibleBossIds: [],
+        }, // dead do realm 0 (Phàm Nhân)
+        {
+          mapId: "lac_ha",
+          resting: false,
+          hp: 1000,
+          realm: 2,
+          isConnected: false,
+          visibleBossIds: [],
+        }, // disconnected (không tính vào dead)
+      ];
+
+      const snap = computeBossHunterMinuteStatus(3, inputs);
+      expect(snap.minute).toBe(3);
+      expect(snap.totalHunters).toBe(5);
+      expect(snap.inHacPhong).toBe(4);
+      expect(snap.resting).toBe(1);
+      expect(snap.dead).toBe(2);
+      expect(snap.disconnected).toBe(1);
+      expect(snap.bossesVisible).toBe(1); // Set { mang_1 } -> 1
+      expect(snap.byMap).toEqual({ hac_phong: 4, lac_ha: 1 });
+    });
+
+    it("diagnoseBossDeficiency kiểm tra từng điều kiện độc lập và kết hợp", () => {
+      // 1. Chỉ sai bản đồ
+      const d1 = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 12,
+        huntersAlive: 15,
+        bossesVisible: 1,
+      });
+      expect(d1).toBe("gợi ý nguyên nhân: 3/15 bot săn trùm ở sai bản đồ (không ở Hắc Phong Cốc)");
+
+      // 2. Chỉ chết / luân hồi
+      const d2 = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 15,
+        huntersAlive: 13,
+        bossesVisible: 1,
+      });
+      expect(d2).toBe("gợi ý nguyên nhân: 2/15 bot săn trùm đã chết/luân hồi về Phàm Nhân");
+
+      // 3. Chỉ không thấy trùm
+      const d3 = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 15,
+        huntersAlive: 15,
+        bossesVisible: 0,
+      });
+      expect(d3).toBe(
+        "gợi ý nguyên nhân: không bot săn trùm nào THẤY trùm trong vùng quan sát (có thể trùm chết hoặc bot ở xa bãi)",
+      );
+
+      // 4. Đầy đủ cả 3 điều kiện
+      const dAll = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 10,
+        huntersAlive: 11,
+        bossesVisible: 0,
+      });
+      expect(dAll).toContain("5/15 bot săn trùm ở sai bản đồ");
+      expect(dAll).toContain("4/15 bot săn trùm đã chết/luân hồi");
+      expect(dAll).toContain("không bot săn trùm nào THẤY trùm");
+
+      // 5. Bình thường (không có lỗi)
+      const dOk = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 15,
+        huntersAlive: 15,
+        bossesVisible: 1,
+      });
+      expect(dOk).toBeUndefined();
+    });
+  });
+
+  describe("Chế độ thử tải Chặn đường (--ambush, CD10 #1070, #1276)", () => {
+    const samples = generateSamples(60, 10, () => 90);
+
+    it("vắng extra.ambush thì không có kết quả ambush và bảng không in khối CHẶN ĐƯỜNG", () => {
+      const res = analyzeSoak(samples, {}, {});
+      expect(res.ambush).toBeUndefined();
+      expect(formatSoakTable(res)).not.toContain("CHẶN ĐƯỜNG");
+    });
+
+    it("ĐẠT khi bot gặp chặn đường, phòng đấu trường không vượt MAX_AMBUSH_ROOMS và về 0 sau khi dừng", () => {
+      const ambushCtx = {
+        offersTotal: 45,
+        fightTotal: 25,
+        fleeCoinTotal: 10,
+        fleeExpTotal: 10,
+        midFleeTotal: 3,
+        wonTotal: 18,
+        lostTotal: 4,
+        fledTotal: 3,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 8,
+        finalActiveArenaRooms: 0,
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(true);
+      expect(res.ambush?.passed).toBe(true);
+      expect(res.ambush?.offersTotal).toBe(45);
+      expect(res.ambush?.maxActiveArenaRooms).toBe(8);
+      expect(res.ambush?.finalActiveArenaRooms).toBe(0);
+
+      const table = formatSoakTable(res);
+      expect(table).toContain("CHẶN ĐƯỜNG (AMBUSH=on):");
+      expect(table).toContain("Số lần bị chặn:       45 lần");
+      expect(table).toContain("Chiến: 25 | Bỏ chạy: 20 (Linh thạch: 10, Tu vi: 10)");
+      expect(table).toContain("Thoát giữa trận:      3 lần");
+      expect(table).toContain("Thắng: 18 | Thua: 4 | Chạy thoát: 3 | Hết giờ: 0");
+      expect(table).toContain("Tối đa đồng thời: 8/20 | Cuối cùng: 0 (yêu cầu: 0)");
+    });
+
+    it("KHÔNG ĐẠT khi rò rỉ phòng đấu trường sau khi dừng (finalActiveArenaRooms > 0)", () => {
+      const ambushCtx = {
+        offersTotal: 45,
+        fightTotal: 25,
+        fleeCoinTotal: 10,
+        fleeExpTotal: 10,
+        midFleeTotal: 0,
+        wonTotal: 15,
+        lostTotal: 5,
+        fledTotal: 2,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 6,
+        finalActiveArenaRooms: 2, // rò 2 phòng
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(false);
+      expect(res.ambush?.passed).toBe(false);
+      expect(
+        res.reasons.some((r) => r.includes("Rò rỉ phòng đấu trường") && r.includes("còn 2")),
+      ).toBe(true);
+    });
+
+    it("KHÔNG ĐẠT khi số phòng đấu trường vượt trần MAX_AMBUSH_ROOMS (maxActiveArenaRooms > 20)", () => {
+      const ambushCtx = {
+        offersTotal: 100,
+        fightTotal: 60,
+        fleeCoinTotal: 20,
+        fleeExpTotal: 20,
+        midFleeTotal: 0,
+        wonTotal: 40,
+        lostTotal: 10,
+        fledTotal: 10,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 22, // vượt 20
+        finalActiveArenaRooms: 0,
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(false);
+      expect(res.ambush?.passed).toBe(false);
+      expect(res.reasons.some((r) => r.includes("vượt trần: 22 > 20"))).toBe(true);
+    });
+
+    it("KHÔNG ĐẠT khi bật --ambush nhưng không có lượt chặn nào (offersTotal = 0)", () => {
+      const ambushCtx = {
+        offersTotal: 0,
+        fightTotal: 0,
+        fleeCoinTotal: 0,
+        fleeExpTotal: 0,
+        midFleeTotal: 0,
+        wonTotal: 0,
+        lostTotal: 0,
+        fledTotal: 0,
+        timeoutTotal: 0,
+        droppedTotal: 0,
+        canceledTotal: 0,
+        maxActiveArenaRooms: 0,
+        finalActiveArenaRooms: 0,
+      };
+      const res = analyzeSoak(samples, {}, { ambush: ambushCtx });
+      expect(res.pass).toBe(false);
+      expect(res.ambush?.passed).toBe(false);
+      expect(res.reasons.some((r) => r.includes("offersTotal = 0"))).toBe(true);
     });
   });
 

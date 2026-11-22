@@ -15,7 +15,6 @@ import {
   AMBUSH_ARM_MS,
   AMBUSH_MSG,
   AUTH_API,
-  DEFAULT_MAP,
   DUEL_COOLDOWN_MS,
   DUEL_MSG,
   DUEL_RANGE,
@@ -37,6 +36,7 @@ import {
   statsFor,
   TRAVEL_COOLDOWN_MS,
   SECT_MSG,
+  SOCIAL_MSG,
   PROTOCOL_VERSION,
   LEARNABLE_SLOTS,
   SKILL_MSG,
@@ -87,6 +87,8 @@ import {
   type TravelMsg,
   type TravelToMsg,
   type WalletMsg,
+  type WorldBossMsg,
+  DEFAULT_MAP_ID,
 } from "@tien-gioi/shared";
 import { runBench } from "../src/perf/bench";
 import { hashSecret, type SavedPlayer } from "../src/store";
@@ -147,10 +149,13 @@ interface CliArgs {
   duel: boolean;
   sect: boolean;
   skills: boolean;
+  skillOverride?: string;
   evade: boolean;
   boss: boolean;
   reflexMs: number;
   ambush: boolean;
+  worldBoss: boolean;
+  worldBossMap?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -176,7 +181,7 @@ function parseArgs(argv: string[]): CliArgs {
   let flapDelay: [number, number] = [1, 5];
   let storm = false;
   let leak = false;
-  let map = DEFAULT_MAP.def.id;
+  let map = getMap(DEFAULT_MAP_ID)!.def.id;
   let travel = false;
   let die = false;
   let account = false;
@@ -187,20 +192,39 @@ function parseArgs(argv: string[]): CliArgs {
   let duel = false;
   let sect = false;
   let skills = false;
+  let skillOverride: string | undefined;
   let evade = false;
   let boss = false;
   let reflexMs = 400;
   let ambush = false;
+  let worldBoss = false;
+  let worldBossMap: string | undefined;
 
   for (const arg of argv) {
     if (arg.startsWith("--bots=")) bots = Math.max(0, Number(arg.slice(7)));
     else if (arg.startsWith("--duration=")) durationSec = Math.max(2, Number(arg.slice(11)));
     else if (arg.startsWith("--url=")) url = arg.slice(6);
     else if (arg.startsWith("--map=")) map = arg.slice(6);
-    else if (arg === "--travel" || arg === "--portal") travel = true;
+    else if (arg === "--world-boss" || arg === "--wboss") {
+      worldBoss = true;
+      if (!argv.includes("--no-evade") && !argv.includes("--evade=false")) {
+        evade = true;
+      }
+      if (!argv.some((a) => a.startsWith("--map="))) map = "han_van";
+    } else if (arg.startsWith("--world-boss-map=")) {
+      worldBossMap = arg.slice(17).trim();
+      worldBoss = true;
+      map = worldBossMap;
+    } else if (arg === "--travel" || arg === "--portal") travel = true;
     else if (arg === "--die") die = true;
     else if (arg === "--skills") skills = true;
-    else if (arg === "--evade") evade = true;
+    else if (arg.startsWith("--skill=")) {
+      const s = arg.slice(8).trim();
+      if (s) {
+        skillOverride = s;
+        skills = true;
+      }
+    } else if (arg === "--evade") evade = true;
     else if (arg === "--no-evade" || arg === "--evade=false") evade = false;
     else if (arg === "--boss" || arg === "--boss-hunt") {
       boss = true;
@@ -284,7 +308,7 @@ function parseArgs(argv: string[]): CliArgs {
 
   if (!getMap(map)) {
     console.warn(
-      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${DEFAULT_MAP.def.id}".`,
+      `[CẢNH BÁO] Bản đồ "${map}" không tồn tại trong MAPS. Sẽ dùng bản đồ mặc định "${getMap(DEFAULT_MAP_ID)!.def.id}".`,
     );
   }
 
@@ -330,10 +354,13 @@ function parseArgs(argv: string[]): CliArgs {
     duel,
     sect,
     skills,
+    skillOverride,
     evade,
     boss,
     reflexMs,
     ambush,
+    worldBoss,
+    worldBossMap,
   };
 }
 
@@ -396,7 +423,16 @@ export function decideSectM8Action(state: BotSectM8DecisionState): BotSectM8Deci
  * Mẫu sổ chiêu (SkillBook) hợp lệ theo từng cảnh giới cho bot thử tải (M7.10 #511).
  * Đảm bảo chiêu đã học và gắn vào các ô mở theo đúng luật của shared/skills.ts.
  */
-export function sampleSkillsForRealm(realm: number): SkillBook {
+export function sampleSkillsForRealm(realm: number, customSkillId?: string): SkillBook {
+  if (customSkillId) {
+    const def = skillOf(customSkillId);
+    if (def) {
+      return {
+        learned: { [def.id]: 1 },
+        slots: [def.id, "", "", ""],
+      };
+    }
+  }
   if (realm <= 0) {
     return { learned: {}, slots: ["", "", "", ""] };
   }
@@ -456,7 +492,7 @@ export function seedBotSaveFile(
   y: number,
   realm: number,
   tier: number,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
   life?: { playMs: number; kills: number; bossKills: number },
   coinOverride?: number,
   dataDirOverride?: string,
@@ -1002,6 +1038,13 @@ export interface BotState {
   ambushTimeoutCount: number;
   ambushDroppedCount: number;
   ambushCanceledCount: number;
+  // Các trường cho thử tải trùm thế giới (--world-boss / --wboss, M9.14 #1033)
+  worldBoss?: boolean;
+  worldBossState?: WorldBossMsg;
+  worldBossMsgsCount: number;
+  worldBossBoardsCount: number;
+  worldBossEligibleCount: number;
+  worldBossFxCount: number;
 }
 
 export interface LoadTestMetrics {
@@ -1152,6 +1195,12 @@ export interface LoadTestMetrics {
   ambushTimeoutTotal?: number;
   ambushDroppedTotal?: number;
   ambushCanceledTotal?: number;
+  /** Các chỉ số thử tải trùm thế giới M9.14 (--world-boss / --wboss, #1033) */
+  worldBoss?: boolean;
+  worldBossMsgsTotal?: number;
+  worldBossBoardsTotal?: number;
+  worldBossEligibleTotal?: number;
+  worldBossFxTotal?: number;
 }
 
 export interface IdleZeroBotMetrics {
@@ -1185,9 +1234,9 @@ async function runIdleZeroBotTest(
   url: string,
   port: number,
   keepSaves: boolean,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
 ): Promise<IdleZeroBotMetrics> {
-  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
+  const currentMap = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   console.log(
     `\n=== Đo mức 0 bot (phòng trống, kiểm tra quái ngủ) trong ${durationSec}s (${url}, bản đồ=${currentMap.def.name}) ===`,
   );
@@ -1756,7 +1805,20 @@ function bindRoomEvents(
   b.kicked4429 = false;
 
   room.onMessage("fx", (msg?: FxMsg) => {
-    if (isMeasuring()) b.fxCount++;
+    if (isMeasuring()) {
+      b.fxCount++;
+      if (
+        b.worldBoss &&
+        (msg?.kind === "warn" ||
+          msg?.kind === "bossCast" ||
+          msg?.kind === "bossPhase" ||
+          msg?.kind === "bossEnrage" ||
+          msg?.kind === "bossArmor" ||
+          msg?.kind === "bossSummon")
+      ) {
+        b.worldBossFxCount++;
+      }
+    }
     const zone = parseWarnZoneFromFx(msg, performance.now(), b.reflexMs ?? 400);
     if (zone) {
       if (isPointInWarnZone(b.predX, b.predY, zone, 0)) {
@@ -1979,6 +2041,15 @@ function bindRoomEvents(
     }
   });
 
+  room.onMessage(SOCIAL_MSG.worldBoss, (msg: WorldBossMsg) => {
+    b.worldBossState = msg;
+    if (isMeasuring()) {
+      b.worldBossMsgsCount++;
+      if (msg.top !== undefined) b.worldBossBoardsCount++;
+      if (msg.mine?.eligible) b.worldBossEligibleCount++;
+    }
+  });
+
   room.onLeave((code) => {
     if (!b.isFlapping && !b.isTravelling && code !== 4000) {
       b.closedCode = code;
@@ -2077,7 +2148,7 @@ async function runLoadTest(
   flapDelay: [number, number] = [1, 5],
   storm = false,
   leak = false,
-  mapId: string = DEFAULT_MAP.def.id,
+  mapId: string = getMap(DEFAULT_MAP_ID)!.def.id,
   travel = false,
   die = false,
   account = false,
@@ -2087,12 +2158,14 @@ async function runLoadTest(
   duel = false,
   sect = false,
   skills = false,
+  skillOverride?: string,
   evade = false,
   boss = false,
   reflexMs = 400,
   ambush = false,
+  worldBoss = false,
 ): Promise<LoadTestMetrics> {
-  const currentMap = getMap(mapId) ?? DEFAULT_MAP;
+  const currentMap = getMap(mapId) ?? getMap(DEFAULT_MAP_ID)!;
   const partySuffix = partySize > 1 ? `, tổ đội ${partySize} người` : "";
   const shopSuffix = shop ? ", mua bán shop" : "";
   const flapSuffix = flap > 0 ? `, flap=${flap}` : "";
@@ -2111,14 +2184,15 @@ async function runLoadTest(
   const skillsSuffix = skills ? ", chiêu thức (--skills)" : "";
   const evadeSuffix = evade ? ", né đòn (--evade)" : "";
   const bossSuffix = boss ? `, săn trùm (--boss, reflex=${reflexMs}ms)` : "";
+  const worldBossSuffix = worldBoss ? ", trùm thế giới (--world-boss)" : "";
   const mapSuffix =
-    currentMap.def.id !== DEFAULT_MAP.def.id ? `, bản đồ=${currentMap.def.name}` : "";
+    currentMap.def.id !== getMap(DEFAULT_MAP_ID)!.def.id ? `, bản đồ=${currentMap.def.name}` : "";
   const modeLabel =
     mode === "realistic"
-      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
+      ? `Thực tế (vào tầm đứng chém${partySuffix}${shopSuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${worldBossSuffix}${mapSuffix})`
       : mode === "crowd"
-        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`
-        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${mapSuffix})`;
+        ? `Đông người trong trấn/khu an toàn (${shop ? "25% ghé Dược Sư, 25% đứng, 50% đi" : "30% đứng yên, 70% đi lại"}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${worldBossSuffix}${mapSuffix})`
+        : `Xấu nhất (100% di chuyển 20 input/s${partySuffix}${flapSuffix}${stormSuffix}${leakSuffix}${travelSuffix}${dieSuffix}${accountSuffix}${dungeonSuffix}${duelSuffix}${sectSuffix}${skillsSuffix}${evadeSuffix}${bossSuffix}${worldBossSuffix}${mapSuffix})`;
   console.log(
     `\n=== Bắt đầu thử tải [${modeLabel}]: ${botCount} bot, đo trong ${durationSec}s (${url}) ===`,
   );
@@ -2267,14 +2341,20 @@ async function runLoadTest(
       joinOpts = { token: botToken, v: PROTOCOL_VERSION };
     } else {
       const lifeSeed = die ? { playMs: 48 * 60_000, kills: 30, bossKills: 0 } : undefined;
-      const skillsSeed = skills ? sampleSkillsForRealm(realm) : undefined;
+      const customSkillDef = skillOverride ? skillOf(skillOverride) : undefined;
+      const botRealm = customSkillDef ? Math.max(realm, customSkillDef.reqRealm) : realm;
+      const botTier =
+        customSkillDef && customSkillDef.reqRealm === botRealm
+          ? Math.max(tier, customSkillDef.reqTier)
+          : tier;
+      const skillsSeed = skills ? sampleSkillsForRealm(botRealm, skillOverride) : undefined;
       seedBotSaveFile(
         name,
         secret,
         campX,
         campY,
-        duel ? 1 : dungeon ? 1 : die ? 1 : realm,
-        duel ? 4 : dungeon ? 8 : die ? 8 : tier,
+        duel ? 1 : dungeon ? 1 : die ? 1 : botRealm,
+        duel ? 4 : dungeon ? 8 : die ? 8 : botTier,
         currentMap.def.id,
         lifeSeed,
         sect ? 5000 : undefined,
@@ -2292,7 +2372,7 @@ async function runLoadTest(
 
     const handleBotTravel = async (bot: BotState, msg: TravelToMsg) => {
       try {
-        const nextMap = getMap(msg.mapId) ?? DEFAULT_MAP;
+        const nextMap = getMap(msg.mapId) ?? getMap(DEFAULT_MAP_ID)!;
         const targetClient = new Client(url);
         const nextOpts = bot.token
           ? { token: bot.token, v: PROTOCOL_VERSION }
@@ -2469,6 +2549,11 @@ async function runLoadTest(
       ambushTimeoutCount: 0,
       ambushDroppedCount: 0,
       ambushCanceledCount: 0,
+      worldBoss,
+      worldBossMsgsCount: 0,
+      worldBossBoardsCount: 0,
+      worldBossEligibleCount: 0,
+      worldBossFxCount: 0,
     };
 
     bindRoomEvents(
@@ -3023,21 +3108,35 @@ async function runLoadTest(
       } else {
         let targetMon: any = null;
         let bestScore = Number.POSITIVE_INFINITY;
-        const maxSearchDist = b.bossHunt ? 2500 : mode === "realistic" ? 280 : 420;
+        const maxSearchDist = b.worldBoss
+          ? 3500
+          : b.bossHunt
+            ? 2500
+            : mode === "realistic"
+              ? 280
+              : 420;
         if (state?.monsters && typeof state.monsters.forEach === "function") {
           state.monsters.forEach((m: any) => {
             if (!m || m.hp <= 0) return;
             const dist = Math.hypot(m.x - b.predX, m.y - b.predY);
             if (dist > maxSearchDist) return;
-            const penalty = b.bossHunt
-              ? m.kind === "mang"
-                ? -2000
-                : 500
-              : m.kind === "mang"
-                ? 250
-                : m.kind === "ho"
-                  ? 80
-                  : 0;
+            const isWorldBossMon =
+              b.worldBoss &&
+              (m.wboss ||
+                m.kind === "thien_han_vuong" ||
+                m.kind === "hac_giao" ||
+                (b.worldBossState?.name && m.name === b.worldBossState.name));
+            const penalty = isWorldBossMon
+              ? -5000
+              : b.bossHunt
+                ? m.kind === "mang"
+                  ? -2000
+                  : 500
+                : m.kind === "mang"
+                  ? 250
+                  : m.kind === "ho"
+                    ? 80
+                    : 0;
             const score = dist + penalty;
             if (score < bestScore) {
               bestScore = score;
@@ -3667,6 +3766,11 @@ async function runLoadTest(
   const totalAmbushDropped = bots.reduce((s, b) => s + b.ambushDroppedCount, 0);
   const totalAmbushCanceled = bots.reduce((s, b) => s + b.ambushCanceledCount, 0);
 
+  const totalWorldBossMsgs = bots.reduce((s, b) => s + b.worldBossMsgsCount, 0);
+  const totalWorldBossBoards = bots.reduce((s, b) => s + b.worldBossBoardsCount, 0);
+  const totalWorldBossEligible = bots.reduce((s, b) => s + b.worldBossEligibleCount, 0);
+  const totalWorldBossFx = bots.reduce((s, b) => s + b.worldBossFxCount, 0);
+
   const metrics: LoadTestMetrics = {
     commit,
     note,
@@ -3815,6 +3919,11 @@ async function runLoadTest(
     ambushTimeoutTotal: ambush || totalAmbushTimeout > 0 ? totalAmbushTimeout : undefined,
     ambushDroppedTotal: ambush || totalAmbushDropped > 0 ? totalAmbushDropped : undefined,
     ambushCanceledTotal: ambush || totalAmbushCanceled > 0 ? totalAmbushCanceled : undefined,
+    worldBoss: worldBoss ? true : undefined,
+    worldBossMsgsTotal: totalWorldBossMsgs > 0 ? totalWorldBossMsgs : undefined,
+    worldBossBoardsTotal: totalWorldBossBoards > 0 ? totalWorldBossBoards : undefined,
+    worldBossEligibleTotal: totalWorldBossEligible > 0 ? totalWorldBossEligible : undefined,
+    worldBossFxTotal: totalWorldBossFx > 0 ? totalWorldBossFx : undefined,
   };
 
   printMetrics(metrics);
@@ -3958,6 +4067,11 @@ function printMetrics(m: LoadTestMetrics) {
   if (m.ambush || (m.ambushOffersTotal !== undefined && m.ambushOffersTotal > 0)) {
     console.log(
       `- Thử tải Chặn đường (--ambush, CD9 #1069): Bị chặn: ${m.ambushOffersTotal ?? 0} lần | Chọn Chiến: ${m.ambushFightTotal ?? 0} | Bỏ chạy (Linh thạch: ${m.ambushFleeCoinTotal ?? 0}, Tu vi: ${m.ambushFleeExpTotal ?? 0}) | Thoát giữa trận: ${m.ambushMidFleeTotal ?? 0} | Thắng: ${m.ambushWonTotal ?? 0} | Thua: ${m.ambushLostTotal ?? 0} | Bỏ chạy thành công: ${m.ambushFledTotal ?? 0} | Hết giờ: ${m.ambushTimeoutTotal ?? 0} | Canceled: ${m.ambushCanceledTotal ?? 0}`,
+    );
+  }
+  if (m.worldBoss || (m.worldBossMsgsTotal !== undefined && m.worldBossMsgsTotal > 0)) {
+    console.log(
+      `- Thử tải Trùm thế giới (--world-boss / --wboss, M9.14 #1033): Tin worldBoss: ${m.worldBossMsgsTotal ?? 0} | Bảng đóng góp (2s): ${m.worldBossBoardsTotal ?? 0} | Đạt ngưỡng nhận thưởng (>=1.5% HP): ${m.worldBossEligibleTotal ?? 0} | Fx trùm: ${m.worldBossFxTotal ?? 0}`,
     );
   }
 }
@@ -4249,10 +4363,12 @@ async function main() {
           args.duel,
           args.sect,
           args.skills,
+          args.skillOverride,
           args.evade,
           args.boss,
           args.reflexMs,
           args.ambush,
+          args.worldBoss,
         ),
       );
     }

@@ -432,13 +432,13 @@ describe("M5.1 #400: parseFxDriverReport (hàm thuần)", () => {
   });
 });
 
-describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chiêu của 53 chiêu qua đường onFx thật)", () => {
+describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chiêu của 57 chiêu qua đường onFx thật)", () => {
   const CAST_PLANS = ["burst-cast", "boss-cast"] as const;
 
   it("FX_CAST_SKILLS TRÙNG đúng các chiêu trong `SKILLS` của shared (thêm / bớt chiêu mà quên ở đây thì đỏ), không trùng id", () => {
     expect([...FX_CAST_SKILLS].sort()).toEqual(Object.keys(SKILL_BY_ID).sort());
     expect(new Set(FX_CAST_SKILLS).size).toBe(FX_CAST_SKILLS.length);
-    expect(FX_CAST_SKILLS).toHaveLength(53);
+    expect(FX_CAST_SKILLS).toHaveLength(57);
     // sáu chiêu Nguyên Anh đợt 2 (#722) nằm trong danh sách
     for (const id of [
       "han_quang_tien",
@@ -458,6 +458,14 @@ describe("#515: kế hoạch `burst-cast` / `boss-cast` (hiệu ứng dùng chi�
       "thiem_to_cong",
       "doan_truong_chi_phap",
       "kho_moc_phung_xuan_quyet",
+    ])
+      expect(FX_CAST_SKILLS, id).toContain(id);
+    // bốn chiêu Kim / Thổ (CT17 lát 1, G) nằm trong danh sách
+    for (const id of [
+      "kim_thoa_xuyen_tam",
+      "thuc_giap_phi_tan",
+      "thiet_sa_chuong",
+      "chuong_vu_phong_lam",
     ])
       expect(FX_CAST_SKILLS, id).toContain(id);
   });

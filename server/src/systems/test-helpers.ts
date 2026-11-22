@@ -2,8 +2,9 @@
 import { legacyIdentity } from "../identity";
 import {
   MONSTER_BY_ID,
-  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
   emptyInventory,
+  getMap,
   newSoul,
   type FxMsg,
   type DmgMsg,
@@ -47,7 +48,7 @@ import type { Hub } from "../hub";
 import { applyStats } from "./progression";
 import { syncPublicPos } from "./movement";
 
-export function makeWorld(map: GameMap = DEFAULT_MAP, hub?: Hub) {
+export function makeWorld(map: GameMap = getMap(DEFAULT_MAP_ID)!, hub?: Hub) {
   const fx: FxMsg[] = [];
   const toasts: { sid: string; msg: ToastMsg }[] = [];
   const sys: string[] = [];

@@ -4,11 +4,12 @@
 //
 // Định dạng tối thiểu (đọc docs mục 4):
 //  - `orientation: "orthogonal"`, `infinite: false`, `tilewidth == tileheight`, `width` x `height` ô (<= TILED_MAX_SIDE), dữ liệu ô là MẢNG số (không nén).
-//  - thuộc tính bản đồ: `schema` (= TILED_SCHEMA), `id`, `name`, tuỳ chọn `townName`, `wildName`, `monsterCap` (chuỗi JSON `{"id_quai": số}`), `kind` (chỉ `"world"`).
+//  - thuộc tính bản đồ: `schema` (= TILED_SCHEMA), `id`, `name`, tuỳ chọn `townName`, `wildName`, `monsterCap` (chuỗi JSON `{"id_quai": số}`), `seed` (số nguyên: hạt giống TRANG TRÍ tất định của client, vd bố trí sương mù; không sinh ô), `kind` (chỉ `"world"`).
 //  - lớp ô `logic`: mỗi ô là `firstgid + T` của tileset tên `logic` (8 ô, theo thứ tự enum `T` của map.ts); 0 (ô trống) và cờ lật KHÔNG hợp lệ. Các lớp hình khác bị bỏ qua ở đây (client dùng, S3).
 //  - lớp đối tượng `objects`: MỘT `town`, tối đa MỘT `lair` (điểm đặt trong ô tâm, thuộc tính `r` tính bằng ô) và các `portal` (điểm đặt ở tâm cổng; `id`, `name`, `toMap`, `toPortal`, `r`, `safeR`, `spawnX`, `spawnY`
-//    tính bằng px CỦA TỆP: nhân `tile / tilewidth` ra px thế giới). Đối tượng loại khác bị bỏ qua (dành cho `spawnZone` ở S5).
-import type { MapDef, PortalDef } from "./map";
+//    tính bằng px CỦA TỆP: nhân `tile / tilewidth` ra px thế giới). Đối tượng loại khác bị bỏ qua.
+//  - `spawnZone` (S5): hình CHỮ NHẬT hoặc ELIP THẲNG (không phải điểm / đa giác, không xoay, không `gid`), thuộc tính `monster` (id quái) và tuỳ chọn `max`; `x, y` là góc trên trái của khung như Tiled ghi; khung >= một ô và nằm trong bản đồ bỏ viền một ô.
+import type { MapDef, PortalDef, SpawnZoneDef } from "./map";
 
 export const TILED_SCHEMA = 1;
 /** Số loại ô logic (= số thành viên của enum `T` trong map.ts; test giữ khớp) */
@@ -32,6 +33,8 @@ export interface TiledObject {
   width?: number;
   height?: number;
   point?: boolean;
+  /** Elip (khung `x, y, width, height`) */
+  ellipse?: boolean;
   properties?: TiledProperty[];
 }
 export interface TiledLayer {
@@ -67,6 +70,8 @@ export interface ParsedTiled {
   name: string;
   townName?: string;
   wildName?: string;
+  /** Hạt giống trang trí tất định (client); 0 nếu tệp không khai */
+  seed: number;
   w: number;
   h: number;
   /** Loại ô logic (giá trị enum `T`), đúng `w * h` */
@@ -75,6 +80,8 @@ export interface ParsedTiled {
   lair?: { cx: number; cy: number; r: number };
   portals: PortalDef[];
   monsterCap?: Record<string, number>;
+  /** Vùng sinh (px THẾ GIỚI, đã nhân `tile / tilewidth`); rỗng nếu tệp không khai */
+  spawnZones: SpawnZoneDef[];
 }
 
 type Rec = Record<string, unknown>;
@@ -144,7 +151,8 @@ interface Analysis {
   errors: string[];
   /** Có đủ dữ liệu để dựng (kể cả khi `errors` rỗng); chỉ có giá trị khi `errors` rỗng */
   built?: {
-    parsedBase: Omit<ParsedTiled, "portals"> & {
+    parsedBase: Omit<ParsedTiled, "portals" | "spawnZones"> & {
+      rawZones: SpawnZoneDef[];
       rawPortals: {
         id: string;
         name: string;
@@ -207,6 +215,10 @@ function analyze(json: unknown): Analysis {
     }
   }
 
+  const seedRaw = mapProps.get("seed");
+  if (seedRaw !== undefined && !isInt(seedRaw))
+    errors.push(`${at}: thuộc tính 'seed' phải là số nguyên`);
+
   const layers = Array.isArray(json.layers) ? json.layers.filter(isRec) : [];
   if (!Array.isArray(json.layers)) errors.push(`${at}: thiếu layers`);
 
@@ -248,6 +260,7 @@ function analyze(json: unknown): Analysis {
   const towns: { cx: number; cy: number; r: number }[] = [];
   const lairs: { cx: number; cy: number; r: number }[] = [];
   const rawPortals: NonNullable<Analysis["built"]>["parsedBase"]["rawPortals"] = [];
+  const rawZones: SpawnZoneDef[] = [];
   if (!objLayer) errors.push(`${at}: thiếu lớp đối tượng 'objects'`);
   else if (!Array.isArray(objLayer.objects)) errors.push(`${at}: lớp objects thiếu objects`);
   else if (isNum(tw) && tw > 0) {
@@ -258,10 +271,57 @@ function analyze(json: unknown): Analysis {
         continue;
       }
       const kindOf = typeof o.class === "string" && o.class !== "" ? o.class : o.type;
-      if (kindOf !== "town" && kindOf !== "lair" && kindOf !== "portal") continue;
+      if (kindOf !== "town" && kindOf !== "lair" && kindOf !== "portal" && kindOf !== "spawnZone")
+        continue;
       const oAt = `${at}: ${String(kindOf)}${typeof o.name === "string" && o.name ? " " + o.name : ""}`;
       if (!isNum(o.x) || !isNum(o.y)) {
         errors.push(`${oAt}: thiếu x / y`);
+        continue;
+      }
+      if (kindOf === "spawnZone") {
+        // Vùng sinh là khung (chữ nhật / elip), ngược với mọi đối tượng khác (điểm): điểm, đa giác, đường gấp khúc, chữ đều không có khung nên bị từ chối.
+        if (o.point === true || "polygon" in o || "polyline" in o || "text" in o) {
+          errors.push(
+            `${oAt}: phải là hình CHỮ NHẬT hoặc ELIP, không phải điểm / đa giác / đường / chữ`,
+          );
+          continue;
+        }
+        // Tiled cho XOAY chữ nhật / elip quanh góc trên trái và cho "đối tượng ô" (`gid`, khi đó `x, y` là góc DƯỚI trái): đọc như chưa xoay / như khung thường thì vùng lệch IM LẶNG (B bắt ở review #1214). Chỉ nhận khung thẳng.
+        if (o.rotation !== undefined && (!isNum(o.rotation) || o.rotation !== 0)) {
+          errors.push(`${oAt}: không được xoay (rotation phải bằng 0)`);
+          continue;
+        }
+        if (o.gid !== undefined) {
+          errors.push(`${oAt}: không được là đối tượng ô (gid): chỉ chữ nhật / elip thường`);
+          continue;
+        }
+        const zp = propsOf(o, oAt, errors);
+        const monster = needStr(zp, "monster", oAt, errors);
+        const maxRaw = zp.get("max");
+        if (maxRaw !== undefined && (!isInt(maxRaw) || maxRaw < 1))
+          errors.push(`${oAt}: max phải là số nguyên >= 1`);
+        if (!isNum(o.width) || !isNum(o.height) || !(o.width > 0) || !(o.height > 0)) {
+          errors.push(`${oAt}: khung phải có width / height > 0`);
+          continue;
+        }
+        if (o.ellipse !== undefined && typeof o.ellipse !== "boolean") {
+          errors.push(`${oAt}: ellipse phải là true / false`);
+          continue;
+        }
+        // Khung nằm trong bản đồ, bỏ viền núi MỘT ô (cùng luật của `GameMap.checkSpawnZones`, để lỗi gom một chỗ ở `errors` thay vì ném lúc dựng): toạ độ tính theo px của tệp
+        if (o.width < tw || o.height < tw)
+          errors.push(`${oAt}: khung phải rộng / cao ít nhất một ô (${tw} px)`);
+        if (o.x < tw || o.y < tw || o.x + o.width > (w - 1) * tw || o.y + o.height > (h - 1) * tw)
+          errors.push(`${oAt}: khung nằm ngoài bản đồ hoặc đè viền núi một ô`);
+        rawZones.push({
+          monster,
+          shape: o.ellipse === true ? "ellipse" : "rect",
+          x: o.x,
+          y: o.y,
+          w: o.width,
+          h: o.height,
+          ...(isInt(maxRaw) ? { max: maxRaw } : {}),
+        });
         continue;
       }
       // Tiled ghi x, y của elip / chữ nhật là GÓC TRÊN TRÁI của khung, không phải tâm: coi là tâm thì trấn / cổng lệch im lặng. Chỉ nhận đối tượng ĐIỂM.
@@ -316,6 +376,7 @@ function analyze(json: unknown): Analysis {
           typeof mapProps.get("townName") === "string"
             ? (mapProps.get("townName") as string)
             : undefined,
+        seed: isInt(seedRaw) ? seedRaw : 0,
         wildName:
           typeof mapProps.get("wildName") === "string"
             ? (mapProps.get("wildName") as string)
@@ -327,6 +388,7 @@ function analyze(json: unknown): Analysis {
         lair: lairs[0],
         monsterCap,
         rawPortals,
+        rawZones,
       },
     },
   };
@@ -347,9 +409,10 @@ export function parseTiledMap(json: unknown, tile: number): ParsedTiled {
   if (!isNum(tile) || !(tile > 0)) throw new Error("parseTiledMap: tile phải > 0");
   const { parsedBase: b, tw } = a.built;
   const k = tile / tw;
-  const { rawPortals, ...rest } = b;
+  const { rawPortals, rawZones, ...rest } = b;
   return {
     ...rest,
+    spawnZones: rawZones.map((z) => ({ ...z, x: z.x * k, y: z.y * k, w: z.w * k, h: z.h * k })),
     portals: rawPortals.map((p) => ({
       id: p.id,
       name: p.name,
@@ -364,13 +427,13 @@ export function parseTiledMap(json: unknown, tile: number): ParsedTiled {
   };
 }
 
-/** `MapDef` dựng từ tệp (đưa thẳng cho `new GameMap`): `tiles` dựng sẵn nên `GameMap` không sinh theo seed (seed = 0 chỉ để đủ kiểu). */
+/** `MapDef` dựng từ tệp (đưa thẳng cho `new GameMap`): `tiles` dựng sẵn nên `GameMap` không sinh ô theo `seed`; `seed` còn lại chỉ là hạt giống trang trí tất định của client (0 nếu tệp không khai). */
 export function mapDefFromTiled(json: unknown, tile: number): MapDef {
   const p = parseTiledMap(json, tile);
   return {
     id: p.id,
     name: p.name,
-    seed: 0,
+    seed: p.seed,
     w: p.w,
     h: p.h,
     town: p.town,
@@ -379,6 +442,7 @@ export function mapDefFromTiled(json: unknown, tile: number): MapDef {
     ...(p.portals.length > 0 ? { portals: p.portals } : {}),
     ...(p.lair ? { lair: p.lair } : {}),
     ...(p.monsterCap ? { monsterCap: p.monsterCap } : {}),
+    ...(p.spawnZones.length > 0 ? { spawnZones: p.spawnZones } : {}),
     tiles: p.tiles,
   };
 }

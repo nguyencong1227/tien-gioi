@@ -482,6 +482,58 @@ try {
   s = await state();
   check(!s.open, "ambushOffer sai dạng không mở hộp thoại");
 
+  console.log("--- nhắc túi đan dưới nút Chiến (< 2 đan hồi huyết) ---");
+  await offer();
+  await sleep(ARM_WAIT); // qua khoá 700 ms: nút Chiến đã bật, để so trạng thái trước / sau cùng điều kiện
+  // nhắc túi đan (< 2 Hồi Huyết Đan): túi mock trống nên có dòng nhắc; đổi túi thì dòng đổi theo, đủ đan thì ẩn; nút Chiến KHÔNG bị khoá vì dòng này
+  const potion = () =>
+    J(`(() => { const e = document.getElementById('ambush-potion-note');
+      return { text: e.textContent, shown: getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0,
+        cls: document.getElementById('ambush-modal').classList.contains('has-potion-note') }; })()`);
+  const setPotions = (qty, itemId = "hoi_huyet_dan") =>
+    evalJs(
+      `window.__ui.onInv({ slots: [${qty > 0 ? `{ itemId: '${itemId}', qty: ${qty} }` : "null"}, ...Array(40).fill(null)] }); 1`,
+    );
+  const p0 = await potion();
+  const fightDis0 = (await state()).fight.dis;
+  check(fightDis0 === "false", `nút Chiến bật khi túi không đan (${fightDis0})`);
+  check(
+    p0.shown && p0.cls && p0.text === "Túi không có đan hồi huyết: nên mang ít nhất 2.",
+    `túi không đan: dòng nhắc đan hiện, nhãn 'hoặc bỏ chạy' nhường chỗ ('${p0.text}')`,
+  );
+  await setPotions(1);
+  await sleep(450);
+  const p1 = await potion();
+  check(
+    p1.shown && p1.text === "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
+    `túi còn 1 đan: dòng nhắc nêu số đan ('${p1.text}')`,
+  );
+  await setPotions(2);
+  await sleep(450);
+  const p2 = await potion();
+  check(
+    !p2.shown && !p2.cls && p2.text === "",
+    `túi đủ 2 đan: dòng nhắc ẨN, không còn nhãn nhường chỗ ('${p2.text}')`,
+  );
+  check(
+    (await state()).fight.dis === "false",
+    "nút Chiến vẫn BẬT (aria-disabled=false) khi thiếu đan cũng như khi đủ đan (dòng nhắc đan không khoá nút)",
+  );
+  // đan Đại / Thượng cũng là đan hồi khí huyết: người Kim Đan trở lên không bị nhắc sai "không có đan"
+  await setPotions(2, "dai_hoi_huyet_dan");
+  await sleep(450);
+  const p3 = await potion();
+  check(!p3.shown && p3.text === "", `túi 2 Đại Hồi Huyết Đan: KHÔNG nhắc ('${p3.text}')`);
+  await setPotions(1, "thuong_hoi_huyet_dan");
+  await sleep(450);
+  const p4 = await potion();
+  check(
+    p4.shown && p4.text === "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
+    `túi 1 Thượng Hồi Huyết Đan: nhắc 'chỉ còn 1' ('${p4.text}')`,
+  );
+  await evalJs(`window.__ui.onAmbushEnd(${JSON.stringify({ result: "canceled" })}); 1`);
+  await setPotions(0);
+
   console.log("--- kích thước ở 5 khung ---");
   const FRAMES = [
     { name: "mobile-sm", w: 360, h: 640, mobile: true },

@@ -482,6 +482,77 @@ export const QUESTS: QuestDef[] = [
     },
   },
 
+  // ---------- Việc phụ Âm Sương Trạch (Kim Đan, D8 #756): mỗi NPC một việc, một tầng (0/1/2), KHÔNG thuộc chuỗi chính ----------
+  // Việc phụ KHÔNG bắt buộc: thưởng cho công sức săn quái thêm. exp nhỏ (cả ba <= ~1% tổng thanh Kim Đan, tổng việc phụ Kim Đan <= 2,5%,
+  // xem kim-dan-world.test.ts), mỗi việc tối đa một kinh quyển rarity <= 2. doc_thiem chỉ an toàn từ trung kỳ -> việc độc nang đòi tier 1.
+  {
+    id: "am_suong_mao_hang",
+    title: "Sương mao dự trữ",
+    giver: "lai_buon_suong",
+    desc: "Việc phụ (không bắt buộc): Phó Quang cần sương mao dự trữ buôn bán. Hạ 12 Sương Hồ, mang về 8 túm lông.",
+    steps: [
+      { kind: "kill", monster: "suong_ho", count: 12 },
+      { kind: "collect", itemId: "suong_mao", count: 8 },
+    ],
+    rewards: { exp: 400, items: [{ itemId: "dai_hoi_huyet_dan", qty: 2 }] },
+    minRealm: { realm: 3, tier: 0 },
+    talk: {
+      offer: [
+        "Đầm cho lông sương hồ nhẹ như sương, ta buôn xa cần nhiều. Ngươi mới Kim Đan, ra rìa hạ mười hai con, mang tám túm lông về.",
+      ],
+      progress: ["Sương hồ ở rìa gần trạm. Đánh một đòn rồi lùi, đừng để cả đàn vây."],
+      complete: ["Lông còn nhẹ, đúng hàng ta cần. Cầm ít đan, thu được gì cứ mang sang ta mua."],
+    },
+  },
+  {
+    id: "am_suong_quy_cao",
+    title: "Mai rùa cổ",
+    giver: "tho_ren_suong",
+    desc: "Việc phụ (không bắt buộc): Hồ Thiết cần quy giáp dày của rùa già rèn giáp. Hạ 10 Thạch Quy già, mang về 6 tấm quy giáp.",
+    steps: [
+      { kind: "kill", monster: "thach_quy", count: 10 },
+      { kind: "collect", itemId: "quy_giap", count: 6 },
+    ],
+    rewards: { exp: 600, items: [{ itemId: "dai_hoi_linh_dan", qty: 2 }] },
+    minRealm: { realm: 3, tier: 2 },
+    talk: {
+      offer: [
+        "Mai rùa già dày nhất, rèn giáp chịu đòn tốt hơn cả. Ngươi đã Kim Đan hậu kỳ, vào sâu tìm những con tuổi thọ cao, hạ mười con.",
+      ],
+      progress: ["Thạch quy già ở vùng giữa đầm, máu dày. Đánh đều tay, đừng đứng lâu."],
+      complete: [
+        "Quy giáp dày đều, lò ta đủ lửa rèn cả bộ. Cầm lấy đan, thiếu nguyên liệu khác thì tới khi có.",
+      ],
+    },
+  },
+  {
+    id: "am_suong_doc_nang",
+    title: "Độc nang dược sư",
+    giver: "tram_truong",
+    desc: "Việc phụ (không bắt buộc): dược sư thu độc nang. Đạt Kim Đan trung kỳ, hạ 10 Độc Thiềm, mang về 6 độc nang.",
+    steps: [
+      { kind: "kill", monster: "doc_thiem", count: 10 },
+      { kind: "collect", itemId: "doc_nang", count: 6 },
+    ],
+    rewards: {
+      exp: 500,
+      items: [
+        { itemId: "hoi_huyet_dan", qty: 3 },
+        { itemId: "kinh_thi_doc_am_chuong", qty: 1 },
+      ],
+    },
+    minRealm: { realm: 3, tier: 1 },
+    talk: {
+      offer: [
+        "Độc thiềm nằm sâu, đòn nặng mà máu mỏng. Đạt trung kỳ rồi mới vào, hạ mười con, mang sáu túi độc nang cho dược sư các trạm.",
+      ],
+      progress: ["Độc thiềm trúng hai ba cú là ngã. Mang đủ đan, đánh nhanh rồi lùi."],
+      complete: [
+        "Độc nang không vỡ, dược sư mừng. Ta có quyển Thi Độc Âm Chưởng, chiêu độc phù với đầm này. Mở Túi đồ rồi bấm Học.",
+      ],
+    },
+  },
+
   // ---------- Chuỗi Nguyên Anh ở Hàn Vân Trạm (M7.5c, #506): nối sau `giao_hoan` ----------
   {
     id: "lang_han_quan",

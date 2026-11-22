@@ -12,7 +12,7 @@ import {
   REALMS,
   SKILLS,
   TICK_MS,
-  DEFAULT_MAP,
+  DEFAULT_MAP_ID,
   getMap,
   type GameMap,
 } from "@tien-gioi/shared";
@@ -41,20 +41,30 @@ function seeded(seed: number) {
 }
 
 /**
- * Đo thời gian thực thi (ms) của một bước đồng bộ thuần CPU: lấy `min(wallMs, cpuMs)` (#723).
+ * Đo thời gian thực thi (ms) của một bước đồng bộ thuần CPU: lấy `min(wallMs, cpuMs)` (#723, sửa ở #1215).
  * - `wallMs = T_self + T_preempted >= T_self`: đồng hồ tường bị đội lên khi hệ điều hành tạm lấy CPU giao cho tiến trình khác (máy tải cao).
- * - `cpuMs = T_self + T_other_threads >= T_self`: `process.cpuUsage` dừng khi tiến trình bị preempt, chỉ bị đội nếu cùng tiến trình có worker thread khác chạy song song trên nhân khác.
- * Do đó `min(wallMs, cpuMs) = T_self + min(T_preempted, T_other_threads) >= T_self`: không bao giờ nhỏ hơn thời gian CPU thật `T_self` của luồng đang chạy tick (bắt mọi hồi quy thật), đồng thời loại bỏ thời gian chờ lịch chạy khi máy bận.
+ * - `cpuMs` là CPU của CHÍNH LUỒNG đang chạy bước này (`process.threadCpuUsage`): dừng khi luồng bị preempt VÀ không cộng luồng nào khác.
+ *   Trước #1215 dùng `process.cpuUsage()` (CẢ TIẾN TRÌNH). Vitest chạy `pool: "threads"` (xem `vitest.config.ts`): MỌI tệp test chạy song song là worker thread của CÙNG một
+ *   tiến trình, nên khi chạy cả bộ `npm test` CPU cả tiến trình đo được gấp 10-30 lần CPU thật của luồng (B đo: tick ~1,3 ms thật ra 20-50 ms), `min` luôn rơi về đồng hồ tường và
+ *   mất tác dụng chống tải. `cpuMs <= wallMs` về nguyên tắc (không bao giờ nhỏ hơn thời gian CPU thật `T_self`), nên vẫn bắt mọi hồi quy CPU thật.
+ * Node cũ chưa có `process.threadCpuUsage` (có từ 22.19) thì quay về `process.cpuUsage()` như trước.
  */
 export function measureSyncStepMs(fn: () => void): number {
-  const c0 = process.cpuUsage();
+  const c0 = readCpuUsage();
   const t0 = performance.now();
   fn();
   const wallMs = performance.now() - t0;
-  const c1 = process.cpuUsage(c0);
+  const c1 = readCpuUsage(c0);
   const cpuMs = (c1.user + c1.system) / 1000;
   return Math.min(wallMs, cpuMs);
 }
+
+/** `process.threadCpuUsage` (Node >= 22.19; `@types/node` đang ghim chưa khai báo) hoặc `process.cpuUsage` nếu Node cũ. */
+const threadCpuUsage = (
+  process as unknown as { threadCpuUsage?: (prev?: NodeJS.CpuUsage) => NodeJS.CpuUsage }
+).threadCpuUsage;
+const readCpuUsage = (prev?: NodeJS.CpuUsage): NodeJS.CpuUsage =>
+  threadCpuUsage ? threadCpuUsage.call(process, prev) : process.cpuUsage(prev);
 
 /** Tính trung bình, p95 và max từ mảng thời gian từng tick (không làm thay đổi mảng đầu vào). */
 export function summarizeTickMs(tickMs: readonly number[]): {
@@ -110,7 +120,7 @@ export function runBench(
   seconds: number,
   seed = 1,
   mode: BenchMode = "hunt",
-  map: GameMap = DEFAULT_MAP,
+  map: GameMap = getMap(DEFAULT_MAP_ID)!,
 ): BenchResult {
   const realRandom = Math.random;
   Math.random = seeded(seed);
@@ -391,7 +401,7 @@ export function runMultiMapBench(
   Math.random = seeded(seed);
   try {
     const rooms = roomsConfig.map((cfg, rIdx) => {
-      const map = getMap(cfg.mapId) ?? DEFAULT_MAP;
+      const map = getMap(cfg.mapId) ?? getMap(DEFAULT_MAP_ID)!;
       const players = cfg.players;
       const mode = cfg.mode ?? "hunt";
       let evBroadcast = 0;
@@ -674,8 +684,8 @@ if (process.argv[1]?.endsWith("bench.ts")) {
   const seconds = arg("seconds", 60);
   const mode: BenchMode = process.argv.includes("--crowd") ? "crowd" : "hunt";
   const mapArg = process.argv.find((a) => a.startsWith("--map="));
-  const targetMapId = mapArg ? mapArg.slice(6) : DEFAULT_MAP.def.id;
-  const targetMap = getMap(targetMapId) ?? DEFAULT_MAP;
+  const targetMapId = mapArg ? mapArg.slice(6) : DEFAULT_MAP_ID;
+  const targetMap = getMap(targetMapId) ?? getMap(DEFAULT_MAP_ID)!;
   const isMulti = process.argv.includes("--multi");
 
   const jsonArg = process.argv.find((a) => a === "--json" || a.startsWith("--json="));

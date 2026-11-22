@@ -13,7 +13,10 @@ import {
   MAX_BOLTS,
   SKILL_BY_ID,
   type SkillDef,
+  WORLD_BOSS_TZ_OFFSET_MS,
+  sampleWorldBossSchedule,
 } from "@tien-gioi/shared";
+import { Hub } from "../hub";
 import { ANGLE_STEP, quantAngle, takeWhole } from "../world";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 import { POS_SYNC_EVERY_TICKS, applyInputs, syncPublicPos } from "./movement";
@@ -470,10 +473,13 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     for (const h of heroes) h.c.ambush!.offer!.seen = true; // người thật đã xác nhận: giữ hộp thoại mở suốt phép đo
     const ticks: number[] = [];
     for (let t = 0; t < 100; t++) {
-      const t0 = performance.now();
-      w.now += TICK_MS;
-      tickWorld(w, TICK_MS);
-      ticks.push(performance.now() - t0);
+      // CPU của luồng này (không đồng hồ tường): máy tải nặng / pool threads của vitest không làm tick "chậm" giả (#1215)
+      ticks.push(
+        measureSyncStepMs(() => {
+          w.now += TICK_MS;
+          tickWorld(w, TICK_MS);
+        }),
+      );
     }
     const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
     expect(avg).toBeLessThan(10);
@@ -520,12 +526,14 @@ describe("ngân sách băng thông và CPU (benchmark có seed, kết quả cố
     const ticks: number[] = [];
     const rounds = 200; // 10 giây
     for (let t = 0; t < rounds; t++) {
-      const t0 = performance.now();
-      for (const h of rooms) {
-        h.w.now += TICK_MS;
-        tickWorld(h.w, TICK_MS);
-      }
-      ticks.push(performance.now() - t0);
+      ticks.push(
+        measureSyncStepMs(() => {
+          for (const h of rooms) {
+            h.w.now += TICK_MS;
+            tickWorld(h.w, TICK_MS);
+          }
+        }),
+      );
     }
     const avg = ticks.reduce((a, b) => a + b, 0) / ticks.length;
     expect(avg).toBeLessThan(10); // tổng cả 20 phòng trong MỘT vòng tick (mỗi phòng thật chạy trong timer riêng, đây là chặn trên nghiêm hơn thực tế)
@@ -1251,4 +1259,131 @@ describe("vật thể bền của người chơi (mục 51, CT4 #1049)", () => {
       for (const id of ids) delete (SKILL_BY_ID as Record<string, SkillDef>)[id];
     }
   });
+});
+
+describe("trùm thế giới theo giờ đông người (M9.14 #1033)", () => {
+  // Đo ca 700 ticks = 35 s (#1033): avgMs = 0.28 ms/t, p95Ms = 1.00 ms/t (< 10 ms); avgPatchBytes = 13.3 B/t (< 600 B/t);
+  // maxPatchBytes = 728 B; maxFxPerTick = 102 (<= 400). Chạy ~330 ms máy rảnh nhưng gán hạn 60 s để CI và máy tải nặng an toàn (#1215).
+  it("100 người dồn một phòng đánh trùm thế giới đang vận chiêu (world-boss-crowd): tick < 10 ms, byte / tick < 600 mỗi client, fx không bùng nổ", () => {
+    const hub = new Hub();
+    hub.worldBoss.slots = sampleWorldBossSchedule();
+    hub.worldBoss.enabled = true;
+    const { w, fx, worldBosses } = makeWorld(getMap("han_van")!, hub);
+    // Bản chạy thật bật `BOSS_MOVES=on`: KHÔNG bật thì trùm chỉ đánh thường (không báo trước, không chuyển giai đoạn, không gọi quái con) và ca này đo hụt
+    w.bossMoves = true;
+
+    // 00:00 UTC+7 ngày 18/11/2026
+    const DAY0 = Date.UTC(2026, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
+    const at = (h: number, m = 0, s = 0) => DAY0 + ((h * 60 + m) * 60 + s) * 1000;
+
+    // Cho thời gian khởi động sổ trước giờ sự kiện, rồi nhảy tới 12:00:01 để sinh trùm
+    w.now = at(11, 59);
+    tickWorld(w, TICK_MS);
+    w.now = at(12, 0, 1);
+    tickWorld(w, TICK_MS);
+
+    // Kiểm tra trùm thế giới đã được sinh tại phòng Hàn Vân
+    expect(w.wbossId).not.toBeNull();
+    const bossId = w.wbossId!;
+    const bossMon = w.state.monsters.get(bossId)!;
+    expect(bossMon).toBeDefined();
+    // Máu cực lớn để trùm không chết giữa ca đo, chỉ đo CPU, byte patch và fx
+    bossMon.hp = bossMon.maxHp = 1e12;
+    if (hub.worldBoss.current) hub.worldBoss.current.maxHp = 1e12;
+
+    // 100 người chơi Nguyên Anh tụ quanh trùm thế giới trong bán kính 60-140 px
+    const players: string[] = [];
+    for (let i = 0; i < 100; i++) {
+      const sid = `wbc_${i}`;
+      const rad = (i / 100) * Math.PI * 2;
+      const dist = 60 + (i % 5) * 16;
+      const { p } = addPlayer(w, sid, 4, 0); // Nguyên Anh tầng 1
+      p.x = bossMon.x + Math.cos(rad) * dist;
+      p.y = bossMon.y + Math.sin(rad) * dist;
+      p.hp = p.maxHp = 1e9;
+      p.mp = p.maxMp = 1e9;
+      syncPublicPos(p);
+      players.push(sid);
+    }
+
+    // Gắn StateView và Encoder như server thật để đo byte patch mỗi client
+    const views: StateView[] = [];
+    for (const sid of players) {
+      const v = new StateView();
+      w.interest.join(w, sid, v);
+      views.push(v);
+    }
+    const encoder = new Encoder(w.state);
+    encoder.encodeAll();
+    encoder.discardChanges();
+    for (const v of views) encoder.encodeView(v, 1, { offset: 1 });
+    encoder.discardChanges();
+
+    // 700 ticks = 35 giây: chiêu có hồi 8 giây nên 5 giây chỉ thấy MỘT lần báo trước; ép máu qua 50% / 25% để có cả hai lần chuyển giai đoạn (gầm, giáp, gọi Hàn Lang)
+    const ticks = 700;
+    const durations: number[] = [];
+    const bytesPerTick: number[] = [];
+    let maxFxPerTick = 0;
+
+    for (let t = 0; t < ticks; t++) {
+      if (t === 200) bossMon.hp = bossMon.maxHp * 0.49;
+      if (t === 450) bossMon.hp = bossMon.maxHp * 0.24;
+      w.now += TICK_MS;
+      const fx0 = fx.length;
+
+      const dt = measureSyncStepMs(() => {
+        // 100 người cùng chém vào trùm thế giới mỗi tick
+        for (const sid of players) {
+          const p = w.state.players.get(sid)!;
+          const angle = Math.atan2(bossMon.y - p.y, bossMon.x - p.x);
+          slash(w, sid, angle);
+        }
+        // tickWorld chạy đầy đủ combat, monsters (trùm vận chiêu), worldBoss, interest
+        tickWorld(w, TICK_MS);
+      });
+      durations.push(dt);
+      maxFxPerTick = Math.max(maxFxPerTick, fx.length - fx0);
+
+      // Đo byte patch gửi client theo StateView
+      const it = { offset: 1 };
+      let sharedOffset = 1;
+      const shared = encoder.hasChanges;
+      if (shared) {
+        encoder.encode(it);
+        sharedOffset = it.offset;
+      }
+      let tickBytes = 0;
+      for (const v of views) {
+        if (shared || v.changes.size > 0) {
+          tickBytes += encoder.encodeView(v, sharedOffset, it).byteLength;
+        }
+      }
+      encoder.discardChanges();
+      bytesPerTick.push(tickBytes / players.length);
+    }
+
+    const { avgMs, p95Ms } = summarizeTickMs(durations);
+    expect(avgMs).toBeLessThan(10); // Ngân sách tick < 10 ms
+    expect(p95Ms).toBeLessThan(10);
+
+    const avgPatchBytes = bytesPerTick.reduce((a, b) => a + b, 0) / bytesPerTick.length;
+    expect(avgPatchBytes).toBeLessThan(600); // Ngân sách patch < 600 byte/tick mỗi client
+
+    // fx bị chặn theo số người (slash + boss cast / telegraph / warning), không bùng nổ theo số tick
+    expect(maxFxPerTick).toBeLessThanOrEqual(100 * 4);
+
+    // CHỐNG PASS RỖNG: ca chỉ có nghĩa khi trùm THẬT SỰ dùng bộ chiêu (báo trước, vận chiêu, hai lần chuyển giai đoạn, gọi quái con)
+    const kinds = new Map<string, number>();
+    for (const m of fx) kinds.set(m.kind, (kinds.get(m.kind) ?? 0) + 1);
+    expect(kinds.get("slash") ?? 0).toBeGreaterThanOrEqual(100 * 50); // 100 người THẬT SỰ chém (đo: ~88 nhát mỗi người trong 35 giây)
+    expect(kinds.get("warn") ?? 0).toBeGreaterThanOrEqual(2);
+    expect(kinds.get("bossCast") ?? 0).toBeGreaterThanOrEqual(2);
+    expect(kinds.get("bossPhase") ?? 0).toBe(2);
+    expect(kinds.get("bossSummon") ?? 0).toBeGreaterThanOrEqual(1);
+
+    // Bảng đóng góp chỉ gửi định kỳ mỗi 2 giây: 35 giây ~ 17-18 đợt x 100 người; không gửi mỗi tick (700 x 100 = 70000)
+    const boardMsgs = worldBosses.filter((m) => m.msg.phase === "live" && m.msg.top !== undefined);
+    expect(boardMsgs.length).toBeGreaterThanOrEqual(100 * 15);
+    expect(boardMsgs.length).toBeLessThanOrEqual(100 * 20);
+  }, 60_000);
 });

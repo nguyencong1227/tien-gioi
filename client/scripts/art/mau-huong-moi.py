@@ -133,6 +133,14 @@ def parse_terrain_tiles(src):
     return tiles
 
 
+def canonical_want(want):
+    """Chuẩn hoá 8 hàng xóm (1 = cùng địa hình đích) theo luật Wang: bit GÓC chỉ giữ khi CẢ HAI cạnh kề đều có (góc bị cạnh khác che thì
+    không ảnh hưởng ô). Không chuẩn hoá thì mặt nạ 'chéo không cạnh' không có ô khớp và thuật toán 'khớp nhiều bit nhất' chọn ô sai
+    (B đo trên bản đồ thật: 9-28 % ô đất / nước chọn sai; review #1210). Thứ tự bit như NEIGH: TL, T, TR, L, R, BL, B, BR."""
+    tl, t, tr, l, r, bl, b, br = want
+    return [tl & t & l, t, tr & t & r, l, r, bl & b & l, b, br & b & r]
+
+
 def autotile(grid, tiles, floor_img, variant, bg=None):
     """Ghép lớp địa hình `grid` (0 / 1) bằng ô của khối màu `variant` = (cột, hàng) trong `tileset_floor.png`
     (8 khối 11x7 ô cùng bố cục: 2 cột x 4 hàng; terrain trong tileset.tres nằm ở khối (0, 1)). Chọn ô khớp đủ 8 hàng xóm,
@@ -147,6 +155,8 @@ def autotile(grid, tiles, floor_img, variant, bg=None):
         for x in range(w):
             t = grid[y][x]
             want = [grid[min(max(y + oy, 0), h - 1)][min(max(x + ox, 0), w - 1)] for ox, oy in NEIGH]
+            if t == 1:
+                want = canonical_want(want)
             best, score = None, -1
             for pos, v in by_center.get(t, []):
                 s = sum(1 for i, n in enumerate(PEER) if v.get(n, t) == want[i])  # bit thiếu = cùng địa hình tâm

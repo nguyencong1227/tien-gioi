@@ -1,6 +1,7 @@
 // Bản đồ sinh tất định từ seed: client và server sinh ra cùng một bản đồ,
 // nên không phải gửi dữ liệu bản đồ qua mạng.
 import { MONSTER_BY_ID, MONSTER_CAP, PLAYER_RADIUS } from "./game";
+import { mapDefFromTiled } from "./tiled";
 
 export const TILE = 32;
 export const MAP_W = 96;
@@ -159,6 +160,34 @@ export interface PortalDef {
   readonly toPortal: string;
 }
 
+/**
+ * Vùng sinh quái / trùm theo DỮ LIỆU (docs/THIET_KE_BAN_DO_TILED.md mục 4 và 6, lát cắt S5): chữ nhật hoặc elip trong khung `x, y, w, h` (px thế giới; `x, y` là GÓC TRÊN TRÁI của khung
+ * như Tiled ghi, không phải tâm). Loài `monster` chỉ sinh trong các vùng của nó khi bản đồ khai; bản đồ không khai vùng cho loài nào thì loài đó sinh theo cách cũ (`dangerAt` + `minDanger`).
+ */
+export interface SpawnZoneDef {
+  /** `MonsterKind.id` */
+  readonly monster: string;
+  readonly shape: "rect" | "ellipse";
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  /** Số con CÙNG loài tối đa đang sống trong vùng này (số nguyên >= 1); bỏ trống thì vùng không tự giới hạn (vẫn theo `monsterCap` của bản đồ) */
+  readonly max?: number;
+}
+
+const NO_ZONES: readonly SpawnZoneDef[] = [];
+
+/** (x, y) có nằm trong vùng không (elip: phương trình chuẩn trên khung; chữ nhật: khung kín ở cạnh trên / trái, hở ở cạnh dưới / phải). */
+export function inSpawnZone(z: SpawnZoneDef, x: number, y: number): boolean {
+  if (z.shape === "rect") return x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h;
+  const rx = z.w / 2;
+  const ry = z.h / 2;
+  const dx = (x - (z.x + rx)) / rx;
+  const dy = (y - (z.y + ry)) / ry;
+  return dx * dx + dy * dy <= 1;
+}
+
 /** Mô tả một bản đồ: client và server cùng sinh ô từ `seed`, không gửi dữ liệu bản đồ qua mạng. */
 export interface MapDef {
   readonly id: string;
@@ -197,6 +226,8 @@ export interface MapDef {
    * Bỏ trống thì dùng `MONSTER_CAP` (như Lạc Hà Trấn từ trước tới giờ).
    */
   readonly monsterCap?: Readonly<Record<string, number>>;
+  /** Vùng sinh quái theo dữ liệu (từ đối tượng `spawnZone` của tệp Tiled); bỏ trống là bản đồ sinh quái theo cách cũ (`dangerAt`) */
+  readonly spawnZones?: readonly SpawnZoneDef[];
   /**
    * Ô DỰNG SẴN (loại ô `T`, đúng `w * h`, hàng trước cột sau) từ tệp Tiled (`mapDefFromTiled`, docs/THIET_KE_BAN_DO_TILED.md). Có thì `GameMap` dùng đúng các ô này
    * (đã gồm trấn, đường, hang: tệp là nguồn duy nhất) và KHÔNG sinh theo `seed`; không có thì sinh theo `seed` như trước.
@@ -223,6 +254,10 @@ export class GameMap {
   readonly portals: readonly PortalDef[];
   /** Số quái tối đa mỗi loại ở bản đồ này (đã có giá trị mặc định). Dùng `monsterCapOf` để tra theo id. */
   readonly monsterCap: Readonly<Record<string, number>>;
+  /** Vùng sinh quái theo dữ liệu (rỗng nếu bản đồ không khai: sinh theo cách cũ). Dùng `spawnZonesOf` để tra theo loài. */
+  readonly spawnZones: readonly SpawnZoneDef[];
+  /** Vùng sinh gom theo loài (dựng một lần: `spawnZonesOf` không cấp phát mỗi lần gọi) */
+  private readonly zonesByMonster = new Map<string, SpawnZoneDef[]>();
   /** Hang trùm tính bằng px (tâm và bán kính); `undefined` nếu bản đồ không có (xem `MapDef.lair`) */
   readonly lairPx: Readonly<{ x: number; y: number; r: number }> | undefined;
 
@@ -263,12 +298,19 @@ export class GameMap {
     this.wildName = def.wildName ?? def.name;
     this.portals = def.portals ?? [];
     this.monsterCap = def.monsterCap ?? MONSTER_CAP;
+    this.spawnZones = def.spawnZones ?? [];
     this.lairPx = def.lair
       ? { x: def.lair.cx * TILE, y: def.lair.cy * TILE, r: def.lair.r * TILE }
       : undefined;
     this.checkLair();
     this.checkPortals();
     this.checkMonsterCap();
+    this.checkSpawnZones();
+    for (const z of this.spawnZones) {
+      const list = this.zonesByMonster.get(z.monster);
+      if (list) list.push(z);
+      else this.zonesByMonster.set(z.monster, [z]);
+    }
   }
 
   /**
@@ -334,6 +376,44 @@ export class GameMap {
       throw new Error(
         `MapDef ${this.def.id}: ${bosses} trùm sinh sẵn vượt giới hạn ${MAX_BOSSES_PER_MAP} mỗi bản đồ (monsterCap)`,
       );
+  }
+
+  /**
+   * Vùng sinh sai (loài lạ, số không hữu hạn, khung rỗng, tràn ra ngoài bản đồ hay đè viền núi, `max` không phải số nguyên >= 1): báo ngay khi dựng bản đồ. Chỗ đứng có hợp lệ thật hay không
+   * (ô chặn, khu an toàn, liên thông) là việc của `spawnZoneViolations` ở server, kiểm trên dữ liệu thật.
+   */
+  private checkSpawnZones() {
+    this.spawnZones.forEach((z, i) => {
+      const at = `MapDef ${this.def.id}: vùng sinh #${i + 1}`;
+      if (!Object.prototype.hasOwnProperty.call(MONSTER_BY_ID, z.monster))
+        throw new Error(`${at}: loại quái lạ "${String(z.monster)}"`);
+      if (z.shape !== "rect" && z.shape !== "ellipse")
+        throw new Error(`${at}: shape phải là rect hoặc ellipse`);
+      for (const [f, v] of [
+        ["x", z.x],
+        ["y", z.y],
+        ["w", z.w],
+        ["h", z.h],
+      ] as const)
+        if (!Number.isFinite(v)) throw new Error(`${at}: ${f} phải là số hữu hạn (${v})`);
+      if (!(z.w >= TILE) || !(z.h >= TILE))
+        throw new Error(`${at}: khung phải rộng / cao ít nhất một ô (${TILE} px)`);
+      // Viền bản đồ là núi đá một ô: vùng nằm gọn trong phần còn lại
+      if (
+        z.x < TILE ||
+        z.y < TILE ||
+        z.x + z.w > this.worldW - TILE ||
+        z.y + z.h > this.worldH - TILE
+      )
+        throw new Error(`${at}: không nằm gọn trong bản đồ (bỏ viền một ô)`);
+      if (z.max !== undefined && (!Number.isInteger(z.max) || z.max < 1))
+        throw new Error(`${at}: max phải là số nguyên >= 1 (${z.max})`);
+    });
+  }
+
+  /** Các vùng sinh của loài `id` (rỗng: bản đồ không khai vùng cho loài này, sinh theo cách cũ). Id lạ cũng rỗng. */
+  spawnZonesOf(id: string): readonly SpawnZoneDef[] {
+    return this.zonesByMonster.get(id) ?? NO_ZONES;
   }
 
   /** Số quái tối đa của loại `id` ở bản đồ này (loại không khai báo là 0). Id lạ cũng là 0. */
@@ -424,10 +504,12 @@ export const AM_SUONG_ID = "am_suong";
 export const HAN_VAN_ID = "han_van";
 
 /**
- * Danh sách bản đồ của game (docs/THIET_KE_NHIEU_BAN_DO.md). Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed:
- * cổng nằm ở đầu mút con đường đất, ô xung quanh đi lại được (test giữ). Đổi seed / kích thước thì phải đặt lại cổng.
+ * ĐỊNH NGHĨA SINH THEO `seed` của bốn bản đồ thường: nguồn gốc cũ, nay là "đồng hồ chuẩn" của test và đầu vào của công cụ `npm run map:bake -w server`
+ * (sinh ra `shared/maps/<id>.logic.json`). Trò chơi KHÔNG dựng bản đồ từ đây mà từ `MAPS` (đọc tệp); đấu trường chặn đường vẫn lấy `seed` / tên từ đây.
+ * Toạ độ cổng (px) đã đối chiếu với ô sinh từ seed: cổng nằm ở đầu mút con đường đất, ô xung quanh đi lại được (test giữ). Đổi seed / kích thước thì phải đặt lại cổng.
+ * Khi một bản đồ đầu tiên được sửa TAY (lát cắt S6), nó ra khỏi danh sách này (tệp thành nguồn duy nhất) và test "đồng hồ chuẩn" của nó bị gỡ.
  */
-export const MAPS: readonly MapDef[] = [
+export const PROCEDURAL_MAPS: readonly MapDef[] = [
   {
     id: DEFAULT_MAP_ID,
     name: "Lạc Hà Trấn",
@@ -563,6 +645,15 @@ export const MAPS: readonly MapDef[] = [
   },
 ];
 
+/**
+ * Danh sách bản đồ thường của game (docs/THIET_KE_NHIEU_BAN_DO.md). Ban đầu là các định nghĩa sinh theo `seed` (`PROCEDURAL_MAPS`); `adoptTiledMaps` (bên dưới) thay từng mục bằng bản
+ * dựng từ TỆP Tiled (`shared/maps/<id>.logic.json`, docs/THIET_KE_BAN_DO_TILED.md mục 4a): cùng id / thứ tự, cùng ô / cổng / trấn từng byte (test `tiled-maps.test.ts`). SERVER nhận tệp lúc
+ * `defineRooms` (xem `shared/src/map-files.ts`); CLIENT cũng nhận tệp (S3a): `client/src/game-modules.ts` gọi `adoptTiledMapFiles()` khi chunk game tải xong, TRƯỚC khi dựng `WorldScene`, nên hai bên dựng bản đồ từ CÙNG tệp (từ S6 tệp sửa tay khác `seed`); 4 tệp ~16 KB gzip KHÔNG nằm trong gói KHỞI ĐỘNG.
+ * Mảng này được SỬA TẠI CHỖ bởi `adoptTiledMaps`: giữ tham chiếu `MAPS` thì thấy bản mới.
+ */
+const worldDefs: MapDef[] = [...PROCEDURAL_MAPS];
+export const MAPS: readonly MapDef[] = worldDefs;
+
 /** Id bản đồ bí cảnh đầu tiên (docs/THIET_KE_BI_CANH.md). */
 export const LINH_HU_MAP_ID = "bi_canh_linh_hu";
 
@@ -600,7 +691,7 @@ export function arenaMapIdOf(mapId: string): string {
  * Không có khu an toàn (xem `MapDef.kind`), không cổng, không quái sinh tự nhiên (`monsterCap` rỗng: kẻ chặn đường do server đặt). Người chơi vào ở phía nam
  * (`townPx`), kẻ địch phía bắc / giữa. `getMap` tra được (client và server cùng dựng ô từ `seed`); `defineRooms` chỉ đăng ký `MAPS` nên phòng do server mở (CD3).
  */
-export const ARENA_MAPS: readonly MapDef[] = MAPS.map((m) => ({
+export const ARENA_MAPS: readonly MapDef[] = PROCEDURAL_MAPS.map((m) => ({
   id: arenaMapIdOf(m.id),
   kind: "arena",
   arenaFor: m.id,
@@ -616,9 +707,10 @@ export const ARENA_MAPS: readonly MapDef[] = MAPS.map((m) => ({
   monsterCap: {},
 }));
 
-export const MAP_BY_ID: Readonly<Record<string, MapDef>> = Object.fromEntries(
+const mapById: Record<string, MapDef> = Object.fromEntries(
   [...MAPS, ...DUNGEON_MAPS, ...ARENA_MAPS].map((m) => [m.id, m]),
 );
+export const MAP_BY_ID: Readonly<Record<string, MapDef>> = mapById;
 
 /** Bản đồ `id` là đấu trường chặn đường? Id lạ / sai kiểu là `false`. */
 export function isArenaMap(id: unknown): boolean {
@@ -641,6 +733,26 @@ export function isDungeonMap(id: unknown): boolean {
 const mapCache = new Map<string, GameMap>();
 
 /**
+ * Nhận TỆP Tiled cho các bản đồ thường: với mỗi `id` -> JSON, dựng `MapDef` bằng `mapDefFromTiled` (ném lỗi gom MỌI vi phạm nếu tệp sai, hoặc `id` không phải bản đồ thường / lệch id trong tệp)
+ * và thay bản định nghĩa cũ ở `MAPS` / `MAP_BY_ID`, bỏ `GameMap` đã nhớ của id đó (lần `getMap` sau dựng từ tệp). Gọi MỘT lần lúc khởi động, TRƯỚC khi ai dùng `getMap(id)` của các id này.
+ * Chưa gọi thì mọi thứ vẫn là bản sinh theo `seed` (cùng từng byte ở S2, nên gọi sớm hay muộn không đổi kết quả hiện nay; khi tệp bị sửa tay ở S6 thì PHẢI nhận trước khi dùng). Trả danh sách id đã nhận.
+ */
+export function adoptTiledMaps(sources: Readonly<Record<string, unknown>>): string[] {
+  const done: string[] = [];
+  for (const [id, src] of Object.entries(sources)) {
+    const idx = worldDefs.findIndex((d) => d.id === id);
+    if (idx < 0) throw new Error(`adoptTiledMaps: '${id}' không phải bản đồ thường`);
+    const def = mapDefFromTiled(src, TILE);
+    if (def.id !== id) throw new Error(`adoptTiledMaps: tệp của '${id}' khai id '${def.id}'`);
+    worldDefs[idx] = def;
+    mapById[id] = def;
+    mapCache.delete(id);
+    done.push(id);
+  }
+  return done;
+}
+
+/**
  * Lấy bản đồ theo id (sinh một lần rồi nhớ). Id lạ trả `undefined`: id có thể đến từ client / file lưu,
  * nên không tra bảng trực tiếp (`MAP_BY_ID["constructor"]` không phải `undefined`).
  */
@@ -655,36 +767,42 @@ export function getMap(id: unknown): GameMap | undefined {
   return m;
 }
 
-/** Bản đồ mặc định (Lạc Hà Trấn). */
+/**
+ * Bản đồ mặc định (Lạc Hà Trấn) DỰNG MỘT LẦN lúc nạp module (từ `seed`). SAU `adoptTiledMaps` (server nhận tệp ở `defineRooms`) `getMap(DEFAULT_MAP_ID)` là bản dựng từ TỆP và KHÁC đối tượng này
+ * (cùng từng byte ở S2, nhưng khi tệp Lạc Hà bị sửa tay ở S6 thì `DEFAULT_MAP` là bản CŨ). Vì vậy mã nguồn server / client KHÔNG được nhập `DEFAULT_MAP` (test `no-global-map-imports` canh):
+ * dùng `getMap(DEFAULT_MAP_ID)!` (hoặc `world.map` / `scene.map`). Chỉ còn cho các test cũ và cho tên cũ bên dưới.
+ * @deprecated dùng `getMap(DEFAULT_MAP_ID)!`.
+ */
 export const DEFAULT_MAP: GameMap = getMap(DEFAULT_MAP_ID)!;
 
-// ---- Tên cũ: trỏ tới bản đồ mặc định, giữ để chuyển dần sang `GameMap` (#123), không đổi hành vi ----
+// ---- Tên cũ: trỏ tới bản đồ mặc định, giữ để chuyển dần sang `GameMap` (#123). Các HÀM tra `getMap(DEFAULT_MAP_ID)` mỗi lần gọi (theo bản đã nhận tệp); `MAP_TILES` là ảnh chụp lúc nạp module ----
 
+/** @deprecated ảnh chụp lúc nạp module (bản sinh theo seed): dùng `getMap(DEFAULT_MAP_ID)!.tiles`. */
 export const MAP_TILES = DEFAULT_MAP.tiles;
 
 export function tileAt(tx: number, ty: number): T {
-  return DEFAULT_MAP.tileAt(tx, ty);
+  return getMap(DEFAULT_MAP_ID)!.tileAt(tx, ty);
 }
 
 export function isBlockedPx(x: number, y: number): boolean {
-  return DEFAULT_MAP.isBlockedPx(x, y);
+  return getMap(DEFAULT_MAP_ID)!.isBlockedPx(x, y);
 }
 
 /** Kiểm tra hình tròn bán kính r có chạm ô chặn không. */
 export function circleBlocked(x: number, y: number, r: number): boolean {
-  return DEFAULT_MAP.circleBlocked(x, y, r);
+  return getMap(DEFAULT_MAP_ID)!.circleBlocked(x, y, r);
 }
 
 /** Di chuyển có trượt theo tường (tách trục X/Y). Dùng chung client và server. */
 export function moveWithCollision(x: number, y: number, dx: number, dy: number, r: number) {
-  return DEFAULT_MAP.moveWithCollision(x, y, dx, dy, r);
+  return getMap(DEFAULT_MAP_ID)!.moveWithCollision(x, y, dx, dy, r);
 }
 
 export function inTown(x: number, y: number, pad = 0): boolean {
-  return DEFAULT_MAP.inTown(x, y, pad);
+  return getMap(DEFAULT_MAP_ID)!.inTown(x, y, pad);
 }
 
 /** Độ nguy hiểm theo khoảng cách tới trấn: 0..1 */
 export function dangerAt(x: number, y: number): number {
-  return DEFAULT_MAP.dangerAt(x, y);
+  return getMap(DEFAULT_MAP_ID)!.dangerAt(x, y);
 }

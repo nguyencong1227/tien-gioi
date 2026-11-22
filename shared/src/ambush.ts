@@ -116,11 +116,47 @@ export function ambushRollP(danger: unknown): number {
 /** Thời điểm tính giá: `offer` (hộp thoại, trước trận) hoặc `mid` (giữa trận / thua / hết giờ / rớt mạng). */
 export type AmbushPriceStage = "offer" | "mid";
 
-/** % thanh tu vi của CẢNH GIỚI hiện tại phải trả khi bỏ chạy, theo thời điểm. TẠM: CD6 chốt. */
-export const AMBUSH_EXP_PRICE_PCT: Readonly<Record<AmbushPriceStage, number>> = {
-  offer: 5,
-  mid: 10,
+/**
+ * Tu vi / PHÚT của người săn quái tốt nhất ở từng bậc (thang `stepOf`, 0 = Phàm Nhân ... 18 = Nguyên Anh tầng cuối): thước đo chung cho giá bỏ chạy và thưởng thắng, để "N phút" nghĩa là
+ * N phút săn quái ở CHÍNH bậc đó (thời gian săn đầy một thanh tu vi khác nhau tới ~160 lần giữa Luyện Khí và Nguyên Anh nên giá theo % thanh không dùng được: 5% thanh = 0,3 phút săn ở
+ * Luyện Khí tầng 3 nhưng 48 phút ở Nguyên Anh tầng cuối). SINH từ mô phỏng (`bestOption` của `server/src/balance/simulate.ts`): `chan-duong.test.ts` buộc bảng này khớp bản sinh, đổi số liệu quái / đồ
+ * làm lệch thì test đỏ và in ra bảng đúng để dán lại.
+ */
+export const AMBUSH_HUNT_EXP_PER_MIN: readonly number[] = [
+  30, 48, 51, 54, 57, 59, 89, 107, 113, 120, 134, 139, 124, 507, 523, 536, 552, 475, 396,
+];
+
+/** Tu vi / phút săn ở bậc `step` (kẹp vào bảng: bậc ngoài bảng lấy bậc gần nhất; không phải số hữu hạn -> bậc 0). Thuần. */
+export function ambushHuntExpPerMin(step: unknown): number {
+  const s = Math.min(wholeNonNeg(step), AMBUSH_HUNT_EXP_PER_MIN.length - 1);
+  return AMBUSH_HUNT_EXP_PER_MIN[s];
+}
+
+/**
+ * Giá TU VI khi bỏ chạy, tính bằng PHÚT SĂN (`ambushHuntExpPerMin`) của bậc hiện tại, theo thời điểm. Luôn NHỎ HƠN thưởng thắng của mức thấp nhất (`AMBUSH_REWARD_MIN.normal` = 4 phút): thắng luôn
+ * lợi hơn bỏ chạy và người chơi đang yếu không bị dồn vào "Chiến" vì bỏ chạy đắt hơn cả thưởng (thua = chết thật, mục 53). CD6b chốt.
+ */
+export const AMBUSH_EXP_PRICE_MIN: Readonly<Record<AmbushPriceStage, number>> = {
+  offer: 2,
+  mid: 3,
 };
+
+/**
+ * Thưởng TU VI khi thắng, tính bằng PHÚT SĂN của bậc người chơi, theo mức kẻ địch (không phụ thuộc số con trong bầy: bầy đã được chọn để trận dài 30-70 giây và tỉ lệ thắng đạt mục tiêu,
+ * nên công sức / rủi ro giữa các bầy cùng mức xấp xỉ nhau). Trộn theo `AMBUSH_TIER_WEIGHTS` ~ 4,8 phút / lần chặn: so với khoảng ~15 phút giữa hai lần chặn (`ambushIntervalMin`) là tăng
+ * ~30% tu vi / phút (mục tiêu 20-40%, KHÔNG hơn bí cảnh). CD6b chốt bằng đo (docs/THIET_KE_CHAN_DUONG.md mục 9).
+ */
+export const AMBUSH_REWARD_MIN: Readonly<Record<AmbushTier, number>> = {
+  normal: 4,
+  elite: 6,
+  leader: 10,
+};
+
+/** Thưởng tu vi của một trận thắng ở bậc `step`, mức `tier` (số nguyên >= 0). Mức lạ -> 0. Thuần. */
+export function ambushRewardExp(step: unknown, tier: unknown): number {
+  if (!isAmbushTier(tier)) return 0;
+  return Math.round(AMBUSH_REWARD_MIN[tier] * ambushHuntExpPerMin(step));
+}
 /** Giá Linh thạch: `AMBUSH_COIN_BASE` x `AMBUSH_COIN_GROWTH`^(bậc) x hệ số thời điểm. TẠM: CD6 chốt (mục tiêu ~6-8 / 12-16 con quái cùng bậc). */
 export const AMBUSH_COIN_BASE = 30;
 export const AMBUSH_COIN_GROWTH = 1.18;
@@ -132,15 +168,11 @@ const wholeNonNeg = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
 
 /**
- * Giá TU VI khi bỏ chạy: `AMBUSH_EXP_PRICE_PCT[stage]`% của `barSize` (độ lớn thanh tu vi của cảnh giới hiện tại), nhưng KHÔNG quá `expInBar` (tu vi đang có
- * trong thanh: không bao giờ rớt cảnh giới, không âm). Làm tròn xuống. Đầu vào sai (không hữu hạn / âm) coi là 0. Thuần.
+ * Giá TU VI khi bỏ chạy ở bậc `step`: `AMBUSH_EXP_PRICE_MIN[stage]` phút săn (`ambushHuntExpPerMin`), nhưng KHÔNG quá `expInBar` (tu vi đang có trong thanh: không bao giờ rớt cảnh giới,
+ * không âm). Làm tròn xuống. Đầu vào sai (không hữu hạn / âm) coi là 0. Thuần.
  */
-export function ambushExpPrice(
-  barSize: unknown,
-  expInBar: unknown,
-  stage: AmbushPriceStage,
-): number {
-  const raw = Math.floor((wholeNonNeg(barSize) * AMBUSH_EXP_PRICE_PCT[stage]) / 100);
+export function ambushExpPrice(step: unknown, expInBar: unknown, stage: AmbushPriceStage): number {
+  const raw = Math.floor(AMBUSH_EXP_PRICE_MIN[stage] * ambushHuntExpPerMin(step));
   return Math.min(raw, wholeNonNeg(expInBar));
 }
 
@@ -170,9 +202,7 @@ export interface AmbushPrice {
 
 /** Đầu vào để tính giá (server đọc từ nhân vật thật; không bao giờ lấy từ client). */
 export interface AmbushPriceInput {
-  /** Độ lớn thanh tu vi của cảnh giới hiện tại. */
-  barSize: number;
-  /** Tu vi đang có trong thanh đó. */
+  /** Tu vi đang có trong thanh của cảnh giới hiện tại (giá tu vi không bao giờ vượt số này). */
   expInBar: number;
   /** Bậc trên thang cảnh giới (`stepOf`). */
   step: number;
@@ -188,7 +218,7 @@ export interface AmbushPriceInput {
 export function ambushPrice(input: AmbushPriceInput, stage: AmbushPriceStage): AmbushPrice {
   const price = ambushCoinPrice(input.step, stage);
   return {
-    exp: ambushExpPrice(input.barSize, input.expInBar, stage),
+    exp: ambushExpPrice(input.step, input.expInBar, stage),
     coin: { price, enough: wholeNonNeg(input.wallet) >= price },
   };
 }

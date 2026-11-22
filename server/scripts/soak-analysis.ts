@@ -2,6 +2,8 @@
 // Đánh giá: rò rỉ bộ nhớ (VmRSS, dốc hồi quy tuyến tính OLS), số đo vận hành thật từ /metrics (tick p95 phòng tệ nhất,
 // hàng đợi ghi, độ trễ vòng lặp), băng thông WebSocket mỗi client, log server và toàn vẹn dữ liệu.
 
+import { MAX_AMBUSH_ROOMS } from "@tien-gioi/shared";
+
 export type ServerLogCategory = "error" | "monitorAlert" | "startupWarning" | "info";
 
 /**
@@ -79,6 +81,8 @@ export interface SoakSample {
   sampleErrors: number;
   /** Cờ báo gọi /metrics thất bại hoặc không trả về HTTP 200 */
   metricsFetchFailed?: boolean;
+  /** Số phòng đấu trường chặn đường đang mở (lấy từ /metrics) */
+  activeArenaRooms?: number;
 }
 
 export interface SoakThresholds {
@@ -102,6 +106,8 @@ export interface SoakThresholds {
   maxWritesOldestAgeMs?: number;
   /** Độ trễ vòng lặp p99 tối đa (ms). Mặc định 100 ms */
   maxLoopLagP99Ms?: number;
+  /** Số phòng đấu trường chặn đường tối đa đồng thời. Mặc định MAX_AMBUSH_ROOMS (20) */
+  maxArenaRooms?: number;
 }
 
 export interface LinearRegressionResult {
@@ -178,6 +184,168 @@ export interface ExtraSoakContext {
   currencyConservationPassed?: boolean;
   /** Chỉ có khi soak chạy với `--m7`; vắng thì không kiểm gì về chiêu (đúng như soak cũ) */
   m7?: M7SoakContext;
+  /** Chỉ có khi soak chạy với `--boss` (bộ chiêu trùm nhiều chiêu BOSS_MOVES=on) */
+  boss?: BossSoakContext;
+  /** Chỉ có khi soak chạy với `--ambush` (chặn đường AMBUSH=on + AMBUSH_BOTS=on) */
+  ambush?: AmbushSoakContext;
+}
+
+/** Số đo thử tải chặn đường của một lượt soak bật `--ambush` (CD10, #1070, #1276) */
+export interface AmbushSoakContext {
+  offersTotal: number;
+  fightTotal: number;
+  fleeCoinTotal: number;
+  fleeExpTotal: number;
+  midFleeTotal: number;
+  wonTotal: number;
+  lostTotal: number;
+  fledTotal: number;
+  timeoutTotal: number;
+  droppedTotal: number;
+  canceledTotal: number;
+  maxActiveArenaRooms: number;
+  finalActiveArenaRooms: number;
+}
+
+/** Kết quả phần thử tải chặn đường trong báo cáo (chỉ có khi soak chạy với `--ambush`) */
+export interface AmbushSoakResult extends AmbushSoakContext {
+  passed: boolean;
+  reasons: string[];
+}
+
+/** Dữ liệu đầu vào một bot săn trùm tại thời điểm lấy mẫu snapshot (#1301) */
+export interface BossHunterSnapshotInput {
+  mapId: string;
+  resting: boolean;
+  hp?: number;
+  realm?: number;
+  isConnected: boolean;
+  visibleBossIds?: string[];
+}
+
+/** Sự kiện thi triển chiêu trùm để ghi dòng thời gian (#1301) */
+export interface BossCastEvent {
+  minute: number;
+  second: number;
+  ability: string;
+  bossId?: string;
+  bossKind?: string;
+}
+
+/** Trạng thái nhóm bot săn trùm theo từng phút để theo dõi và chẩn đoán (#1301) */
+export interface BossHunterMinuteStatus {
+  minute: number;
+  totalHunters: number;
+  inHacPhong: number;
+  resting: number;
+  dead: number;
+  disconnected: number;
+  byMap: Record<string, number>;
+  bossesVisible: number;
+}
+
+/** Tính trạng thái nhóm bot săn trùm từ danh sách snapshot của từng bot (#1301) */
+export function computeBossHunterMinuteStatus(
+  minute: number,
+  hunters: readonly BossHunterSnapshotInput[],
+): BossHunterMinuteStatus {
+  const totalHunters = hunters.length;
+  let inHacPhong = 0;
+  let resting = 0;
+  let dead = 0;
+  let disconnected = 0;
+  const byMap: Record<string, number> = {};
+  const visibleBossSet = new Set<string>();
+
+  for (const h of hunters) {
+    byMap[h.mapId] = (byMap[h.mapId] ?? 0) + 1;
+    if (h.mapId === "hac_phong") inHacPhong++;
+    if (h.resting) resting++;
+    if (!h.isConnected) {
+      disconnected++;
+    } else if (
+      (typeof h.realm === "number" && h.realm < 1) ||
+      (typeof h.hp === "number" && h.hp <= 0)
+    ) {
+      dead++;
+    }
+    if (h.visibleBossIds) {
+      for (const id of h.visibleBossIds) {
+        visibleBossSet.add(id);
+      }
+    }
+  }
+
+  return {
+    minute,
+    totalHunters,
+    inHacPhong,
+    resting,
+    dead,
+    disconnected,
+    byMap,
+    bossesVisible: visibleBossSet.size,
+  };
+}
+
+/** Gợi ý nguyên nhân chẩn đoán khi thiếu chiêu trùm (#1301) */
+export function diagnoseBossDeficiency(status?: {
+  totalHunters: number;
+  huntersInMap: number;
+  huntersAlive: number;
+  bossesVisible?: number;
+}): string | undefined {
+  if (!status) return undefined;
+  const hints: string[] = [];
+  if (status.huntersInMap < status.totalHunters) {
+    hints.push(
+      `${status.totalHunters - status.huntersInMap}/${status.totalHunters} bot săn trùm ở sai bản đồ (không ở Hắc Phong Cốc)`,
+    );
+  }
+  if (status.huntersAlive < status.totalHunters) {
+    hints.push(
+      `${status.totalHunters - status.huntersAlive}/${status.totalHunters} bot săn trùm đã chết/luân hồi về Phàm Nhân`,
+    );
+  }
+  if (status.bossesVisible !== undefined && status.bossesVisible === 0) {
+    hints.push(
+      "không bot săn trùm nào THẤY trùm trong vùng quan sát (có thể trùm chết hoặc bot ở xa bãi)",
+    );
+  }
+  return hints.length > 0 ? `gợi ý nguyên nhân: ${hints.join("; ")}` : undefined;
+}
+
+/** Số đo bộ chiêu trùm của một lượt soak bật `--boss` */
+export interface BossSoakContext {
+  /** Các chiêu trùm bắt buộc có ít nhất một lần thi triển */
+  requiredAbilities?: readonly string[];
+  /** Số lần thi triển theo id chiêu trùm, đếm từ tin `fx` `bossCast` */
+  abilityCastCounts: Record<string, number>;
+  /** Tình trạng bot săn trùm để chẩn đoán nguyên nhân khi thiếu chiêu (#1301) */
+  bossHunterStatus?: {
+    totalHunters: number;
+    huntersInMap: number;
+    huntersAlive: number;
+    bossesVisible?: number;
+  };
+  /** Dòng thời gian chiêu trùm ghi nhận trong quá trình soak (#1301) */
+  bossTimeline?: BossCastEvent[];
+  /** Trạng thái nhóm bot săn trùm theo từng phút (#1301) */
+  bossHuntersTimeline?: BossHunterMinuteStatus[];
+}
+
+/** Kết quả phần bộ chiêu trùm trong báo cáo (chỉ có khi soak chạy với `--boss`) */
+export interface BossSoakResult {
+  abilityCastCounts: Record<string, number>;
+  totalAbilityCasts: number;
+  requiredAbilities: string[];
+  missingRequired: string[];
+  /** Gợi ý nguyên nhân khi thiếu chiêu (#1301) */
+  diagnosis?: string;
+  /** Dòng thời gian chiêu trùm (#1301) */
+  timeline?: BossCastEvent[];
+  /** Trạng thái nhóm bot săn trùm theo phút (#1301) */
+  huntersTimeline?: BossHunterMinuteStatus[];
 }
 
 /** Kết quả phần nội dung M7 trong báo cáo (chỉ có khi soak chạy với `--m7`) */
@@ -226,6 +394,8 @@ export interface SoakAnalysisResult {
   hongFilesCount?: number;
   currencyConservationPassed?: boolean;
   m7?: M7SoakResult;
+  boss?: BossSoakResult;
+  ambush?: AmbushSoakResult;
   thresholds: Required<SoakThresholds>;
 }
 
@@ -253,6 +423,7 @@ export function analyzeSoak(
     maxDropRatio: customThresholds.maxDropRatio ?? 0.05,
     maxWritesOldestAgeMs: customThresholds.maxWritesOldestAgeMs ?? 30000,
     maxLoopLagP99Ms: customThresholds.maxLoopLagP99Ms ?? 100,
+    maxArenaRooms: customThresholds.maxArenaRooms ?? MAX_AMBUSH_ROOMS,
   };
 
   if (samples.length === 0) {
@@ -469,6 +640,62 @@ export function analyzeSoak(
     }
   }
 
+  // 14. Bộ chiêu trùm (chỉ khi bật --boss / BOSS_MOVES=on)
+  let boss: BossSoakResult | undefined;
+  if (extra.boss) {
+    const counts = extra.boss.abilityCastCounts;
+    const castOf = (id: string) => counts[id] ?? 0;
+    const required = extra.boss.requiredAbilities ?? [];
+    const missingRequired = required.filter((id) => castOf(id) <= 0);
+    const totalAbilityCasts = Object.values(counts).reduce((sum, n) => sum + n, 0);
+    boss = {
+      abilityCastCounts: counts,
+      totalAbilityCasts,
+      requiredAbilities: [...required],
+      missingRequired,
+      timeline: extra.boss.bossTimeline,
+      huntersTimeline: extra.boss.bossHuntersTimeline,
+    };
+    if (missingRequired.length > 0) {
+      const diag = diagnoseBossDeficiency(extra.boss.bossHunterStatus);
+      if (diag) {
+        boss.diagnosis = diag;
+      }
+      reasons.push(
+        `Chế độ --boss: ${missingRequired.length}/${required.length} chiêu trùm không được thi triển lần nào: ${missingRequired.join(", ")}${diag ? ` (${diag})` : ""}`,
+      );
+    }
+  }
+
+  // 15. Chặn đường (chỉ khi bật --ambush / AMBUSH=on)
+  let ambush: AmbushSoakResult | undefined;
+  if (extra.ambush) {
+    const a = extra.ambush;
+    const ambushReasons: string[] = [];
+    const maxAllowed = thresholds.maxArenaRooms ?? MAX_AMBUSH_ROOMS;
+    if (a.maxActiveArenaRooms > maxAllowed) {
+      ambushReasons.push(
+        `Số phòng đấu trường chặn đường vượt trần: ${a.maxActiveArenaRooms} > ${maxAllowed}`,
+      );
+    }
+    if (a.finalActiveArenaRooms > 0) {
+      ambushReasons.push(
+        `Rò rỉ phòng đấu trường chặn đường sau khi dừng: còn ${a.finalActiveArenaRooms} phòng (yêu cầu về 0)`,
+      );
+    }
+    if (a.offersTotal <= 0) {
+      ambushReasons.push("Chế độ --ambush: không có lượt gặp chặn đường nào (offersTotal = 0)");
+    }
+    ambush = {
+      ...a,
+      passed: ambushReasons.length === 0,
+      reasons: ambushReasons,
+    };
+    if (ambushReasons.length > 0) {
+      reasons.push(...ambushReasons);
+    }
+  }
+
   return {
     pass: reasons.length === 0,
     reasons,
@@ -503,6 +730,8 @@ export function analyzeSoak(
     hongFilesCount: extra.hongFilesCount,
     currencyConservationPassed: extra.currencyConservationPassed,
     m7,
+    boss,
+    ambush,
     thresholds,
   };
 }
@@ -578,6 +807,70 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
       `  - Chiêu Nguyên Anh:      ${m.requiredSkillIds.length - m.missingRequired.length}/${m.requiredSkillIds.length} có lượt thi triển (yêu cầu: đủ)`,
       `  - Chiêu chưa thi triển:  ${m.notCast.length === 0 ? "(không có, cả game đều được dùng)" : m.notCast.join(", ")}`,
       `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
+    );
+  }
+
+  if (res.boss) {
+    const b = res.boss;
+    const castLine = Object.entries(b.abilityCastCounts)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([id, n]) => `${id} ${n}`)
+      .join(", ");
+    lines.push(
+      "--------------------------------------------------------------------------------",
+      "BỘ CHIÊU TRÙM (BOSS_MOVES=on):",
+      `  - Tổng lượt thi triển:   ${b.totalAbilityCasts} (máy chủ xác nhận qua fx bossCast)`,
+      `  - Chiêu bắt buộc:        ${b.requiredAbilities.length - b.missingRequired.length}/${b.requiredAbilities.length} có lượt thi triển`,
+      `  - Theo từng chiêu:       ${castLine || "(không có)"}`,
+    );
+    if (b.timeline && b.timeline.length > 0) {
+      lines.push("  - Dòng thời gian chiêu trùm theo phút:");
+      const castsByMin: Record<number, Record<string, number>> = {};
+      for (const ev of b.timeline) {
+        castsByMin[ev.minute] ??= {};
+        castsByMin[ev.minute][ev.ability] = (castsByMin[ev.minute][ev.ability] ?? 0) + 1;
+      }
+      for (const min of Object.keys(castsByMin)
+        .map(Number)
+        .sort((a, b) => a - b)) {
+        const detail = Object.entries(castsByMin[min])
+          .map(([ab, count]) => `${ab}: ${count}`)
+          .join(", ");
+        lines.push(`      + Phút ${String(min).padStart(2, "0")}: ${detail}`);
+      }
+    }
+    if (b.huntersTimeline && b.huntersTimeline.length > 0) {
+      lines.push("  - Trạng thái nhóm săn trùm theo phút:");
+      lines.push(
+        "      Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Mất kết nối | Trùm thấy | Bản đồ khác",
+      );
+      for (const s of b.huntersTimeline) {
+        const otherMaps = Object.entries(s.byMap)
+          .filter(([m]) => m !== "hac_phong")
+          .map(([m, count]) => `${m}: ${count}`)
+          .join(", ");
+        const otherStr = otherMaps || "0";
+        lines.push(
+          `      ${String(s.minute).padStart(4)} | ${String(s.totalHunters).padStart(8)} | ${String(s.inHacPhong).padStart(9)} | ${String(s.resting).padStart(11)} | ${String(s.dead).padStart(14)} | ${String(s.disconnected ?? 0).padStart(11)} | ${String(s.bossesVisible ?? 0).padStart(9)} | ${otherStr}`,
+        );
+      }
+    }
+    if (b.diagnosis) {
+      lines.push(`  - Gợi ý nguyên nhân:     ${b.diagnosis}`);
+    }
+  }
+
+  if (res.ambush) {
+    const a = res.ambush;
+    lines.push(
+      "--------------------------------------------------------------------------------",
+      "CHẶN ĐƯỜNG (AMBUSH=on):",
+      `  - Số lần bị chặn:       ${a.offersTotal} lần`,
+      `  - Lựa chọn hộp thoại:   Chiến: ${a.fightTotal} | Bỏ chạy: ${a.fleeCoinTotal + a.fleeExpTotal} (Linh thạch: ${a.fleeCoinTotal}, Tu vi: ${a.fleeExpTotal})`,
+      `  - Thoát giữa trận:      ${a.midFleeTotal} lần`,
+      `  - Kết quả đấu trường:   Thắng: ${a.wonTotal} | Thua: ${a.lostTotal} | Chạy thoát: ${a.fledTotal} | Hết giờ: ${a.timeoutTotal} | Rớt: ${a.droppedTotal} | Huỷ: ${a.canceledTotal}`,
+      `  - Phòng đấu trường:     Tối đa đồng thời: ${a.maxActiveArenaRooms}/${res.thresholds.maxArenaRooms ?? MAX_AMBUSH_ROOMS} | Cuối cùng: ${a.finalActiveArenaRooms} (yêu cầu: 0)`,
     );
   }
   lines.push("================================================================================");

@@ -26,8 +26,10 @@ import {
 import { createStores } from "./stores";
 import { Monitor, mountMetrics, thresholdsOf } from "./metrics";
 import { applyStaticHeaders } from "./static-headers";
+import { loadPrivatePacks, mountPrivatePacks, privatePacksNotice } from "./private-packs";
 import { bossMovesNotice } from "./systems/boss-config";
 import { ambushNotice } from "./systems/ambush-config";
+import { worldBossNotice, worldBossOn } from "./systems/world-boss-config";
 
 // Đọc .env.local ở gốc repo (cổng riêng cho từng dev). Không có file thì dùng mặc định.
 const envFile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../.env.local");
@@ -63,10 +65,10 @@ async function main() {
   console.log(`Lưu trữ: ${stores.kind === "pg" ? "PostgreSQL" : "tệp JSON"}`);
   // Bảng xếp hạng (M9.3): làm mới mỗi 5 phút ngoài tick; `LEADERBOARD=off` gỡ. Chế độ tài khoản: đạo hiệu nằm ở tài khoản.
   WorldRoom.achievements = process.env.ACHIEVEMENTS === "on"; // cấp thành tựu / Duyên / danh hiệu (M9.5): MẶC ĐỊNH TẮT cho tới khi M9 phát hành
-  // Trùm thế giới theo giờ (M9.4, `systems/world-boss.ts`): chỉ chạy khi `WORLD_BOSS_SCHEDULE` có khung giờ (dữ liệu của E, M9.10); `WORLD_BOSS=off` gỡ hẳn
-  WorldRoom.hub.worldBoss.enabled = process.env.WORLD_BOSS !== "off";
-  if (WorldRoom.hub.worldBoss.active)
-    console.log(`Trùm thế giới: bật (${WorldRoom.hub.worldBoss.slots.length} khung giờ mỗi ngày)`);
+  // Trùm thế giới theo giờ (M9.4, `systems/world-boss.ts`): chỉ chạy khi `WORLD_BOSS=on` (mặc định TẮT, `systems/world-boss-config.ts`) VÀ `WORLD_BOSS_SCHEDULE` có khung giờ
+  WorldRoom.hub.worldBoss.enabled = worldBossOn(process.env);
+  const wbMsg = worldBossNotice(process.env, WorldRoom.hub.worldBoss.slots.length);
+  if (wbMsg) console.log(wbMsg);
   if (process.env.LEADERBOARD !== "off") {
     const lb = new LeaderboardService({
       souls: stores.souls,
@@ -117,6 +119,12 @@ async function main() {
   );
   // Dọn phiên hết hạn mỗi giờ (unref: không giữ tiến trình sống)
   if (auth) setInterval(() => void auth.sweep().catch(() => {}), 3_600_000).unref();
+
+  // Gói tài nguyên RIÊNG (mục 63, cấm phân phối lại; KHÔNG nằm trong repo): `ASSETS_PRIVATE_DIR` rỗng = tắt, `/assets-private/*` luôn 404 sạch (không rơi xuống index.html). Gắn SAU Origin / khung, TRƯỚC trang tĩnh
+  const privatePacks = loadPrivatePacks(process.env.ASSETS_PRIVATE_DIR);
+  for (const w of privatePacks.warnings) console.warn(`[CẢNH BÁO] ${w}`);
+  console.log(privatePacksNotice(privatePacks));
+  mountPrivatePacks(app, privatePacks.table);
 
   // Production: phục vụ luôn bản build của client (client/dist) từ cùng server
   const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../client/dist");

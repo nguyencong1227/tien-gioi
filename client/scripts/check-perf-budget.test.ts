@@ -10,6 +10,7 @@ import {
   checkWorstCaseTextureMemoryByTier,
   checkBundleGzip,
   checkTotalJsGzip,
+  MAP_FILES_CHUNK_RE,
   findStartupChunk,
   checkAtlasTileset,
   checkAiAssets,
@@ -246,7 +247,7 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     }
   });
 
-  it("perf-budget.json thật: có HAI trần (khởi động + tổng JS), khởi động nhỏ hơn tổng, tổng giữ 540 KB (#1088)", () => {
+  it("perf-budget.json thật: có HAI trần (khởi động + tổng JS), khởi động nhỏ hơn tổng, tổng giữ 548 KB (#1088: 540; S3a #1206 nâng +8 cho tệp bản đồ Tiled nhận ở client)", () => {
     const budget = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../perf-budget.json"), "utf-8"),
     ) as { static: Record<string, number> };
@@ -254,8 +255,19 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     expect(typeof budget.static.totalJsGzipKb).toBe("number");
     expect(budget.static.startupGzipKb).toBeLessThan(budget.static.totalJsGzipKb!);
     expect(budget.static.startupGzipKb).toBeLessThanOrEqual(500);
-    expect(budget.static.totalJsGzipKb).toBeLessThanOrEqual(540);
+    expect(budget.static.totalJsGzipKb).toBeLessThanOrEqual(548);
     expect(budget.static.bundleGzipKb).toBeUndefined();
+  });
+
+  it("perf-budget.json thật (#1283): trần RIÊNG cho dữ liệu bản đồ có mặt, > 0 và <= 48 KB (nâng thì phải sửa test này có chủ ý)", () => {
+    const budget = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "../perf-budget.json"), "utf-8"),
+    ) as { static: Record<string, number> };
+    expect(typeof budget.static.mapFilesGzipKb).toBe("number");
+    expect(budget.static.mapFilesGzipKb).toBeGreaterThan(0);
+    expect(budget.static.mapFilesGzipKb).toBeLessThanOrEqual(48);
+    // dữ liệu bản đồ nhỏ hơn trần MÃ: không thể coi nó là chỗ giấu mã thoải mái
+    expect(budget.static.mapFilesGzipKb).toBeLessThan(budget.static.totalJsGzipKb!);
   });
 
   it("checkAtlasTileset: tính tổng dung lượng và bắt lỗi khi vượt ngân sách (Đột biến đỏ)", () => {
@@ -689,6 +701,199 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
       expect(failRes.worstCaseTexture.ok).toBe(false);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("#1283: dữ liệu bản đồ (chunk map-files-*.js) có trần RIÊNG, tách khỏi trần TỔNG mã JS", () => {
+  // byte giả ngẫu nhiên (LCG có hạt) để gzip không nén được gần hết
+  const noise = (n: number, seed: number) => {
+    let x = seed;
+    return Buffer.from(
+      Array.from({ length: n }, () => {
+        x = (Math.imul(x, 1103515245) + 12345) >>> 0;
+        return (x >>> 16) & 255;
+      }),
+    );
+  };
+  /** Dựng dist giả: `{ tên tệp: số byte ngẫu nhiên }`, chạy `fn(distDir)`, rồi dọn. */
+  const withDist = <T>(files: Record<string, number>, fn: (distDir: string) => T): T => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-test-dist-mapfiles-"));
+    const assetsDir = path.join(tmpDir, "assets");
+    fs.mkdirSync(assetsDir, { recursive: true });
+    try {
+      let seed = 7;
+      for (const [name, bytes] of Object.entries(files)) {
+        fs.writeFileSync(path.join(assetsDir, name), noise(bytes, (seed += 13)));
+      }
+      return fn(tmpDir);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  };
+  const KB = 1024;
+
+  it("MAP_FILES_CHUNK_RE khớp CHẶT: chỉ `map-files-<băm>.js`; tên gần giống KHÔNG được miễn", () => {
+    for (const ok of ["map-files-DMwuQVDW.js", "map-files-a_b-C.js", "map-files-0.js"]) {
+      expect(MAP_FILES_CHUNK_RE.test(ok), ok).toBe(true);
+    }
+    for (const bad of [
+      "map-files.js", // không băm
+      "map-files-.js", // băm rỗng
+      "mapfiles-x.js",
+      "xmap-files-a.js", // neo đầu
+      "index-map-files-a.js",
+      "map-files-a.js.map", // neo cuối
+      "map-files-a.json",
+      "map-files-a.css",
+      "map-files-a b.js",
+    ]) {
+      expect(MAP_FILES_CHUNK_RE.test(bad), bad).toBe(false);
+    }
+  });
+
+  it("chunk map-files bị LOẠI khỏi tổng mã và kiểm riêng; không khai báo trần riêng thì KHÔNG miễn trừ gì (fail-safe)", () => {
+    withDist(
+      { "index-a.js": 20 * KB, "phaser-b.js": 40 * KB, "map-files-abc.js": 30 * KB },
+      (d) => {
+        const r = checkTotalJsGzip(d, 1000, 48);
+        expect(r.files.map((f) => f.file)).toEqual(["index-a.js", "phaser-b.js"]);
+        expect(r.mapFiles?.files.map((f) => f.file)).toEqual(["map-files-abc.js"]);
+        expect(r.mapFiles?.gzipKb).toBeGreaterThan(29);
+        expect(r.mapFiles?.limitKb).toBe(48);
+        expect(r.warning).toBeNull();
+
+        // tổng mã KHÔNG gồm dữ liệu bản đồ: trần sát ngay trên số đo vẫn qua, thấp hơn một chút thì đỏ
+        expect(r.gzipKb).toBeGreaterThan(59);
+        expect(r.gzipKb).toBeLessThan(62);
+        expect(checkTotalJsGzip(d, r.gzipKb, 48).ok).toBe(true);
+        expect(checkTotalJsGzip(d, r.gzipKb - 0.5, 48).ok).toBe(false);
+
+        // không truyền trần riêng: mọi tệp tính vào tổng (không ai được miễn khi chưa có trần riêng cho nó)
+        const all = checkTotalJsGzip(d, 1000);
+        expect(all.files.map((f) => f.file)).toEqual([
+          "index-a.js",
+          "map-files-abc.js",
+          "phaser-b.js",
+        ]);
+        expect(all.mapFiles).toBeNull();
+        expect(all.warning).toBeNull();
+        expect(all.gzipKb).toBeGreaterThan(r.gzipKb + 29);
+        expect(checkTotalJsGzip(d, r.gzipKb, undefined).ok).toBe(false);
+      },
+    );
+  });
+
+  it("trần RIÊNG chặn khi vượt (kể cả khi ai đó nhét mã vào chunk map-files): đúng bằng trần thì qua (<=)", () => {
+    withDist({ "index-a.js": 10 * KB, "map-files-abc.js": 60 * KB }, (d) => {
+      const r = checkTotalJsGzip(d, 1000, 48);
+      expect(r.ok).toBe(true); // tổng mã không bị ảnh hưởng
+      expect(r.mapFiles?.gzipKb).toBeGreaterThan(48);
+      expect(r.mapFiles?.ok).toBe(false);
+      const exact = checkTotalJsGzip(d, 1000, r.mapFiles!.gzipKb);
+      expect(exact.mapFiles?.ok).toBe(true);
+      expect(checkTotalJsGzip(d, 1000, r.mapFiles!.gzipKb - 0.5).mapFiles?.ok).toBe(false);
+    });
+  });
+
+  it("tên chunk LẠ (đổi tên / gộp / giả) KHÔNG được miễn: tính đủ vào tổng mã", () => {
+    for (const odd of ["mapfiles-x.js", "map-files.js", "xmap-files-a.js", "map-files-.js"]) {
+      withDist({ "index-a.js": 5 * KB, [odd]: 30 * KB }, (d) => {
+        const r = checkTotalJsGzip(d, 1000, 48);
+        expect(
+          r.files.map((f) => f.file),
+          odd,
+        ).toContain(odd);
+        expect(r.mapFiles?.files, odd).toEqual([]);
+        expect(r.gzipKb, odd).toBeGreaterThan(34); // gồm cả 30 KB của tệp lạ
+        // trần tổng đủ chặt thì tệp lạ làm đỏ (không trốn được bằng cách đổi tên)
+        expect(checkTotalJsGzip(d, 20, 48).ok, odd).toBe(false);
+      });
+    }
+  });
+
+  it("không có chunk map-files nào: cảnh báo + tính đủ vào tổng; có thì không cảnh báo", () => {
+    withDist({ "index-a.js": 5 * KB, "phaser-b.js": 5 * KB }, (d) => {
+      const r = checkTotalJsGzip(d, 1000, 48);
+      expect(r.warning).toMatch(/Không thấy chunk dữ liệu bản đồ/);
+      expect(r.mapFiles?.files).toEqual([]);
+      expect(r.mapFiles?.ok).toBe(true);
+      expect(r.files).toHaveLength(2);
+    });
+    withDist({ "index-a.js": 5 * KB, "map-files-q.js": 5 * KB }, (d) => {
+      expect(checkTotalJsGzip(d, 1000, 48).warning).toBeNull();
+    });
+  });
+
+  it("checkPerfBudget: vượt trần riêng làm đỏ với lời nêu tên chunk; không vượt thì xanh dù tổng cả hai lớn hơn trần mã", () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "tg-test-budget-mapfiles-"));
+    const assetsDir = path.join(tmpRoot, "assets");
+    const packsDir = path.join(tmpRoot, "packs");
+    const budgetPath = path.join(tmpRoot, "perf-budget.json");
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(path.join(assetsDir, "atlas.png"), Buffer.alloc(5000));
+    const budgetOf = (staticPart: Record<string, unknown>) =>
+      JSON.stringify({
+        static: {
+          startupGzipKb: 1000,
+          atlasTilesetKb: 1024,
+          textureMemoryMb: { low: 48, mid: 80, high: 128 },
+          ...staticPart,
+        },
+        packs: { core: { maxKb: 2048 }, map: { maxKb: 2048 }, hdMaxFactor: 3 },
+      });
+    try {
+      withDist({ "index-sample.js": 8 * KB, "map-files-xyz.js": 30 * KB }, (distDir) => {
+        const run = () =>
+          checkPerfBudget({
+            budgetPath,
+            distDir,
+            assetsDir,
+            packsDir,
+            manifestPath: path.join(packsDir, "manifest.json"),
+          });
+
+        // 1. Trần mã chỉ vừa phần mã (~8 KB), dữ liệu bản đồ 30 KB nằm dưới trần riêng 48: XANH
+        fs.writeFileSync(budgetPath, budgetOf({ totalJsGzipKb: 12, mapFilesGzipKb: 48 }));
+        const ok = run();
+        expect(ok.errors).toEqual([]);
+        expect(ok.ok).toBe(true);
+        expect(ok.warnings).toEqual([]);
+        expect(ok.totalJs?.mapFiles?.files.map((f) => f.file)).toEqual(["map-files-xyz.js"]);
+
+        // 2. Trần riêng thấp hơn dữ liệu thật: ĐỎ, nêu tên chunk, trần tổng mã vẫn xanh
+        fs.writeFileSync(budgetPath, budgetOf({ totalJsGzipKb: 12, mapFilesGzipKb: 5 }));
+        const over = run();
+        expect(over.ok).toBe(false);
+        expect(
+          over.errors.some((e) => e.includes("Dữ liệu bản đồ") && e.includes("map-files-xyz.js")),
+        ).toBe(true);
+        expect(over.errors.some((e) => e.includes("Tổng JS"))).toBe(false);
+
+        // 3. Ngân sách CHƯA khai báo trần riêng: chunk tính đủ vào tổng mã nên trần 12 KB đỏ (không có miễn trừ ngầm)
+        fs.writeFileSync(budgetPath, budgetOf({ totalJsGzipKb: 12 }));
+        const none = run();
+        expect(none.ok).toBe(false);
+        expect(none.errors.some((e) => e.includes("Tổng JS"))).toBe(true);
+        expect(none.totalJs?.mapFiles).toBeNull();
+      });
+
+      // 4. Dist không có chunk map-files nhưng ngân sách khai báo trần riêng: cảnh báo (không phải lỗi)
+      withDist({ "index-sample.js": 8 * KB }, (distDir) => {
+        fs.writeFileSync(budgetPath, budgetOf({ totalJsGzipKb: 100, mapFilesGzipKb: 48 }));
+        const res = checkPerfBudget({
+          budgetPath,
+          distDir,
+          assetsDir,
+          packsDir,
+          manifestPath: path.join(packsDir, "manifest.json"),
+        });
+        expect(res.ok).toBe(true);
+        expect(res.warnings).toHaveLength(1);
+        expect(res.warnings[0]).toMatch(/Không thấy chunk dữ liệu bản đồ/);
+      });
+    } finally {
+      fs.rmSync(tmpRoot, { recursive: true, force: true });
     }
   });
 });

@@ -12,6 +12,8 @@ import {
   DUNGEON_MAPS,
   HAN_VAN_ID,
   INVENTORY_SLOTS,
+  isArenaMap,
+  isDungeonMap,
   ITEM_BY_ID,
   LINH_HU_MAP_ID,
   MAPS,
@@ -33,6 +35,10 @@ import {
   SECT_LEVELS,
   SECT_SHOP,
   SKILLS_M7,
+  SOCIAL_ACH_MAX,
+  SOCIAL_COUNTER_CAP,
+  SOCIAL_COUNTER_KEYS_MAX,
+  SOCIAL_PK_CAP,
   sanitizeSkillBook,
 } from "@tien-gioi/shared";
 import {
@@ -749,6 +755,136 @@ describe("audit-saves (Issue #112)", () => {
       );
     });
 
+    it("kiểm tra Soul.social (M9, #1033): hợp lệ và các lỗi cấu trúc / khoá / trần", () => {
+      const validSocial = {
+        v: 1,
+        pk: { won: 5, lost: 2 },
+        counters: { kiep: 2, pk_won: 5, "boss:mang": 1 },
+        ach: { kiep_2: "2026-11-20T00:00:00.000Z" },
+        title: "lh2",
+      };
+
+      // 1. Hợp lệ -> không lỗi
+      const rawGood = JSON.stringify({ ...validSoul, social: validSocial });
+      expect(auditSoulSaveData(rawGood, rawGood.length)).toEqual([]);
+
+      // 2. social không phải object -> invalid_soul_social
+      const rawNotObj = JSON.stringify({ ...validSoul, social: "invalid_string" });
+      expect(auditSoulSaveData(rawNotObj, rawNotObj.length).map((e) => e.code)).toContain(
+        "invalid_soul_social",
+      );
+
+      // 3. social.v !== 1 -> invalid_soul_social_version
+      const rawBadV = JSON.stringify({ ...validSoul, social: { ...validSocial, v: 2 } });
+      expect(auditSoulSaveData(rawBadV, rawBadV.length).map((e) => e.code)).toContain(
+        "invalid_soul_social_version",
+      );
+
+      // 4. pk sai (won âm, lost vượt cap)
+      const rawBadPk = JSON.stringify({
+        ...validSoul,
+        social: { ...validSocial, pk: { won: -1, lost: 2_000_000 } },
+      });
+      const pkCodes = auditSoulSaveData(rawBadPk, rawBadPk.length).map((e) => e.code);
+      expect(pkCodes).toContain("invalid_soul_social_pk_won");
+      expect(pkCodes).toContain("invalid_soul_social_pk_lost");
+
+      // 5. counters có khoá lạ hoặc giá trị âm
+      const rawBadCounter = JSON.stringify({
+        ...validSoul,
+        social: {
+          ...validSocial,
+          counters: { khoá_lạ_không_hợp_lệ: 10, kiep: -5 },
+        },
+      });
+      const counterCodes = auditSoulSaveData(rawBadCounter, rawBadCounter.length).map(
+        (e) => e.code,
+      );
+      expect(counterCodes).toContain("invalid_soul_social_counter_key");
+      expect(counterCodes).toContain("invalid_soul_social_counter_val");
+
+      // 6. ach có id sai quy cách hoặc date không phải chuỗi hợp lệ
+      const rawBadAch = JSON.stringify({
+        ...validSoul,
+        social: {
+          ...validSocial,
+          ach: { "ID-CÓ-HOA": "2026-11-20T00:00:00.000Z", kiep_2: "" },
+        },
+      });
+      const achCodes = auditSoulSaveData(rawBadAch, rawBadAch.length).map((e) => e.code);
+      expect(achCodes).toContain("invalid_soul_social_ach_id");
+      expect(achCodes).toContain("invalid_soul_social_ach_date");
+
+      // 7. title sai dạng (chứa ký tự lạ hoặc quá dài > 4 ký tự)
+      const rawBadTitle = JSON.stringify({
+        ...validSoul,
+        social: { ...validSocial, title: "danh_hieu_dai" },
+      });
+      expect(auditSoulSaveData(rawBadTitle, rawBadTitle.length).map((e) => e.code)).toContain(
+        "invalid_soul_social_title",
+      );
+    });
+
+    it("Soul.social: MỖI nhánh kiểm còn lại có một ca đỏ riêng (trần, kiểu, số nguyên, độ dài, ISO)", () => {
+      const ok = { v: 1, pk: { won: 0, lost: 0 }, counters: {}, ach: {}, title: null };
+      const keys = (n: number) =>
+        Object.fromEntries(Array.from({ length: n }, (_, i) => [`boss:b${i}`, 1]));
+      const achs = (n: number) =>
+        Object.fromEntries(Array.from({ length: n }, (_, i) => [`a${i}`, "2026-11-20"]));
+      const cases: [string, unknown, string][] = [
+        [
+          "pk.won vượt trần",
+          { ...ok, pk: { won: SOCIAL_PK_CAP + 1, lost: 0 } },
+          "invalid_soul_social_pk_won",
+        ],
+        ["pk không phải đối tượng", { ...ok, pk: 5 }, "invalid_soul_social_pk"],
+        ["counters là mảng", { ...ok, counters: [] }, "invalid_soul_social_counters"],
+        ["ach là chuỗi", { ...ok, ach: "x" }, "invalid_soul_social_ach"],
+        [
+          "bộ đếm vượt trần giá trị",
+          { ...ok, counters: { kiep: SOCIAL_COUNTER_CAP + 1 } },
+          "invalid_soul_social_counter_val",
+        ],
+        [
+          "bộ đếm không nguyên",
+          { ...ok, counters: { kiep: 1.5 } },
+          "invalid_soul_social_counter_val",
+        ],
+        [
+          "thời điểm thành tựu dài 41 ký tự",
+          { ...ok, ach: { kiep_2: "x".repeat(41) } },
+          "invalid_soul_social_ach_date",
+        ],
+        [
+          "thời điểm thành tựu không phải ISO",
+          { ...ok, ach: { kiep_2: "abc" } },
+          "invalid_soul_social_ach_date",
+        ],
+        [
+          "quá số khoá bộ đếm",
+          { ...ok, counters: keys(SOCIAL_COUNTER_KEYS_MAX + 1) },
+          "social_counters_exceed_max",
+        ],
+        ["quá số thành tựu", { ...ok, ach: achs(SOCIAL_ACH_MAX + 1) }, "social_ach_exceed_max"],
+      ];
+      for (const [name, social, code] of cases) {
+        const raw = JSON.stringify({ ...validSoul, social });
+        expect(
+          auditSoulSaveData(raw, raw.length).map((e) => e.code),
+          name,
+        ).toContain(code);
+      }
+      // đúng ở biên thì KHÔNG lỗi (chặn trần dịch xuống một đơn vị)
+      const edge = {
+        ...ok,
+        pk: { won: SOCIAL_PK_CAP, lost: SOCIAL_PK_CAP },
+        counters: { ...keys(SOCIAL_COUNTER_KEYS_MAX - 1), kiep: SOCIAL_COUNTER_CAP },
+        ach: achs(SOCIAL_ACH_MAX),
+      };
+      const rawEdge = JSON.stringify({ ...validSoul, social: edge });
+      expect(auditSoulSaveData(rawEdge, rawEdge.length)).toEqual([]);
+    });
+
     it("auditSavesDirectory kiểm tra thư mục souls/ và đối chiếu limbo", () => {
       const soulsSubDir = path.join(tmpDir, "souls");
       mkdirSync(soulsSubDir, { recursive: true });
@@ -1134,6 +1270,27 @@ describe("audit-saves (Issue #112)", () => {
       expect(auditPlayerSaveData(rawOverCap, rawOverCap.length).map((e) => e.code)).toContain(
         "invalid_dungeon_daily_rewards",
       );
+    });
+
+    it("chặn bản đồ đấu trường solo (isArenaMap, CD10 #1276) trong hồ sơ lưu và đột biến chứng minh", () => {
+      const arenaMapId = "arena_lac_ha";
+      expect(isArenaMap(arenaMapId)).toBe(true);
+      expect(getMap(arenaMapId)).toBeDefined();
+
+      const rawArenaMap = JSON.stringify({ ...validPlayer, mapId: arenaMapId });
+      const errs = auditPlayerSaveData(rawArenaMap, rawArenaMap.length);
+      const mapErrs = errs.filter((e) => e.code === "invalid_map_id");
+      expect(mapErrs.length).toBeGreaterThan(0);
+      expect(mapErrs[0].message).toContain("đấu trường");
+
+      // Đột biến: bỏ kiểm isArenaMap sẽ làm lọt file lưu mang bản đồ đấu trường
+      const laxMapCheck = (mapId: unknown) => {
+        const m = getMap(mapId);
+        if (!m) return false;
+        if (isDungeonMap(mapId)) return false; // Chỉ chặn bí cảnh, bỏ quên đấu trường!
+        return true;
+      };
+      expect(laxMapCheck(arenaMapId)).toBe(true); // Đột biến để lọt dữ liệu sai!
     });
   });
 

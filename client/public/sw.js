@@ -43,7 +43,8 @@ function isStaticAsset(pathname) {
   if (
     pathname.startsWith("/assets/") ||
     pathname.startsWith("/icons/") ||
-    pathname.startsWith("/packs/")
+    pathname.startsWith("/packs/") ||
+    pathname.startsWith("/assets-private/")
   )
     return true;
   return /\.(?:js|css|png|svg|webp|json|webmanifest|woff2?|ogg|mp3)$/i.test(pathname);
@@ -54,12 +55,16 @@ function isStaticAsset(pathname) {
  * - Bundle JS/CSS của Vite (/assets/*-[hash].js/css)
  * - Tệp trong gói tải (/packs/**) có gắn băm tham số query ?v=<12 ký tự hex> (M7.15, #516).
  *   Lưu ý: /packs/manifest.json KHÔNG bao giờ có hash và phải ưu tiên mạng (network-first).
+ * - Tệp trong gói tài nguyên RIÊNG (/assets-private/**, mục 63: do máy chủ phục vụ, không nằm trong repo) cùng luật: ?v=<12 hex đầu sha256>
+ *   thì cache-first; /assets-private/manifest.json không bao giờ có hash, luôn network-first. KHÔNG bao giờ nằm trong PRECACHE_URLS.
  */
+const HASHED_PREFIXES = ["/packs/", "/assets-private/"];
+const UNHASHED_MANIFESTS = ["/packs/manifest.json", "/assets-private/manifest.json"];
 function isHashedImmutableAsset(url) {
   if (/^\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?)$/i.test(url.pathname)) return true;
   if (
-    url.pathname.startsWith("/packs/") &&
-    url.pathname !== "/packs/manifest.json" &&
+    HASHED_PREFIXES.some((p) => url.pathname.startsWith(p)) &&
+    !UNHASHED_MANIFESTS.includes(url.pathname) &&
     /^[0-9a-f]{12}$/i.test(url.searchParams.get("v") || "")
   ) {
     return true;

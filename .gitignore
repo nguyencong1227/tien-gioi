@@ -1,4 +1,7 @@
 node_modules/
+# Gói tài nguyên RIÊNG cấm phân phối lại (mục 63): KHÔNG BAO GIỜ vào git (chỉ ở /mnt/data/assets-private trên máy chủ)
+assets-private/
+**/assets-private/
 dist/
 server/data/
 backups/

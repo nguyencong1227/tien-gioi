@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   INVENTORY_SLOTS,
   MONSTER_BY_ID,
+  WORLD_BOSS_SCHEDULE,
   WORLD_BOSS_TZ_OFFSET_MS,
   getMap,
   sampleWorldBossSchedule,
@@ -19,6 +20,7 @@ import { dealMonsterDamage } from "./combat";
 import { navKindsOf, topUpMonsters } from "./monsters";
 import { placeMonster } from "./monster-place";
 import { tickWorldBoss, worldBossStatus } from "./world-boss";
+import { measureSyncStepMs } from "../perf/bench";
 
 /** 00:00 giờ máy chủ (UTC+7) của ngày 18/11/2026, theo ms của đồng hồ. */
 const DAY0 = Date.UTC(2026, 10, 18) - WORLD_BOSS_TZ_OFFSET_MS;
@@ -30,6 +32,7 @@ const HAN = MONSTER_BY_ID.thien_han_vuong;
 function setup(slots: WorldBossSlot[] = sampleWorldBossSchedule()) {
   const hub = new Hub();
   hub.worldBoss.slots = slots;
+  hub.worldBoss.enabled = true; // mặc định của sổ là TẮT (chỉ index.ts bật theo WORLD_BOSS=on): ca nào cần sự kiện thì tự bật
   const han = makeWorld(getMap("han_van")!, hub);
   const lac = makeWorld(undefined, hub);
   return { hub, han, lac };
@@ -66,18 +69,27 @@ function hit(w: World, sid: string, dmg: number) {
 const soulOf = (sid: string) => legacyIdentity(sid).soulKey;
 
 describe("world-boss: lịch rỗng / tắt", () => {
-  it("không có lịch (mặc định) hoặc WORLD_BOSS=off thì không làm gì và trả `none`", () => {
+  it("sổ MẶC ĐỊNH tắt dù đã có lịch thật; lịch rỗng hoặc WORLD_BOSS tắt thì không làm gì và trả `none`", () => {
     const hub = new Hub();
     const a = makeWorld(getMap("han_van")!, hub);
     addPlayer(a.w, "A");
-    expect(hub.worldBoss.slots.length).toBe(0); // dữ liệu thật của E chưa có
+    // lịch thật có khung 12:00 / 21:00 nhưng sổ mới dựng KHÔNG chạy (opt-in): test dùng Hub mới + đồng hồ thật không bao giờ dính báo trước / trùm theo giờ trong ngày
+    expect(hub.worldBoss.slots).toBe(WORLD_BOSS_SCHEDULE);
+    expect(hub.worldBoss.slots.length).toBeGreaterThan(0);
+    expect(hub.worldBoss.enabled).toBe(false);
+    expect(hub.worldBoss.active).toBe(false);
+    run([a.w], at(11, 59), at(12, 1));
+    expect(a.sys).toEqual([]);
+    expect(a.w.wbossId).toBeNull();
+    hub.worldBoss.enabled = true;
+    hub.worldBoss.slots = []; // bật mà lịch rỗng
     expect(hub.worldBoss.active).toBe(false);
     run([a.w], at(11, 59), at(12, 1));
     expect(a.sys).toEqual([]);
     expect(a.worldBosses).toEqual([]);
     expect(worldBossStatus(a.w, "A").phase).toBe("none");
     hub.worldBoss.slots = sampleWorldBossSchedule();
-    hub.worldBoss.enabled = false;
+    hub.worldBoss.enabled = false; // lịch có nhưng cờ tắt (WORLD_BOSS không đặt / off)
     run([a.w], at(11, 59), at(12, 1));
     expect(a.worldBosses).toEqual([]);
     expect(a.w.wbossId).toBeNull();
@@ -115,6 +127,42 @@ describe("world-boss: báo trước + sinh trùm", () => {
     expect(live[0].msg.endsInMs).toBeGreaterThan(29 * MIN);
   });
 
+  it("hpMult: trùm sinh với máu = máu loài x hệ số (state, sổ sự kiện, bản sao của loài); bảng MONSTERS dùng chung KHÔNG bị sửa; không hpMult thì đúng máu loài", () => {
+    const base = sampleWorldBossSchedule()[0]!;
+    const hpBefore = HAN.hp;
+    const big = setup([{ ...base, hpMult: 20 }]);
+    addPlayer(big.han.w, "A");
+    run([big.han.w, big.lac.w], at(11, 59), at(12, 0, 5), 500);
+    const b = bossOf(big.han.w)!;
+    expect(b.m.maxHp).toBe(hpBefore * 20);
+    expect(b.m.hp).toBe(hpBefore * 20);
+    expect(b.mc.def.hp).toBe(hpBefore * 20);
+    expect(b.mc.def.atk).toBe(HAN.atk); // chỉ máu đổi: đòn đánh giữ nguyên
+    expect(big.hub.worldBoss.current!.maxHp).toBe(hpBefore * 20); // ngưỡng 1,5% máu tính trên máu THẬT
+    expect(HAN.hp).toBe(hpBefore); // bản sao: loài gốc nguyên vẹn
+    expect(MONSTER_BY_ID.thien_han_vuong.hp).toBe(hpBefore);
+
+    const plain = setup([base]);
+    addPlayer(plain.han.w, "A");
+    run([plain.han.w, plain.lac.w], at(11, 59), at(12, 0, 5), 500);
+    const p = bossOf(plain.han.w)!;
+    expect(p.m.maxHp).toBe(hpBefore);
+    expect(p.mc.def).toBe(HAN); // không hpMult: đúng đối tượng loài gốc như trước
+    expect(plain.hub.worldBoss.current!.maxHp).toBe(hpBefore);
+  });
+
+  it("hpMult: ngưỡng thưởng 1,5% máu tối đa tính theo máu NHÂN (sát thương bằng 1,5% máu loài chưa đủ khi hpMult 20)", () => {
+    const base = sampleWorldBossSchedule()[0]!;
+    const { han, lac, hub } = setup([{ ...base, hpMult: 20 }]);
+    addPlayer(han.w, "A");
+    run([han.w, lac.w], at(11, 59), at(12, 0, 5), 500);
+    const dmg = Math.round(HAN.hp * 0.015) + 1; // hơn 1,5% máu LOÀI nhưng chỉ ~0,075% máu thật
+    hit(han.w, "A", dmg);
+    expect(hub.worldBoss.ranking(hub.worldBoss.current!).length).toBe(0);
+    hit(han.w, "A", Math.round(HAN.hp * 20 * 0.015)); // đủ 1,5% máu thật
+    expect(hub.worldBoss.ranking(hub.worldBoss.current!).length).toBe(1);
+  });
+
   it("khung giờ 00:00-00:09: báo trước 10 / 5 / 1 phút rơi vào cuối NGÀY HÔM TRƯỚC (23:55...) vẫn phát đủ, mỗi mốc MỘT lần, qua nửa đêm không phát đôi, trùm sinh đúng 00:05", () => {
     const slot: WorldBossSlot = {
       ...sampleWorldBossSchedule()[0]!,
@@ -139,6 +187,7 @@ describe("world-boss: báo trước + sinh trùm", () => {
     const def = MONSTER_BY_ID.hac_giao!;
     for (let i = 0; i < 20; i++) {
       const hub = new Hub();
+      hub.worldBoss.enabled = true; // mặc định của sổ là TẮT
       hub.worldBoss.slots = sampleWorldBossSchedule();
       const am = makeWorld(getMap("am_suong")!, hub);
       addPlayer(am.w, "A");
@@ -553,10 +602,11 @@ describe("world-boss: hiệu năng", () => {
     const TICKS = 200; // 10 giây
     for (let t = 0; t < TICKS; t++) {
       han.w.now = at(12, 0, 2) + t * 50;
-      const t0 = performance.now();
-      for (const id of ids) dealMonsterDamage(han.w, b.id, b.m, id, 1000, false); // mỗi người một đòn mỗi tick: nặng hơn thật nhiều
-      tickWorldBoss(han.w);
-      const dt = performance.now() - t0;
+      // CPU của chính luồng, không đồng hồ tường (#1215)
+      const dt = measureSyncStepMs(() => {
+        for (const id of ids) dealMonsterDamage(han.w, b.id, b.m, id, 1000, false); // mỗi người một đòn mỗi tick: nặng hơn thật nhiều
+        tickWorldBoss(han.w);
+      });
       total += dt;
       if (dt > 10) slow++;
     }

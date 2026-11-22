@@ -15,6 +15,7 @@ Mục lục:
 - [Tổ đội](#tổ-đội)
 - [Bí cảnh](#bí-cảnh)
 - [Trùm nhiều chiêu: học né](#trùm-nhiều-chiêu-học-né)
+- [Gặp chặn đường (đang thử nghiệm)](#gặp-chặn-đường-đang-thử-nghiệm)
 - [Luân hồi và Hoàng Tuyền](#luân-hồi-và-hoàng-tuyền)
 - [PK thách đấu](#pk-thách-đấu)
 - [Tông môn](#tông-môn)
@@ -265,7 +266,7 @@ Chỉ có một bí cảnh hiện nay: **Linh Hư Bí Cảnh**.
 - Mở cho người từ **Luyện Khí Tầng 9** đến **Trúc Cơ Hậu kỳ**.
 - Mỗi lượt giới hạn **12 phút**; hôm nay nhận thưởng hoàn thành tối đa **3 lượt**.
 - Trong trận: một trùm và nhiều quái con. Hoàn thành cho Linh thạch và đan dược, đồ rơi nhặt trong 60 giây.
-- **Gục trong bí cảnh KHÔNG mất kiếp:** bạn hồi về cổng sau vài giây với 30% máu và mất một lượt thưởng trong ngày. Chỉ chết do quái ở bản đồ thường mới vào Hoàng Tuyền (xem bên dưới).
+- **Gục trong bí cảnh KHÔNG mất kiếp:** bạn hồi về cổng sau vài giây với 30% máu và mất một lượt thưởng trong ngày. Chết do quái ở bản đồ thường, hoặc thua trong đấu trường của Gặp chặn đường, mới vào Hoàng Tuyền (xem bên dưới).
 
 > **Mẹo:** Bí cảnh là "bao máu" — trận dài, sát thương nhẹ nhưng liên tục. Mang đủ đan và đánh đều, đừng tham đuổi quái xa khỏi đội.
 
@@ -308,11 +309,31 @@ Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hà
 
 ---
 
+## Gặp chặn đường (đang thử nghiệm)
+
+> **Tính năng này chỉ có khi máy chủ bật.** Hiện nó **TẮT** ở bản chạy thật cho tới khi nghiệm thu xong (xem `docs/THIET_KE_CHAN_DUONG.md`). Khi bật, nó chỉ chạy với bản trò chơi mới: nếu thấy trang cũ, tải lại trang.
+
+- **Khi nào gặp:** đi bộ ngoài vùng hoang, **thỉnh thoảng** (đi liên tục ngoài vùng hoang vài phút tới mười mấy phút mới gặp một lần, tuỳ độ nguy hiểm của vùng) có kẻ chặn đường: tán tu, tà tu, cường đạo hay yêu thú tuỳ vùng. Có thời gian hồi (khoảng 8 phút sau một lần) và **trần mỗi ngày** (12 lần). Chỉ **đi bộ thật** mới tính; dịch chuyển tức thời không tính.
+- **Sẽ KHÔNG bị chặn khi:** đang ở trấn / khu an toàn, trong bí cảnh, đang thách đấu PK, khí huyết dưới 30%, vừa đánh nhau hoặc bị đánh (8 giây), có đồng đội ở gần (khoảng 700 px) đang giao chiến, vừa đầu thai, hoặc đang rớt mạng chờ nối lại.
+- **Hộp thoại (10 giây):** nhân vật đứng yên, không ai đánh được. Có ba nút: **Chiến** (phím Enter), **Bỏ chạy: trả Linh thạch**, **Bỏ chạy: trả tu vi**. **Giá hiện ngay trên nút và đúng bằng số bị trừ**; giá tu vi tương đương **khoảng 2 phút săn quái** ở bậc của bạn (giữa trận khoảng 3 phút) và **không bao giờ làm rớt cảnh giới** (không trừ quá số tu vi bạn đang có trong thanh). Hết 10 giây không bấm thì tính là **Chiến**. Bỏ chạy ở hộp thoại: trả giá rồi đi tiếp như chưa có gì.
+- **Chiến:** bạn vào một đấu trường nhỏ **một mình** với kẻ chặn đường (đồng đội không vào được), có đồng hồ 2 phút. Hạ hết kẻ chặn đường là **thắng**: nhận tu vi (tương đương khoảng 4 phút săn quái với kẻ chặn đường thường, 6 phút với tinh anh, 10 phút với kẻ cầm đầu, tính theo bậc của bạn) và một ít Linh thạch (đồ rơi và sách chiêu sẽ có sau khi chốt cân bằng); sau vài giây bạn về **đúng chỗ cũ** và được bảo hộ 5 giây.
+- **Bỏ chạy giữa trận** luôn bấm được (kể cả khi bị khống chế) nhưng phải **vận 1 giây** mới thoát, và giá **cao hơn** giá ở hộp thoại (Linh thạch gấp đôi, tu vi khoảng 3 phút săn thay vì 2 phút). Bị hạ giữa lúc vận thì tính là thua.
+- **Thua là CHẾT THẬT:** bị hạ khi đang đánh trong đấu trường giống như chết ở bản đồ thường: bạn vào **Hoàng Tuyền và mất kiếp** (xem mục Luân hồi bên dưới), không trừ thêm giá. Để việc này công bằng: kẻ chặn đường **không mạnh vượt cảnh giới** của bạn, và **Bỏ chạy luôn là một lựa chọn**.
+- **Hết giờ, rời phòng, thoát chủ động:** trả giá giữa trận bằng tu vi (không thể né giá bằng cách thoát).
+- **Rớt mạng:** trò chơi **chờ nối lại 90 giây**, đồng hồ hộp thoại / trận **đóng băng** và kẻ địch bỏ mục tiêu; nối lại kịp thì mọi thứ còn nguyên. Chỉ khi quá hạn mới tính giá. Không ai bị phạt oan vì mạng chập chờn.
+- **Đội:** người trong đội gặp chặn đường vẫn đấu **một mình** (đấu trường chỉ nhận đúng một người, đồng đội không vào giúp được).
+
+> **Mẹo:** Hộp thoại có giá ngay trên nút, nên hãy quyết định theo khí huyết và đan còn lại. Nếu khí huyết đầy và bạn quen đánh bậc này thì **Chiến** là cách duy nhất để nhận thưởng; chưa chắc thì **Bỏ chạy** bằng Linh thạch cho khỏi tốn tu vi (thua trận là mất kiếp, nên đừng liều). **Hãy luôn mang theo ít nhất 2 Hồi Huyết Đan** (hộp thoại sẽ **nhắc** bằng một dòng vàng dưới nút Chiến khi túi có ít hơn 2 viên đan hồi huyết, tính cả đan Đại và Thượng; chỉ là lời nhắc, không khoá nút) và mặc đồ đúng bậc: đo thử cho thấy chiến với 2 đan gần như không chết, nhưng chiến khi không có đan có thể chết cứ sáu bảy lần một lần. Các con số trong mục này (xác suất, hồi, giá, thưởng) **có thể chỉnh** sau khi cân bằng.
+
+Chi tiết thiết kế: [docs/THIET_KE_CHAN_DUONG.md](THIET_KE_CHAN_DUONG.md).
+
+---
+
 ## Luân hồi và Hoàng Tuyền
 
 Đây là cơ chế quan trọng nhất cần hiểu rõ:
 
-> **CHẾT DO YÊU THÚ = MẤT MỘT KIẾP.** Khi nhân vật bị quái giết, chân linh của bạn đầu thai sang kiếp mới. **Chỉ chết do quái ở bản đồ thường mới tính là mất kiếp** — chết trong bí cảnh hay trong quyết đấu **không** tính.
+> **CHẾT DO YÊU THÚ = MẤT MỘT KIẾP.** Khi nhân vật bị quái giết, chân linh của bạn đầu thai sang kiếp mới. **Chết do quái ở bản đồ thường, hoặc thua trong đấu trường của Gặp chặn đường (xem mục Gặp chặn đường ở trên), đều tính là mất kiếp** — chết trong bí cảnh hay trong quyết đấu **không** tính.
 
 Khi đầu thai:
 

@@ -7,14 +7,14 @@
 // Chặng ba (M7.5, #506, M7.8 #509): nhân vật lưu sẵn cạnh Lăng Hàn Quan đi Âm Sương Trạch -> Hàn Vân Lĩnh -> Âm Sương Trạch bằng cổng THẬT: bản đồ thứ tư dựng đủ lớp
 // (kiểu `han_van`), chỗ xuất hiện đúng cạnh Hồi Sương Quan (cổng nam, trong khu an toàn), quay về đúng cổng bắc Âm Sương.
 // Chạy: `npm run build && npm run e2e:chuyen-canh -w server` (cần google-chrome).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 import { freePort } from "../src/test-port.js";
@@ -26,6 +26,9 @@ const clientDist = path.resolve(repoRoot, "client/dist");
 const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
 const out = (m: string) => console.log(m);
+// Hạn chờ và bán kính "tới sát tâm cổng" khi đi bộ (đổi bằng biến môi trường chỉ để THỬ ĐỘT BIẾN chứng minh chẩn đoán in ra; mặc định như cũ: 90 s, 40 px)
+const WALK_WAIT_MS = Number(process.env.E2E_WALK_WAIT_MS) || 90000;
+const WALK_NEAR_PX = Number(process.env.E2E_WALK_NEAR_PX ?? 40);
 
 async function main() {
   // Cổng do hệ điều hành cấp (không `Math.random`): cổng CDP trùng Chrome của dev khác thì ta điều khiển nhầm trình duyệt của họ (nit của A ở #549)
@@ -160,6 +163,60 @@ async function main() {
       `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
     );
 
+    // Chẩn đoán khi đi bộ tới cổng hết giờ: vị trí đoán trước (client) VÀ vị trí thật trong World của phòng (cùng tiến trình), toạ độ cổng, cờ `nearPortal`,
+    // joystick / bộ hẹn giờ đi bộ, khung hình / giây, tải máy + số Chrome đang chạy, lỗi console. Mỗi phần tự bắt lỗi để chẩn đoán không bao giờ che lỗi gốc.
+    const walkDiag = async (id: string): Promise<string> => {
+      const d: Record<string, unknown> = {};
+      try {
+        const page =
+          await ev(`(() => { const s = window.__scene, J = window.__joystick, m = s.map, p = m.portals.find((q) => q.id === ${JSON.stringify(id)});
+          return JSON.stringify({ sid: s.room.sessionId, roomId: s.room.roomId, map: m.def.id, pred: [Math.round(s.predX), Math.round(s.predY)],
+            portal: p ? [Math.round(p.x), Math.round(p.y), p.r] : null, dist: p ? Math.round(Math.hypot(s.predX - p.x, s.predY - p.y)) : null,
+            nearPortal: !!s.nearPortal, joy: J ? [J.x, J.y, J.active] : null, walkLen: window.__walkLen ?? null, walkErr: window.__walkErr ?? null,
+            timer: !!window.__walkTimer, fps: Math.round(s.game?.loop?.actualFps ?? -1) }); })()`);
+        Object.assign(d, JSON.parse(String(page)));
+      } catch (e) {
+        d.pageErr = String(e).slice(0, 120);
+      }
+      try {
+        const room = matchMaker.getLocalRoomById(String(d.roomId)) as any;
+        const me = room?.world?.state?.players?.get(String(d.sid));
+        d.server = me
+          ? {
+              map: room.world.map?.def?.id,
+              x: Math.round(me.x),
+              y: Math.round(me.y),
+              hp: me.hp,
+              dead: me.dead,
+            }
+          : null;
+      } catch (e) {
+        d.serverErr = String(e).slice(0, 120);
+      }
+      // Máy chủ: tải 1 phút / số nhân, số trình duyệt Chrome ĐANG chạy (tiến trình chính có `--remote-debugging-port` và không có `--type=`; tiến trình con của Chrome cũng mang cờ cổng nên phải loại: > 1 nghĩa là còn sót Chrome của kịch bản trước hoặc của dev khác), 3 tiến trình ngốn CPU nhất
+      try {
+        const sh = (cmd: string, args: string[]) =>
+          spawnSync(cmd, args, { encoding: "utf8", timeout: 3000 }).stdout?.trim() ?? "";
+        d.host = {
+          load1: Number(os.loadavg()[0].toFixed(1)),
+          cpus: os.cpus().length,
+          chromes: sh("ps", ["-eo", "args", "--no-headers"])
+            .split("\n")
+            .filter((l) => l.includes("--remote-debugging-port") && !l.includes("--type=")).length,
+          topCpu: sh("ps", ["-eo", "pcpu,comm", "--sort=-pcpu", "--no-headers"])
+            .split("\n")
+            .slice(0, 3)
+            .map((l) => l.trim().replace(/\s+/, " ")),
+        };
+      } catch (e) {
+        d.hostErr = String(e).slice(0, 120);
+      }
+      d.console = T.errors.slice(0, 4);
+      delete d.sid;
+      delete d.roomId;
+      return JSON.stringify(d);
+    };
+
     // Đi bộ tới cổng `id` của bản đồ hiện tại bằng joystick ảo (BFS trên ô) rồi đứng sát tâm cổng
     const walkToPortal = async (id: string) => {
       const P = `window.__scene.map.portals.find((q) => q.id === ${JSON.stringify(id)})`;
@@ -185,11 +242,17 @@ async function main() {
         !(await ev(`window.__walkErr`)),
         `có đường đi bộ tới cổng ${id} (${await ev(`window.__walkErr`)})`,
       );
-      await T.waitFor(
-        `!!window.__scene.nearPortal && Math.hypot(window.__scene.predX - ${P}.x, window.__scene.predY - ${P}.y) < 40`,
-        `tới sát tâm cổng ${id}`,
-        90000,
-      );
+      try {
+        await T.waitFor(
+          `!!window.__scene.nearPortal && Math.hypot(window.__scene.predX - ${P}.x, window.__scene.predY - ${P}.y) < ${WALK_NEAR_PX}`,
+          `tới sát tâm cổng ${id}`,
+          WALK_WAIT_MS,
+        );
+      } catch (err) {
+        // Chỉ chẩn đoán rồi ném lại đúng lỗi gốc: lần đỏ trên CI (22/11, 90 s ở am_suong_nam, 2/2 lần, không tái hiện được ở máy dev) chỉ để lại một dòng timeout
+        out(`  (chẩn đoán đi bộ tới cổng ${id}: ${await walkDiag(id)})`);
+        throw err;
+      }
       ok(`đã tới gần cổng ${id} sau ${await ev(`window.__walkLen`)} ô`);
       await ev(
         `(() => { const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; return 1; })()`,

@@ -48,6 +48,15 @@ export const DEFAULT_LIMIT: Limit = { perSec: 8, burst: 16 };
  */
 export const ABUSE: Limit = { perSec: 30, burst: 200 };
 
+/**
+ * Số loại tin nhắn KHÁC NHAU được theo dõi tối đa cho mỗi người (mỗi loại một quỹ: chống gửi hàng triệu `type` ngẫu nhiên làm phình bộ nhớ). Loại thứ (MAX + 1) trở đi bị coi là spam.
+ * PHẢI lớn hơn số loại `WorldRoom` đăng ký + dư địa (hiện 64 loại; bản đầu đặt đúng 64 nên thêm loại thứ 65 là mọi phiên đã dùng đủ 64 loại thấy loại mới luôn bị bỏ và hao quỹ ABUSE, #1250):
+ * `server/scripts/red-team.test.ts` khoá `đã đăng ký + MESSAGE_TYPE_HEADROOM <= MAX_TRACKED_TYPES`.
+ */
+export const MAX_TRACKED_TYPES = 128;
+/** Dư địa tối thiểu giữa số loại tin đã đăng ký và `MAX_TRACKED_TYPES` (thêm ~tới chừng này loại tin mới trước khi phải nâng trần). */
+export const MESSAGE_TYPE_HEADROOM = 32;
+
 interface Bucket {
   tokens: number;
   at: number;
@@ -77,7 +86,7 @@ export class RateLimiter {
     let b = this.buckets.get(type);
     if (!b) {
       // Giới hạn số loại tin nhắn khác nhau được theo dõi, để gửi hàng triệu type ngẫu nhiên không làm phình bộ nhớ
-      if (this.buckets.size >= 64) return this.reject(now);
+      if (this.buckets.size >= MAX_TRACKED_TYPES) return this.reject(now);
       b = { tokens: limit.burst, at: now };
       this.buckets.set(type, b);
     }

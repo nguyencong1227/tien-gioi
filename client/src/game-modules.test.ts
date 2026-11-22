@@ -15,6 +15,7 @@ class FakeScene {}
 const okImporters = () => ({
   phaser: vi.fn(async () => ({ default: { fake: "phaser" } })),
   scene: vi.fn(async () => ({ WorldScene: FakeScene as never })),
+  mapFiles: vi.fn(async () => ({ adoptTiledMapFiles: vi.fn(() => ["lac_ha"]) })),
 });
 
 describe("createGameLoader: tải Phaser + cảnh MỘT lần, thử lại khi lỗi", () => {
@@ -36,8 +37,8 @@ describe("createGameLoader: tải Phaser + cảnh MỘT lần, thử lại khi l
   it("Phaser trả thẳng không gian tên (không có default) cũng nhận", async () => {
     const ns = { Game: class {} };
     const l = createGameLoader({
+      ...okImporters(),
       phaser: async () => ns,
-      scene: async () => ({ WorldScene: FakeScene as never }),
     });
     expect((await l.load()).Phaser).toBe(ns);
   });
@@ -50,6 +51,7 @@ describe("createGameLoader: tải Phaser + cảnh MỘT lần, thử lại khi l
         return { default: { fake: 1 } };
       }),
       scene: vi.fn(async () => ({ WorldScene: FakeScene as never })),
+      mapFiles: okImporters().mapFiles,
     };
     const l = createGameLoader(imp);
     await expect(l.load()).rejects.toThrow("mất mạng");
@@ -68,6 +70,7 @@ describe("createGameLoader: tải Phaser + cảnh MỘT lần, thử lại khi l
         return { default: {} };
       }),
       scene: vi.fn(async () => ({ WorldScene: FakeScene as never })),
+      mapFiles: okImporters().mapFiles,
     };
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
@@ -81,6 +84,72 @@ describe("createGameLoader: tải Phaser + cảnh MỘT lần, thử lại khi l
     } finally {
       process.off("unhandledRejection", unhandled);
     }
+  });
+});
+
+describe("createGameLoader: nhận tệp bản đồ (S3a) trước khi ai nhận được GameModules", () => {
+  it("`adoptTiledMapFiles` chạy ĐÚNG MỘT lần, SAU khi cả ba chunk đã về và TRƯỚC khi lời hứa nạp xong", async () => {
+    const order: string[] = [];
+    const adopt = vi.fn(() => {
+      order.push("adopt");
+      return ["lac_ha"];
+    });
+    const l = createGameLoader({
+      phaser: async () => {
+        order.push("phaser");
+        return { default: {} };
+      },
+      scene: async () => {
+        order.push("scene");
+        return { WorldScene: FakeScene as never };
+      },
+      mapFiles: async () => {
+        order.push("mapFiles");
+        return { adoptTiledMapFiles: adopt };
+      },
+    });
+    const done = l.load().then((m) => {
+      order.push("resolved");
+      return m;
+    });
+    await done;
+    await l.load(); // lần gọi sau dùng chung lời hứa: không nhận lại
+    expect(adopt).toHaveBeenCalledTimes(1);
+    expect(order.indexOf("adopt")).toBeGreaterThan(order.indexOf("phaser"));
+    expect(order.indexOf("adopt")).toBeGreaterThan(order.indexOf("scene"));
+    expect(order.indexOf("adopt")).toBeGreaterThan(order.indexOf("mapFiles"));
+    expect(order.indexOf("adopt")).toBeLessThan(order.indexOf("resolved"));
+  });
+
+  it("tải tệp bản đồ LỖI thì cả lời hứa lỗi (không vào game với bản đồ sinh theo seed), rồi lần sau thử lại", async () => {
+    let fail = true;
+    const adopt = vi.fn(() => ["lac_ha"]);
+    const imp = {
+      ...okImporters(),
+      mapFiles: vi.fn(async () => {
+        if (fail) throw new Error("mất mạng");
+        return { adoptTiledMapFiles: adopt };
+      }),
+    };
+    const l = createGameLoader(imp);
+    await expect(l.load()).rejects.toThrow("mất mạng");
+    expect(adopt).not.toHaveBeenCalled();
+    await Promise.resolve();
+    fail = false;
+    await expect(l.load()).resolves.toBeDefined();
+    expect(adopt).toHaveBeenCalledTimes(1);
+  });
+
+  it("nhận tệp NÉM lỗi (tệp hỏng) thì lời hứa lỗi, không trả GameModules", async () => {
+    const l = createGameLoader({
+      ...okImporters(),
+      mapFiles: async () => ({
+        adoptTiledMapFiles: () => {
+          throw new Error("tệp hỏng");
+        },
+      }),
+    });
+    await expect(l.load()).rejects.toThrow("tệp hỏng");
   });
 });
 
@@ -203,5 +272,30 @@ describe("gói khởi động KHÔNG kéo Phaser / WorldScene về (#1097)", () 
     expect(src).toContain("loadGameModules()");
     expect(src).toMatch(/\}\);\s*\n\s*\/\/[^\n]*\n\s*prefetchGameModulesWhenIdle\(\);/);
     expect(src).toContain("room.leave?.()");
+  });
+});
+
+describe("tệp bản đồ Tiled chỉ vào gói khởi động qua import ĐỘNG (S3a)", () => {
+  const MAP_FILES = "@tien-gioi/shared/src/map-files";
+  const root = path.resolve(here, "../..");
+
+  it("bao đóng import tĩnh từ `main.ts` KHÔNG nhập `map-files` (bốn tệp ~14 KB gzip sẽ vào gói khởi động, `startupGzipKb`)", () => {
+    const { packages } = staticClosure(path.join(here, "main.ts"));
+    expect([...packages]).not.toContain(MAP_FILES);
+  });
+
+  it("`shared/src/index.ts` không xuất lại `map-files` (nhập `@tien-gioi/shared` không kéo bốn tệp)", () => {
+    expect(fs.readFileSync(path.join(root, "shared/src/index.ts"), "utf8")).not.toMatch(
+      /map-files/,
+    );
+  });
+
+  it("client nhập module đó bằng `import()` động ở `game-modules.ts`, và máy chủ nhập CÙNG module (một nguồn: client và server dựng bản đồ từ cùng tệp)", () => {
+    const gm = fs.readFileSync(path.join(here, "game-modules.ts"), "utf8");
+    expect(gm).toMatch(/import\("@tien-gioi\/shared\/src\/map-files"\)/);
+    const room = fs.readFileSync(path.join(root, "server/src/rooms/WorldRoom.ts"), "utf8");
+    expect(room).toMatch(
+      /import \{ adoptTiledMapFiles \} from "@tien-gioi\/shared\/src\/map-files"/,
+    );
   });
 });
