@@ -2271,7 +2271,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | | Tệp hỏng (`*.hong-*`) | 0 | 0 | 0 | **ĐẠT** |
 | **Bảo toàn Linh thạch** | Đối chiếu sổ cái tiền tệ | Ví đầu 29.600 -> ví 11.479 + kho 8.420 = 19.899 (giảm 9.701, không vượt trần ban đầu, 0 ví âm; chưa có bộ đếm thả ra/tiêu) | **Đo chặt từ harness:** Ban đầu **29.600** + Thả ra **15.401** - Tiêu **35.580** = **9.421** = ví cuối **9.421**; Ví 9.421 + kho tông môn 8.740 = 18.161 <= trần 45.001; **lệch ví bot: 0** | Khớp sổ cái từng đồng, lệch ví bot = 0 | **ĐẠT** |
 | **Nội dung M7** | Chiêu thức Nguyên Anh | — | 999 lượt thi triển, **6/6** chiêu Nguyên Anh bắt buộc có lượt | Đủ 6/6 | **ĐẠT** |
-| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT ở lần 2; chạy lại trên `575a3887` ĐẠT 4/4 ở 10 phút và 30 phút (41.4); 0/4 chưa tái hiện, chưa giải thích (#1301)** |
+| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT ở lần 2; chạy lại trên `575a3887` ĐẠT 4/4 ở 10 phút và 30 phút (41.4; n = 1 mỗi cấu hình); 0/4 chưa tái hiện, chưa giải thích (#1301)** |
 
 ---
 
@@ -2317,4 +2317,4 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=30 --m7 --bos
 
 Đối chứng 10 phút (cùng tham số, `575a3887`): PASS, 23 lượt, 4 / 4 (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); nhóm săn trùm (Bot 001-015): 13 / 15 bot có lượt thi triển.
 
-Giới hạn: mỗi cấu hình chạy MỘT lần (n = 1) nên không ước được tỉ lệ chập chờn của `--boss`; thử bằng kho TỆP; lần 3 chạy trên máy dùng chung và CÓ soak khác của dev khác chạy chồng một phần (một thư mục soak có sẵn lúc bắt đầu đã biến mất khi soak đó xong), nên số tick của lần này chỉ để kiểm 'vẫn trong ngưỡng xa', số tick sạch hơn là của lần 2.
+Giới hạn: mỗi cấu hình chạy MỘT lần (n = 1) nên không ước được tỉ lệ chập chờn của `--boss`; thử bằng kho tệp (không qua PostgreSQL). Tải chồng lên hai lần chạy (theo Dev B, kiểm bằng `ps`): lần 10 phút (09:34:27-09:44:30) bị `npm test` đầy đủ của B (09:34:11-09:35:49, `nice 10`) chồng 82 giây đầu cộng build client ~10 giây (~09:36:45); lần 30 phút (09:46:07-10:16:28) bị soak 100 bot của C (PID 2451046, 09:42:16-09:52:33) chồng 6,5 phút đầu, B không chạy gì nặng trong 09:46-10:16. Số `--boss` ít nhạy với tải; số tick của lần 3 chỉ để kiểm 'vẫn trong ngưỡng xa', số tick sạch hơn là của lần 2.
