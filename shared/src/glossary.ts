@@ -170,6 +170,13 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     wrong: ["Tam Sinh Thach", "tam sinh thach"],
     note: "Bảng mở khóa lợi ích vĩnh viễn của luân hồi.",
   },
+  {
+    id: "khai-niem.chan-linh",
+    group: "khai-niem",
+    canonical: "chân linh",
+    wrong: ["chan linh"],
+    note: "Linh hồn đầu thai qua kiếp (reincarnation.ts); viết thường, KHÔNG thiếu dấu. KHÔNG lẫn 'Duyên' (để sau — 'cơ duyên' dễ báo oan).",
+  },
 
   // --- Tên chính: trùm (boss-level, có chữ "Vương") — quái thường để lượt sau ---
   {

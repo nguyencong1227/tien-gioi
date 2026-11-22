@@ -72,6 +72,7 @@
 |---|---|---|
 | Hoàng Tuyền | Hoang Thuyen, hoang thuyen | Chết thật (mất kiếp), KHÔNG viết "Hoànguyền". |
 | Tam Sinh Thạch | Tam Sinh Thach, tam sinh thach | Bảng mở khóa lợi ích vĩnh viễn của luân hồi. |
+| chân linh | chan linh | Linh hồn đầu thai qua kiếp; viết thường, KHÔNG thiếu dấu. (Chưa thêm "Duyên": "cơ duyên" dễ báo oan — để khi có cơ chế khử nhập nhằng.) |
 
 ---
 

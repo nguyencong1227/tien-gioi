@@ -75,6 +75,7 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
       "Vào Lạc Hà Trấn phía bắc.",
       "Kiếm này Thiên phẩm.",
       "Chết trong tay quái = Hoàng Tuyền, mất kiếp.",
+      "Chân linh đầu thai làm kiếp mới.",
     ])
       expect(glossaryViolations(t), t).toEqual([]);
   });
@@ -82,6 +83,10 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
   it("thiếu dấu thanh vẫn bị bắt (khớp không phân biệt dấu)", () => {
     expect(glossaryViolations("Ngươi ở Truc Co trung ky.")).toContain(
       "thấy 'Truc Co' -> dùng 'Trúc Cơ'",
+    );
+    // khái niệm "chân linh" thiếu dấu -> bắt (viết thường đúng thì KHÔNG báo)
+    expect(glossaryViolations("chan linh đầu thai.")).toContain(
+      "thấy 'chan linh' -> dùng 'chân linh'",
     );
     expect(glossaryViolations("vào Lac Ha Tran")).toContain(
       "thấy 'Lac Ha Tran' -> dùng 'Lạc Hà Trấn'",
