@@ -213,6 +213,16 @@ export interface AmbushSoakResult extends AmbushSoakContext {
   reasons: string[];
 }
 
+/** Dữ liệu đầu vào một bot săn trùm tại thời điểm lấy mẫu snapshot (#1301) */
+export interface BossHunterSnapshotInput {
+  mapId: string;
+  resting: boolean;
+  hp?: number;
+  realm?: number;
+  isConnected: boolean;
+  visibleBossIds?: string[];
+}
+
 /** Sự kiện thi triển chiêu trùm để ghi dòng thời gian (#1301) */
 export interface BossCastEvent {
   minute: number;
@@ -229,8 +239,80 @@ export interface BossHunterMinuteStatus {
   inHacPhong: number;
   resting: number;
   dead: number;
+  disconnected: number;
   byMap: Record<string, number>;
-  bossesAlive?: number;
+  bossesVisible: number;
+}
+
+/** Tính trạng thái nhóm bot săn trùm từ danh sách snapshot của từng bot (#1301) */
+export function computeBossHunterMinuteStatus(
+  minute: number,
+  hunters: readonly BossHunterSnapshotInput[],
+): BossHunterMinuteStatus {
+  const totalHunters = hunters.length;
+  let inHacPhong = 0;
+  let resting = 0;
+  let dead = 0;
+  let disconnected = 0;
+  const byMap: Record<string, number> = {};
+  const visibleBossSet = new Set<string>();
+
+  for (const h of hunters) {
+    byMap[h.mapId] = (byMap[h.mapId] ?? 0) + 1;
+    if (h.mapId === "hac_phong") inHacPhong++;
+    if (h.resting) resting++;
+    if (!h.isConnected) {
+      disconnected++;
+    } else if (
+      (typeof h.realm === "number" && h.realm < 1) ||
+      (typeof h.hp === "number" && h.hp <= 0)
+    ) {
+      dead++;
+    }
+    if (h.visibleBossIds) {
+      for (const id of h.visibleBossIds) {
+        visibleBossSet.add(id);
+      }
+    }
+  }
+
+  return {
+    minute,
+    totalHunters,
+    inHacPhong,
+    resting,
+    dead,
+    disconnected,
+    byMap,
+    bossesVisible: visibleBossSet.size,
+  };
+}
+
+/** Gợi ý nguyên nhân chẩn đoán khi thiếu chiêu trùm (#1301) */
+export function diagnoseBossDeficiency(status?: {
+  totalHunters: number;
+  huntersInMap: number;
+  huntersAlive: number;
+  bossesVisible?: number;
+}): string | undefined {
+  if (!status) return undefined;
+  const hints: string[] = [];
+  if (status.huntersInMap < status.totalHunters) {
+    hints.push(
+      `${status.totalHunters - status.huntersInMap}/${status.totalHunters} bot săn trùm ở sai bản đồ (không ở Hắc Phong Cốc)`,
+    );
+  }
+  if (status.huntersAlive < status.totalHunters) {
+    hints.push(
+      `${status.totalHunters - status.huntersAlive}/${status.totalHunters} bot săn trùm đã chết/luân hồi về Phàm Nhân`,
+    );
+  }
+  if (status.bossesVisible !== undefined && status.bossesVisible === 0) {
+    hints.push(
+      "không bot săn trùm nào THẤY trùm trong vùng quan sát (có thể trùm chết hoặc bot ở xa bãi)",
+    );
+  }
+  return hints.length > 0 ? `gợi ý nguyên nhân: ${hints.join("; ")}` : undefined;
 }
 
 /** Số đo bộ chiêu trùm của một lượt soak bật `--boss` */
@@ -244,7 +326,7 @@ export interface BossSoakContext {
     totalHunters: number;
     huntersInMap: number;
     huntersAlive: number;
-    bossesAliveInMap?: number;
+    bossesVisible?: number;
   };
   /** Dòng thời gian chiêu trùm ghi nhận trong quá trình soak (#1301) */
   bossTimeline?: BossCastEvent[];
@@ -575,27 +657,9 @@ export function analyzeSoak(
       huntersTimeline: extra.boss.bossHuntersTimeline,
     };
     if (missingRequired.length > 0) {
-      let diag: string | undefined;
-      if (extra.boss.bossHunterStatus) {
-        const s = extra.boss.bossHunterStatus;
-        const hints: string[] = [];
-        if (s.huntersInMap < s.totalHunters) {
-          hints.push(
-            `${s.totalHunters - s.huntersInMap}/${s.totalHunters} bot săn trùm ở sai bản đồ (không ở Hắc Phong Cốc)`,
-          );
-        }
-        if (s.huntersAlive < s.totalHunters) {
-          hints.push(
-            `${s.totalHunters - s.huntersAlive}/${s.totalHunters} bot săn trùm đã chết/luân hồi về Phàm Nhân`,
-          );
-        }
-        if (s.bossesAliveInMap !== undefined && s.bossesAliveInMap === 0) {
-          hints.push("không còn con trùm nào sống trên bản đồ");
-        }
-        if (hints.length > 0) {
-          diag = `gợi ý nguyên nhân: ${hints.join("; ")}`;
-          boss.diagnosis = diag;
-        }
+      const diag = diagnoseBossDeficiency(extra.boss.bossHunterStatus);
+      if (diag) {
+        boss.diagnosis = diag;
       }
       reasons.push(
         `Chế độ --boss: ${missingRequired.length}/${required.length} chiêu trùm không được thi triển lần nào: ${missingRequired.join(", ")}${diag ? ` (${diag})` : ""}`,
@@ -778,7 +842,9 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
     }
     if (b.huntersTimeline && b.huntersTimeline.length > 0) {
       lines.push("  - Trạng thái nhóm săn trùm theo phút:");
-      lines.push("      Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Bản đồ khác");
+      lines.push(
+        "      Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Mất kết nối | Trùm thấy | Bản đồ khác",
+      );
       for (const s of b.huntersTimeline) {
         const otherMaps = Object.entries(s.byMap)
           .filter(([m]) => m !== "hac_phong")
@@ -786,7 +852,7 @@ export function formatSoakTable(res: SoakAnalysisResult): string {
           .join(", ");
         const otherStr = otherMaps || "0";
         lines.push(
-          `      ${String(s.minute).padStart(4)} | ${String(s.totalHunters).padStart(8)} | ${String(s.inHacPhong).padStart(9)} | ${String(s.resting).padStart(11)} | ${String(s.dead).padStart(14)} | ${otherStr}`,
+          `      ${String(s.minute).padStart(4)} | ${String(s.totalHunters).padStart(8)} | ${String(s.inHacPhong).padStart(9)} | ${String(s.resting).padStart(11)} | ${String(s.dead).padStart(14)} | ${String(s.disconnected ?? 0).padStart(11)} | ${String(s.bossesVisible ?? 0).padStart(9)} | ${otherStr}`,
         );
       }
     }

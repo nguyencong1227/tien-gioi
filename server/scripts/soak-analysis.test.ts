@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeSoak,
   classifyServerLogLine,
+  computeBossHunterMinuteStatus,
+  diagnoseBossDeficiency,
   formatSoakTable,
   linearRegression,
   type BossHunterMinuteStatus,
+  type BossHunterSnapshotInput,
   type M7SoakContext,
   type SoakSample,
 } from "./soak-analysis";
@@ -424,7 +427,7 @@ describe("analyzeSoak", () => {
               totalHunters: 15,
               huntersInMap: 10,
               huntersAlive: 11,
-              bossesAliveInMap: 0,
+              bossesVisible: 0,
             },
           },
         },
@@ -432,7 +435,9 @@ describe("analyzeSoak", () => {
       expect(res.pass).toBe(false);
       expect(res.boss?.diagnosis).toContain("5/15 bot săn trùm ở sai bản đồ");
       expect(res.boss?.diagnosis).toContain("4/15 bot săn trùm đã chết/luân hồi về Phàm Nhân");
-      expect(res.boss?.diagnosis).toContain("không còn con trùm nào sống trên bản đồ");
+      expect(res.boss?.diagnosis).toContain(
+        "không bot săn trùm nào THẤY trùm trong vùng quan sát (có thể trùm chết hoặc bot ở xa bãi)",
+      );
       const table = formatSoakTable(res);
       expect(table).toContain(
         "Gợi ý nguyên nhân:     gợi ý nguyên nhân: 5/15 bot săn trùm ở sai bản đồ",
@@ -455,8 +460,9 @@ describe("analyzeSoak", () => {
           inHacPhong: 15,
           resting: 0,
           dead: 0,
+          disconnected: 0,
           byMap: { hac_phong: 15 },
-          bossesAlive: 1,
+          bossesVisible: 1,
         },
         {
           minute: 1,
@@ -464,8 +470,9 @@ describe("analyzeSoak", () => {
           inHacPhong: 14,
           resting: 2,
           dead: 0,
+          disconnected: 1,
           byMap: { hac_phong: 14, default: 1 },
-          bossesAlive: 1,
+          bossesVisible: 1,
         },
       ];
       const res = analyzeSoak(
@@ -491,9 +498,117 @@ describe("analyzeSoak", () => {
       expect(table).toContain("+ Phút 02: goi_ran_con: 1");
       expect(table).toContain("Trạng thái nhóm săn trùm theo phút:");
       expect(table).toContain(
-        "Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Bản đồ khác",
+        "Phút | Săn trùm | Hắc Phong | Nghỉ/đả tọa | Chết/Phàm nhân | Mất kết nối | Trùm thấy | Bản đồ khác",
       );
       expect(table).toContain("default: 1");
+    });
+  });
+
+  describe("Hàm thuần tính toán trạng thái nhóm săn trùm và chẩn đoán (#1301)", () => {
+    it("computeBossHunterMinuteStatus phân tách chính xác dead, disconnected, resting và gộp bossesVisible", () => {
+      const inputs: BossHunterSnapshotInput[] = [
+        {
+          mapId: "hac_phong",
+          resting: false,
+          hp: 1000,
+          realm: 2,
+          isConnected: true,
+          visibleBossIds: ["mang_1"],
+        },
+        {
+          mapId: "hac_phong",
+          resting: true,
+          hp: 200,
+          realm: 2,
+          isConnected: true,
+          visibleBossIds: ["mang_1"],
+        }, // cùng thấy mang_1
+        {
+          mapId: "hac_phong",
+          resting: false,
+          hp: 0,
+          realm: 2,
+          isConnected: true,
+          visibleBossIds: [],
+        }, // dead do hp 0
+        {
+          mapId: "hac_phong",
+          resting: false,
+          hp: 500,
+          realm: 0,
+          isConnected: true,
+          visibleBossIds: [],
+        }, // dead do realm 0 (Phàm Nhân)
+        {
+          mapId: "lac_ha",
+          resting: false,
+          hp: 1000,
+          realm: 2,
+          isConnected: false,
+          visibleBossIds: [],
+        }, // disconnected (không tính vào dead)
+      ];
+
+      const snap = computeBossHunterMinuteStatus(3, inputs);
+      expect(snap.minute).toBe(3);
+      expect(snap.totalHunters).toBe(5);
+      expect(snap.inHacPhong).toBe(4);
+      expect(snap.resting).toBe(1);
+      expect(snap.dead).toBe(2);
+      expect(snap.disconnected).toBe(1);
+      expect(snap.bossesVisible).toBe(1); // Set { mang_1 } -> 1
+      expect(snap.byMap).toEqual({ hac_phong: 4, lac_ha: 1 });
+    });
+
+    it("diagnoseBossDeficiency kiểm tra từng điều kiện độc lập và kết hợp", () => {
+      // 1. Chỉ sai bản đồ
+      const d1 = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 12,
+        huntersAlive: 15,
+        bossesVisible: 1,
+      });
+      expect(d1).toBe("gợi ý nguyên nhân: 3/15 bot săn trùm ở sai bản đồ (không ở Hắc Phong Cốc)");
+
+      // 2. Chỉ chết / luân hồi
+      const d2 = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 15,
+        huntersAlive: 13,
+        bossesVisible: 1,
+      });
+      expect(d2).toBe("gợi ý nguyên nhân: 2/15 bot săn trùm đã chết/luân hồi về Phàm Nhân");
+
+      // 3. Chỉ không thấy trùm
+      const d3 = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 15,
+        huntersAlive: 15,
+        bossesVisible: 0,
+      });
+      expect(d3).toBe(
+        "gợi ý nguyên nhân: không bot săn trùm nào THẤY trùm trong vùng quan sát (có thể trùm chết hoặc bot ở xa bãi)",
+      );
+
+      // 4. Đầy đủ cả 3 điều kiện
+      const dAll = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 10,
+        huntersAlive: 11,
+        bossesVisible: 0,
+      });
+      expect(dAll).toContain("5/15 bot săn trùm ở sai bản đồ");
+      expect(dAll).toContain("4/15 bot săn trùm đã chết/luân hồi");
+      expect(dAll).toContain("không bot săn trùm nào THẤY trùm");
+
+      // 5. Bình thường (không có lỗi)
+      const dOk = diagnoseBossDeficiency({
+        totalHunters: 15,
+        huntersInMap: 15,
+        huntersAlive: 15,
+        bossesVisible: 1,
+      });
+      expect(dOk).toBeUndefined();
     });
   });
 

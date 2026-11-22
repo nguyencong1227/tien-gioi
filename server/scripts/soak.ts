@@ -83,10 +83,12 @@ import {
 import {
   analyzeSoak,
   classifyServerLogLine,
+  computeBossHunterMinuteStatus,
   formatSoakTable,
   type AmbushSoakContext,
   type BossCastEvent,
   type BossHunterMinuteStatus,
+  type BossHunterSnapshotInput,
   type BossSoakContext,
   type M7SoakContext,
   type SoakSample,
@@ -825,46 +827,39 @@ export async function main(): Promise<number> {
   /** Trạng thái nhóm săn trùm theo từng phút (#1301) */
   const bossHuntersTimeline: BossHunterMinuteStatus[] = [];
   let lastRecordedHunterMinute = -1;
-  const soakStartTime = Date.now();
+  let testStartTime = 0;
   const wsUrl = `ws://localhost:${port}`;
 
-  const recordBossHunterStatus = (min: number) => {
-    if (!args.boss) return;
+  const collectBossHunterInputs = (): BossHunterSnapshotInput[] => {
     const bossBots = bots.filter((b) => b.bossHunt);
-    const totalHunters = bossBots.length;
-    const inHacPhong = bossBots.filter((b) => b.map.def.id === "hac_phong").length;
-    const resting = bossBots.filter((b) => b.resting).length;
-    const dead = bossBots.filter((b) => {
+    return bossBots.map((b) => {
       const me = b.room?.state?.players?.get(b.room?.sessionId);
-      return !me || me.realm < 1 || me.hp <= 0 || b.closedCode !== null;
-    }).length;
-    const byMap: Record<string, number> = {};
-    for (const b of bossBots) {
-      byMap[b.map.def.id] = (byMap[b.map.def.id] ?? 0) + 1;
-    }
-    let bossesAlive = 0;
-    for (const b of bossBots) {
+      const visibleBossIds: string[] = [];
       if (b.map.def.id === "hac_phong") {
-        b.room?.state?.monsters?.forEach((m: any) => {
+        b.room?.state?.monsters?.forEach((m: any, id: string) => {
           if (
             m.hp > 0 &&
             (m.kind === "mang" || m.kind === "hac_giao" || m.kind === "thien_han_vuong")
           ) {
-            bossesAlive++;
+            visibleBossIds.push(id);
           }
         });
-        if (bossesAlive > 0) break;
       }
-    }
-    bossHuntersTimeline.push({
-      minute: min,
-      totalHunters,
-      inHacPhong,
-      resting,
-      dead,
-      byMap,
-      bossesAlive,
+      return {
+        mapId: b.map.def.id,
+        resting: b.resting,
+        hp: me?.hp,
+        realm: me?.realm,
+        isConnected: b.room?.connection?.isOpen && b.closedCode === null,
+        visibleBossIds,
+      };
     });
+  };
+
+  const recordBossHunterStatus = (min: number) => {
+    if (!args.boss) return;
+    const snap = computeBossHunterMinuteStatus(min, collectBossHunterInputs());
+    bossHuntersTimeline.push(snap);
   };
 
   const bindBotEvents = (b: BotState, room: Room) => {
@@ -890,7 +885,8 @@ export async function main(): Promise<number> {
           if (now - last > 500) {
             recentBossCasts.set(key, now);
             bossAbilityCastCounts[msg.ability] = (bossAbilityCastCounts[msg.ability] ?? 0) + 1;
-            const elapsedSec = Math.floor((Date.now() - soakStartTime) / 1000);
+            const elapsedSec =
+              testStartTime > 0 ? Math.floor((Date.now() - testStartTime) / 1000) : 0;
             const minute = Math.floor(elapsedSec / 60);
             const second = elapsedSec % 60;
             const bossMon = b.room?.state?.monsters?.get(msg.by);
@@ -1799,6 +1795,7 @@ export async function main(): Promise<number> {
   let prevExecTime = readServerExecRuntimeMs(actualPid) ?? 0;
   let prevRxBytesTotal = 0;
   const startTime = Date.now();
+  testStartTime = startTime;
 
   const sampleIntervalMs = args.sampleIntervalSec * 1000;
   const totalIterations = Math.ceil(args.durationSec / args.sampleIntervalSec);
@@ -2056,28 +2053,13 @@ export async function main(): Promise<number> {
     : undefined;
   let bossHunterStatus: BossSoakContext["bossHunterStatus"] | undefined;
   if (args.boss) {
-    const bossBots = bots.filter((b) => b.bossHunt);
-    const totalHunters = bossBots.length;
-    const huntersInMap = bossBots.filter((b) => b.map.def.id === "hac_phong").length;
-    const huntersAlive = bossBots.filter((b) => {
-      const me = b.room?.state?.players?.get(b.room?.sessionId);
-      return me && me.realm >= 1;
-    }).length;
-    const livingBossIds = new Set<string>();
-    for (const b of bossBots) {
-      if (b.map.def.id === "hac_phong") {
-        b.room?.state?.monsters?.forEach((m: any, id: string) => {
-          if (m.hp > 0 && m.kind === "mang") {
-            livingBossIds.add(id);
-          }
-        });
-      }
-    }
+    const inputs = collectBossHunterInputs();
+    const finalSnap = computeBossHunterMinuteStatus(0, inputs);
     bossHunterStatus = {
-      totalHunters,
-      huntersInMap,
-      huntersAlive,
-      bossesAliveInMap: livingBossIds.size,
+      totalHunters: finalSnap.totalHunters,
+      huntersInMap: finalSnap.inHacPhong,
+      huntersAlive: inputs.filter((h) => h.isConnected && (h.realm ?? 0) >= 1).length,
+      bossesVisible: finalSnap.bossesVisible,
     };
   }
 
