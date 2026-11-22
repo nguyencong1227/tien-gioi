@@ -321,8 +321,7 @@ function payLossExp(w: World, a: ArenaCtrl, p: Player, c: PlayerCtrl): number {
 }
 
 /**
- * Thưởng khi thắng. TU VI + LINH THẠCH đều theo PHÚT SĂN của bậc người chơi x mức kẻ địch (`ambushRewardExp` / `ambushRewardCoin`, thuần, ở `shared/`; CD6b PR2): KHÔNG còn
- * `rollCoin` x `ARENA_REWARD_MULT` (đỡ gọi `Math.random` trong luồng tick, thưởng ổn định theo bậc chứ không theo số con / viên rơi). Đi qua `gainExp` / `changeCoin`; đồ rơi chờ CD6 (D chốt `AMBUSH_LOOT`).
+ * Thưởng khi thắng. TU VI + LINH THẠCH đều theo PHÚT SĂN của bậc người chơi x mức kẻ địch (`ambushRewardExp` / `ambushRewardCoin`, thuần, ở `shared/`; CD6b PR2): KHÔNG xúc xắc — thưởng ổn định theo bậc chứ không theo số con / viên rơi. Đi qua `gainExp` / `changeCoin`; đồ rơi chờ CD6 (D chốt `AMBUSH_LOOT`).
  */
 function payRewards(
   w: World,
