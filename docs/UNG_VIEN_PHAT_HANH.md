@@ -6,25 +6,31 @@
 
 ## Tóm Tắt Cho Người Dùng (Executive Summary)
 
-- **Bản chất gói phát hành:** Gói này **KHÔNG BẬT MẶC ĐỊNH BẤT KỲ TÍNH NĂNG GAMEPLAY MỚI NÀO** (chặn đường `AMBUSH` vẫn TẮT, trùm thế giới `WORLD_BOSS` mặc định TẮT, gói tài nguyên riêng `ASSETS_PRIVATE_DIR` tắt; không thêm chiêu thức, vật phẩm, quái vật hay cảnh giới mới; `PROTOCOL_VERSION` giữ nguyên 6).
-- **Người chơi THỰC SỰ THẤY:** 3 nhiệm vụ phụ mới tại Âm Sương Trạch (cảnh giới Kim Đan, #756) và trang Điều khoản sử dụng & Bản quyền mới (`terms.html`).
+- **Bản chất gói phát hành:** Gói này **KHÔNG BẬT MẶC ĐỊNH BẤT KỲ TÍNH NĂNG GAMEPLAY MỚI NÀO** (chặn đường `AMBUSH` vẫn TẮT, trùm thế giới `WORLD_BOSS` mặc định TẮT, gói tài nguyên riêng `ASSETS_PRIVATE_DIR` tắt; không thêm cảnh giới hay quái vật mới; `PROTOCOL_VERSION` giữ nguyên 6). Nếu cắt ở đầu `main` mới nhất, có bổ sung 4 chiêu thức Kim / Thổ mới (#1187, #1299: 53 -> 57 chiêu học được) kèm 4 kinh quyển (2 quyển rơi hiếm từ Xích Mãng 1% và Phong Nha 0,8%).
+- **Người chơi THỰC SỰ THẤY:**
+  - 3 nhiệm vụ phụ mới tại Âm Sương Trạch (cảnh giới Kim Đan, #756).
+  - 4 chiêu thức mới thuộc hệ Kim & Thổ (#1187, #1299, nếu chọn điểm cắt sau #1299): *Kim Thoa Xuyên Tâm* (Luyện Khí), *Thực Giáp Phi Tán* (Trúc Cơ), *Thiết Sa Chưởng* (Luyện Khí), *Chướng Vũ Phong Lâm* (Nguyên Anh) cùng 4 kinh quyển tương ứng.
+  - Trang Điều khoản sử dụng & Bản quyền mới (`terms.html`).
 - **Người chơi KHÔNG THẤY:** Chuyển đổi kiến trúc bản đồ Tiled tĩnh (khớp từng byte với bản đồ seed cũ), cơ chế hồi vị trí lưu rơi vào vật cản, hạ tầng gói tài nguyên riêng (đấu trường solo đã có từ v0.5.0, vẫn tắt).
 - **Những việc cần NGƯỜI DÙNG quyết định trước khi phát hành:**
   1. *Kiểm tra Origin app Android:* Xác nhận tệp `.env.production` thật đã có `https://localhost` trong `CORS_ORIGINS` chưa (tránh bị bộ lọc Origin Guard mới từ chối kết nối 403).
   2. *Quyết định Trùm Thế Giới:* Có bật `WORLD_BOSS=on` hay không (đã có lịch thật: Thiên Hàn Vương ở Hàn Vân Lĩnh lúc 12:00, Hắc Giao ở Âm Sương Trạch lúc 21:00; lưu ý trùm sinh ở bản đồ thường, bị hạ là chết thật).
   3. *Quyết định Chặn Đường:* Có bật `AMBUSH=on` (kèm khuyến nghị `AMBUSH_MIN_POTIONS=2`) hay không (chờ trả lời 5 câu hỏi tại issue #1070).
-  4. *Chọn số phiên bản:* `v0.5.3` (tuân thủ chặt chẽ định nghĩa 10.1 do không đổi giao thức) hay `v0.6.0` (đánh dấu mốc lớn 346 commits & kiến trúc Tiled).
+  4. *Chọn số phiên bản:* `v0.5.3` (tuân thủ chặt chẽ định nghĩa 10.1 do không đổi giao thức) hay `v0.6.0` (đánh dấu mốc lớn 346+ commits & kiến trúc Tiled).
+  5. *Lựa chọn điểm cắt RC (Release Candidate Cutoff):* Người dùng quyết định mốc cắt phát hành:
+     - *Phương án A (cắt tại `66aef6aa`):* Khớp đúng hồ sơ và nghiệm thu ban đầu của #1290 (chưa có 4 chiêu Kim/Thổ mới, 53 chiêu).
+     - *Phương án B (cắt tại đầu `main` hiện tại `575a3887`):* Tích hợp thêm 4 chiêu Kim/Thổ mới (#1299, 57 chiêu), các bản sửa công cụ và kiểm thử (#1296, #1298, #1302).
 
 ---
 
 ## 1. Thông Tin Tổng Quan
 
-- **Mốc so sánh:** Thẻ phát hành `v0.5.2` (commit `e4c1d717`, đối tượng thẻ `79c6b40e`) -> Đầu nhánh `main` hiện tại (commit `b007b456`).
-- **Khối lượng tích luỹ:** **346 commit** (`git rev-list --count v0.5.2..origin/main`).
-- **Hợp đồng `shared/src`:** Thay đổi **21 tệp** (`+4.134` dòng, `-58` dòng), trong đó:
+- **Mốc so sánh:** Thẻ phát hành `v0.5.2` (commit `e4c1d717`, đối tượng thẻ `79c6b40e`) -> Mốc nghiệm thu RC ban đầu (commit `66aef6aa`, 346 commit) hoặc đầu nhánh `main` hiện tại (commit `575a3887`, 355 commit).
+- **Khối lượng tích luỹ:** **346 commit** (tại `66aef6aa`) hoặc **355 commit** (tại `575a3887`, bao gồm #1299, #1296, #1298, #1302).
+- **Hợp đồng `shared/src`:** Thay đổi **22 tệp** từ `v0.5.2` (`+4.232` dòng, `-58` dòng), trong đó:
   - Khoảng **2.000 dòng là kiểm thử** (`shared/src/*.test.ts`).
-  - Phần mã nguồn thực tế (+2.134 dòng) gồm: hệ thống bản đồ Tiled / autotile / bake / map-files (~1.060 dòng), hợp đồng gói tài nguyên riêng `private-pack.ts` (246 dòng), dữ liệu kẻ chặn đường `ambush-data.ts` (506 dòng), nhiệm vụ phụ Âm Sương Trạch `quests.ts` (+71 dòng), lịch thật trùm thế giới `social.ts` (+52 dòng), cùng các mở rộng nhỏ ở `map.ts` và `ambush.ts`.
-  - **Không có chiêu thức, vật phẩm, quái vật hay cảnh giới mới nào thêm từ v0.5.2:** `skills-*.ts` giữ nguyên 38 dòng `reqRealm`; `items.ts`, `game.ts`, `realms.ts` có `git diff` rỗng.
+  - Phần mã nguồn thực tế gồm: hệ thống bản đồ Tiled tĩnh (~1.060 dòng), hợp đồng gói tài nguyên riêng `private-pack.ts` (246 dòng), dữ liệu kẻ chặn đường `ambush-data.ts` (506 dòng), nhiệm vụ phụ Âm Sương Trạch `quests.ts` (+71 dòng), lịch thật trùm thế giới `social.ts` (+52 dòng), bổ sung 4 chiêu Kim / Thổ mới trong `skills-kim-tho.ts` (+93 dòng, tăng từ 53 lên 57 chiêu học được; #1299), bảng rơi kinh quyển hiếm trong `items.ts` (+5 dòng), cùng các mở rộng nhỏ ở `map.ts` và `ambush.ts`.
+  - **Quái vật và cảnh giới mới:** Không có quái vật hay cảnh giới mới nào thêm từ `v0.5.2` (`game.ts`, `realms.ts` có `git diff` rỗng).
 - **Phiên bản giao thức (`shared/src/protocol.ts`):**
   - `PROTOCOL_VERSION`: **`6`** (giữ nguyên từ `v0.5.2`).
   - `MIN_PROTOCOL_VERSION`: **`0`** (giữ nguyên, máy chủ tiếp tục chấp nhận client cũ).
