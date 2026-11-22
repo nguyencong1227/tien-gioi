@@ -1,14 +1,14 @@
 // Test rò rỉ (issue #1105, Dev H): chạy N vòng đời (vào-thoát, rớt-nối lại) LIÊN TIẾP rồi kiểm MỌI sổ dùng chung của
-// `Hub` (parties / runs / ambushes / sects / pkPairs / worldBoss / writes) + số phòng Colyseus / World sống về ĐÚNG mức gốc,
-// không tích luỹ theo số vòng. Chỉ test; KHÔNG sửa mã trò chơi (rò thì mở issue `dev-a` kèm test này).
+// `Hub` (parties / runs / ambushes / sects / pkPairs / worldBoss / writes) + players/ctrl/ghosts/số phòng sống về ĐÚNG mức
+// gốc, KHÔNG tích luỹ theo số vòng. Chỉ test; KHÔNG sửa mã trò chơi (rò thì mở issue `dev-a` kèm test này).
 //
-// Vì sao tập trung vào sổ CHUNG: mỗi phòng dựng MỘT `World` (đăng ký vào `Hub.worlds` lúc `onCreate`, gỡ lúc `onDispose`),
-// nên `Hub.worlds.size` = số phòng sống (1:1). Nếu dọn phòng hỏng, World + chat sink + players/ctrl sót lại và PHỒNG theo vòng.
-// Các sổ chung (parties/runs/...) tồn tại VƯỢT qua việc đóng phòng nên mới là chỗ tích luỹ thật sự — snapshot trước/sau mỗi vòng.
+// Vì sao snapshot BAO QUANH TOÀN BỘ test (before/after), KHÔNG snapshot giữa các vòng: phòng THƯỜNG `autoDispose = false`
+// nên KHÔNG tự đóng khi hết client — `Hub.worlds.size` / chat sink / hộ thể CÒN lại qua việc rời (thiết kế: thế giới luôn
+// sống). Rò ở đây là TÍCH LŨY (players/ctrl/ghosts/phòng/phòng-sống/chat-sink) theo số vòng; snapshot trước/sau cùng một
+// điểm nên mọi thứ PHẢI về đúng mức, phồng = rò. Snapshot giữa các vòng sẽ báo nhầm các trạng thái hợp lệ này.
 //
 // Hai chuỗi vòng đời v1 (vững, chạy được ổn định ≥ 20 lượt):
-//   A. vào phòng → thoát chủ động. Phòng THƯỜNG KHÔNG tự đóng (`autoDispose = false`), nên `worlds.size` giữ nguyên; dấu vết
-//      rò là players/ctrl còn sót + mọi sổ chung phình lên — snapshot TRƯỚC khi vào so với sau khi thoát sạch phải bằng nhau.
+//   A. vào phòng → thoát chủ động (players/ctrl rút khỏi state; phòng vẫn sống).
 //   B. vào phòng → rớt socket → nối lại → thoát (đường net-guard: ghost phòng, hộ thể World.shielded; phòng vẫn sống qua nối lại).
 // Các chuỗi populating sổ chung (đội / thách đấu / bí cảnh / đấu trường) thêm dần ở các lượt sau; snapshot đã gồm mọi sổ để bắt rò.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -40,7 +40,9 @@ beforeAll(async () => {
 
 afterEach(async () => {
   // An toàn: nếu một vòng để sót phòng (test đỏ giữa chừng), force-leave dọn trước khi vòng/test kế.
-  // KHÔNG che mất rò: lỗ hổng bị bắt bởi assertion worlds.size TRONG vòng, TRƯỚC khi dọn ở đây.
+  // Phòng THƯỜNG `autoDispose = false` nên KHÔNG tự đóng khi hết client — `afterEach` chỉ force-leave client, KHÔNG khiến
+  // phòng đóng. Rò ở đây là TÍCH LŨY (players/ctrl/ghosts/phòng) theo số vòng, nên phát hiện bằng snapshot bao-quanh-toàn-test
+  // (beforeTest/afterTest), KHÔNG phải snapshot giữa các vòng hay snapshot sau force-leave.
   await Promise.all(
     rooms.splice(0).map((r) => (r.connection.isOpen ? r.leave(true) : Promise.resolve())),
   );
@@ -164,20 +166,27 @@ function snapshot(): Snap {
   };
 }
 
-/**
- * Khóa KHÔNG phải rò rỉ — bình thường mà snapshot `before`/`after` khác nhau, KHÔNG phải do dọn phòng hỏng:
- * - `worlds` / `chatSinks`: phòng THƯỜNG `autoDispose = false`, sống vĩnh viễn; `before` (vòng đầu = 0) khác `after` (1).
- * - `worldShielded`: `grantShield` thêm hộ thể khi nối lại, nhưng `tickNetGuard` chỉ gỡ cho player CÒN TRONG `state.players`
- *   (`tickWorld` lặp `state.players`); player đã rời (`dropPlayer` xóa khỏi state) nên hộ thể CÒN trong Set cho tới khi phòng
- *   đóng — trạng thái tồn tại qua việc rời (như `worlds`), KHÔNG tích lũy theo vòng. Đếm là rò sẽ báo nhầm.
- */
-const NON_LEAK_KEYS = new Set<keyof Snap>(["worlds", "chatSinks", "worldShielded"]);
+// Khởi tạo HỢP LỆ lần đầu: snapshot `beforeTest` chụp khi CHƯA ai vào (vòng đầu tiên tạo phòng + chat sink). `worlds` /
+// `chatSinks` tăng 0→1 là hợp lệ (không phải rò). Mọi thứ KHÁC (players/ctrl/worldGhosts/worldShielded + mọi sổ chung) PHẢI
+// về đúng mức; phồng theo số vòng = rò.
+//
+// `worldShielded` là RÒ THẬT (đã tái hiện: `rớt-nối lại × N` thấy `0 → N`): `grantShield` thêm sid vào `World.shielded` khi
+// nối lại, nhưng player đã rời khỏi `state.players` (dropPlayer) nên `tickNetGuard` KHÔNG bao giờ gỡ → tích luỹ theo số vòng
+// nối lại. Test ĐỎ ở đây là đúng — đây là bug cần Dev A sửa (mở issue `dev-a`, KHÔNG sửa mã trò chơi trong test này).
+const FIRST_INIT_KEYS = new Set<keyof Snap>(["worlds", "chatSinks"]);
 
-/** Trả khóa + giá trị đầu tiên KHÁC nhau (loại các khóa hợp lệ) giữa hai snapshot, hoặc `null` nếu mọi thứ hợp lệ bằng nhau. */
+/**
+ * Trả khóa + giá trị đầu tiên KHÁC nhau (loại khởi tạo hợp lệ lần đầu) giữa hai snapshot, hoặc `null` nếu mọi thứ hợp lệ.
+ * Bao quanh toàn bộ test (beforeTest/afterTest): mọi sổ + players/ctrl/worldGhosts/worldShielded phải VỀ ĐÚNG MỨC.
+ * worldGhosts / players / ctrl là RÒ TÍCH LŨY — xét TRƯỚC FIRST_INIT_KEYS để rò ghost KHÔNG bị `worlds: 0→1` che mất.
+ */
+const LEAK_FIRST_KEYS: (keyof Snap)[] = ["worldGhosts", "players", "ctrl", "worldShielded"];
+
 function diffSnap(a: Snap, b: Snap): string | null {
+  for (const k of LEAK_FIRST_KEYS) if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
   const keys = Object.keys(a) as (keyof Snap)[];
   for (const k of keys) {
-    if (NON_LEAK_KEYS.has(k)) continue;
+    if (FIRST_INIT_KEYS.has(k) && a[k] === 0 && b[k] === 1) continue; // khởi tạo hợp lệ lần đầu (vòng đầu tạo phòng)
     if (a[k] !== b[k]) return `${k}: ${a[k]} → ${b[k]}`;
   }
   return null;
@@ -206,20 +215,20 @@ describe("rò rỉ sổ Hub / phòng sau nhiều vòng đời (#1105)", () => {
     async () => {
       const N = 14;
       const heap: number[] = [];
+      const beforeTest = snapshot(); // snapshot TRƯỚC khi vào vòng nào: mọi sổ + players/ctrl/ghosts ở mức gốc
       for (let i = 0; i < N; i++) {
-        // Snapshot TRƯỚC khi vào: phòng thường KHÔNG đóng nên worlds/chatSinks giữ nguyên; người của vòng này chưa có.
-        // Nếu RÒ, sau vào-thoát sẽ còn dư players/ctrl (rò player) hoặc một sổ chung nào đó phình lên so với `before`.
-        const before = snapshot();
         const room = await join(roundName());
         await leaveAndClear(room);
-        const after = snapshot();
-        expect(
-          diffSnap(before, after),
-          `vòng ${i}: sổ dùng chung / người rò rỉ sau vào-thoát`,
-        ).toBeNull();
         if (gc) gc();
         heap.push(process.memoryUsage().heapUsed);
       }
+      // Sau N vòng vào-thoát: mọi sổ dùng chung + players/ctrl/ghosts/phòng/phòng-sống/chat-sink HỒI VỀ ĐÚNG MỨC.
+      // Rò (players/ctrl/ghosts/phòng sót) sẽ PHỒNG theo số vòng → snapshot sau khác trước.
+      const afterTest = snapshot();
+      expect(
+        diffSnap(beforeTest, afterTest),
+        "rò rỉ sau N vòng vào-thoát: " + diffSnap(beforeTest, afterTest),
+      ).toBeNull();
       // Bộ nhớ MỀM: chỉ in + dán PR; đỏ CHỈ khi --expose-gc có sẵn và tăng > 50% (rò thật).
       const first = heap[0]!;
       const last = heap[heap.length - 1]!;
@@ -241,8 +250,8 @@ describe("rò rỉ sổ Hub / phòng sau nhiều vòng đời (#1105)", () => {
     { timeout: 120_000 },
     async () => {
       const N = 8;
+      const beforeTest = snapshot(); // snapshot TRƯỚC khi vào vòng nào: mọi sổ + players/ctrl/ghosts ở mức gốc
       for (let i = 0; i < N; i++) {
-        const before = snapshot();
         const a = await join(roundName());
         const sid = a.sessionId;
         dropConnection(a);
@@ -252,11 +261,14 @@ describe("rò rỉ sổ Hub / phòng sau nhiều vòng đời (#1105)", () => {
         const r2 = await reconnectTo(a);
         await waitFor(() => (r2.state as any).players.get(r2.sessionId), 5000);
         await leaveAndClear(r2);
-        // Hộ thể nối lại (`grantShield`) KHÔNG gỡ khi thoát (chỉ `tickNetGuard` gỡ cho player CÒN trong `state.players`), nên
-        // `worldShielded` là trạng thái tồn tại qua việc rời — đã loại khỏi `diffSnap`, snapshot ngay là được.
-        const after = snapshot();
-        expect(diffSnap(before, after), `vòng ${i}: sổ rò rỉ sau rớt-nối lại`).toBeNull();
       }
+      // Sau N vòng rớt-nối lại-thoát: mọi sổ + players/ctrl/ghosts/phòng HỒI VỀ ĐÚNG MỨC. Rò (ghost sót, players/ctrl/phòng
+      // phình) sẽ tích lũy → snapshot sau khác trước.
+      const afterTest = snapshot();
+      expect(
+        diffSnap(beforeTest, afterTest),
+        "rò rỉ sau N vòng rớt-nối lại: " + diffSnap(beforeTest, afterTest),
+      ).toBeNull();
     },
   );
 });
