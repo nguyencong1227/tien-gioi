@@ -45,8 +45,32 @@ export function deepCompareEntities(
       valAfter !== null
     ) {
       if (Array.isArray(valBefore) && Array.isArray(valAfter)) {
-        if (JSON.stringify(valBefore) !== JSON.stringify(valAfter)) {
-          diffs.push({ keyPath: fullKey, before: valBefore, after: valAfter });
+        if (valBefore.length !== valAfter.length) {
+          diffs.push({
+            keyPath: `${fullKey}.length`,
+            before: valBefore.length,
+            after: valAfter.length,
+          });
+        }
+        const maxLen = Math.max(valBefore.length, valAfter.length);
+        for (let i = 0; i < maxLen; i++) {
+          const itemBefore = valBefore[i];
+          const itemAfter = valAfter[i];
+          const itemPath = `${fullKey}[${i}]`;
+          if (itemBefore === undefined && itemAfter !== undefined) {
+            diffs.push({ keyPath: itemPath, before: undefined, after: itemAfter });
+          } else if (itemBefore !== undefined && itemAfter === undefined) {
+            diffs.push({ keyPath: itemPath, before: itemBefore, after: undefined });
+          } else if (
+            typeof itemBefore === "object" &&
+            itemBefore !== null &&
+            typeof itemAfter === "object" &&
+            itemAfter !== null
+          ) {
+            diffs.push(...deepCompareEntities(itemBefore, itemAfter, itemPath));
+          } else if (itemBefore !== itemAfter) {
+            diffs.push({ keyPath: itemPath, before: itemBefore, after: itemAfter });
+          }
         }
       } else if (!Array.isArray(valBefore) && !Array.isArray(valAfter)) {
         diffs.push(...deepCompareEntities(valBefore, valAfter, fullKey));
@@ -75,8 +99,10 @@ export function takeDirectorySnapshot(dataDir: string): Map<string, Record<strin
         try {
           const content = JSON.parse(fs.readFileSync(fullPath, "utf8"));
           snapshot.set(relPath, content);
-        } catch {
-          /* bỏ qua */
+        } catch (err) {
+          throw new Error(`Tệp ${fullPath} chứa JSON không hợp lệ: ${String(err)}`, {
+            cause: err,
+          });
         }
       }
     }
@@ -172,12 +198,18 @@ export function verifyPhase(args: VerifyPhaseArgs): VerifyPhaseResult {
     const afterData = args.snapshotAfter.get(file);
     if (!afterData) continue;
 
-    const beforeUpdated = beforeData.updatedAt ?? 0;
-    const afterUpdated = afterData.updatedAt ?? 0;
+    const beforeUpdated = beforeData.updatedAt ?? "";
+    const afterUpdated = afterData.updatedAt ?? "";
     const beforePlayMs = beforeData.life?.playMs ?? 0;
     const afterPlayMs = afterData.life?.playMs ?? 0;
 
-    const hasWritten = afterUpdated > beforeUpdated || afterPlayMs > beforePlayMs;
+    const hasUpdatedChanged =
+      typeof beforeUpdated === "number" && typeof afterUpdated === "number"
+        ? afterUpdated > beforeUpdated
+        : String(afterUpdated) > String(beforeUpdated);
+
+    const hasPlayMsChanged = afterPlayMs > beforePlayMs;
+    const hasWritten = hasUpdatedChanged || hasPlayMsChanged;
     if (!hasWritten) {
       errors.push(
         `[${args.phaseName}] Tệp nhân vật ${file} không có bằng chứng được server ghi lại (updatedAt: ${beforeUpdated} -> ${afterUpdated}, playMs: ${beforePlayMs} -> ${afterPlayMs})`,
@@ -189,6 +221,60 @@ export function verifyPhase(args: VerifyPhaseArgs): VerifyPhaseResult {
     valid: errors.length === 0,
     errors,
   };
+}
+
+/** Dựng thư mục node_modules cho archive sao cho @tien-gioi/* trỏ vào chính archiveDir */
+export function setupArchiveNodeModules(archiveDir: string, rootDir: string): void {
+  const rootNodeModules = path.join(rootDir, "node_modules");
+  const archiveNodeModules = path.join(archiveDir, "node_modules");
+
+  if (!fs.existsSync(rootNodeModules)) {
+    throw new Error(`Không tìm thấy node_modules tại ${rootNodeModules}`);
+  }
+
+  // Tạo thư mục node_modules thật trong archiveDir
+  fs.mkdirSync(archiveNodeModules, { recursive: true });
+
+  // Duyệt qua tất cả các mục trong rootNodeModules
+  for (const entry of fs.readdirSync(rootNodeModules)) {
+    if (entry === "@tien-gioi") {
+      // Xử lý riêng namespace @tien-gioi
+      const archiveScopeDir = path.join(archiveNodeModules, "@tien-gioi");
+      fs.mkdirSync(archiveScopeDir, { recursive: true });
+
+      // Symlink các package nội bộ trỏ vào archiveDir
+      for (const pkg of ["shared", "server", "client"]) {
+        const targetDir = path.join(archiveDir, pkg);
+        if (fs.existsSync(targetDir)) {
+          fs.symlinkSync(targetDir, path.join(archiveScopeDir, pkg), "dir");
+        }
+      }
+    } else {
+      // Symlink các third-party package thông thường từ rootNodeModules
+      const src = path.join(rootNodeModules, entry);
+      const dst = path.join(archiveNodeModules, entry);
+      fs.symlinkSync(src, dst, "dir");
+    }
+  }
+
+  // Chốt chặn kiểm tra: @tien-gioi/shared phải giải về bên trong archiveDir
+  verifyArchiveSharedResolution(archiveDir);
+}
+
+/** Chốt chặn kiểm tra đường dẫn giải quyết của @tien-gioi/shared */
+export function verifyArchiveSharedResolution(archiveDir: string): string {
+  const sharedPkg = path.join(archiveDir, "node_modules", "@tien-gioi", "shared");
+  if (!fs.existsSync(sharedPkg)) {
+    throw new Error(`Không tìm thấy @tien-gioi/shared trong ${archiveDir}/node_modules`);
+  }
+  const realShared = fs.realpathSync(sharedPkg);
+  const realArchive = fs.realpathSync(archiveDir);
+  if (!realShared.startsWith(realArchive)) {
+    throw new Error(
+      `@tien-gioi/shared giải quyết ra ngoài archiveDir: "${realShared}" không nằm trong "${realArchive}"`,
+    );
+  }
+  return realShared;
 }
 
 /** Chờ cổng nhả hoàn toàn */
@@ -226,7 +312,7 @@ export async function waitForServerReady(port: number, timeoutMs = 15000): Promi
 
 /** Tắt tiến trình server sạch sẽ */
 export async function stopServerGracefully(proc: ChildProcess, port: number): Promise<void> {
-  if (!proc || proc.killed) return;
+  if (!proc || proc.exitCode !== null || proc.signalCode !== null) return;
   proc.kill("SIGTERM");
 
   const exited = await Promise.race([
@@ -317,13 +403,11 @@ async function run() {
     tempDirsToClean.push(archiveDir);
     execSync(`git archive ${tag} | tar -x -C ${archiveDir}`, { stdio: "ignore" });
 
-    // Symlink node_modules
-    fs.symlinkSync(
-      path.join(repoRoot, "node_modules"),
-      path.join(archiveDir, "node_modules"),
-      "dir",
-    );
+    // Dựng node_modules cho archive sao cho @tien-gioi/* trỏ vào chính archiveDir (N1)
+    setupArchiveNodeModules(archiveDir, repoRoot);
+    const resolvedShared = verifyArchiveSharedResolution(archiveDir);
     console.log(`    Đã giải nén tại: ${archiveDir}`);
+    console.log(`    @tien-gioi/shared giải quyết tại: ${resolvedShared}`);
 
     // 2. Chạy soak mã cũ để sinh dữ liệu
     console.log(`\n==> [2/6] Chạy soak sinh dữ liệu ${tag} (${numBots} bot, ${duration}s)...`);
@@ -356,7 +440,7 @@ async function run() {
     console.log("\n==> [3/6] Chuẩn bị thư mục nâng cấp lên main...");
     const upgradeDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "tien-gioi-rc-upgrade-main-"));
     tempDirsToClean.push(upgradeDataDir);
-    execSync(`cp -r ${sourceDataDir}/* ${upgradeDataDir}/`);
+    fs.cpSync(sourceDataDir, upgradeDataDir, { recursive: true });
 
     // Audit trước nâng cấp
     const auditBefore = auditSavesDirectory(upgradeDataDir);
@@ -370,6 +454,7 @@ async function run() {
     // 4. Khởi động server main để nạp/ghi dữ liệu
     console.log("\n==> [4/6] Khởi động server main để nạp & ghi lại dữ liệu...");
     const mainPort = await freePort();
+    const mainLogs: string[] = [];
     const mainProc = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
       cwd: serverDir,
       env: {
@@ -381,8 +466,15 @@ async function run() {
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    mainProc.stdout?.on("data", (d) => mainLogs.push(d.toString()));
+    mainProc.stderr?.on("data", (d) => mainLogs.push(d.toString()));
     activeProcesses.push({ proc: mainProc, port: mainPort });
-    await waitForServerReady(mainPort);
+    try {
+      await waitForServerReady(mainPort);
+    } catch (err) {
+      console.error("[LỖI SERVER MAIN]", mainLogs.slice(-20).join(""));
+      throw err;
+    }
     console.log(`    Server main sẵn sàng tại cổng ${mainPort}`);
 
     const mainLogins = await simulatePlayerLogins(mainPort, upgradeDataDir);
@@ -425,9 +517,10 @@ async function run() {
     console.log(`\n==> [5/6] Thử nghiệm lùi bản về server ${tag}...`);
     const rollbackDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "tien-gioi-rc-rollback-"));
     tempDirsToClean.push(rollbackDataDir);
-    execSync(`cp -r ${upgradeDataDir}/* ${rollbackDataDir}/`);
+    fs.cpSync(upgradeDataDir, rollbackDataDir, { recursive: true });
 
     const rollbackPort = await freePort();
+    const rollbackLogs: string[] = [];
     const rollbackProc = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
       cwd: path.join(archiveDir, "server"),
       env: {
@@ -439,8 +532,15 @@ async function run() {
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    rollbackProc.stdout?.on("data", (d) => rollbackLogs.push(d.toString()));
+    rollbackProc.stderr?.on("data", (d) => rollbackLogs.push(d.toString()));
     activeProcesses.push({ proc: rollbackProc, port: rollbackPort });
-    await waitForServerReady(rollbackPort);
+    try {
+      await waitForServerReady(rollbackPort);
+    } catch (err) {
+      console.error("[LỖI SERVER ROLLBACK]", rollbackLogs.slice(-20).join(""));
+      throw err;
+    }
     console.log(`    Server ${tag} sẵn sàng tại cổng ${rollbackPort}`);
 
     const rollbackLogins = await simulatePlayerLogins(rollbackPort, rollbackDataDir);
