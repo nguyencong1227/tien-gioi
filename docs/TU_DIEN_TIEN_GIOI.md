@@ -75,7 +75,7 @@
 
 | Thuật ngữ chuẩn | Biến thể sai | Ghi chú |
 |---|---|---|
-| Hoàng Tuyền | Hoang Thuyen, hoang thuyen | Chết thật (mất kiếp), KHÔNG viết "Hoànguyền". |
+| Hoàng Tuyền | Hoang Tuyen, hoang tuyen | Chết thật (mất kiếp); KHÔNG thiếu dấu ("hoang tuyen") hay dính chữ "Hoànguyền". |
 | Tam Sinh Thạch | Tam Sinh Thach, tam sinh thach | Bảng mở khóa lợi ích vĩnh viễn của luân hồi. |
 | chân linh | chan linh | Linh hồn đầu thai qua kiếp; viết thường, KHÔNG thiếu dấu. (Chưa thêm "Duyên": "cơ duyên" dễ báo oan — để khi có cơ chế khử nhập nhằng.) |
 
@@ -86,7 +86,7 @@
 | Thuật ngữ chuẩn | Biến thể sai | Ghi chú |
 |---|---|---|
 | Lạc Hà Trấn | Lac Ha Tran, lac ha tran | Trấn trung tâm, bản đồ mặc định. |
-| Hắc Phong Cốc | Hac Phong Coc, hack phong coc | |
+| Hắc Phong Cốc | Hac Phong Coc, hac phong coc | |
 | Âm Sương Trạch | Am Suong Trach, am suong trach | |
 | Hàn Vân Lĩnh | Han Van Linh, han van linh | |
 

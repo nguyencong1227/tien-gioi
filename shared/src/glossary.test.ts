@@ -1,6 +1,7 @@
 // Test cho Từ điển Tiên Giới (issue #1198): `GLOSSARY` + `glossaryViolations`.
 // - Ca chứng minh từng tính năng bằng DỮ LIỆU GIẢ (đột biến matcher => đỏ).
 // - KHÔNG có ca nào phụ thuộc dữ liệu thật đang sạch (dữ liệu thật quét ở khối cuối, chỉ khẳng định KHÔNG báo oan).
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ACHIEVEMENTS,
@@ -143,10 +144,13 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
     );
   });
 
-  it("khớp là TỪ (ranh giới chữ hai bên): KHÔNG bắt nhầm chữ dính trong từ khác", () => {
-    // "Phàm phẩm" KHÔNG bám vào "Phàm phẩmX"
-    expect(glossaryViolations("vật phẩm Phàm phamX")).toEqual([]);
-    // ranh giới dấu câu: "Trúc Cơ." vẫn bắt "Truc Co." dạng thiếu dấu (dấu . sau vẫn là ranh giới từ)
+  it("khớp là TỪ (ranh giới chữ hai bên): biến thể LIỆT KÊ KHÔNG bám vào chữ dính hai bên", () => {
+    // Đột biến chứng minh: bỏ atWordStart && atWordEnd thì "xTruc Co" / "Truc Cod" bị báo oan -> ca này ĐỎ.
+    // Biến thể "Truc Co" (đã liệt kê) dính chữ hai bên (xTruc Co, Truc Cod) => KHÔNG phải từ => KHÔNG báo.
+    expect(glossaryViolations("xTruc Co và Truc Cod")).toEqual([]);
+    // "Truc Co" đứng riêng (ranh giới khoảng trắng) => bắt.
+    expect(glossaryViolations("hạng Truc Co")).toContain("thấy 'Truc Co' -> dùng 'Trúc Cơ'");
+    // ranh giới dấu câu: "Truc Co." vẫn bắt (dấu . sau vẫn là ranh giới từ).
     expect(glossaryViolations("hạng Truc Co.")).toContain("thấy 'Truc Co' -> dùng 'Trúc Cơ'");
   });
 
@@ -257,6 +261,24 @@ describe("GLOSSARY — bất biến dữ liệu", () => {
     ).toEqual([]);
   });
 
+  it("mọi WRONG PHẢI là biến thể hợp lệ của canonical: fold(w) === fold(canonical) (bắt lỗi gõ sai biến thể)", () => {
+    // fold = bóc dấu (NFKD + bỏ dấu kết hợp) + Đ/đ -> d + hạ thường. Một wrong gõ sai (vd "hack phong coc" thừa k,
+    // "hoang thuyen" thừa H, "luyen kx" sai chữ) thì fold(w) !== fold(canonical) -> ĐỎ. Đột biến đã chứng minh.
+    const fold = (s: string): string =>
+      s.normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/Đ/g, "d").replace(/đ/g, "d").toLowerCase();
+    const bad: string[] = [];
+    for (const t of GLOSSARY as GlossaryTerm[]) {
+      const fc = fold(t.canonical);
+      for (const w of t.wrong)
+        if (fold(w) !== fc)
+          bad.push(`${t.id}: wrong '${w}' -> fold '${fold(w)}' ≠ fold canonical '${fc}'`);
+    }
+    expect(
+      bad,
+      `wrong gõ sai (sửa cho khớp canonical rồi chạy lại):\n${bad.join("\n") || "không có"}`,
+    ).toEqual([]);
+  });
+
   it("đủ nhóm: canh-gioi / dia-danh / he / tien-te / pham-cap / khai-niem / nhan-vat đã phủ", () => {
     const groups = new Set(GLOSSARY.map((t) => t.group));
     for (const g of [
@@ -269,5 +291,57 @@ describe("GLOSSARY — bất biến dữ liệu", () => {
       "nhan-vat",
     ] as const)
       expect(groups.has(g), `thiếu nhóm ${g}`).toBe(true);
+  });
+
+  it("docs/TU_DIEN_TIEN_GIOI.md đồng bộ 2 CHIỀU với GLOSSARY (chống trôi dữ liệu viết tay)", () => {
+    // Hợp đồng #1198: doc viết tay PHẢI khớp với hợp đồng. Đột biến sửa 1 biến thể / xoá 1 term trong doc => ĐỎ.
+    // Chỉ kiểm canonical + biến thể (cột dữ liệu); cột Ghi chú là văn bản, KHÔNG so (nơi nào ghi khác dấu câu).
+    const raw = readFileSync(new URL("../../docs/TU_DIEN_TIEN_GIOI.md", import.meta.url), "utf8");
+    // Lấy dòng bảng dữ liệu | canonical | biến-thể (phẩy) | note |; bỏ dòng header + dòng phân cách |---|.
+    const rows = raw
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("|") && l.endsWith("|"))
+      .map((l) =>
+        l
+          .slice(1, -1)
+          .split("|")
+          .map((c) => c.trim()),
+      )
+      .filter(
+        (cells) => cells.length === 3 && cells[0] !== "Thuật ngữ chuẩn" && cells[1] !== "---",
+      );
+    const docByFold = new Map<string, { canonical: string; variants: string[] }>();
+    for (const [canonical, variantsRaw] of rows) {
+      const variants = variantsRaw
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      docByFold.set(canonical.normalize("NFD"), { canonical, variants });
+    }
+    const errors: string[] = [];
+    // (a) MỌI term GLOSSARY PHẢI có trong doc với ĐÚNG tập biến thể (raw, thứ tự không quan trọng).
+    for (const t of GLOSSARY as GlossaryTerm[]) {
+      const d = [...docByFold.values()].find(
+        (e) => e.canonical.normalize("NFD") === t.canonical.normalize("NFD"),
+      );
+      if (!d) {
+        errors.push(`thiếu trong doc: '${t.canonical}' (${t.id})`);
+        continue;
+      }
+      const want = new Set(t.wrong);
+      for (const v of want)
+        if (!d.variants.includes(v)) errors.push(`doc thiếu biến thể '${v}' cho '${t.canonical}'`);
+      for (const v of d.variants)
+        if (!want.has(v)) errors.push(`doc thừa biến thể '${v}' cho '${t.canonical}'`);
+    }
+    // (b) MỌI dòng doc PHẢI ứng với một term (không dòng thừa / sai chính tả canonical).
+    for (const d of docByFold.values()) {
+      const hit = (GLOSSARY as GlossaryTerm[]).some(
+        (t) => t.canonical.normalize("NFD") === d.canonical.normalize("NFD"),
+      );
+      if (!hit) errors.push(`dòng doc KHÔNG có trong GLOSSARY: '${d.canonical}'`);
+    }
+    expect(errors, `doc KHÔNG khớp GLOSSARY:\n${errors.join("\n") || "không có"}`).toEqual([]);
   });
 });

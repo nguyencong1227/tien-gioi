@@ -107,7 +107,7 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     id: "dia-danh.hac-phong-coc",
     group: "dia-danh",
     canonical: "Hắc Phong Cốc",
-    wrong: ["Hac Phong Coc", "hack phong coc"],
+    wrong: ["Hac Phong Coc", "hac phong coc"],
   },
   {
     id: "dia-danh.am-suong-trach",
@@ -123,12 +123,10 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
   },
 
   // --- Hệ (skills.ts: ELEMENTS — 10 hệ) ---
-  // CHỈ thêm 3 hệ mà việc bóc dấu KHÔNG đụng chữ khác đang có trong chữ hiển thị (đã quét CẢ lời thoại — xem ghi chú test).
-  // TRỄ (đừng thêm khi chưa có cơ chế khử nhập nhằng — pha / ngữ cảnh):
-  //   Hỏa "Hoa" ≡ Hoa (Băng Hoa Loạn) / Hóa (Hóa Huyết, Hóa Thần) / Hòa (Hòa thượng);
-  //   Thổ "Tho" ≡ Thố·Thỏ (Linh Thố) / Thợ (Thợ rèn);  Băng "Bang" ≡ Bảng (Bảng cáo thị);  Âm "Am" ≡ Ám (Ám sát);
-  //   Lôi "Loi" ≡ Lối (Lối núi, lối ra) — BÁO OAN thật trên SECT_QUESTS, đã bỏ.
-  //   Matcher bóc dấu KHÔNG phân biệt được nên thêm vào sẽ BÁO OAN chữ đúng.
+  // matcher KHớp CHÍNH XÁC (không bóc dấu) => hết nhập nhằng do THĂNG SẮC: "Lối" (con đường) ≠ "Loi", "Móc" ≠ "Moc" — KHÔNG còn báo oan chữ đúng.
+  // NHƯNG biến thể thiếu dấu của hệ vẫn là CHUỖI TRẦN, nên nếu thêm sẽ Bám chữ trần hợp lệ đang có trong chữ hiển thị (vd wrong "Hoa" của Hỏa bám "Hoa"
+  // trong "Băng Hoa Loạn"; "Tho" bám "Thố/Thợ"; "Bang" bám "Bảng"; "Am" bám "Ám"; "Loi" bám "Lối núi/lối ra"). Mỗi hệ cần quét chữ hiển thị thật rồi mới thêm.
+  // Đã thêm 3 hệ KHÔNG có chữ trần hợp lệ đụng: Mộc ("Moc"), Thủy ("Thuy"), Vô sắc ("Vo sac" — xem ghi chú test đã quét CẢ lời thoại).
   // Kim / Phong KHÔNG dấu → bỏ wrong. Casing (hoa/thường) của MỌI hệ để Dev G chốt ở #1199 → term hệ chỉ có wrong thiếu dấu.
   { id: "he.moc", group: "he", canonical: "Mộc", wrong: ["Moc"] },
   { id: "he.thuy", group: "he", canonical: "Thủy", wrong: ["Thuy"] },
@@ -159,11 +157,11 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
 
   // --- Khái niệm ---
   {
-    id: "khai-niem.hoang-thuyen",
+    id: "khai-niem.hoang-tuyen",
     group: "khai-niem",
     canonical: "Hoàng Tuyền",
-    wrong: ["Hoang Tuyen", "hoang thuyen"],
-    note: "Chết thật (mất kiếp), KHÔNG viết 'Hoànguyền'.",
+    wrong: ["Hoang Tuyen", "hoang tuyen"],
+    note: "Chết thật (mất kiếp); KHÔNG thiếu dấu ('hoang tuyen') hay dính chữ 'Hoànguyền'.",
   },
   {
     id: "khai-niem.tam-sinh-thach",
