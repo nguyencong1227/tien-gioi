@@ -1,7 +1,9 @@
 // Kiểm toán NGUỒN của mọi vật phẩm (issue #751; gom vào `check:content` ở Phần 2 #1200): mọi vật phẩm phải có
 // ít nhất MỘT đường vào game (rơi quái / cửa hàng / cửa hàng tông / công thức / thưởng nhiệm vụ + nhiệm vụ tông /
 // đổi NPC / rương bí cảnh), trừ ngoại lệ có chú thích; mọi nguyên liệu (type "material") phải được ít nhất một nơi
-// DÙNG TỚI (không là nguyên liệu "chết"); mọi tham chiếu nguồn phải trỏ tới vật phẩm CÓ THẬT (không itemId rác).
+// DÙNG TỚI (không là nguyên liệu "chết"); mọi ĐÍCH nguồn trỏ tới (rơi / mua / thành phẩm / thưởng / đổi / rương)
+// phải là vật phẩm CÓ THẬT (không itemId rác); đầu vào nguyên liệu (công thức, bước collect nhiệm vụ thường) KHÔNG
+// kiểm ở đây — do recipes.test.ts / quests.test.ts canh.
 //
 // Các hàm ở đây là THUẦN, dùng chung giữa `item-sources.test.ts` (chứng minh hướng `give`/`get` của TRADES, ngoại
 // lệ...) và `server/scripts/check-content.ts` (Phần 2 #1200: chạy trong CI, đỏ khi dữ liệu sai). KHÔNG đổi số dữ
@@ -139,17 +141,27 @@ export function orphans(
 /**
  * Vi phạm NGUỒN vật phẩm (Phần 2 #1200, chạy trong `check:content`): (1) vật phẩm mồ côi — không nguồn vào nào;
  * (2) owner-gear lang thang ngoài ITEMS (sẽ KHÔNG bị kiểm nguồn); (3) nguyên liệu chết — không nơi nào dùng;
- * (4) tham chiếu nguồn trỏ tới itemId KHÔNG có trong ITEMS (rác). Trả danh sách lỗi (rỗng = sạch). Đọc bảng THẬT.
+ * (4) mọi ĐÍCH nguồn trỏ tới (rơi / mua / thành phẩm / thưởng / đổi / rương) là itemId KHÔNG có trong ITEMS (rác);
+ *     đầu vào nguyên liệu KHÔNG kiểm ở đây (xem chú thích trên). Trả danh sách lỗi (rỗng = sạch). Đọc bảng THẬT.
  */
-export function itemSourceViolations(): string[] {
+export interface ItemSourceInput {
+  items?: ReadonlyArray<{ id: string; type?: string }>;
+  tables?: Partial<AuditTables>;
+  ownerGear?: ReadonlyArray<{ id: string }>;
+}
+
+export function itemSourceViolations(input: ItemSourceInput = {}): string[] {
   const bad: string[] = [];
-  const valid = new Set(ITEMS.map((i) => i.id));
+  const items = input.items ?? ITEMS;
+  const T: AuditTables = { ...REAL_TABLES, ...input.tables };
+  const gear = input.ownerGear ?? OWNER_GEAR_ITEMS;
+  const valid = new Set(items.map((i) => i.id));
 
   // (1) Mọi vật phẩm có ít nhất MỘT nguồn vào (không mồ côi).
   const src = new Map<string, Source[]>();
-  for (const i of ITEMS) src.set(i.id, sourcesOf(i.id));
+  for (const i of items) src.set(i.id, sourcesOf(i.id, T));
   for (const id of orphans(
-    ITEMS.map((i) => i.id),
+    items.map((i) => i.id),
     (id) => src.get(id) ?? [],
   ))
     bad.push(
@@ -157,14 +169,14 @@ export function itemSourceViolations(): string[] {
     );
 
   // (2) Owner-gear đều là vật phẩm CÓ TRONG ITEMS → thừa hưởng kiểm nguồn ở trên; lang thang ngoài ITEMS sẽ KHÔNG bị kiểm.
-  for (const g of OWNER_GEAR_ITEMS)
+  for (const g of gear)
     if (!valid.has(g.id))
       bad.push(`owner-gear lang thang ngoài ITEMS: ${g.id} (sẽ KHÔNG bị kiểm nguồn)`);
 
   // (3) Mọi nguyên liệu (type "material") được ít nhất một nơi DÙNG TỚI (không là nguyên liệu chết).
-  for (const m of ITEMS) {
+  for (const m of items) {
     if (m.type !== "material") continue;
-    if (consumedBy(m.id).length === 0)
+    if (consumedBy(m.id, T).length === 0)
       bad.push(`nguyên liệu chết: ${m.id} (không công thức / nhiệm vụ / đổi đồ nào dùng tới)`);
   }
 
@@ -173,20 +185,20 @@ export function itemSourceViolations(): string[] {
     if (typeof id !== "string" || !valid.has(id))
       bad.push(`${loc}: vật phẩm ${id ?? "(thiếu)"} lạ`);
   };
-  for (const [kind, table] of Object.entries(REAL_TABLES.drops))
+  for (const [kind, table] of Object.entries(T.drops))
     for (const d of table) ref(`DROP_TABLES[${kind}]`, d.itemId);
-  for (const s of REAL_TABLES.shops) for (const id of s.itemIds) ref("SHOPS", id);
-  for (const r of REAL_TABLES.recipes) ref(`RECIPES ${r.output.itemId}`, r.output.itemId);
-  for (const q of REAL_TABLES.quests)
+  for (const s of T.shops) for (const id of s.itemIds) ref("SHOPS", id);
+  for (const r of T.recipes) ref(`RECIPES ${r.output.itemId}`, r.output.itemId);
+  for (const q of T.quests)
     for (const rw of q.rewards.items ?? []) ref(`QUEST ${q.id ?? "?"} reward`, rw.itemId);
-  for (const t of REAL_TABLES.trades) {
+  for (const t of T.trades) {
     for (const g of t.give) ref("TRADES give", g.itemId);
     ref("TRADES get", t.get.itemId);
   }
-  for (const d of REAL_TABLES.dungeons)
+  for (const d of T.dungeons)
     for (const r of d.reward?.items ?? []) ref("DUNGEON reward", r.itemId);
-  for (const e of REAL_TABLES.sectShop) ref("SECT_SHOP", e.itemId);
-  for (const t of REAL_TABLES.sectQuests)
+  for (const e of T.sectShop) ref("SECT_SHOP", e.itemId);
+  for (const t of T.sectQuests)
     for (const def of Object.values(t.byTier)) {
       for (const rw of def.rewards.items ?? []) ref("SECT_QUEST reward", rw.itemId);
       for (const s of def.steps) if (s.kind === "collect") ref("SECT_QUEST collect", s.itemId);

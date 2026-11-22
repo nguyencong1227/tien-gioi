@@ -102,4 +102,23 @@ Làm SAU khi `shared/src/glossary.ts` (E) và `glossary-banned.ts` (G) vào main
 | Đổi `DROP_TABLES.tho[0].itemId: "long_tho"` → `"zzz_khong_co_ton_tai"` ở `shared/src/items.ts` (tham chiếu rác) | ĐỎ: nhóm "nguồn vật phẩm", `item-sources.ts`, `DROP_TABLES[tho]: vật phẩm zzz_khong_co_ton_tai lạ`; exit 1 |
 | Thêm vật phẩm mồ côi `{ id: "zzz_orphan_tmp", ... }` vào `ITEMS` (`shared/src/items.ts`) | ĐỎ: nhóm "nguồn vật phẩm", `item-sources.ts`, `vật phẩm mồ côi: zzz_orphan_tmp (không có nguồn...)`; exit 1 |
 
-Cả ba đều báo đúng nhóm + tệp + id, thoát mã 1. Đã hoàn nguyên bằng `git checkout --`.
+Cả bốn đều báo đúng nhóm + tệp + id, thoát mã 1. Đã hoàn nguyên bằng `git checkout --`.
+
+### 5b. Đột biến CODE — răng của `itemSourceViolations` (chứng minh test bắt được hàm bị làm yếu)
+
+Dữ liệu thật đang sạch nên ca test duy nhất canh `itemSourceViolations()` (không tham số) là "sạch => rỗng";
+xóa hay làm yếu một trong bốn kiểm TRONG HÀM thì CI vẫn xanh — chỉ đột biến dữ liệu như trên mới thấy răng.
+Đã tham số hoá hàm (`itemSourceViolations(input)` nhận `{ items?, tables?, ownerGear? }`, mặc định bảng thật nên
+`check-content.ts` giữ nguyên lời gọi) và thêm 5 ca dữ liệu giả vào `shared/src/item-sources.test.ts`. Bốn đột
+biến CODE dưới đây (mã thật commit TRƯỚC tại `089efa57`, mỗi lần `git diff` xác nhận đã áp, `cp` khôi phục sau)
+chứng minh MỖI đột biến làm ĐỎ đúng 1 ca tương ứng, 11 ca kia xanh (tổng 12/12 khi sạch):
+
+| Đột biến trong `itemSourceViolations` | Kết quả `item-sources.test.ts` |
+| --- | --- |
+| (M1) bỏ kiểm (3): `if (consumedBy(m.id, T).length === 0)` → `if (false)` | ĐỎ ca "(3) nguyên liệu chết bị báo"; 11 ca kia xanh |
+| (M2) bỏ kiểm (4) bảng rơi: `for (const d of table) ref(...)` → `for (const d of table) void d` | ĐỎ ca "(4) tham chiếu trỏ vật phẩm lạ bị báo (bảng rơi)"; 11 ca kia xanh |
+| (M3) bỏ kiểm (1): `src.set(i.id, sourcesOf(i.id, T))` → `src.set(i.id, ["drop"])` | ĐỎ ca "(1) vật phẩm mồ côi bị báo"; 11 ca kia xanh |
+| (M4) bỏ kiểm (2): `if (!valid.has(g.id))` → `if (false)` | ĐỎ ca "(2) owner-gear ngoài ITEMS bị báo"; 11 ca kia xanh |
+
+Bốn ca test dữ liệu giả (mồ côi / owner-gear ngoài ITEMS / nguyên liệu chết / bảng rơi trỏ vật phẩm lạ) là răng
+của hàm: ai xóa hay làm yếu một kiểm thì ca tương ứng đỏ. Đã hoàn nguyên bằng `cp` từ bản đã commit.

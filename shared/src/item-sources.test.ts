@@ -2,6 +2,7 @@
 // (rơi quái / cửa hàng / cửa hàng tông / công thức / thưởng nhiệm vụ + nhiệm vụ tông / đổi NPC / rương bí cảnh), trừ ngoại lệ có chú thích.
 // Nguyên liệu (type "material") phải được ít nhất một công thức / nhiệm vụ / đổi đồ dùng tới (không là nguyên liệu "chết").
 // KHÔNG đổi số dữ liệu game — chỉ kiểm chứng (test chéo). Báo cáo đầy đủ ở docs/KIEM_TOAN_VAT_PHAM.md.
+import { itemSourceViolations } from "./item-sources";
 import { describe, expect, it } from "vitest";
 import {
   DUNGEONS,
@@ -130,5 +131,60 @@ describe("kiểm toán nguồn vật phẩm (issue #751)", () => {
       ).toBe(true);
       expect(NGOAI_LE[id].length, `NGOAI_LE[${id}] thiếu lý do`).toBeGreaterThan(0);
     }
+  });
+});
+
+// RĂNG của `itemSourceViolations` (Phần 2 #1200): dữ liệu GIẢ, mỗi lớp lỗi một ca; xoá / làm yếu một kiểm trong hàm thì ca đó ĐỎ.
+describe("itemSourceViolations: bắt đủ 4 lớp lỗi (dữ liệu giả)", () => {
+  const empty = {
+    drops: {},
+    shops: [],
+    recipes: [],
+    quests: [],
+    trades: [],
+    dungeons: [],
+    sectShop: [],
+    sectQuests: [],
+  };
+  const clean = {
+    items: [
+      { id: "mat", type: "material" },
+      { id: "gear", type: "weapon" },
+    ],
+    tables: {
+      ...empty,
+      drops: { q: [{ itemId: "mat" }] },
+      recipes: [{ output: { itemId: "gear" }, inputs: [{ itemId: "mat" }] }],
+    },
+    ownerGear: [],
+  };
+  it("dữ liệu sạch => rỗng", () => {
+    expect(itemSourceViolations(clean)).toEqual([]);
+  });
+  it("(1) vật phẩm mồ côi bị báo", () => {
+    const v = itemSourceViolations({
+      ...clean,
+      items: [...clean.items, { id: "mocoi", type: "weapon" }],
+    });
+    expect(v.some((m) => m.includes("mồ côi: mocoi"))).toBe(true);
+  });
+  it("(2) owner-gear ngoài ITEMS bị báo", () => {
+    const v = itemSourceViolations({ ...clean, ownerGear: [{ id: "langthang" }] });
+    expect(v.some((m) => m.includes("langthang"))).toBe(true);
+  });
+  it("(3) nguyên liệu chết bị báo", () => {
+    const v = itemSourceViolations({
+      ...clean,
+      items: [...clean.items, { id: "chet", type: "material" }],
+      tables: { ...clean.tables, drops: { q: [{ itemId: "mat" }, { itemId: "chet" }] } },
+    });
+    expect(v.some((m) => m.includes("nguyên liệu chết: chet"))).toBe(true);
+  });
+  it("(4) tham chiếu trỏ vật phẩm lạ bị báo (bảng rơi)", () => {
+    const v = itemSourceViolations({
+      ...clean,
+      tables: { ...clean.tables, drops: { q: [{ itemId: "mat" }, { itemId: "rac" }] } },
+    });
+    expect(v.some((m) => m.includes("DROP_TABLES[q]") && m.includes("rac"))).toBe(true);
   });
 });
