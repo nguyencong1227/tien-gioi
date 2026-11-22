@@ -12,7 +12,6 @@ import { freePort } from "../src/test-port";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const serverDir = path.resolve(here, "..");
 const repoRoot = path.resolve(here, "../..");
-const tsxCli = path.resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -126,6 +125,72 @@ export function compareDirectorySnapshots(
   return { missingFiles, addedFiles, mismatchedFiles };
 }
 
+export interface VerifyPhaseArgs {
+  phaseName: string;
+  snapshotBefore: Map<string, Record<string, any>>;
+  snapshotAfter: Map<string, Record<string, any>>;
+  loginCount: number;
+  expectedLogins: number;
+}
+
+export interface VerifyPhaseResult {
+  valid: boolean;
+  errors: string[];
+}
+
+/** Kiểm tra tính đúng đắn của từng chặng thực nghiệm (nâng cấp hoặc lùi bản) */
+export function verifyPhase(args: VerifyPhaseArgs): VerifyPhaseResult {
+  const errors: string[] = [];
+
+  // 1. Kiểm tra số lượng bot đăng nhập
+  if (args.loginCount !== args.expectedLogins) {
+    errors.push(
+      `[${args.phaseName}] Số bot đăng nhập không đủ: đạt ${args.loginCount}/${args.expectedLogins}`,
+    );
+  }
+
+  // 2. So sánh snapshot tệp (missingFiles, addedFiles, mismatchedFiles)
+  const comp = compareDirectorySnapshots(args.snapshotBefore, args.snapshotAfter);
+  if (comp.missingFiles.length > 0) {
+    errors.push(`[${args.phaseName}] Có tệp bị mất: ${comp.missingFiles.join(", ")}`);
+  }
+  if (comp.addedFiles.length > 0) {
+    errors.push(`[${args.phaseName}] Có tệp bị thêm bất thường: ${comp.addedFiles.join(", ")}`);
+  }
+  if (comp.mismatchedFiles.length > 0) {
+    for (const m of comp.mismatchedFiles) {
+      errors.push(
+        `[${args.phaseName}] Tệp ${m.file} có trường sai lệch: ${m.diffs.map((d) => `${d.keyPath} (trước: ${JSON.stringify(d.before)}, sau: ${JSON.stringify(d.after)})`).join("; ")}`,
+      );
+    }
+  }
+
+  // 3. Kiểm tra bằng chứng server THỰC SỰ nạp và ghi lại từng tệp nhân vật
+  for (const [file, beforeData] of args.snapshotBefore) {
+    // Chỉ kiểm tra các tệp nhân vật ở thư mục gốc (không nằm trong souls/ hay sects/)
+    if (file.includes("/")) continue;
+    const afterData = args.snapshotAfter.get(file);
+    if (!afterData) continue;
+
+    const beforeUpdated = beforeData.updatedAt ?? 0;
+    const afterUpdated = afterData.updatedAt ?? 0;
+    const beforePlayMs = beforeData.life?.playMs ?? 0;
+    const afterPlayMs = afterData.life?.playMs ?? 0;
+
+    const hasWritten = afterUpdated > beforeUpdated || afterPlayMs > beforePlayMs;
+    if (!hasWritten) {
+      errors.push(
+        `[${args.phaseName}] Tệp nhân vật ${file} không có bằng chứng được server ghi lại (updatedAt: ${beforeUpdated} -> ${afterUpdated}, playMs: ${beforePlayMs} -> ${afterPlayMs})`,
+      );
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
 /** Chờ cổng nhả hoàn toàn */
 export async function waitForPortFree(port: number, timeoutMs = 5000): Promise<void> {
   const start = Date.now();
@@ -181,32 +246,44 @@ export async function stopServerGracefully(proc: ChildProcess, port: number): Pr
 }
 
 /** Đăng nhập bot qua Colyseus client để kích hoạt nạp/lưu */
-async function simulatePlayerLogins(port: number, dataDir: string): Promise<number> {
+export async function simulatePlayerLogins(port: number, dataDir: string): Promise<number> {
   const client = new Client(`ws://127.0.0.1:${port}`);
   const playerFiles = fs.readdirSync(dataDir).filter((f) => f.endsWith(".json"));
   let loginCount = 0;
 
   for (const file of playerFiles) {
-    const botName = path.basename(file, ".json");
+    const fullPath = path.join(dataDir, file);
+    let raw: Record<string, any>;
     try {
-      const raw = JSON.parse(fs.readFileSync(path.join(dataDir, file), "utf8"));
-      const mapId = raw.mapId ?? DEFAULT_MAP_ID;
-      const roomName = roomNameOf(mapId);
+      raw = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+    } catch {
+      continue;
+    }
+    const botName = raw.name;
+    if (!botName) continue;
 
-      // Đăng nhập bot
+    const match = String(botName).match(/(\d+)/);
+    const botNum = match ? match[1]!.padStart(3, "0") : "001";
+    const secret = `bot_secret_tien_gioi_${botNum}_soak`;
+
+    const mapId = raw.mapId ?? DEFAULT_MAP_ID;
+    const roomName = roomNameOf(mapId);
+
+    try {
       const room = await client.joinOrCreate(roomName, {
         name: botName,
-        secret: "soak_bot_secret_tien_gioi",
+        secret,
         v: PROTOCOL_VERSION,
       });
 
       // Gửi lệnh đả tọa ngắn
       room.send("rest");
-      await sleep(50);
+      await sleep(60);
       await room.leave();
       loginCount++;
-    } catch {
-      /* bỏ qua lỗi bot đơn lẻ */
+    } catch (err) {
+      console.error(`[LỖI] Đăng nhập bot ${botName} thất bại:`, err);
+      throw new Error(`Đăng nhập bot ${botName} thất bại: ${String(err)}`, { cause: err });
     }
   }
 
@@ -221,7 +298,12 @@ async function run() {
     "[CẢNH BÁO] ORIGIN_CHECK=off được sử dụng trong bài kiểm tra này để bot kết nối cục bộ.",
   );
 
-  const tag = process.argv.find((a) => a.startsWith("--tag="))?.slice(6) || "v0.5.2";
+  const tagArg = process.argv.find((a) => a.startsWith("--tag="))?.slice(6) || "v0.5.2";
+  if (!/^v\d+\.\d+\.\d+(-[\w.]+)?$/.test(tagArg)) {
+    throw new Error(`Tag không hợp lệ: "${tagArg}". Phải có dạng vX.Y.Z`);
+  }
+  const tag = tagArg;
+
   const numBots = Number(process.argv.find((a) => a.startsWith("--bots="))?.slice(7)) || 30;
   const duration = Number(process.argv.find((a) => a.startsWith("--duration="))?.slice(11)) || 30;
 
@@ -252,7 +334,11 @@ async function run() {
 
     execSync(
       `nice -n 10 npx tsx scripts/soak.ts --bots=${numBots} --duration=${duration} --keep-data --m7 --port=${soakPort}`,
-      { cwd: path.join(archiveDir, "server"), stdio: "inherit" },
+      {
+        cwd: path.join(archiveDir, "server"),
+        stdio: "inherit",
+        timeout: (duration + 120) * 1000,
+      },
     );
 
     const afterDirs = fs.readdirSync(os.tmpdir()).filter((d) => d.startsWith("tien-gioi-soak-"));
@@ -262,7 +348,7 @@ async function run() {
         `Kỳ vọng đúng 1 thư mục soak mới, nhưng tìm thấy ${newSoakDirs.length}: ${newSoakDirs.join(", ")}`,
       );
     }
-    const sourceDataDir = path.join(os.tmpdir(), newSoakDirs[0]);
+    const sourceDataDir = path.join(os.tmpdir(), newSoakDirs[0]!);
     tempDirsToClean.push(sourceDataDir);
     console.log(`    Dữ liệu được sinh tại: ${sourceDataDir}`);
 
@@ -284,7 +370,7 @@ async function run() {
     // 4. Khởi động server main để nạp/ghi dữ liệu
     console.log("\n==> [4/6] Khởi động server main để nạp & ghi lại dữ liệu...");
     const mainPort = await freePort();
-    const mainProc = spawn(process.execPath, [tsxCli, "src/index.ts"], {
+    const mainProc = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
       cwd: serverDir,
       env: {
         ...process.env,
@@ -316,17 +402,23 @@ async function run() {
     if (auditAfter.errorFiles > 0) throw new Error("Dữ liệu sau nâng cấp có lỗi!");
 
     const snapshotAfterUpgrade = takeDirectorySnapshot(upgradeDataDir);
-    const upgradeDiff = compareDirectorySnapshots(snapshotBefore, snapshotAfterUpgrade);
+    const upgradeVerification = verifyPhase({
+      phaseName: "Nâng cấp lên main",
+      snapshotBefore,
+      snapshotAfter: snapshotAfterUpgrade,
+      loginCount: mainLogins,
+      expectedLogins: auditBefore.cleanFiles,
+    });
 
-    if (upgradeDiff.mismatchedFiles.length > 0) {
-      console.error("[LỖI] Khác biệt bất thường sau khi nâng cấp:");
-      for (const m of upgradeDiff.mismatchedFiles) {
-        console.error(`- Tệp ${m.file}:`, m.diffs);
+    if (!upgradeVerification.valid) {
+      console.error("[LỖI] Kiểm tra chặng Nâng cấp thất bại:");
+      for (const err of upgradeVerification.errors) {
+        console.error(`- ${err}`);
       }
-      throw new Error("Dữ liệu bị sai lệch sau nâng cấp!");
+      throw new Error("Chặng nâng cấp lên main thất bại!");
     }
     console.log(
-      "    Bảo toàn toàn bộ cây JSON sau nâng cấp ĐẠT (chỉ updatedAt và playMs thay đổi).",
+      "    Bảo toàn toàn bộ cây JSON sau nâng cấp ĐẠT (mọi tệp nhân vật đều được nạp/ghi lại thành công).",
     );
 
     // 5. Thử nghiệm lùi bản về mã cũ
@@ -336,7 +428,7 @@ async function run() {
     execSync(`cp -r ${upgradeDataDir}/* ${rollbackDataDir}/`);
 
     const rollbackPort = await freePort();
-    const rollbackProc = spawn(process.execPath, [tsxCli, "src/index.ts"], {
+    const rollbackProc = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
       cwd: path.join(archiveDir, "server"),
       env: {
         ...process.env,
@@ -368,14 +460,20 @@ async function run() {
     if (auditRollback.errorFiles > 0) throw new Error("Dữ liệu sau lùi bản có lỗi!");
 
     const snapshotAfterRollback = takeDirectorySnapshot(rollbackDataDir);
-    const rollbackDiff = compareDirectorySnapshots(snapshotAfterUpgrade, snapshotAfterRollback);
+    const rollbackVerification = verifyPhase({
+      phaseName: `Lùi bản về ${tag}`,
+      snapshotBefore: snapshotAfterUpgrade,
+      snapshotAfter: snapshotAfterRollback,
+      loginCount: rollbackLogins,
+      expectedLogins: auditAfter.cleanFiles,
+    });
 
-    if (rollbackDiff.mismatchedFiles.length > 0) {
-      console.error("[LỖI] Khác biệt bất thường sau khi lùi bản:");
-      for (const m of rollbackDiff.mismatchedFiles) {
-        console.error(`- Tệp ${m.file}:`, m.diffs);
+    if (!rollbackVerification.valid) {
+      console.error("[LỖI] Kiểm tra chặng Lùi bản thất bại:");
+      for (const err of rollbackVerification.errors) {
+        console.error(`- ${err}`);
       }
-      throw new Error("Dữ liệu bị sai lệch sau lùi bản!");
+      throw new Error(`Chặng lùi bản về ${tag} thất bại!`);
     }
     console.log(`    Bảo toàn toàn bộ cây JSON sau lùi bản về ${tag} ĐẠT.`);
 

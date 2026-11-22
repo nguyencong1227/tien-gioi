@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deepCompareEntities, compareDirectorySnapshots } from "./kiem-nang-cap";
+import { deepCompareEntities, compareDirectorySnapshots, verifyPhase } from "./kiem-nang-cap";
 
 describe("kiem-nang-cap: deepCompareEntities", () => {
   it("trả về rỗng khi hai đối tượng giống hệt nhau", () => {
@@ -91,5 +91,189 @@ describe("kiem-nang-cap: compareDirectorySnapshots", () => {
     expect(res.mismatchedFiles).toHaveLength(1);
     expect(res.mismatchedFiles[0].file).toBe("bot_1.json");
     expect(res.mismatchedFiles[0].diffs[0].keyPath).toBe("coin");
+  });
+});
+
+describe("kiem-nang-cap: verifyPhase", () => {
+  const baseBefore = new Map<string, Record<string, any>>([
+    [
+      "abc123player.json",
+      {
+        name: "Bot 001",
+        coin: 100,
+        realm: 1,
+        updatedAt: 1000,
+        life: { playMs: 10000 },
+      },
+    ],
+    [
+      "souls/bot_001.json",
+      {
+        soulKey: "bot_001",
+        reincarnations: 0,
+      },
+    ],
+  ]);
+
+  it("ĐẠT khi tất cả tệp bảo toàn, bot đăng nhập đủ và có bằng chứng ghi nhận updatedAt", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 100,
+          realm: 1,
+          updatedAt: 1500, // tăng -> server thật sự nạp và ghi lại
+          life: { playMs: 10060 }, // tăng do đả tọa
+        },
+      ],
+      [
+        "souls/bot_001.json",
+        {
+          soulKey: "bot_001",
+          reincarnations: 0,
+        },
+      ],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(true);
+    expect(res.errors).toHaveLength(0);
+  });
+
+  it("ĐỘT BIẾN 1: thất bại nếu số bot đăng nhập không đạt expectedLogins", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 100,
+          realm: 1,
+          updatedAt: 1500,
+          life: { playMs: 10060 },
+        },
+      ],
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 0, // đột biến: 0 đăng nhập
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("Số bot đăng nhập không đủ"))).toBe(true);
+  });
+
+  it("ĐỘT BIẾN 2: thất bại nếu có tệp bị mất (missingFiles)", () => {
+    const after = new Map<string, Record<string, any>>([
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+      // thiếu abc123player.json
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("Có tệp bị mất"))).toBe(true);
+  });
+
+  it("ĐỘT BIẾN 3: thất bại nếu có tệp lạ bị thêm vào (addedFiles)", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 100,
+          realm: 1,
+          updatedAt: 1500,
+          life: { playMs: 10060 },
+        },
+      ],
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+      ["la_lung.json", { corrupted: true }],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("Có tệp bị thêm bất thường"))).toBe(true);
+  });
+
+  it("ĐỘT BIẾN 4: thất bại nếu có trường bị thay đổi giá trị (mismatchedFiles)", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 999, // đột biến: tiền nhảy lên 999
+          realm: 1,
+          updatedAt: 1500,
+          life: { playMs: 10060 },
+        },
+      ],
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("có trường sai lệch"))).toBe(true);
+  });
+
+  it("ĐỘT BIẾN 5: thất bại nếu không có bằng chứng server ghi lại (updatedAt và playMs không tăng)", () => {
+    const after = new Map<string, Record<string, any>>([
+      [
+        "abc123player.json",
+        {
+          name: "Bot 001",
+          coin: 100,
+          realm: 1,
+          updatedAt: 1000, // không tăng -> server không hề ghi lại!
+          life: { playMs: 10000 }, // không tăng
+        },
+      ],
+      ["souls/bot_001.json", { soulKey: "bot_001", reincarnations: 0 }],
+    ]);
+
+    const res = verifyPhase({
+      phaseName: "TestPhase",
+      snapshotBefore: baseBefore,
+      snapshotAfter: after,
+      loginCount: 1,
+      expectedLogins: 1,
+    });
+
+    expect(res.valid).toBe(false);
+    expect(res.errors.some((e) => e.includes("không có bằng chứng được server ghi lại"))).toBe(
+      true,
+    );
   });
 });
