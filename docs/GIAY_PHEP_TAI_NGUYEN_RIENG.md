@@ -19,7 +19,7 @@
 | E. willYEE Xianxia Pixel Pack 2.1 | Có (CC0) | Không bắt buộc | KHÔNG (CC0) | Có | **Dùng được — VÀO REPO** (CC0, nguồn 1; vẽ side-scroller → dùng cho hiệu ứng / icon / UI / chân dung) | đa cỡ |
 | F. DQYYY Wuxia RTS Pixel Asset Pack — Free Lite | Có | Không bắt buộc | Có (cấm `repack` / substitute; **cấm huấn luyện AI**) | Có | **Dùng được (riêng)** | top-down |
 | G. HOANTDZ Free 100 Wuxia & Xianxia Battlebacks | Có | Không bắt buộc (HOANTDZ) | Có (cấm `repackage` / NFT / stock / **AI dataset**) | Có | **Dùng được CÓ ĐIỀU KIỆN (riêng, NỘI DUNG AI — xem rủi ro 6)** | 640x360..1920x1080 |
-| H. HOANTDZ Wuxia Pixel Icons Mega — FREE Sample | Có | Không bắt buộc (HOANTDZ) | Có (cấm `repackage` sheets / atlases) | Có | **Dùng được (riêng)** | 32 / 64 px |
+| H. HOANTDZ Wuxia Pixel Icons Mega — FREE Sample | Có | Không bắt buộc (HOANTDZ) | Có (cấm `repackage` sheets / atlases) | Có | **Dùng được (riêng); AI CHƯA khai báo → hỏi người dùng trước khi vào game** | 32 / 64 px |
 
 ## Chi tiết từng gói
 
@@ -85,8 +85,8 @@
 - Link: https://hoantdz.itch.io/wuxia-rpg-pixel-icons-mega-collection
 - Nguồn: `/mnt/data/assets-private/src/hoantdz-wuxia-icons-free-sample` + `/mnt/data/assets-private/work/hoantdz-icons`; tải 23/11/2026 ("Download demo", miễn phí).
 - Thương mại: ĐƯỢC: "You may use these assets in personal and commercial games and projects."; resize / recolor / crop / modify OK; ghi công HOANTDZ **tuỳ chọn**.
-- Cấm: "Do not resell, redistribute, or **repackage** the standalone originals or modified images, **sheets or atlases** as assets or stock art."; không nhận bản quyền độc quyền over standalone icons.
-- AI: `SOURCES.md` ghi "README về AI: (không nhắc)" — tác giả KHÔNG khai báo nội dung AI (khác gói G).
+- Cấm: "Do not resell, redistribute, or **repackage** the standalone originals or modified images, **sheets or atlases** as assets or stock art."; không nhận bản quyền độc quyền over standalone icons. **Đã thoả bởi thiết kế:** ta CHỈ phục vụ atlas đã ghép của Tiên Giới ở `/assets-private/` (PrivatePack), KHÔNG phát sheet / atlas gốc → KHÔNG đụng điều cấm 'sheets or atlases' (xem rủi ro 1).
+- AI: `SOURCES.md` chỉ có dòng "README về AI: (không nhắc)" — tác giả **CHƯA khai báo** gói icons này có phải nội dung AI hay KHÔNG (tình trạng KHÔNG rõ, KHÔNG phải 'tác giả xác nhận KHÔNG phải AI'). Cùng tác giả HOANTDZ với gói G (G đã khai báo battlebacks là ảnh AI Codex ImageGen) → KHÔNG được mặc định icons là không-AI. **Trước khi icon HOANTDZ vào GAME phải hỏi người dùng** (như gói G).
 - Nội dung: icon 32 / 64 px, bảng 32 màu, mỗi họ **5 bậc** (Thường, Tinh luyện, Thượng phẩm, Tuyệt phẩm, Gia truyền tông môn) — khớp phẩm trang bị / đan / kinh quyển.
 
 ## Rủi ro và điều kiện chung (để người dùng quyết)
@@ -95,7 +95,7 @@
 3. **Ghi công:** không gói nào bắt buộc (A, B, D); vẫn nên ghi (màn Ghi công hiện `title` + `url` + `license` của mỗi gói đang dùng: `PrivatePack.url` / `license`). Gói C Free bắt buộc ghi 'Kenmi'.
 4. **Bản quyền tệp:** tệp gốc VÀ tệp đã chỉnh / ghép KHÔNG vào git (AGENTS.md nguồn 4); lưu ở `/mnt/data/assets-private/` kèm `SOURCES.md` (tên, link, giấy phép trích, ngày tải, SHA-256 zip).
 5. **Tải về:** do người dùng tự tải trên itch.io ('Name your own price'), agent KHÔNG tự tải. Tải xong ghi `SOURCES.md` rồi đóng gói bằng `npm run assets-private:manifest -w server -- <dist> --title id=Tên --url id=https://... --license id="..."`. Công cụ in `BỎ QUA <tệp>: <lý do>` cho tệp tên sai luật (gói itch.io hay có khoảng trắng: 'Tile Set.png' sẽ KHÔNG được phục vụ: đổi tên chỉ gồm chữ / số / . _ - rồi chạy lại); thêm `--strict` để thoát 1 và KHÔNG ghi manifest khi có tệp bị bỏ qua; đóng gói lại thì KHỞI ĐỘNG LẠI máy chủ (manifest và `Content-Length` nạp một lần).
-6. **Ảnh AI bên thứ ba (gói G — HOANTDZ battlebacks):** tác giả công bố ảnh concept do AI tạo (Codex ImageGen). Về GIẤY PHÉP thì dùng được (thương mại, riêng); nhưng AGENTS.md quy định ảnh AI *do nhóm tự sinh* (SDXL base) mới đủ điều kiện ghi CREDITS nguồn 1. Ảnh AI *bên thứ ba* này thuộc nguồn 4 (riêng), hợp giấy phép nhưng **nếu phát hành vào game thương mại, nghĩa vụ khai báo "nội dung AI" trên cửa hàng (Steam / Google Play /...) thuộc về người dùng / sản phẩm — đây là quyết định của người dùng, KHÔNG phải của agent.** Gói H (icons HOANTDZ) tác giả KHÔNG khai báo AI; các gói A–F không liên quan ảnh AI.
+6. **Ảnh AI bên thứ ba (gói G — HOANTDZ battlebacks):** tác giả công bố ảnh concept do AI tạo (Codex ImageGen). Về GIẤY PHÉP thì dùng được (thương mại, riêng); nhưng AGENTS.md quy định ảnh AI *do nhóm tự sinh* (SDXL base) mới đủ điều kiện ghi CREDITS nguồn 1. Ảnh AI *bên thứ ba* này thuộc nguồn 4 (riêng), hợp giấy phép nhưng **nếu phát hành vào game thương mại, nghĩa vụ khai báo "nội dung AI" trên cửa hàng (Steam / Google Play /...) thuộc về người dùng / sản phẩm — đây là quyết định của người dùng, KHÔNG phải của agent.** Gói H (icons HOANTDZ) cùng tác giả HOANTDZ nhưng **CHƯA khai báo** (tình trạng AI KHÔNG rõ — KHÔNG được mặc định là không-AI); trước khi icon HOANTDZ vào GAME phải hỏi người dùng, như gói G; các gói A–F không liên quan ảnh AI.
 7. **Xianxia là CC0 (gói E), KHÔNG phải gói riêng:** khác ba gói F/G/H — được tự do đưa vào repo (`client/public/`) theo nguồn 1, không bị giới hạn "chỉ `/mnt/data/assets-private`". Vẫn ghi CREDITS. Nhược điểm: vẽ side-scroller → chủ yếu cho hiệu ứng / icon / UI / chân dung, ít dùng cho nhân vật top-down di chuyển.
 
 ## Việc còn lại
