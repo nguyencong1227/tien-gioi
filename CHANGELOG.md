@@ -5,6 +5,7 @@
 ## [Chưa phát hành] — sau v0.5.4
 
 ### Client
+- **Icon 5 kinh quyển Âm (lô 1 của #1186 / CT16 đợt 2, `Refs #1186`; B vẽ TRƯỚC dữ liệu chiêu theo thư của Dev E; người chơi CHƯA thấy đổi vì chưa có chiêu / vật phẩm trong `shared/`):** `kinh_thuc_hon_nhat_chi`, `kinh_tich_da_phan_anh` (dấu kiếm), `kinh_kho_mach_dan_luu`, `kinh_kho_hon_an_than`, `kinh_am_nguyet_tram_hon` vào bảng `BOOKS` của `gen-assets.mjs` (bìa tím đen theo hệ Âm, mỗi quyển một sắc riêng; ấn 7 x 7 sinh từ id, #1303). Atlas 497 khung, sáu tệp đếm số cộng 5 (icon 130 -> 135, tệp tĩnh 149 -> 154). `book-marks.test.ts` chạy thử với cả 5 id này: không trùng hình, không trùng màu gần nhau. **`FX_CAST_SKILLS` KHÔNG đổi ở PR này** (`fx-driver.test.ts` đòi nó TRÙNG đúng các chiêu trong `SKILL_BY_ID` của `shared/`): Dev E thêm 5 id vào `FX_CAST_SKILLS` (+ đổi số 61 -> 66 ở test) CÙNG PR dữ liệu chiêu.
 - **Toast không chồng lên bảng thưởng trả nhiệm vụ** (B; ảnh chơi thử AI chạy trên bản build v0.5.4: ở 1366x768 dòng "Hoàn thành: <tên>" của máy chủ và dòng "ĐÃ ĐỦ" còn lại từ trước đè lên bảng, che dòng vật phẩm; ở điện thoại còn che cả thẻ theo dõi). Khi bảng hiện, `ui.ts` gỡ hai toast lặp lại điều bảng đã nói (`isQuestRewardEchoToast`: chỉ của CHÍNH nhiệm vụ vừa trả) và dời các toast khác (vd. "Nhận nhiệm vụ" kế tiếp) xuống DƯỚI bảng cho tới khi bảng ẩn. `e2e:tra-nhiem-vu` đo thêm hình chữ nhật từng toast với bảng; hai đột biến (bỏ dời, bỏ gỡ) đều làm nó đỏ đúng chỗ.
 
 ### Công cụ và tài liệu
