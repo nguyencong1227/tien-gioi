@@ -208,7 +208,12 @@ import {
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { perfRttText } from "./net-latency";
-import { questRewardView, sanitizeQuestRewardMsg, type QuestRewardView } from "./quest-reward-view";
+import {
+  isQuestRewardEchoToast,
+  questRewardView,
+  sanitizeQuestRewardMsg,
+  type QuestRewardView,
+} from "./quest-reward-view";
 import {
   questCardSubtitle,
   dialogRewardOf,
@@ -2342,7 +2347,7 @@ const QUEST_REWARD_SHOW_MS = 6000;
 let questRewardTimer: number | undefined;
 
 /** Vẽ bảng thưởng khi TRẢ nhiệm vụ (mục 66): tiêu đề + từng dòng (tu vi, vật phẩm có biểu tượng tô độ hiếm, Linh thạch). Tin mới tới thì thay bảng cũ. */
-function showQuestReward(view: QuestRewardView) {
+function showQuestReward(view: QuestRewardView, questId: string) {
   const box = $("quest-reward");
   box.replaceChildren();
   const title = document.createElement("div");
@@ -2373,9 +2378,18 @@ function showQuestReward(view: QuestRewardView) {
   box.style.animation = "none";
   void box.offsetWidth;
   box.style.animation = "";
+  // Toast không được CHỒNG lên bảng (ảnh chơi thử AI v0.5.4: toast ở 16 % chiều cao che dòng vật phẩm của bảng ở 64 px): gỡ toast lặp lại điều bảng đã nói
+  // ("Hoàn thành: <tên>", "ĐÃ ĐỦ: <tên> ..."), còn toast khác (vd. nhận nhiệm vụ kế ngay sau đó) dời xuống DƯỚI bảng khi bảng còn hiện. `offsetTop +
+  // offsetHeight` không bị hoạt ảnh trượt vào (transform) làm lệch.
+  const toastBox = $("toast");
+  for (const p of toastBox.querySelectorAll("p")) {
+    if (isQuestRewardEchoToast(p.textContent ?? "", questId)) p.remove();
+  }
+  toastBox.style.top = `${box.offsetTop + box.offsetHeight + 8}px`;
   window.clearTimeout(questRewardTimer);
   questRewardTimer = window.setTimeout(() => {
     box.hidden = true;
+    toastBox.style.top = "";
   }, QUEST_REWARD_SHOW_MS);
 }
 
@@ -6448,7 +6462,7 @@ export const ui = {
   onQuestReward(raw: unknown) {
     const msg = sanitizeQuestRewardMsg(raw);
     if (!msg) return;
-    showQuestReward(questRewardView(msg));
+    showQuestReward(questRewardView(msg), msg.questId);
     sound.questDone();
   },
 

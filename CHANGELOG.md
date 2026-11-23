@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.5.4
 
+### Client
+- **Toast không chồng lên bảng thưởng trả nhiệm vụ** (B; ảnh chơi thử AI chạy trên bản build v0.5.4: ở 1366x768 dòng "Hoàn thành: <tên>" của máy chủ và dòng "ĐÃ ĐỦ" còn lại từ trước đè lên bảng, che dòng vật phẩm; ở điện thoại còn che cả thẻ theo dõi). Khi bảng hiện, `ui.ts` gỡ hai toast lặp lại điều bảng đã nói (`isQuestRewardEchoToast`: chỉ của CHÍNH nhiệm vụ vừa trả) và dời các toast khác (vd. "Nhận nhiệm vụ" kế tiếp) xuống DƯỚI bảng cho tới khi bảng ẩn. `e2e:tra-nhiem-vu` đo thêm hình chữ nhật từng toast với bảng; hai đột biến (bỏ dời, bỏ gỡ) đều làm nó đỏ đúng chỗ.
+
 ### Công cụ và tài liệu
 - **Hướng dẫn người chơi theo v0.5.4 (`docs/HUONG_DAN_NGUOI_CHOI.md`; A; chỉ tài liệu):** mục Nhiệm vụ sửa dấu cũ ("**?** nhiệm vụ đang làm") thành đúng hiện tại (**!** nhận, **?** vàng = đã đủ, chờ TRẢ) và thêm "Nhận, làm, rồi quay về TRẢ" (xem trước thưởng, thẻ "ĐÃ ĐỦ", thiếu đồ thu thập, bảng "Hoàn thành", túi đầy, tu vi đã đầy; thưởng một lần, sàn khoảng 5 % / 2 % thanh); mục điều khiển thêm ô Cài đặt "Cảnh bản đồ kiểu mới".
 
