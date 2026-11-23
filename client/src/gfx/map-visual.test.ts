@@ -152,9 +152,22 @@ describe("sanitizeVisualMap: từ chối tệp xấu (mỗi ca một lỗi)", ()
       ).toBeNull();
     }
   });
-  it("quá nhiều ô (chống tệp lạ ngốn bộ nhớ)", () => {
-    const n = Math.floor(Math.sqrt(VISUAL_MAX_CELLS)) + 1;
-    expect(sanitizeVisualMap({ ...tiny(), width: n, height: n }, n, n)).toBeNull();
+  it("rộng x cao bị đảo (cùng số ô) vẫn bị từ chối: chỉ kiểm chiều của tệp mới bắt được, độ dài lớp thì khớp", () => {
+    expect(sanitizeVisualMap(tiny(), 3, 4)).toBeNull(); // tệp nói 4 x 3, bản đồ thật 3 x 4: cùng 12 ô
+  });
+  it("quá nhiều ô (chống tệp lạ ngốn bộ nhớ): tệp ĐÚNG mọi mặt nhưng quá trần thì bị từ chối, vừa trần thì qua", () => {
+    const big = (w: number, h: number) => {
+      const m = tiny({ width: w, height: h });
+      m.layers = VISUAL_LAYER_NAMES.map((name) => ({
+        name,
+        type: "tilelayer",
+        data: new Array<number>(w * h).fill(0),
+      }));
+      return m;
+    };
+    const side = Math.floor(Math.sqrt(VISUAL_MAX_CELLS));
+    expect(sanitizeVisualMap(big(side, side), side, side)).not.toBeNull(); // đúng trần
+    expect(sanitizeVisualMap(big(side + 1, side), side + 1, side)).toBeNull(); // quá trần 1 hàng
   });
   it("không bao giờ ném lỗi, kể cả với getter ném", () => {
     const evil = tiny();
