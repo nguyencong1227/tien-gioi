@@ -32,6 +32,25 @@ process.stdout.write("[assets:merge-fix] Bắt đầu gỡ xung đột tài sả
 let tmpCreditsFile = null;
 let tmpRaSoatFile = null;
 
+function cleanup() {
+  if (tmpCreditsFile && fs.existsSync(tmpCreditsFile)) {
+    try {
+      fs.unlinkSync(tmpCreditsFile);
+    } catch {
+      // bỏ qua lỗi dọn dẹp
+    }
+    tmpCreditsFile = null;
+  }
+  if (tmpRaSoatFile && fs.existsSync(tmpRaSoatFile)) {
+    try {
+      fs.unlinkSync(tmpRaSoatFile);
+    } catch {
+      // bỏ qua lỗi dọn dẹp
+    }
+    tmpRaSoatFile = null;
+  }
+}
+
 try {
   let theirsCredits = "";
   let theirsRaSoat = "";
@@ -142,6 +161,7 @@ try {
         remainingConflicts.map((f) => `  - ${f}`).join("\n") +
         `\nKhông thực hiện git add. Hãy kiểm tra và gỡ xung đột trước!\n`,
     );
+    cleanup();
     process.exit(1);
   }
 
@@ -156,21 +176,8 @@ try {
   );
 } catch (err) {
   process.stderr.write(`[assets:merge-fix] Lỗi: ${err.message}\n`);
+  cleanup();
   process.exit(1);
 } finally {
-  // Dọn dẹp tệp tạm trong os.tmpdir()
-  if (tmpCreditsFile && fs.existsSync(tmpCreditsFile)) {
-    try {
-      fs.unlinkSync(tmpCreditsFile);
-    } catch {
-      // bỏ qua lỗi dọn dẹp
-    }
-  }
-  if (tmpRaSoatFile && fs.existsSync(tmpRaSoatFile)) {
-    try {
-      fs.unlinkSync(tmpRaSoatFile);
-    } catch {
-      // bỏ qua lỗi dọn dẹp
-    }
-  }
+  cleanup();
 }

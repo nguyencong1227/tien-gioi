@@ -3,6 +3,7 @@
 // với số liệu tài sản thực tế: thêm icon vào gen-assets.mjs mà quên chạy lại lệnh thì CI đỏ ngay
 // (theo Issue #1368, mẫu can-bang-sync.test.ts, bảo vệ chống sót xung đột merge #1371).
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -47,7 +48,7 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu 
     );
 
     // 2. Đọc từ tệp tạm khi direct rỗng
-    const tmpFile = path.resolve(rootDir, "client/src/test-theirs-tmp.md");
+    const tmpFile = path.join(os.tmpdir(), `tien-gioi-test-theirs-tmp-${Date.now()}.md`);
     try {
       fs.writeFileSync(tmpFile, "mô tả từ tệp tạm trong tmpdir", "utf8");
       process.env.THEIRS_TEST_FILE = tmpFile;
