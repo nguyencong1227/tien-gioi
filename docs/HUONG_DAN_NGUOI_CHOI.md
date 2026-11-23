@@ -61,6 +61,8 @@ Bạn điều khiển nhân vật bằng bàn phím. Mặc định:
 
 Khi nói chuyện với NPC, bấm **1 – 9** để chọn dòng trả lời. Mọi phím đều đổi được ở màn **Cài đặt và phím tắt (E)**; chỉ có **Esc** là cố định.
 
+**Cảnh bản đồ kiểu mới:** bốn bản đồ được vẽ lại bằng hình pixel art (đất, cỏ, cây, nước, đường). Hình mới bật sẵn; nếu máy yếu hoặc thấy giật, tắt ô **"Cảnh bản đồ kiểu mới"** ở Cài đặt (E), cảnh đổi về kiểu cũ ngay, không cần tải lại. Chỉ là hình ảnh: đường đi, va chạm, vùng quái và cổng không đổi.
+
 > **Mẹo:** Tay trái giữ **WASD** di chuyển, tay phải dùng cụm **J K L U I O** để đánh và ra chiêu — đừng bỏ tay khỏi vị trí này khi giao chiến.
 
 Chi tiết thiết kế bàn phím: [docs/THIET_KE_BAN_PHIM.md](THIET_KE_BAN_PHIM.md).
@@ -221,13 +223,24 @@ Ba ô đầu (Vũ khí, Áo bào, Hộ phù) ảnh hưởng ngoại hình và hi
 
 ## Nhiệm vụ
 
-Góc trên có dấu **!** (nhiệm vụ có thể nhận) và **?** (nhiệm vụ đang làm). Sổ nhiệm vụ mở bằng **N**.
+Trên đầu NPC (và trên bản đồ) có hai dấu: **!** là NPC có nhiệm vụ mới để bạn **nhận**; **?** màu **vàng**, to hơn, là NPC đang chờ bạn **trả nhiệm vụ** (bạn đã làm đủ mục tiêu). Sổ nhiệm vụ mở bằng **N**.
 
 - **Chuỗi chính** dẫn bạn từ Phàm Nhân qua Luyện Khí, Trúc Cơ, Kim Đan tới Nguyên Anh, mỗi chặng ở một vùng đất mới (Lạc Hà Trấn → Hắc Phong Cốc → Âm Sương Trạch → Hàn Vân Lĩnh). Chuỗi dạy lần lượt: đánh quái, nhặt đồ, đột phá, đả tọa, đổi đồ, dùng đan.
 - **Việc phụ** (không bắt buộc): thường là hạ một con trùm (Xích Mãng, Hắc Giao…) — **nên đi theo đội**.
 - **Nhiệm vụ hằng ngày** ở Bảng cáo thị: làm lặp lại mỗi ngày để có thêm phần thưởng.
 
-Các bước nhiệm vụ gồm: hạ quái, thu thập vật phẩm, nói chuyện với NPC, hoặc đạt cảnh giới. Thưởng là tu vi và đan dược.
+Các bước nhiệm vụ gồm: hạ quái, thu thập vật phẩm, nói chuyện với NPC, hoặc đạt cảnh giới. Thưởng là tu vi và đan dược (đôi khi có Linh thạch hoặc kinh quyển). Thưởng tu vi của nhiệm vụ chính và việc phụ chỉ nhận **một lần**; mỗi nhiệm vụ chính cho khoảng 5 % thanh tu vi của bậc nhận trở lên, mỗi việc phụ khoảng 2 % trở lên.
+
+### Nhận, làm, rồi quay về TRẢ
+
+Thưởng chỉ tới khi bạn **trả** nhiệm vụ, không phải lúc vừa làm xong mục tiêu:
+
+1. **Nhận:** ở NPC giao nhiệm vụ, ngay dưới dòng "Nhận nhiệm vụ" có dòng **Thưởng (gốc)** cho biết sẽ được gì. Số tu vi thật có thể nhiều hơn số gốc nếu bạn có buff tông môn.
+2. **Làm đủ mục tiêu:** thẻ theo dõi và sổ nhiệm vụ đổi sang **"ĐÃ ĐỦ — về gặp (tên NPC) ở (bản đồ) để trả nhiệm vụ"**, game báo một lần, và NPC đó hiện dấu **?** vàng. Nếu đã đủ mục tiêu mà lỡ vứt, bán hay dùng mất vật phẩm thu thập thì thẻ ghi "Cần đủ (vật phẩm): có / cần để trả nhiệm vụ" cho tới khi bạn có đủ lại.
+3. **Trả:** về gặp NPC giao, chọn **Trả nhiệm vụ: (tên)**. Một bảng **"Hoàn thành: (tên)"** hiện ra, liệt kê đúng những gì bạn vừa nhận: **+N tu vi** (số thật, đã nhân buff tông môn nếu có), từng vật phẩm kèm số lượng, và Linh thạch nếu có. Bảng ở lại vài giây, không chặn thao tác.
+
+- **Túi đồ đầy** thì chưa nhận được thưởng và nhiệm vụ vẫn còn nguyên: dọn bớt túi rồi trả lại.
+- Tu vi đã đầy ở bậc cuối của cảnh giới thì bảng ghi "Tu vi đã đầy: cần Đột phá để tích luỹ tiếp" (xem [Đột phá cảnh giới lớn](#đột-phá-cảnh-giới-lớn)).
 
 > **Mẹo:** Làm chuỗi chính song song với việc hằng ngày — vừa có định hướng vừa cày thêm tu vi và Linh thạch.
 

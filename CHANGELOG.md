@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.5.4
 
+### Công cụ và tài liệu
+- **Hướng dẫn người chơi theo v0.5.4 (`docs/HUONG_DAN_NGUOI_CHOI.md`; A; chỉ tài liệu):** mục Nhiệm vụ sửa dấu cũ ("**?** nhiệm vụ đang làm") thành đúng hiện tại (**!** nhận, **?** vàng = đã đủ, chờ TRẢ) và thêm "Nhận, làm, rồi quay về TRẢ" (xem trước thưởng, thẻ "ĐÃ ĐỦ", thiếu đồ thu thập, bảng "Hoàn thành", túi đầy, tu vi đã đầy; thưởng một lần, sàn khoảng 5 % / 2 % thanh); mục điều khiển thêm ô Cài đặt "Cảnh bản đồ kiểu mới".
+
 ## [0.5.4] — 23/11/2026: làm xong nhiệm vụ THẤY thưởng (bảng thưởng, "ĐÃ ĐỦ", dấu `?` vàng), thưởng tu vi nhiệm vụ "cảm thấy được", CẢNH MỚI bốn bản đồ, +4 chiêu Mộc / Lôi (chặn đường, trùm thế giới và gói tài nguyên riêng vẫn TẮT)
 
 Bản vá theo QUYET_DINH_M3 mục 66 (người dùng báo trên v0.5.3 "làm xong nhiệm vụ không thấy thưởng"; quy trình mục 65 / mục 58) kèm CẢNH MỚI bốn bản đồ đã duyệt ở mục 67.1. Không đổi giao thức (`PROTOCOL_VERSION` giữ 6: tin `questReward` là tin MỚI, tương thích ngược), không đổi định dạng lưu (`store.ts` chỉ siết nạp hồ sơ hỏng, không ghi trường mới), bản thật giữ `WORLD_BOSS` và `AMBUSH` TẮT, không APK mới.
