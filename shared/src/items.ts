@@ -927,6 +927,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_hon_huong_quyet"), chance: 0.006, min: 1, max: 1 },
     // Lôi Trúc Cơ, Huyền phẩm (CT15 đợt 2, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ — Hắc Hổ là con săn Linh thạch/phút cao nhất cùng bậc, thêm sách vào nó đẩy denominator của `balance/dungeon.test.ts` lên làm bí cảnh Linh Hư < 15 phút (đỏ ở 14,90)
     { itemId: bookIdOf("loi_hoa_pha_ta_chuong"), chance: 0.006, min: 1, max: 1 },
+    // Độc Mộc Trúc Cơ, Huyền phẩm (A, #1187 / book-drop-realm): hai sách trước đây CHỈ rơi từ Độc Tước (Nguyên Anh, cao hơn cấp chiêu hai bậc); Xích Mãng là trùm Trúc Cơ, hợp chủ đề rắn / độc, và KHÔNG phải Hắc Hổ (giữ `balance/dungeon.test.ts`)
+    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("thiem_to_cong"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
