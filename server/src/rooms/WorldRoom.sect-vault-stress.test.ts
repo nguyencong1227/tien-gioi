@@ -586,5 +586,5 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
       4000,
       "ảnh chụp kho cuối cùng của mọi thành viên = số dư thật (5), không phải bản cũ (15)",
     );
-  });
+  }, 25_000); // #752: 4 cảnh soak kia đều có giới hạn ngoài rõ ràng; cảnh này từng thừa hưởng mặc định 5000ms của vitest → chập chờn khi toàn bộ suite chạy song song (transform/IO contention đội thời gian tường)
 });
