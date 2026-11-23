@@ -7,6 +7,7 @@ import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
 import zlib from "node:zlib";
 import { sigilRows } from "./book-marks.mjs";
+import { syncAssetDocs } from "./sync-asset-docs.mjs";
 
 const OUT_DIR = fileURLToPath(new URL("../public/assets", import.meta.url));
 const ITEMS_DIR = path.join(OUT_DIR, "items");
@@ -2060,3 +2061,11 @@ function buildAtlas() {
 buildTileset();
 buildAtlas();
 process.stdout.write("Generated tileset.png, atlas.png, atlas.json, and item icons.\n");
+try {
+  const { stats } = syncAssetDocs();
+  process.stdout.write(
+    `Synced asset docs: ${stats.itemCount} items, ${stats.totalScanned} static files, ${stats.totalAtlasFrames} atlas frames.\n`,
+  );
+} catch (err) {
+  process.stderr.write(`Warning: syncAssetDocs failed: ${err.message}\n`);
+}

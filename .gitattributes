@@ -1,0 +1,16 @@
+# Quy tắc xử lý tệp tài sản và dữ liệu sinh tự động của Tiên Giới (#1368)
+
+# Hình ảnh nhị phân
+client/public/assets/*.png binary
+client/public/assets/items/*.png binary
+client/public/assets/ai/*.webp binary
+client/public/packs/art-trum/*.webp binary
+client/public/icons/*.png binary
+
+# Phông chữ nhị phân
+client/public/fonts/*.woff2 binary
+
+# Texture Atlas JSON sinh tự động bằng gen-assets.mjs:
+# Đánh dấu binary để git không cố merge từng dòng JSON khi hai nhánh cùng thêm icon,
+# xung đột thì chỉ cần chạy `npm run assets:merge-fix` (hoặc `npm run assets -w client`).
+client/public/assets/atlas.json -diff merge=binary

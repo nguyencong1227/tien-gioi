@@ -178,3 +178,36 @@ declare module "*prompt-rules.mjs" {
   };
   export function promptViolations(prompt: unknown, negativePrompt: unknown): string[];
 }
+
+declare module "*sync-asset-docs.mjs" {
+  export interface AssetStats {
+    itemFiles: string[];
+    itemCount: number;
+    aiCount: number;
+    assetsCount: number;
+    iconsCount: number;
+    fontsCount: number;
+    totalScanned: number;
+    totalAtlasFrames: number;
+    itemAtlasFrames: number;
+  }
+
+  export function scanFiles(dir: string): string[];
+  export function replaceMarker(content: string, markerName: string, newInner: string): string;
+  export function extractMarker(content: string, markerName: string): string | null;
+  export function collectAssetStats(): AssetStats;
+  export function generateRaSoatItemRows(
+    orderedItems: string[],
+    currentRaSoatContent: string,
+    extraRaSoatContent?: string,
+  ): string;
+  export function syncAssetDocs(options?: {
+    checkOnly?: boolean;
+    extraCreditsContent?: string;
+    extraRaSoatContent?: string;
+  }): {
+    changed: boolean;
+    errors: string[];
+    stats: AssetStats;
+  };
+}
