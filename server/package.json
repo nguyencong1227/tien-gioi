@@ -2,7 +2,7 @@
   "name": "@tien-gioi/server",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -14,6 +14,7 @@
     "quest-walk": "tsx scripts/quest-walk.ts",
     "backup": "tsx scripts/backup.ts",
     "kiem-save": "tsx scripts/audit-saves.ts",
+    "kiem-nang-cap": "tsx scripts/kiem-nang-cap.ts",
     "e2e:all": "tsx scripts/e2e-all.ts",
     "e2e": "tsx scripts/e2e.ts",
     "e2e:tai-khoan": "tsx scripts/e2e-account.ts",
@@ -57,10 +58,12 @@
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",
     "red-team": "tsx scripts/red-team.ts",
     "check:env": "tsx scripts/check-env.ts",
+    "check:content": "tsx scripts/check-content.ts",
     "khoi-phuc-thu": "tsx scripts/verify-restore.ts",
     "soak": "tsx scripts/soak.ts",
     "thong-ke-tien-do": "tsx scripts/thong-ke-tien-do.ts",
-    "do-test-chap-chon": "tsx scripts/do-test-chap-chon.ts"
+    "do-test-chap-chon": "tsx scripts/do-test-chap-chon.ts",
+    "ai-playtest": "tsx scripts/ai-playtest/play.ts"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.76",

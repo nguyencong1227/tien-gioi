@@ -266,7 +266,7 @@ Chỉ có một bí cảnh hiện nay: **Linh Hư Bí Cảnh**.
 - Mở cho người từ **Luyện Khí Tầng 9** đến **Trúc Cơ Hậu kỳ**.
 - Mỗi lượt giới hạn **12 phút**; hôm nay nhận thưởng hoàn thành tối đa **3 lượt**.
 - Trong trận: một trùm và nhiều quái con. Hoàn thành cho Linh thạch và đan dược, đồ rơi nhặt trong 60 giây.
-- **Gục trong bí cảnh KHÔNG mất kiếp:** bạn hồi về cổng sau vài giây với 30% máu và mất một lượt thưởng trong ngày. Chỉ chết do quái ở bản đồ thường mới vào Hoàng Tuyền (xem bên dưới).
+- **Gục trong bí cảnh KHÔNG mất kiếp:** bạn hồi về cổng sau vài giây với 30% máu và mất một lượt thưởng trong ngày. Chết do quái ở bản đồ thường, hoặc thua trong đấu trường của Gặp chặn đường, mới vào Hoàng Tuyền (xem bên dưới).
 
 > **Mẹo:** Bí cảnh là "bao máu" — trận dài, sát thương nhẹ nhưng liên tục. Mang đủ đan và đánh đều, đừng tham đuổi quái xa khỏi đội.
 
@@ -323,7 +323,7 @@ Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hà
 - **Rớt mạng:** trò chơi **chờ nối lại 90 giây**, đồng hồ hộp thoại / trận **đóng băng** và kẻ địch bỏ mục tiêu; nối lại kịp thì mọi thứ còn nguyên. Chỉ khi quá hạn mới tính giá. Không ai bị phạt oan vì mạng chập chờn.
 - **Đội:** người trong đội gặp chặn đường vẫn đấu **một mình** (đấu trường chỉ nhận đúng một người, đồng đội không vào giúp được).
 
-> **Mẹo:** Hộp thoại có giá ngay trên nút, nên hãy quyết định theo khí huyết và đan còn lại. Nếu khí huyết đầy và bạn quen đánh bậc này thì **Chiến** là cách duy nhất để nhận thưởng; chưa chắc thì **Bỏ chạy** bằng Linh thạch cho khỏi tốn tu vi (thua trận là mất kiếp, nên đừng liều). **Hãy luôn mang theo ít nhất 2 Hồi Huyết Đan** (hộp thoại sẽ **nhắc** bằng một dòng vàng dưới nút Chiến khi túi có ít hơn 2 viên đan hồi huyết, tính cả đan Đại và Thượng; chỉ là lời nhắc, không khoá nút) và mặc đồ đúng bậc: đo thử cho thấy chiến với 2 đan gần như không chết, nhưng chiến khi không có đan có thể chết cứ sáu bảy lần một lần. Các con số trong mục này (xác suất, hồi, giá, thưởng) **có thể chỉnh** sau khi cân bằng.
+> **Mẹo:** Hộp thoại có giá ngay trên nút, nên hãy quyết định theo khí huyết và đan còn lại. Nếu khí huyết đầy và bạn quen đánh bậc này thì **Chiến** là cách duy nhất để nhận thưởng; chưa chắc thì **Bỏ chạy** bằng Linh thạch cho khỏi tốn tu vi (thua trận là mất kiếp, nên đừng liều). **Hãy luôn mang theo ít nhất 2 Hồi Huyết Đan** (hộp thoại sẽ **nhắc** bằng một dòng vàng dưới nút Chiến khi túi có ít hơn 2 viên đan hồi huyết, tính cả đan Đại và Thượng; chỉ là lời nhắc, không khoá nút. Hộp thoại chỉ có 10 giây nên dòng nhắc nói thẳng việc nên làm: túi không có đan thì **"nên bỏ chạy"**; gặp kẻ **Cầm đầu** mà túi còn dưới 2 đan thì cũng **"nên bỏ chạy"**; còn 1 đan trước kẻ thường hay tinh anh thì chỉ nhắc mang đủ 2; nếu bạn không trả nổi giá bỏ chạy nào thì dòng chỉ nhắc mang đan, vì khi đó bỏ chạy không làm được) và mặc đồ đúng bậc: đo thử cho thấy chiến với 2 đan gần như không chết, nhưng chiến khi không có đan có thể chết cứ sáu bảy lần một lần. Các con số trong mục này (xác suất, hồi, giá, thưởng) **có thể chỉnh** sau khi cân bằng.
 
 Chi tiết thiết kế: [docs/THIET_KE_CHAN_DUONG.md](THIET_KE_CHAN_DUONG.md).
 
@@ -333,7 +333,7 @@ Chi tiết thiết kế: [docs/THIET_KE_CHAN_DUONG.md](THIET_KE_CHAN_DUONG.md).
 
 Đây là cơ chế quan trọng nhất cần hiểu rõ:
 
-> **CHẾT DO YÊU THÚ = MẤT MỘT KIẾP.** Khi nhân vật bị quái giết, chân linh của bạn đầu thai sang kiếp mới. **Chỉ chết do quái ở bản đồ thường mới tính là mất kiếp** — chết trong bí cảnh hay trong quyết đấu **không** tính.
+> **CHẾT DO YÊU THÚ = MẤT MỘT KIẾP.** Khi nhân vật bị quái giết, chân linh của bạn đầu thai sang kiếp mới. **Chết do quái ở bản đồ thường, hoặc thua trong đấu trường của Gặp chặn đường (xem mục Gặp chặn đường ở trên), đều tính là mất kiếp** — chết trong bí cảnh hay trong quyết đấu **không** tính.
 
 Khi đầu thai:
 

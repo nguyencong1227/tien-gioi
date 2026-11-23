@@ -5,6 +5,7 @@ import {
   AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_FOES,
   AMBUSH_DAY_CAP,
+  AMBUSH_HUNT_COIN_PER_MIN,
   AMBUSH_HUNT_EXP_PER_MIN,
   AMBUSH_TIER_WEIGHTS,
   ambushRewardExp,
@@ -32,6 +33,7 @@ import {
   type AmbushFight,
   type GroupSummary,
   type SensitivityRow,
+  huntCoinPerMinTable,
   huntExpPerMinTable,
   upliftByRealm,
 } from "./chan-duong";
@@ -208,7 +210,7 @@ describe("bất biến cân bằng", () => {
 
   it("thưởng tu vi không hơn giá bỏ chạy là CẢNH BÁO (bỏ chạy đắt hơn cả thưởng), KHÔNG phải vi phạm: thắng +R luôn hơn bỏ chạy -P", () => {
     const priceWarn = (s: GroupSummary) =>
-      ambushBalanceWarnings([s]).filter((w) => w.includes("bỏ chạy đắt hơn"));
+      ambushBalanceWarnings([s]).filter((w) => w.includes("thưởng tu vi"));
     const dear: GroupSummary = { ...easy, winExp: easy.fleeExp, realSeconds: 45 };
     expect(ambushBalanceViolations([dear])).toEqual([]);
     expect(priceWarn(dear).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
@@ -218,11 +220,40 @@ describe("bất biến cân bằng", () => {
     expect(priceWarn(none)).toEqual([]);
   });
 
-  it("DỮ LIỆU THẬT (CD6b): ở mọi bậc giá bỏ chạy giữa trận NHỎ hơn thưởng thắng thấp nhất: không bầy nào bị cảnh báo 'bỏ chạy đắt hơn cả thưởng'", () => {
+  it("thưởng Linh thạch không hơn giá bỏ chạy là CẢNH BÁO (CD6b PR2), KHÔNG phải vi phạm; hai phía TU VI / LINH THẠCH độc lập, không nhầm lẫn", () => {
+    const coinWarn = (s: GroupSummary) =>
+      ambushBalanceWarnings([s]).filter((w) => w.includes("thưởng Linh thạch"));
+    const dear: GroupSummary = { ...easy, winCoin: easy.fleeCoin, realSeconds: 45 };
+    expect(ambushBalanceViolations([dear])).toEqual([]); // cảnh báo, KHÔNG phải vi phạm
+    expect(coinWarn(dear).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
+    const cheap: GroupSummary = { ...easy, winCoin: easy.fleeCoin + 1, realSeconds: 45 };
+    expect(coinWarn(cheap)).toEqual([]);
+    const none: GroupSummary = { ...easy, winCoin: 0, realSeconds: 45 }; // chưa có thưởng thắng nào: không cảnh báo
+    expect(coinWarn(none)).toEqual([]);
+    // đột biến lẫn: chỉ đổi winExp (KHÔNG đổi winCoin) thì chỉ cảnh báo TU VI, KHÔNG đụng phía Linh thạch -> hai kiểm độc lập
+    const crossExp: GroupSummary = {
+      ...easy,
+      winExp: easy.fleeExp,
+      winCoin: easy.fleeCoin + 1,
+      realSeconds: 45,
+    };
+    expect(coinWarn(crossExp)).toEqual([]);
+    expect(
+      ambushBalanceWarnings([crossExp]).filter((w) => w.includes("thưởng tu vi")),
+    ).toHaveLength(1);
+  });
+
+  it("DỮ LIỆU THẬT (CD6b): ở mọi bậc giá bỏ chạy TU VI giữa trận NHỎ hơn thưởng thắng thấp nhất: không bầy nào bị cảnh báo 'bỏ chạy đắt hơn' (tu vi)", () => {
     const sums = AMBUSH_FOES.map((g) => ({
       ...summarizeGroup(g, 1),
     }));
-    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("bỏ chạy đắt hơn"));
+    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("thưởng tu vi"));
+    expect(dear).toEqual([]);
+  });
+
+  it("DỮ LIỆU THẬT (CD6b PR2): ở mọi bậc giá bỏ chạy LINH THẠCH giữa trận NHỎ hơn thưởng thắng thấp nhất (payRewards = ambushRewardCoin): không bầy nào bị cảnh báo 'bỏ chạy đắt hơn' (Linh thạch)", () => {
+    const sums = AMBUSH_FOES.map((g) => summarizeGroup(g, 1)); // fightAmbush chạy payRewards THẬT (đã đổi sang ambushRewardCoin)
+    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("thưởng Linh thạch"));
     expect(dear).toEqual([]);
   });
 
@@ -310,6 +341,18 @@ describe("CD6b: bảng tu vi / phút săn và thưởng theo phút", () => {
   });
   it("huntExpPerMinTable: mỗi bậc là tu vi / phút (= bestOption x 60, làm tròn), bậc cao hơn Luyện Khí săn nhanh hơn Phàm Nhân", () => {
     const t = huntExpPerMinTable(4);
+    expect(t).toHaveLength(4);
+    for (const v of t) expect(v).toBeGreaterThan(0);
+    expect(t[3]).toBeGreaterThan(t[0]);
+  });
+  it("AMBUSH_HUNT_COIN_PER_MIN của shared/ KHỚP bản sinh từ monsterEconomy (nếu đỏ: đổi số liệu rơi đồ / giá bán làm lệch; dán bảng mới ở thông báo vào shared/src/ambush.ts)", () => {
+    const fresh = huntCoinPerMinTable();
+    expect([...AMBUSH_HUNT_COIN_PER_MIN], `bảng đúng hiện nay:\n[${fresh.join(", ")}]`).toEqual(
+      fresh,
+    );
+  });
+  it("huntCoinPerMinTable: mỗi bậc là linh thạch / phút (= totalCoinPerHour / 60 của người săn tốt nhất, làm tròn), bậc cao hơn Luyện Khí kiếm nhiều hơn Phàm Nhân", () => {
+    const t = huntCoinPerMinTable(4);
     expect(t).toHaveLength(4);
     for (const v of t) expect(v).toBeGreaterThan(0);
     expect(t[3]).toBeGreaterThan(t[0]);

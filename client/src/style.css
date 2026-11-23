@@ -1016,6 +1016,13 @@ html[data-input="touch"] .mm-foot small {
   flex: none;
   font-size: var(--fs-11);
 }
+/* Xem trước thưởng dưới lựa chọn nhận / trả nhiệm vụ (mục 66): kéo sát lên nút (bù khe 6px của danh sách) để thấy rõ là của nút ngay trên */
+.dlg-opt-reward {
+  margin: -3px 4px 2px;
+  font-size: var(--fs-11);
+  color: var(--gold);
+  opacity: 0.9;
+}
 .dlg-opt-btn:not(:disabled):hover {
   background: rgba(201, 162, 74, 0.38);
   border-color: #ffe08a;

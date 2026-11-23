@@ -52,7 +52,21 @@ import {
 } from "../gfx/fx/combat-fx";
 import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
-import { mapPackId, mapsNearPortals, neighborMapIds, packs } from "../gfx/packs";
+import {
+  isPrivatePackDefId,
+  mapPackId,
+  mapsNearPortals,
+  neighborMapIds,
+  packs,
+  privatePackDefId,
+} from "../gfx/packs";
+import { PRIVATE_MAP_PACKS } from "../gfx/private-art";
+import {
+  PRIVATE_TILESET_KEY,
+  loadPrivateTilesetTexture,
+  privateTilesetUrl,
+  tilesetKeyFor,
+} from "../gfx/private-tileset";
 import { planTileTint, styleIdFor, styleOf } from "../gfx/map-style";
 import { decorTilesetKey, ensureDecorTileset } from "../gfx/decor-tileset";
 import { ambientEnabledByUrl, planWeather, weatherEnabledByUrl } from "../gfx/map-weather";
@@ -188,6 +202,7 @@ import {
 } from "../dungeon";
 import { respawnDeathText } from "../death-text";
 import { dropSourceIn, hopLabel, nextHop, questGoal, type NavHop } from "../quest-nav";
+import { npcMarkerStyle } from "../npc-marker";
 import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
@@ -631,6 +646,12 @@ export class WorldScene extends Phaser.Scene {
     this.buildMapVisuals();
     ui.setCurrentMapId(this.map.def.id);
     this.prefetchPacks();
+    // Nền từ gói riêng (mục 63): xin gói, nạp dải ô khi sẵn sàng (kể cả về muộn) rồi dựng lại nền MỘT lần; không có gói thì không làm gì
+    this.refreshPrivateTileset();
+    const offPrivateReady = packs().onReady((id) => {
+      if (isPrivatePackDefId(id)) this.refreshPrivateTileset();
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offPrivateReady);
 
     // Lõi hiệu ứng (#325): ngân sách theo hồ sơ chất lượng; đóng cảnh thì giải phóng sạch
     this.fx = createFxSystem(this, { getProfile: getQuality, depth: () => this.map.worldH });
@@ -966,6 +987,28 @@ export class WorldScene extends Phaser.Scene {
     this.lightVignette?.setPosition(r.x, r.y).setDisplaySize(r.w, r.h);
   }
 
+  private privateTilesetBusy = false;
+
+  /**
+   * Nền từ gói riêng (mục 63, `gfx/private-tileset.ts`): xin các gói riêng của bản đồ hiện tại (`PRIVATE_MAP_PACKS`), và khi dải ô `tileset` đã sẵn sàng thì nạp texture
+   * rồi dựng lại nền MỘT lần. Bảng rỗng / gói thiếu / tệp lỗi / sai cỡ thì không làm gì (giữ hình thay thế `tileset.png`).
+   */
+  private refreshPrivateTileset() {
+    const p = packs();
+    const own = Object.prototype.hasOwnProperty.call(PRIVATE_MAP_PACKS, this.map.def.id)
+      ? PRIVATE_MAP_PACKS[this.map.def.id]!
+      : [];
+    for (const id of own) void p.ensure(privatePackDefId(id));
+    if (this.privateTilesetBusy || this.textures.exists(PRIVATE_TILESET_KEY)) return;
+    const url = privateTilesetUrl(p);
+    if (!url) return;
+    this.privateTilesetBusy = true;
+    loadPrivateTilesetTexture(this, url, (ok) => {
+      this.privateTilesetBusy = false;
+      if (ok && this.sys.isActive()) this.buildMapVisuals();
+    });
+  }
+
   private buildMapVisuals() {
     this.groundWash?.destroy();
     this.groundWash = undefined;
@@ -1002,7 +1045,9 @@ export class WorldScene extends Phaser.Scene {
     for (let y = 0; y < mh; y++)
       data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
     this.mapTilemap = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    const ts = this.mapTilemap.addTilesetImage("tiles", TILESET_KEY, TILE, TILE, 0, 0)!;
+    // Nền từ gói riêng (mục 63) nếu đã nạp xong, ngược lại hình thay thế `tileset.png` (`gfx/private-tileset.ts`)
+    const tilesetKey = tilesetKeyFor((k) => this.textures.exists(k), TILESET_KEY);
+    const ts = this.mapTilemap.addTilesetImage("tiles", tilesetKey, TILE, TILE, 0, 0)!;
     this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
     this.mapLayer.setDepth(-10);
     // 1b. Màu phủ nền theo kiểu bản đồ (tuyết phủ ở Hàn Vân Lĩnh): một hình chữ nhật phủ cả bản đồ NGAY TRÊN lớp ô, dưới trang trí / nước / thực thể
@@ -2176,6 +2221,7 @@ export class WorldScene extends Phaser.Scene {
     this.buildMapGraphNav();
     this.buildMapVisuals();
     ui.setCurrentMapId(newMap.def.id);
+    this.refreshPrivateTileset();
     this.attachRoom(room);
     this.syncAudioZone();
     this.prefetchPacks();
@@ -2814,12 +2860,15 @@ export class WorldScene extends Phaser.Scene {
 
     for (const [id, ne] of this.npcs) {
       const marker = npcMarker(id, qLog, qCtx);
-      if (marker === "!" || marker === "?") {
-        ne.markerText.setText(marker).setVisible(true);
-        ne.markerAura.setVisible(true);
-        const col = marker === "?" ? 0x6ad06a : 0xffd700;
-        ne.markerAura.setFillStyle(col, 0.25).setStrokeStyle(1.6, col, 0.9);
-        ne.markerText.setColor(marker === "?" ? "#6ad06a" : "#ffe08a");
+      const style = npcMarkerStyle(marker);
+      if (style) {
+        // "?" (đã đủ, về trả) VÀNG tươi và to hơn "!" (mục 66): npc-marker.ts
+        ne.markerText.setText(marker).setVisible(true).setColor(style.text).setScale(style.scale);
+        ne.markerAura
+          .setVisible(true)
+          .setFillStyle(style.aura, style.auraAlpha)
+          .setStrokeStyle(1.6, style.aura, 0.9)
+          .setScale(style.scale);
       } else {
         ne.markerText.setVisible(false);
         ne.markerAura.setVisible(false);

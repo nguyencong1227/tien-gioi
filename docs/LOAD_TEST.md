@@ -2152,45 +2152,169 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 ```
 (Máy chủ con tự động chạy với `AMBUSH=on` và `AMBUSH_BOTS=on`).
 
-### 40.3. Kết quả đo đạc thực tế (Lượt chạy 10 phút ngày 22/11/2026)
-- **Tệp mẫu nhật ký:** `server/soak-2026-11-21T20-23-53-797Z.json`
+### 40.3. Kết quả đo đạc thực tế (Lượt chạy 10 phút ngày 22/11/2026 - CD10b mục 2)
+- **Tệp mẫu nhật ký:** `server/soak-ambush.json` (tệp cục bộ trên máy dev, không commit repo theo `.gitignore`).
 - **Thời lượng:** 10.0 phút (600 giây, 60 mẫu lấy mỗi 10 giây).
 - **Số bot:** 100 khởi tạo -> 100 kết thúc (tỉ lệ rớt: 0%).
+- **Cấu hình bot:** `--ambush` mặc định gieo 50% bot mang 0 đan (`i % 2 === 0 ? 0 : 5`) và 50% bot mang 5 đan, ưu tiên chọn "Chiến" 75% để tập trung thử tải đấu trường solo (đây là lý do có thể dẫn tới trận "Thua" khi bot cạn máu không có đan hồi phục; các nhánh bỏ chạy chọn 0 lần nên không được lượt chính thức này phủ, nhánh bỏ chạy đã được phủ ở lượt trước của mục 40).
 
 | Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Ngân sách | Đánh giá |
 |---|---|---:|---:|:---:|
 | **Phòng đấu trường** | **Số phòng cuối cùng khi dừng** | **0 phòng** | = 0 | **ĐẠT** |
-| | **Số phòng tối đa đồng thời** | **3 phòng** | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
-| | Lượt qua cổng vào / ra đấu trường | 5 lượt vào `arena_lac_ha`, 4 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
-| **Chặn đường** | Số lần bot bị chặn đường | **7 lần** | > 0 | **ĐẠT** |
-| | Lựa chọn hộp thoại | Chiến: 4 \| Bỏ chạy: 3 (Linh thạch: 0, Tu vi: 3) | Phân nhánh tự động | **ĐẠT** |
-| | Thoát giữa trận (vận 1s) | 1 lần | - | **ĐẠT** |
-| | Kết quả trận đấu | Thắng: 0, Thua: 0, Chạy thoát: 2, Hết giờ: 4, Rớt: 0, Huỷ: 0 | - | **ĐẠT** |
-| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 149.22 MB | - | - |
-| | VmRSS sau warmup (5.0m) | 153.36 MB | - | - |
-| | VmRSS kết thúc | 155.42 MB | - | - |
-| | Tăng sau warmup | **+2.06 MB** | <= 50.0 MB | **ĐẠT** |
-| | **Dốc nửa sau (OLS)** | **+0.258 MB / phút** | <= 1.00 MB / phút | **ĐẠT** |
-| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 2.74 ms, Max 3.35 ms** | <= 10.0 ms | **ĐẠT** |
+| | **Số phòng tối đa đồng thời** | **1 phòng** | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
+| | Lượt qua cổng vào / ra đấu trường | 8 lượt vào `arena_lac_ha`, 8 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
+| **Chặn đường** | Số lần bot bị chặn đường | **8 lần** | > 0 | **ĐẠT** |
+| | Lựa chọn hộp thoại | Chiến: 8 \| Bỏ chạy: 0 | Phân nhánh tự động | **ĐẠT** |
+| | Thoát giữa trận (vận 1s) | 0 lần | - | **ĐẠT** |
+| | **Kết quả trận đấu** | **Thắng: 7, Thua: 1, Chạy thoát: 0, Hết giờ: 0**, Rớt: 0, Huỷ: 0 | mục tiêu quan sát: won + lost > 0, timeout = 0 *(soak-analysis chỉ tự động canh trần phòng, rò phòng, offersTotal)* | **Quan sát đạt** |
+| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 177.79 MB | - | - |
+| | VmRSS sau warmup (5.0m) | 223.69 MB | - | - |
+| | VmRSS kết thúc | 224.07 MB | - | - |
+| | Tăng sau warmup | **+0.38 MB** | <= 50.0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0.068 MB / phút** | <= 1.00 MB / phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 4.46 ms, Max 5.99 ms** | <= 10.0 ms | **ĐẠT** |
 | | Tick overruns (> 50 ms) | **0** | 0 | **ĐẠT** |
-| | CPU luồng chính / tick | TB 3.25 ms / tick | - | **ĐẠT** |
+| | CPU luồng chính / tick | TB 4.03 ms / tick | - | **ĐẠT** |
 | | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi max 0.0s, Lỗi 0 | - | **ĐẠT** |
-| | Độ trễ vòng lặp p99 | 23.1 ms | <= 100 ms | **ĐẠT** |
-| **Băng thông WebSocket** | Nhận trung bình | 238 B / tick | <= 600 B / tick | **ĐẠT** |
-| | Phân vị p95 | 334 B / tick | - | **ĐẠT** |
-| | Băng thông nhận TB / bot | 4.66 KB/s | - | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | 25.6 ms | <= 100 ms | **ĐẠT** |
+| **Băng thông WebSocket** | Nhận trung bình | 265 B / tick | <= 600 B / tick | **ĐẠT** |
+| | Phân vị p95 | 407 B / tick | - | **ĐẠT** |
+| | Băng thông nhận TB / bot | 5.17 KB/s | - | **ĐẠT** |
 | **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 | **ĐẠT** |
 | | Lỗi gọi `/metrics` | 0 | 0 | **ĐẠT** |
 | | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
 | | Tệp hỏng (`*.hong-*`) | 0 | 0 | **ĐẠT** |
-| | Bảo toàn Linh thạch | ĐẠT (Trần 10.201, Thực tế 9.499, Lệch ví: 0) | ĐẠT | **ĐẠT** |
+| | Bảo toàn Linh thạch | Ban đầu 10000 + Thả ra 60 - Tiêu 9691 = Trần 10060 \| Thực tế: Ví 429 + Kho 0 = 429 (Lệch ví: 0) *(lưu ý: ví thấp do >= 49 lần chết chỉ trong ~84 giây cuối của đuôi log)* | ĐẠT | **ĐẠT** |
 
 ### 40.4. Nhận xét & Giới hạn
-- Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục chứng minh:
-  - **Không rò rỉ phòng đấu trường:** Số phòng đấu trường solo về đúng 0 khi dừng bot.
-  - **Không rò rỉ bộ nhớ:** Dốc VmRSS OLS nửa sau `+0.258 MB/phút` (nằm trong ngưỡng <= 1.0 MB/phút).
-  - **Nhịp tick và hiệu năng:** Tick p95 trung bình 2.74 ms (max 3.35 ms <= 10.0 ms), 0 overruns.
+- Lượt thử tải dài 10 phút với 100 bot đi hoang liên tục (CD10b mục 2) chứng minh:
+  - **Bot soak hạ kẻ địch thành công, có cả thắng và thua:** Đạt **7 trận Thắng**, **1 trận Thua** (chết thật qua limbo và hồi sinh về Lạc Hà, có thể do bot 0 đan cạn máu), **0 trận Hết giờ** (`timeout = 0`). Bot trong đấu trường chủ động tiếp cận, tấn công kẻ địch bằng đòn đánh cơ bản và tự sử dụng Hồi Huyết Đan khi HP < 60% (`useItem {slot}`, hồi 1,5s). Điều này giải quyết triệt để lỗi bot đứng im dẫn tới 4/4 trận hết giờ ở PR #1279.
+  - **Không rò rỉ phòng đấu trường:** Đúng 8 lượt vào `arena_lac_ha` và 8 lượt về `lac_ha`; số phòng đấu trường solo về đúng 0 khi dừng bot (`finalActiveArenaRooms === 0`).
+  - **Không rò rỉ bộ nhớ:** VmRSS tăng sau warmup chỉ +0.38 MB (xa dưới trần 50 MB); dốc VmRSS OLS nửa sau `+0.068 MB/phút` (rất thấp so với ngưỡng <= 1.0 MB/phút).
+  - **Hiệu năng nhịp tick:** Tick p95 trung bình 4.46 ms (max 5.99 ms <= 10.0 ms), 0 overruns. *(Lưu ý kỹ thuật theo review của Dev A và Dev B: Tick p95 được theo dõi riêng trên từng phòng Colyseus qua WorldState, bắt được trường hợp một phòng bị chậm, không phải là độ trễ vòng lặp sự kiện của cả tiến trình khi 20 phòng cùng chạy).*
   - **Toàn vẹn dữ liệu:** `kiem-save` 100 nhân vật / 100 chân linh báo 0 lỗi, bảo toàn Linh thạch lệch ví 0.
-- **Giới hạn số đo:**
-  - 100 bot phân bổ đi hoang ghi nhận 7 lần bị chặn đường, số phòng đấu trường đồng thời đạt đỉnh 3/20 phòng (chưa chạm trần `MAX_AMBUSH_ROOMS = 20` do thiết kế thời gian hồi chiêu chặn đường giữa các lần là 8 phút). Vì vậy, kết quả này chứng minh việc dọn dẹp phòng sạch sẽ khi kết thúc và hệ thống vận hành không rò rỉ phòng / bộ nhớ / lưu trữ, nhưng chưa đo được thực tế trường hợp chặn đường bị từ chối khi vượt trần 20 phòng (nhánh này đã được bảo vệ độc lập bởi bộ unit test).
 
+### 40.5. Đo đạc thực tế cơ chế AMBUSH_MIN_POTIONS=2 (Lượt chạy 5 phút ngày 22/11/2026 - CD10b mục 3)
+- **Tệp mẫu nhật ký:** `server/soak-potions.json` (tệp cục bộ trên máy dev, không commit repo theo `.gitignore`).
+- **Thời lượng:** 5.0 phút (300 giây, 30 mẫu lấy mỗi 10 giây).
+- **Cấu hình:** `AMBUSH_MIN_POTIONS=2 AMBUSH_SPLIT_POTIONS=1`
+- **Phân bổ bot (100 bot đi hoang):**
+  - 50 bot chẵn: mang 1 Hồi Huyết Đan (dưới ngưỡng tối thiểu 2 đan).
+  - 50 bot lẻ: mang 5 Hồi Huyết Đan (đủ điều kiện gặp chặn đường).
+
+| Nhóm chỉ số | Chỉ số cụ thể | Kết quả đo thực tế | Ngưỡng / Tiêu chuẩn | Đánh giá |
+|---|---|---:|---:|:---:|
+| **Khẳng định đan dược** | **Số hộp thoại bot 1 đan nhận (50 bot)** | **0 hộp thoại** | = 0 (`pot1OffersTotal = 0`) | **Quan sát đạt** |
+| | **Số hộp thoại bot 5 đan nhận (50 bot)** | **1 hộp thoại** | Mẫu thực tế (`pot5OffersTotal = 1`) | Ghi nhận |
+| **Phòng đấu trường** | **Số phòng cuối cùng khi dừng** | **0 phòng** | = 0 | **ĐẠT** |
+| | Số phòng tối đa đồng thời | 1 phòng | <= 20 (`MAX_AMBUSH_ROOMS`) | **ĐẠT** |
+| | Lượt qua cổng vào / ra đấu trường | 1 lượt vào `arena_lac_ha`, 1 lượt về `lac_ha` | Dọn vé sạch sẽ | **ĐẠT** |
+| **Chặn đường** | Kết quả trận đấu | Thắng: 1, Thua: 0, Hết giờ: 0 | won + lost > 0 | **ĐẠT** |
+| **Bộ nhớ (VmRSS)** | VmRSS ban đầu / kết thúc | 173.73 MB / 217.60 MB | - | - |
+| | Tăng sau warmup (1.0m) | **+0.38 MB** | <= 50.0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0.231 MB / phút** | <= 1.00 MB / phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 4.60 ms, Max 5.50 ms** | <= 10.0 ms | **ĐẠT** |
+| | Tick overruns (> 50 ms) | **0** | 0 | **ĐẠT** |
+| | CPU luồng chính / tick | TB 4.16 ms / tick | - | **ĐẠT** |
+| | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi max 0.0s, Lỗi 0 | - | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | 25.4 ms | <= 100 ms | **ĐẠT** |
+| **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 | **ĐẠT** |
+| | `kiem-save` sau soak | **0 lỗi** (100 nhân vật, 100 chân linh) | 0 | **ĐẠT** |
+| | Bảo toàn Linh thạch | Ban đầu 10000 + Thả ra 0 - Tiêu 6200 = Trần 10000 \| Thực tế: Ví 3800 + Kho 0 = 3800 (Lệch ví: 0) *(lưu ý: ~49 lần chết ngoài hoang dã)* | ĐẠT | **ĐẠT** |
+
+- **Kết luận & Phân tích đối chứng:**
+  - Trong lượt chạy 5 phút của Dev C với 100 bot đi hoang, ghi nhận mẫu thực tế $n = 1$ hộp thoại chặn đường (thuộc về nhóm 5 đan, nhóm 1 đan nhận 0 hộp thoại).
+  - **Đối chứng độc lập (Dev B thực hiện trên đầu `7e304a17`, 100 bot, 10 phút, `AMBUSH_MIN_POTIONS=0 AMBUSH_SPLIT_POTIONS=1`):** Khi không bật bộ lọc đan (`AMBUSH_MIN_POTIONS=0`), nhóm 1 đan nhận **4** hộp thoại và nhóm 5 đan nhận **5** hộp thoại (tái hiện độc lập nhánh bot hạ kẻ địch với 9 thắng / 0 thua / 0 hết giờ).
+  - So sánh với số đo đối chứng trên (~4 hộp thoại / 10 phút cho 50 bot 1 đan khi không lọc, kỳ vọng $\lambda \approx 2$ hộp thoại trong 5 phút), xác suất ngẫu nhiên quan sát được 0 hộp thoại ngay cả khi bộ lọc bị hỏng là $P(\text{Poisson}(0; \lambda=2)) = e^{-2} \approx 13,5\%$. Do đó, mẫu $n = 1$ ở lượt chạy 5 phút là quan sát thực tế nhất quán và không mâu thuẫn với cơ chế chặn người ít đan, nhưng không phải là bằng chứng khẳng định độc lập. Bằng chứng quyết định tính đúng đắn của cổng logic này nằm ở các bộ unit test tất định (`WorldRoom.ambush-potions.test.ts` và `server/src/systems/ambush.test.ts`).
+  - Lưu ý thêm về cơ chế túi đồ: Khi bot gục (`reincarnation.ts:109`), hệ thống xoá sạch túi đồ (`c.inv = emptyInventory()`); khi tái sinh (`applyRebirth`), túi xuất phát `startPackOf(unlocks)` chỉ cấp Hồi Huyết Đan khi đã mở khoá `le_ma >= 1`, nhưng bot trong soak không cấu hình unlocks nên túi xuất phát rỗng (0 đan). Do đó, bot nào chết lần đầu ngoài hoang dã đều lập tức tụt về 0 đan; với $\ge 49$ lần chết/tái sinh trong đuôi log, phần lớn bot nhanh chóng rơi về 0 đan (cả hai nhóm đều dưới ngưỡng `AMBUSH_MIN_POTIONS=2` và bị lọc), nên sự phân tách nhóm 1 đan vs 5 đan thực chất chỉ duy trì ở giai đoạn trước lần chết đầu tiên của mỗi bot.
+
+
+
+## 41. Thử tải dài Ứng viên phát hành RC (v0.6.0 / v0.5.3): 100 bot / 30 phút (Mục 4, Refs #1290)
+
+### 41.1. Bối cảnh & Cấu hình thử nghiệm
+- **Bối cảnh:** Thử nghiệm tải dài phục vụ hồ sơ ứng viên phát hành RC (Issue #1290 Mục 4) trên đầu commit `main` (`66aef6aa` / `892325c5`).
+- **Mục tiêu:** Kiểm chứng tính ổn định của máy chủ trong thời gian dài (30 phút, 100 bot): dốc VmRSS nửa sau <= 1,0 MB/phút, tick p95 <= 10,0 ms, không rò rỉ hàng đợi ghi, `kiem-save` dữ liệu an toàn, bảo toàn Linh thạch khớp sổ sách, độ phủ kịch bản `--m7` và `--boss`.
+- **Cấu hình cờ runtime (khớp bản chạy thật):**
+  - `BOSS_MOVES=on` (kèm `--boss`, trùm thi triển bộ chiêu trùm).
+  - `SECTS=on` (tông môn bật đầy đủ).
+  - `--m7` (bật nội dung M7: sổ chiêu 4 bản đồ, bot Nguyên Anh ở Hàn Vân Lĩnh).
+  - `AMBUSH=off` (mặc định tắt như bản chạy thật).
+  - `WORLD_BOSS=off` (mặc định tắt như bản chạy thật).
+  - `STORE=file` (kho tệp JSON cục bộ).
+- **Phân bổ 100 bot:** Săn quái 24 | Trấn/Shop 16 | Qua cổng 8 | Bí cảnh 12 | PK 8 | Tông môn 12 | Nguyên Anh (Hàn Vân Lĩnh) 20.
+- **Hai lần chạy đối chiếu:**
+  1. **Lần 1 (Dev C, 28.3 phút / 170 mẫu):** Khởi chạy với `--minutes=30`, bị dừng ở phút 28.3 do chạm giới hạn thời gian thực thi (timeout 1800s) của lượt chạy đêm. Máy lúc đó chịu tải nền ngoài (`load average ~5,42-5,47`). Đo lại từ 170 mẫu thô và `kiem-save` độc lập.
+  2. **Lần 2 ĐẦY ĐỦ (Dev A, 30.0 phút / 180 mẫu):** Chạy trong lượt riêng của A (`timeout 5400`, 08:13–08:45 giờ máy), máy yên lặng (`load average` 0,19–1,37). Harness chạy trọn vẹn đến bước 8a–8c, tắt êm bằng SIGTERM (`code=0`), xuất kết luận tự động.
+
+---
+
+### 41.2. Bảng tổng hợp số đo giữa hai lần chạy
+
+| Nhóm chỉ số | Chỉ số cụ thể | Lần 1 (Dev C, 28.3m, 170 mẫu) | Lần 2 ĐẦY ĐỦ (Dev A, 30.0m, 180 mẫu) | Ngưỡng / Tiêu chuẩn | Đánh giá |
+|---|---|---:|---:|---:|:---:|
+| **Quy mô bot** | Số bot khởi tạo -> kết thúc | 100 -> 100 (ở mẫu cuối) | 100 -> 100 (rớt 0) | Tỉ lệ rớt <= 5% | **ĐẠT** |
+| **Bộ nhớ (VmRSS)** | VmRSS ban đầu | 179,12 MB | 176,93 MB | — | — |
+| | VmRSS sau làm nóng (5.0m) | 212,77 MB | 211,85 MB | — | — |
+| | VmRSS kết thúc | 214,01 MB | 213,52 MB | — | — |
+| | Mức tăng sau warmup | **+1,24 MB** | **+1,67 MB** | <= 50,0 MB | **ĐẠT** |
+| | **Dốc nửa sau (OLS)** | **+0,009 MB/phút** | **+0,023 MB/phút** (toàn bộ +0,046) | <= 1,00 MB/phút | **ĐẠT** |
+| **Vận hành thật** | **Tick p95 phòng tệ nhất** | **TB 1,54 ms, Max 2,36 ms** | **TB 1,59 ms, Max 2,31 ms** | <= 10,0 ms | **ĐẠT** |
+| | Tick overruns (> 50 ms) | **0** | **0** | 0 | **ĐẠT** |
+| | CPU luồng chính / tick | TB 3,64 ms/tick | TB 3,38 ms/tick | — | **ĐẠT** |
+| | Hàng đợi ghi nhân vật | Inflight max 0, Tuổi 0,0s, Lỗi 0 | Inflight max 0, Tuổi 0,0s, Lỗi 0 | — | **ĐẠT** |
+| | Độ trễ vòng lặp p99 | tối đa 26,0 ms | tối đa 26,4 ms | <= 100 ms | **ĐẠT** |
+| **Băng thông WebSocket** | Nhận trung bình | 153 B/tick | 149 B/tick (p95 175) | <= 600 B/tick | **ĐẠT** |
+| | Băng thông nhận TB / bot | 2,98 KB/s | 2,91 KB/s | — | **ĐẠT** |
+| **Toàn vẹn dữ liệu** | Cảnh báo giám sát / Lỗi log | 0 / 0 | 0 / 0 / 0 (`/metrics` 0) | 0 | **ĐẠT** |
+| | `kiem-save` sau soak | **0 lỗi** (100 nv, 100 hồn, 4 tông) | **0 lỗi** (100 nv, 100 hồn, 4 tông) | 0 lỗi vi phạm | **ĐẠT** |
+| | Tệp hỏng (`*.hong-*`) | 0 | 0 | 0 | **ĐẠT** |
+| **Bảo toàn Linh thạch** | Đối chiếu sổ cái tiền tệ | Ví đầu 29.600 -> ví 11.479 + kho 8.420 = 19.899 (giảm 9.701, không vượt trần ban đầu, 0 ví âm; chưa có bộ đếm thả ra/tiêu) | **Đo chặt từ harness:** Ban đầu **29.600** + Thả ra **15.401** - Tiêu **35.580** = **9.421** = ví cuối **9.421**; Ví 9.421 + kho tông môn 8.740 = 18.161 <= trần 45.001; **lệch ví bot: 0** | Khớp sổ cái từng đồng, lệch ví bot = 0 | **ĐẠT** |
+| **Nội dung M7** | Chiêu thức Nguyên Anh | — | 999 lượt thi triển, **6/6** chiêu Nguyên Anh bắt buộc có lượt | Đủ 6/6 | **ĐẠT** |
+| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT ở lần 2; chạy lại trên `575a3887` ĐẠT 4/4 ở 10 phút và 30 phút (41.4; n = 1 mỗi cấu hình); 0/4 chưa tái hiện, chưa giải thích (#1301)** |
+
+---
+
+### 41.3. Nhận xét & Đánh giá chi tiết
+1. **Không rò rỉ bộ nhớ (ĐẠT):**
+   - Cả hai lần chạy đều cho thấy mức tăng bộ nhớ VmRSS sau thời gian làm nóng (warmup 5 phút) là rất nhỏ: lần 1 tăng **+1,24 MB** trong 23,3 phút, lần 2 tăng **+1,67 MB** trong 25 phút (ngưỡng cho phép <= 50,0 MB).
+   - Hệ số góc hồi quy tuyến tính OLS nửa sau lần lượt là `+0,009 MB/phút` và `+0,023 MB/phút` (toàn bộ lần 2 là `+0,046 MB/phút`), cách rất xa ngưỡng giới hạn `1,00 MB/phút`. Không phát hiện dấu hiệu rò rỉ bộ nhớ dài hạn với vòng lặp 20 tick/giây, StateView và sổ chiêu M7.
+2. **Hiệu năng nhịp tick và vòng lặp sự kiện (ĐẠT):**
+   - Nhịp tick p95 phòng tệ nhất duy trì ổn định ở mức trung bình **1,54–1,59 ms** (đỉnh cực đại 2,31–2,36 ms), chỉ chiếm khoảng 3–4% ngân sách 50 ms / tick.
+   - Suốt cả hai đợt thử tải không xảy ra bất kỳ một tick overrun (> 50 ms) nào.
+   - Độ trễ vòng lặp sự kiện loop lag p99 tối đa đạt 26,4 ms (dưới ngưỡng 100 ms).
+3. **Độ ổn định I/O và Bảo toàn Linh thạch chặt chẽ (ĐẠT):**
+   - Hàng đợi ghi nhân vật luôn giải phóng ngay (`writesInflight = 0`, `writesOldestAgeMs = 0`, 0 lỗi ghi).
+   - `kiem-save` kiểm toán toàn bộ 100 nhân vật, 100 chân linh và 4 tông môn đạt **0 lỗi vi phạm**, không sinh tệp cách ly `*.hong-*`.
+   - Kết quả đo từ harness ở lần 2 chứng minh tính bảo toàn tiền tệ tuyệt đối: `29.600 (ban đầu) + 15.401 (thả ra) - 35.580 (tiêu) = 9.421 (ví cuối)`, sai số lệch ví bot = 0.
+4. **Vấn đề tiêu chí độ phủ chiêu trùm `--boss` (KHÔNG ĐẠT ở lần 2; chạy lại ĐẠT, chưa giải thích được lần 0/4, Refs #1301):**
+   - Harness ở lần chạy 30 phút báo kết luận tổng thể là **KHÔNG ĐẠT (FAIL)** do vi phạm tiêu chí độ phủ chiêu trùm: 0/4 chiêu của trùm Xích Mãng (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`) được thi triển lần nào trong suốt 30 phút.
+   - **Đối chứng harness cũ (A, 10 phút, `892325c5`, `--bots=100 --boss --m7`):** 12 lượt chiêu trùm = **9 lượt của Xích Mãng** (`quat_duoi` 4, `cuon_minh` 3, `phun_doc` 2) + 3 lượt của trùm khác (`doi_lao`, `mua_bang`, `vung_bang`, mỗi chiêu 1); thiếu `goi_ran_con` (3 / 4 chiêu; chiêu này chỉ xuất hiện ở giai đoạn 2 khi rắn con bị hạ, mục 38 cũng chỉ thấy 1 lượt / 10 phút) nên cũng báo KHÔNG ĐẠT. Khác lần 2 ở mã harness VÀ thời lượng (cờ `--sect` không phải khác biệt: `soak.ts` chỉ nhận để tương thích dòng lệnh).
+   - **Chạy lại bằng harness MỚI (A, `main` `575a3887`; `soak.ts` KHÔNG đổi so với `892325c5`, game chỉ khác dữ liệu +4 chiêu của #1299), cùng tham số `--bots=100 --m7 --boss`:** 10 phút ĐẠT, 23 lượt, 4 / 4 chiêu Xích Mãng (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); **30 phút ĐẠT toàn bộ**, 14 lượt, 4 / 4 (`quat_duoi` 6, `phun_doc` 5, `cuon_minh` 2, `goi_ran_con` 1): số đo ở 41.4. Không tái hiện được 0 / 4.
+   - **Kết luận hợp lệ từ dữ liệu:** harness mới KHÔNG hỏng chắc chắn (2 / 3 lần chạy đạt 4 / 4, kể cả đủ 30 phút); lần 0 / 4 là một lần chưa tái hiện và **chưa giải thích**: ngẫu nhiên (vị trí / đường đi bot săn trùm; bot săn trùm đi thẳng, không dò đường quanh vách), +4 chiêu (khó xảy ra, chưa loại) hoặc lỗi harness vẫn chưa loại được. Chưa có chứng cứ lỗi game (game vận chiêu Xích Mãng ở 3 / 4 lần chạy) nhưng cũng chưa loại được vì mỗi cấu hình chỉ chạy một lần. Điều tra tiếp ở #1301 (dòng thời gian chiêu trùm do C thêm).
+   - **Kết luận cho hồ sơ Ứng viên phát hành RC (Refs #1290):** các tiêu chí ổn định và bảo toàn tiền ĐẠT ở CẢ HAI lần 30 phút đầy đủ của A (`892325c5` và `575a3887`); tiêu chí `--boss` KHÔNG ĐẠT ở lần 2 (0 / 4, chưa giải thích) và ĐẠT 4 / 4 ở lần chạy lại 30 phút trên đầu `main` mới nhất; theo dõi ở #1301.
+
+### 41.4. Chạy lại trên `main` `575a3887` (Dev A, 22/11/2026, Refs #1301)
+
+Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=30 --m7 --boss --out=/tmp/a-soak-ab-new30m.json` (không `--keep-data`; đã tắt êm SIGTERM, `code=0`). Thêm một lần 10 phút cùng tham số (`/tmp/a-soak-ab-new10m.json`) làm đối chứng A / B: `soak.ts` không đổi giữa `892325c5` và `575a3887`, chỉ khác +4 chiêu dữ liệu (#1299).
+
+| Chỉ số | Lần 2 (`892325c5`) | Lần 3 (`575a3887`, 30 phút) | Ngưỡng | Đánh giá |
+|---|---:|---:|---:|:---:|
+| Bot khởi tạo -> kết thúc | 100 -> 100 | 100 -> 100 (rớt 0) | rớt <= 5% | **ĐẠT** |
+| VmRSS ban đầu / sau 5 phút / cuối | 176,93 / 211,85 / 213,52 MB | 190,48 / 224,38 / 224,89 MB | — | — |
+| Tăng sau warmup | +1,67 MB | +0,51 MB | <= 50 MB | **ĐẠT** |
+| Dốc nửa sau (OLS) | +0,023 MB/phút | +0,004 MB/phút | <= 1,00 MB/phút | **ĐẠT** |
+| Tick p95 phòng tệ nhất (TB / max) | 1,59 / 2,31 ms | 1,61 / 2 ms | <= 10 ms | **ĐẠT** |
+| Tick overrun (> 50 ms) | 0 | 0 | 0 | **ĐẠT** |
+| Độ trễ vòng lặp p99 | 26,4 ms | 30,1 ms | <= 100 ms | **ĐẠT** |
+| Băng thông nhận TB (p95) | 149 (175) B/tick | 148 (174) B/tick | <= 600 B/tick | **ĐẠT** |
+| Cảnh báo / lỗi log / lỗi `/metrics` | 0 / 0 / 0 | 0 / 0 / 0 | 0 | **ĐẠT** |
+| `kiem-save` (nhân vật / chân linh / tông môn) | 0 lỗi (100 / 100 / 4) | 0 lỗi (100 / 100 / 4) | 0 | **ĐẠT** |
+| Tệp hỏng `*.hong-*` | 0 | 0 | 0 | **ĐẠT** |
+| Sổ Linh thạch | 29.600 + 15.401 - 35.580 = 9.421 = ví cuối | 29.600 + 15.498 - 33.993 = 11.105 = ví cuối (kho 8.920, trần 45.098) | lệch ví bot = 0 | **ĐẠT** (lệch 0) |
+| Nội dung M7 | 999 lượt, 6 / 6 chiêu Nguyên Anh | 1.221 lượt, 6 / 6 chiêu Nguyên Anh | đủ 6 / 6 | **ĐẠT** |
+| Chiêu trùm `--boss` | **0 / 4** (3 lượt trùm khác) | **4 / 4**, 14 lượt: `quat_duoi` 6, `phun_doc` 5, `cuon_minh` 2, `goi_ran_con` 1 | đủ 4 / 4 | **ĐẠT** |
+
+Đối chứng 10 phút (cùng tham số, `575a3887`): PASS, 23 lượt, 4 / 4 (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); nhóm săn trùm (Bot 001-015): 13 / 15 bot có lượt thi triển.
+
+Giới hạn: mỗi cấu hình chạy MỘT lần (n = 1) nên không ước được tỉ lệ chập chờn của `--boss`; thử bằng kho tệp (không qua PostgreSQL). Tải chồng lên hai lần chạy (theo Dev B, kiểm bằng `ps`): lần 10 phút (09:34:27-09:44:30) bị `npm test` đầy đủ của B (09:34:11-09:35:49, `nice 10`) chồng 82 giây đầu cộng build client ~10 giây (~09:36:45); lần 30 phút (09:46:07-10:16:28) bị soak 100 bot của C (PID 2451046, 09:42:16-09:52:33) chồng 6,5 phút đầu, B không chạy gì nặng trong 09:46-10:16. Cả hai lần có tải chồng đều ĐẠT 4/4 nên tải chồng không làm trượt tiêu chí `--boss` ở hai lần này; n = 1 nên chưa đủ để nói `--boss` nhạy hay không nhạy với tải. Số tick của lần 3 chỉ để kiểm 'vẫn trong ngưỡng xa', số tick sạch hơn là của lần 2.

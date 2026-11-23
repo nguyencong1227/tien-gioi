@@ -19,6 +19,7 @@ import {
   questReady,
   canAccept,
   npcMarker,
+  questRewardMsg,
   MAIN_QUEST_START,
   stepOf,
   SKILL_BY_ID,
@@ -329,5 +330,41 @@ describe("thưởng nhiệm vụ bằng kinh quyển (M7.4)", () => {
     expect(talk).toContain("Túi đồ");
     expect(talk).toContain("Học");
     expect(talk).not.toMatch(/Shift|Ctrl|Alt|phím/i);
+  });
+});
+
+describe("tin thưởng trả nhiệm vụ `questReward` (mục 66, #1327)", () => {
+  const withItems = QUESTS.find((q) => (q.rewards.items?.length ?? 0) > 0)!;
+  const noItems = QUESTS.find((q) => !q.rewards.items?.length)!;
+
+  it("mang đúng id, tu vi thật đã cộng và vật phẩm theo thứ tự dữ liệu", () => {
+    const m = questRewardMsg(withItems, 123);
+    expect(m.questId).toBe(withItems.id);
+    expect(m.exp).toBe(123);
+    expect(m.coin).toBe(0);
+    expect(m.items).toEqual(withItems.rewards.items);
+  });
+
+  it("vật phẩm là bản SAO CHÉP: sửa tin không làm hỏng bảng dữ liệu dùng chung", () => {
+    const before = JSON.stringify(withItems.rewards.items);
+    const m = questRewardMsg(withItems, 1);
+    m.items[0].qty = 999;
+    m.items.push({ itemId: "x", qty: 1 });
+    expect(JSON.stringify(withItems.rewards.items)).toBe(before);
+  });
+
+  it("nhiệm vụ không có đồ thưởng: items rỗng (không undefined)", () => {
+    expect(questRewardMsg(noItems, 5).items).toEqual([]);
+  });
+
+  it("số lạ (âm, lẻ, NaN, vô hạn) hạ về số nguyên không âm", () => {
+    for (const bad of [-5, NaN, Infinity, -Infinity, 0]) {
+      expect(questRewardMsg(withItems, bad, bad)).toMatchObject({ exp: 0, coin: 0 });
+    }
+    expect(questRewardMsg(withItems, 7.9, 3.2)).toMatchObject({ exp: 7, coin: 3 });
+  });
+
+  it("Linh thạch đi kèm khi có", () => {
+    expect(questRewardMsg(withItems, 10, 250).coin).toBe(250);
   });
 });

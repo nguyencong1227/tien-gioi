@@ -13,3 +13,4 @@ vitest.log
 .DS_Store
 .env.local
 e2e-logs*/
+tmp/ai-playtest/

@@ -22,7 +22,7 @@ export const AMBUSH_MIN_POTIONS_MAX = 8;
 
 /**
  * `AMBUSH_MIN_POTIONS` -> số ĐAN HỒI KHÍ HUYẾT (mọi bậc: thường / Đại / Thượng) TỐI THIỂU trong túi để bị chặn đường (người có ít đan hơn thì KHÔNG bị chặn: bị hạ là chết thật, mục 53, mà đo cho thấy chiến với 2 đan gần như không chết còn
- * không có đan chết ~16% / lần). Mặc định 0 (không đòi, như trước). Số nguyên 0..`AMBUSH_MIN_POTIONS_MAX`; giá trị lạ / ngoài khoảng coi là 0 (KHÔNG chặn ngầm) và có cảnh báo. Khuyến nghị 2 nếu bật.
+ * không có đan chết ~16% / lần). Mặc định 0 (không đòi, như trước). Số nguyên 0..`AMBUSH_MIN_POTIONS_MAX`; giá trị lạ / ngoài khoảng coi là 0 (KHÔNG chặn ngầm) và có cảnh báo. Người dùng quyết (mục 64, 22/11): chặn đường VẪN chặn người không đan (chỉ cảnh báo), nên giữ 0, KHÔNG đặt 2.
  */
 export function ambushMinPotions(env: NodeJS.ProcessEnv): number {
   const v = (env.AMBUSH_MIN_POTIONS ?? "").trim();

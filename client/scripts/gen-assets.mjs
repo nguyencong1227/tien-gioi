@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
 import zlib from "node:zlib";
+import { sigilRows } from "./book-marks.mjs";
 
 const OUT_DIR = fileURLToPath(new URL("../public/assets", import.meta.url));
 const ITEMS_DIR = path.join(OUT_DIR, "items");
@@ -980,11 +981,11 @@ const BOOKS = {
   kinh_van_kiem_quy_tong: [0xc8ccd4, 0x5a626e, "kiem"],
   // Chiêu dạng mới (CT9 lát 1, A): bìa theo hệ; Lôi vàng nhạt, Âm tím sẫm
   kinh_doc_dang_phuc: [0x4f8a4e, 0xc4e6b0],
-  kinh_phi_kiem_tam_lien: [0xb8bcc8, 0xf2e6a0, "kiem"],
+  kinh_phi_kiem_tam_lien: [0xb8bcc8, 0xa8e0b8, "kiem"], // phi kiếm: viền ngọc bích (trước đây GIỐNG HỆT Thanh Vân Kiếm Khí, #1303)
   kinh_liet_diem_tran: [0xd9433b, 0xffd0a0, "tran"],
   kinh_loi_lien_chau: [0xe0c850, 0xfff6b0],
   kinh_hon_phien_tuong: [0x5a3a7a, 0xc9a8e6, "tran"],
-  kinh_pha_son_nhat_kich: [0x8f6a2e, 0xe6c98a],
+  kinh_pha_son_nhat_kich: [0x8f6a2e, 0xe6c98a, undefined, 1], // salt 1: ấn mặc định chỉ lệch 9 điểm so với Trọng Nhạc Trảm (ngưỡng 10, #1303)
   // Mộc + Thủy (CT7 #1052): màu bìa theo hệ, dấu tròn (không mark để tránh chữ). Dev E thêm chiêu + quyển, atlas.test.ts đòi icon cho mọi vật phẩm.
   kinh_hu_thuy_chuong: [0x3b7bd9, 0xbfe0ff],
   kinh_trien_xa_thu: [0x5e9a4a, 0xd0f0b8],
@@ -1012,6 +1013,11 @@ const BOOKS = {
   kinh_cam_long_khau: [0x7d8590, 0xdde4ec],
   kinh_hoa_huyet_phe_nguyen: [0x8c7f88, 0xeadde6],
   kinh_long_tuong_ho_the: [0xa89c78, 0xf4ecd0],
+  // Kim / Thổ (CT17 lát 1, G): bìa theo hệ (kim 0xc8ccd4, thổ 0xa8803a)
+  kinh_kim_thoa_xuyen_tam: [0xc8ccd4, 0xf2e6a0],
+  kinh_thuc_giap_phi_tan: [0xc8ccd4, 0x8a93a0],
+  kinh_thiet_sa_chuong: [0xa8803a, 0xe6c98a],
+  kinh_chuong_vu_phong_lam: [0xa8803a, 0xd8cc9a],
 };
 
 /**
@@ -1554,7 +1560,7 @@ function drawItemIcon(id) {
     }
   } else if (BOOKS[id]) {
     // Kinh quyển (M7.4): sách khép, gáy tối, mép giấy sáng, dấu hệ trên bìa
-    const [cover, accent, mark] = BOOKS[id];
+    const [cover, accent, mark, salt] = BOOKS[id];
     s.rect(5, 4, 14, 17, cover);
     s.rect(5, 4, 3, 17, 0x2a2018, 110);
     s.rect(19, 5, 1, 15, 0xf4ecd0);
@@ -1571,9 +1577,9 @@ function drawItemIcon(id) {
       return (k(16) << 16) | (k(8) << 8) | k(0);
     };
     if (mark === undefined) {
-      // 12 quyển đợt 1: dấu tròn
-      s.circle(12, 13, 3, accent);
-      s.circle(12, 13, 1.4, cover);
+      // Không chỉ định dấu tay: "ấn" 7 x 7 đối xứng sinh TẤT ĐỊNH từ id quyển (`book-marks.mjs`, #1303), nên quyển mới tự có dấu khác quyển
+      // cũ. Hai quyển lỡ trùng thì ghi `salt` (số nguyên) làm phần tử thứ tư của mục trong `BOOKS`; `book-marks.test.ts` đòi không trùng.
+      paintMark(sigilRows(id, salt ?? 0), 10, { "#": accent });
     } else if (mark === "tien") {
       // Hàn Quang Tiễn: mũi tên xiên, đuôi có hai cánh lông
       s.line(9.6, 16.2, 15, 10.8, accent, 1.2);
