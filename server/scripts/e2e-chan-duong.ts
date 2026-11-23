@@ -22,7 +22,12 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { AMBUSH_STRIDE_PX, DEFAULT_MAP_ID, type AmbushFoeGroup } from "@tien-gioi/shared";
+import {
+  AMBUSH_EXP_PRICE_MIN,
+  AMBUSH_STRIDE_PX,
+  DEFAULT_MAP_ID,
+  type AmbushFoeGroup,
+} from "@tien-gioi/shared";
 import { Tab, sleep, shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -602,10 +607,12 @@ async function main() {
     }
 
     // =========================================================================
-    // CA 3: bỏ chạy GIỮA TRẬN: nút luôn bấm được, vận 1 giây, giá GẤP ĐÔI, về chỗ cũ
+    // CA 3: bỏ chạy GIỮA TRẬN: nút luôn bấm được, vận 1 giây, giá 3 phút săn (hộp thoại 2 phút), về chỗ cũ
     // =========================================================================
     if (wanted(3)) {
-      out("\n--- Ca 3: bỏ chạy giữa trận (vận 1 giây, giá gấp đôi) ---");
+      out(
+        "\n--- Ca 3: bỏ chạy giữa trận (vận 1 giây, giá 3 phút săn so với 2 phút ở hộp thoại) ---",
+      );
       const NAME = nameOf("Ba");
       const s0 = await prepare(NAME, secretOf(NAME));
       changeCoin(s0.world, s0.sid, 5000);
@@ -616,9 +623,14 @@ async function main() {
       const origin = { x: s0.p.x as number, y: s0.p.y as number };
       const s1 = await fightIntoArena(s0.roomId);
       const mid = s1.world.arena.price as { exp: number; coin: { price: number; enough: boolean } };
+      // CD6b (#1066): giá = số PHÚT SĂN x Linh thạch / phút của bậc (hộp thoại `AMBUSH_EXP_PRICE_MIN.offer`, giữa trận `.mid`), KHÔNG còn hệ số x2 giữa trận.
+      // Nhân chéo để khỏi chia: mỗi giá đã làm tròn (sai <= 0,5) nên |mid x offerMin - offer x midMin| <= 0,5 x (offerMin + midMin); dùng trần nguyên + 1.
+      const minOffer = AMBUSH_EXP_PRICE_MIN.offer;
+      const minMid = AMBUSH_EXP_PRICE_MIN.mid;
       check(
-        Math.abs(mid.coin.price - 2 * offerPrice.coin.price) <= 1,
-        `giá giữa trận ${mid.coin.price} Linh thạch ~ GẤP ĐÔI giá hộp thoại ${offerPrice.coin.price}`,
+        Math.abs(mid.coin.price * minOffer - offerPrice.coin.price * minMid) <=
+          Math.ceil(0.5 * (minOffer + minMid)) + 1,
+        `giá giữa trận ${mid.coin.price} Linh thạch = ${minMid} phút săn, hộp thoại ${offerPrice.coin.price} = ${minOffer} phút săn (tỉ lệ ${minMid}:${minOffer})`,
       );
       check(
         mid.exp > offerPrice.exp,
