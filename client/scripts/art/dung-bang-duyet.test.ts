@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LEARNABLE_SKILLS, MONSTERS, NPCS } from "../../../shared/src/index";
+import { ITEMS, LEARNABLE_SKILLS, MONSTERS, NPCS, RARITY_NAMES } from "../../../shared/src/index";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(here, "dung-bang-duyet.py");
@@ -49,6 +49,31 @@ describe("dung-bang-duyet.py: ranh giới giấy phép (đọc mã, chạy mọi
   it("tờ đầy đủ chỉ ghi vào thư mục riêng, mặc định ngoài repo", () => {
     expect(code).toContain('default="/mnt/data/assets-private/preview"');
     expect(code).toContain('f"{code_group}-day-du.png"');
+  });
+});
+
+describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu (chạy mọi máy)", () => {
+  const repo = path.join(here, "..", "..", "..");
+
+  it("DUYET_TUNG_PHAN.md có khối nhóm 14 với ĐỦ mã VP-001..VP-<số vật phẩm> liên tục, mỗi mã đúng một hàng, và các tờ công khai có thật", () => {
+    const doc = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+    const blk = /<!-- NHOM 14 -->([\s\S]*?)<!-- \/NHOM 14 -->/.exec(doc);
+    expect(blk, "thiếu khối NHOM 14").toBeTruthy();
+    const codes = [...blk![1].matchAll(/^\| (VP-\d{3}) \|/gm)].map((m) => m[1]);
+    expect(codes).toHaveLength(ITEMS.length);
+    expect(codes).toEqual(ITEMS.map((_, i) => `VP-${String(i + 1).padStart(3, "0")}`));
+    const sheets = [...blk![1].matchAll(/`(14-vat-pham-[a-z-]+\d?)\.png`/g)].map((m) => m[1]);
+    expect(new Set(sheets).size).toBeGreaterThanOrEqual(4);
+    for (const f of new Set(sheets))
+      expect(fs.statSync(path.join(repo, `docs/art/huong-moi/${f}.png`)).size, f).toBeGreaterThan(
+        5_000,
+      );
+  });
+
+  it("nhóm 14 chỉ dùng nguồn CÔNG KHAI: không ô gói riêng (wuxia / sunny) nào trong group_vp", () => {
+    const body = code.slice(code.indexOf("def vp_row("), code.indexOf("def md_for("));
+    expect(body.length).toBeGreaterThan(500);
+    expect(body).not.toMatch(/"wuxia"|"sunny"/);
   });
 });
 
@@ -122,7 +147,7 @@ describe.skipIf(!hasPillow)("dung-bang-duyet.py: hàm nine() (9-slice) dựng đ
   });
 });
 
-describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13, 15 và 16)", () => {
+describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-16)", () => {
   let dir = "";
   let pub = "";
   let priv = "";
@@ -137,6 +162,13 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13, 15 và 16
       JSON.stringify({
         npcs: NPCS.map((n) => ({ id: n.id, name: n.name, title: n.title })),
         mons: MONSTERS.map((m) => ({ id: m.id, name: m.name, boss: Boolean(m.boss) })),
+        items: ITEMS.map((i) => ({
+          id: i.id,
+          name: i.name,
+          type: i.type,
+          rarity: i.rarity,
+          rarityName: RARITY_NAMES[i.rarity],
+        })),
         skills: LEARNABLE_SKILLS.map((k) => ({
           id: k.id,
           name: k.name,
@@ -152,7 +184,7 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13, 15 và 16
         "-I",
         SCRIPT,
         "--groups",
-        "10,11,12,13,15,16",
+        "10,11,12,13,14,15,16",
         "--public",
         pub,
         "--private",
@@ -242,13 +274,34 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13, 15 và 16
   it("MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ)", () => {
     const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
     const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
-    expect(sheets.length).toBeGreaterThanOrEqual(15); // 4 (nhóm 10-13) + 10 (nhóm 15) + 1 (nhóm 16)
+    expect(sheets.length).toBeGreaterThanOrEqual(21); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16)
     for (const f of sheets) {
       const inRepo = fs.readFileSync(path.join(repoDir, f));
       expect(
         inRepo.equals(fs.readFileSync(path.join(pub, f))),
-        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,15,16 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
+        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
       ).toBe(true);
     }
+  });
+
+  it("nhóm 14 (vật phẩm): sáu tờ, tổng đúng số vật phẩm, KHÔNG ô gói riêng, tờ công khai == tờ đầy đủ từng byte", () => {
+    const out = String(run.stdout);
+    const lines = out.split("\n").filter((l) => l.startsWith("ĐÃ DỰNG 14-vat-pham-"));
+    expect(lines.length).toBe(6);
+    let total = 0;
+    for (const l of lines) {
+      const m = /ĐÃ DỰNG (14-vat-pham-[a-z-]+\d?) (\d+) mã \(ô gói riêng: (\d+)\)/.exec(l);
+      expect(m, l).toBeTruthy();
+      total += Number(m![2]);
+      expect(m![3], l).toBe("0");
+      expect(Number(m![2]), l).toBeLessThanOrEqual(30); // tờ không quá cao
+      const a = fs.readFileSync(path.join(pub, `${m![1]}.png`));
+      const b = fs.readFileSync(path.join(priv, `${m![1]}-day-du.png`));
+      expect(
+        a.equals(b),
+        `${m![1]}: tờ công khai phải == tờ đầy đủ (nhóm 14 không dùng gói riêng)`,
+      ).toBe(true);
+    }
+    expect(total).toBe(ITEMS.length);
   });
 });
