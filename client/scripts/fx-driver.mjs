@@ -104,6 +104,10 @@ export const FX_CAST_SKILLS = [
   // Lôi (CT15 đợt 2, #1185, D)
   "loi_hoa_pha_ta_chuong",
   "chan_hon_loi_phap",
+  // Vô sắc (CT17 lát 3, G)
+  "huyet_trao_pha_mach",
+  "bach_cot_hong_nhan",
+  "niep_hon_doat_phat",
   // Thủy (CT15 đợt 2 lát 2, #1185, D): hình mới aura_water / pull / bolt
   "thai_hoa_bo_nguyen",
   "huyet_co_bi_kinh",

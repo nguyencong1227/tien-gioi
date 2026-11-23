@@ -965,6 +965,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("liet_diem_tran"), chance: 0.008, min: 1, max: 1 }, // vùng cháy Hỏa (CT9 lát 1)
     { itemId: bookIdOf("xich_tuoc_phu"), chance: 0.005, min: 1, max: 1 }, // phù Hỏa Kim Đan (CT8 lát 1)
     { itemId: bookIdOf("hoa_huyet_phe_nguyen"), chance: 0.005, min: 1, max: 1 }, // vô sắc Kim Đan (CT8 lát 3)
+    // Vô sắc Kim Đan (`reqRealm` 3), Huyền phẩm (CT17 lát 3, G; nguồn rơi chuyển từ Xích Mãng sang Độc Thiềm vì Xích Mãng là trùm TRÚC CƠ, `book-drop-realm.test.ts`): rơi hiếm
+    { itemId: bookIdOf("huyet_trao_pha_mach"), chance: 0.006, min: 1, max: 1 },
   ],
   // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
   hac_giao: [
@@ -1006,6 +1008,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("man_da_hoa_kinh"), chance: 0.008, min: 1, max: 1 },
     // Lôi Nguyên Anh gắn dấu (CT15 đợt 2, D #1185): rơi hiếm từ Phong Nha (quái Nguyên Anh), giữ số Linh thạch / giờ mục 30
     { itemId: bookIdOf("chan_hon_loi_phap"), chance: 0.006, min: 1, max: 1 },
+    // Vô sắc Nguyên Anh, Địa phẩm (CT17 lát 3, G): rơi hiếm từ Phong Nha (quái Nguyên Anh), giữ thu nhập Nguyên Anh như các lát trước
+    { itemId: bookIdOf("bach_cot_hong_nhan"), chance: 0.006, min: 1, max: 1 },
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
@@ -1030,6 +1034,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("phuong_minh_cau_hoang"), chance: 0.006, min: 1, max: 1 }, // Hỏa khống chế Nguyên Anh (CT8 lát 2)
+    // Vô sắc Nguyên Anh, Địa phẩm (CT17 lát 3, G): rơi hiếm từ Độc Tước (quái Nguyên Anh), giữ thu nhập Nguyên Anh như các lát trước
+    { itemId: bookIdOf("niep_hon_doat_phat"), chance: 0.006, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [
