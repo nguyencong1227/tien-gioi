@@ -23,6 +23,12 @@ Mỗi nhóm một **tờ ảnh ghép** (nền tối): mỗi hàng một mã; c�
 - **Góc nhìn.** Game là top-down 4 hướng. Nhân vật / quái Xianxia chỉ NHÌN NGANG (trái / phải, lật gương): dùng làm thân trên bản đồ thì khi đi lên / xuống vẫn quay ngang (nhiều game top-down chấp nhận). Chân dung NPC của Xianxia thì dùng ngay không vướng góc nhìn.
 - **Chân dung và thân độc lập.** NPC có hai thứ: chân dung ở hộp thoại (gói tải theo nhu cầu `art:npc`, đã có đường ống) và thân đứng trên bản đồ; duyệt riêng từng thứ.
 
+**Nhóm 15 (hiệu ứng chiêu) khác các nhóm trước ở ba điểm:**
+- Hiệu ứng của Xianxia là ĐƠN SẮC (trắng -> xám đậm) có chủ ý: README của gói khuyên nhân một màu lúc chạy để ra mọi hệ từ MỘT hiệu ứng. Màu trên tờ ảnh (theo hệ của chiêu) chỉ để XEM; màu thật do `FX` của game chốt.
+- Mỗi hiệu ứng có 8-24 khung và một `anchor` (`left`: tia bắn từ tay, `bottom`: đặt dưới chân, `center`); tờ ảnh chỉ hiện 3 khung quanh đỉnh (25 / 50 / 75 %).
+- Mười tờ, mỗi HỆ một tờ (Kim, Mộc, Thủy, Hỏa, Thổ, Băng, Phong, Lôi, Âm, Vô sắc). Cột A = hiệu ứng hợp HÌNH chiêu (tia, quạt, vòng, bay...), B = hiệu ứng đặc trưng của HỆ (sen cho Mộc, phượng hoàng cho Hỏa, lôi kiếp cho Lôi...), C = vệt chém Wuxia Lite (gói riêng, chỉ cho chiêu chém / tia / lao). Cột "hiện tại" là icon kinh quyển (hiệu ứng hiện tại vẽ bằng mã, không có tệp ảnh để so).
+
+<!-- NHOM 10 -->
 ## Nhóm 10 — Người chơi (NV)
 
 Tờ ảnh: `10-nguoi-choi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/10-nguoi-choi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
@@ -34,6 +40,9 @@ Tờ ảnh: `10-nguoi-choi.png` (công khai: hiện tại + CC0) và `/mnt/data/
 | NV-03 | Áo theo trang bị (3 bộ áo hiện có) | thổ nhung / hắc hổ / xích lân | Ninja Adventure (CC0); top-down 4 hướng, 16 px; samurai đổi màu vải (3 bộ) | — | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); swordsman v_black / v_green / v_red | A (đổi màu áo theo bộ) |
 | NV-04 | Chém (hoạt ảnh đánh) | 3 khung chém xuống | Ninja Adventure (CC0); top-down 4 hướng, 16 px; 1 khung chém / hướng (4 hướng) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; Attack_South 4 khung | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); attack (nhìn ngang) | B (4 khung mỗi hướng) hoặc giữ hiện tại |
 
+<!-- /NHOM 10 -->
+
+<!-- NHOM 11 -->
 ## Nhóm 11 — NPC (NPC): chân dung hộp thoại (A) và thân trên bản đồ (B) chọn ĐỘC LẬP
 
 Tờ ảnh: `11-npc.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/11-npc-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
@@ -56,6 +65,9 @@ Tờ ảnh: `11-npc.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-
 | NPC-14 | Mộc Diên — Lão đan sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'alchemist' (hộp thoại) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; thân Herbalist (bản đồ) | — | A cho chân dung + B cho thân |
 | NPC-15 | Tô Linh Ấn — Lão phù sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'fortune' (hộp thoại) | — | — | A cho chân dung |
 
+<!-- /NHOM 11 -->
+
+<!-- NHOM 12 -->
 ## Nhóm 12 — Quái thường (Q)
 
 Tờ ảnh: `12-quai.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/12-quai-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
@@ -75,6 +87,9 @@ Tờ ảnh: `12-quai.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | Q-11 | Rắn Con | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_snake NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
 | Q-12 | Phân Thân Yêu Vương | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_ghost NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
 
+<!-- /NHOM 12 -->
+
+<!-- NHOM 13 -->
 ## Nhóm 13 — Trùm (T): thẻ trùm bằng ảnh AI SDXL giữ nguyên, đây chỉ là THÂN trên bản đồ
 
 Tờ ảnh: `13-trum.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/13-trum-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
@@ -86,11 +101,157 @@ Tờ ảnh: `13-trum.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | T-03 | Thiên Hàn Vương | hiện tại (thân) + thẻ ảnh AI | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); boss fallenimmortal (tiên sa ngã) | — | — | A (cần xem kỹ) / ảnh AI |
 | T-04 | Linh Hư Yêu Vương | hiện tại (thân) + thẻ ảnh AI | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); boss ninetail (cửu vĩ hồ) | — | — | A |
 
-## Nhóm 14, 15, 16 — ĐANG LÀM (B + G)
+<!-- /NHOM 13 -->
 
-| Nhóm | Mã | Việc | Nguồn dự kiến |
-|---|---|---|---|
-| 14 vật phẩm | VP-xxx (126 món: đan, kinh quyển, trang bị theo phẩm, nguyên liệu) | tờ ảnh HIỆN TẠI đủ mã + phương án theo NHÓM kiểu biểu tượng | Xianxia (36 biểu tượng / vũ khí, CC0), Ninja Adventure (vũ khí, hũ, hòm), gói biểu tượng khác của mục 68 khi G kiểm xong giấy phép |
-| 15 hiệu ứng chiêu | HU-xx (57 chiêu học được) | ghép từng chiêu với hiệu ứng theo hệ / loại (kiếm khí, bay kiếm, sen, phượng hoàng, lôi kiếp, bùa, băng...) | Xianxia `fx/` (40 hiệu ứng ĐƠN SẮC trắng-xám: tô màu theo hệ lúc chạy, có `anchor`), Wuxia Lite (1 chém), hạt của Ninja Adventure |
-| 16 giao diện | UI-xx (khung bảng, nút, thanh, ô túi, con trỏ, đường kẻ) | HIỆN TẠI (DOM / CSS) với bộ UI các gói | Xianxia `ui/` (66 tệp, CC0), Ninja Adventure `theme_1` (đổi màu), Sunnyside UI (riêng) |
+<!-- NHOM 15 -->
+## Nhóm 15 — Hiệu ứng chiêu, hệ Kim (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
 
+Tờ ảnh: `15-hieu-ung-chieu-kim.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-kim-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-01 | Ưng Trảo (Kim, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-02 | Kim Chung Tráo (Kim, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-03 | Bạch Kim Trảo (Kim, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-04 | Thanh Vân Kiếm Khí (Kim, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-05 | Thu Thủy Kiếm Ảnh (Kim, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-06 | Vạn Kiếm Quy Tông (Kim, fan) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_rain (theo hình 'fan') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-07 | Kim Thoa Xuyên Tâm (Kim, bolt) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'bolt') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-08 | Thực Giáp Phi Tán (Kim, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-09 | Phi Kiếm Tam Liên (Kim, bolt) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'bolt') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Mộc (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-moc.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-moc-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-10 | Thanh Tùng Phi Châm (Mộc, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-11 | Triền Xà Tỏa Hầu (Mộc, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-12 | Hắc Sa Chưởng (Mộc, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-13 | Thiềm Tô Liệu Thương (Mộc, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-14 | Đoạn Trường Chỉ (Mộc, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-15 | Khô Mộc Phùng Xuân (Mộc, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-16 | Độc Đằng Phục (Mộc, trap) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); talisman (theo hình 'trap') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); lotus (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Thủy (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-thuy.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-thuy-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-17 | Hồi Xuân (Thủy, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bgan_waterfall (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-18 | Hủ Thủy Kình (Thủy, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bgan_waterfall (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-19 | Âm Thi Độc Chưởng (Thủy, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bgan_waterfall (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Hỏa (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-hoa.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-hoa-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-20 | Hỏa Vân Kiếm (Hỏa, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-21 | Liệt Hỏa Kiếm (Hỏa, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-22 | Liệt Diễm Chưởng (Hỏa, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-23 | Xích Tước Phù (Hỏa, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-24 | Phượng Minh Cầu Hoàng (Hỏa, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-25 | Liệt Diễm Trận (Hỏa, zone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); array_seal (theo hình 'zone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Thổ (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-tho.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-tho-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-26 | Bôn Thạch Quyền (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-27 | Trọng Nhạc Trảm (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-28 | Cửu Cung Khốn Sát (Thổ, ground) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-29 | Vân Thạch Trận (Thổ, ground) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-30 | Bàn Thạch Hộ Thể (Thổ, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-31 | Liệt Địa Nhất Quyền (Thổ, ground) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-32 | Phân Nhạc Trảm (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-33 | Thiết Sa Chưởng (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-34 | Chướng Vụ Phong Lâm (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-35 | Phá Sơn Nhất Kích (Thổ, ground) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Băng (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-bang.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-bang-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-36 | Huyền Băng Chỉ (Băng, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); frost_shard (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-37 | Lạc Tuyết Phân Phi (Băng, fan) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_rain (theo hình 'fan') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); frost_shard (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-38 | Hàn Quang Tiễn (Băng, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); frost_shard (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-39 | Băng Hoa Loạn (Băng, fan) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_rain (theo hình 'fan') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); frost_shard (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-40 | Hàn Băng Nhất Chưởng (Băng, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); frost_shard (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Phong (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-phong.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-phong-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-41 | Phiêu Phong Bộ (Phong, dash) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hình 'dash') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); gale_vortex (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-42 | Mê Tung Bộ (Phong, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); gale_vortex (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-43 | Vân Hành Bộ (Phong, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); gale_vortex (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-44 | Hồi Phong Liên Chưởng (Phong, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); gale_vortex (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-45 | Bách Thú Khiếu Phong (Phong, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); gale_vortex (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Lôi (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-loi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-loi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-46 | Lôi Đình Nhất Miết (Lôi, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); tribulation (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-47 | Thiên La Lôi Cấm (Lôi, ground) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); tribulation (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-48 | Chưởng Tâm Lôi Bạo (Lôi, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); tribulation (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-49 | Liên Châu Lôi (Lôi, chain) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_rain (theo hình 'chain') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); tribulation (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Âm (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-am.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-am-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-50 | Minh Ảnh Phúc Chưởng (Âm, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); soul_wisp (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-51 | Minh Vũ Lạc Hồn (Âm, fan) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_rain (theo hình 'fan') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); soul_wisp (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-52 | Hồn Phiên Tượng (Âm, totem) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); array_seal (theo hình 'totem') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); soul_wisp (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+## Nhóm 15 — Hiệu ứng chiêu, hệ Vô sắc (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
+
+Tờ ảnh: `15-hieu-ung-chieu-none.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/15-hieu-ung-chieu-none-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| HU-53 | Huyết Ảnh Xuyên Tâm (Vô sắc, line) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); taiji (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-54 | Sư Tử Hống (Vô sắc, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); taiji (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-55 | Cầm Long Khấu (Vô sắc, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); taiji (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-56 | Hóa Huyết Phệ Nguyên (Vô sắc, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); taiji (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-57 | Long Tượng Hộ Thể (Vô sắc, self) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); bell_ward (theo hình 'self') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); taiji (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+
+<!-- /NHOM 15 -->
+
+<!-- NHOM 16 -->
+## Nhóm 16 — Giao diện (UI): khung, nút, thanh, ô, con trỏ, đường kẻ, ô kiểm, nút tròn, huy hiệu
+
+Tờ ảnh: `16-giao-dien.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/16-giao-dien-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| UI-01 | Khung bảng (hộp thoại, túi, nhân vật...) | hộp 'Đạo Thể' hiện tại (CSS), góc trên trái 150x84 | Xianxia Pixel Pack (willYEE) (CC0); panel_01 mực / ngọc / gỗ hồng / lụa (9-slice, biên của gói) | Ninja Adventure (CC0); theme_1 nine_path_panel / nine_path_bg ×3 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); 9slice_box dt / lt ×3 | giữ hiện tại (đọc tốt); A nếu muốn khung mực / ngọc kiểu tiên hiệp |
+| UI-02 | Nút bấm (thường / chạm / nhấn) | HUD 'Nhiệm vụ' (thường) + 'Nhân vật' (đang mở) | Xianxia Pixel Pack (willYEE) (CC0); button_01 ngọc / lụa x thường / chạm / nhấn | Ninja Adventure (CC0); theme_1 button thường / chạm / nhấn ×3 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); label_left + middle + right ×3 (nhãn, không có trạng thái) | giữ hiện tại; A (ngọc) nếu muốn nút kiểu tiên hiệp |
+| UI-03 | Thanh khí huyết / linh lực / tu vi | HUD hiện tại: ba thanh 244 px (đỏ / xanh / vàng) có chữ | Xianxia Pixel Pack (willYEE) (CC0); bar_01 frame + hp / mp / spirit (phủ 72 %), thu về 244 px | Ninja Adventure (CC0); system/ui/life_bar + bg ×3 (chỉ có thanh ĐỎ; phủ 100 / 60 / 25 %) | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); redbar / bluebar / greenbar mức 0 / 3 / cuối ×3 | giữ hiện tại (chữ số nằm ngay trên thanh); chỉ đổi nếu chữ vẫn đọc được |
+| UI-04 | Ô vật phẩm (túi, thanh dùng nhanh) | HUD: ô 'Hồi Huyết' (sáng) + 'Hồi Linh' (mờ), 54x54 | Xianxia Pixel Pack (willYEE) (CC0); panel_01 mực / ngọc thu 50 % làm ô 54x54 | Ninja Adventure (CC0); theme_1 panel / bg / bg_2 ×2 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); itemdisc_01 / 02 (đĩa tròn) ×3 | giữ hiện tại; C nếu muốn ô tròn kiểu hộp đạo cụ |
+| UI-05 | Con trỏ chuột (máy tính) | con trỏ hệ thống của trình duyệt (không vẽ riêng) | Xianxia Pixel Pack (willYEE) (CC0); cursor_sword / cursor_whisk (phất trần), thu về 32 px | — | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); cursor_01..05 + tay mở / nắm ×3 | A (kiếm) cho điểm nhấn; chỉ máy tính, không ảnh hưởng điện thoại |
+| UI-06 | Đường kẻ phân cách + góc trang trí khung | đường kẻ dưới tiêu đề hộp 'Đạo Thể' (CSS, 1 px) | Xianxia Pixel Pack (willYEE) (CC0); divider_cloud / divider_jade / corner_tl (thu về 40 px) | — | — | A (mây / ngọc) nếu duyệt khung bảng A ở UI-01; không thì giữ hiện tại |
+| UI-07 | Ô tích chọn + thanh trượt (Cài đặt) | Cài đặt: thanh trượt vàng + ô kiểm trắng | Xianxia Pixel Pack (willYEE) (CC0); slider_track + knob (70 %) + check_off / check_on, thu về cỡ hiện tại | Ninja Adventure (CC0); theme_1 unchecked / checked / grabber / slider_progress ×2 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); confirm (✓) / cancel (✗) ×3 (dấu, không phải ô kiểm) | giữ hiện tại (ô kiểm HTML gốc: bàn phím và trình đọc màn hình dùng được) |
+| UI-08 | Nút hành động tròn (Chém, Đột phá, Đả tọa, Kiếm khí) | HUD: bốn nút tròn 156x156 | — | Ninja Adventure (CC0); theme/nine_path_8 / 9 / 4 (tròn) ×4 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); itemdisc_01 / 02 ×4 | giữ hiện tại (chữ Hán + nhãn Việt đã rõ trên mọi cỡ màn hình) |
+| UI-09 | Huy hiệu trạng thái (Bỏng, Choáng, Tăng tốc...) | HUD: ô 'tên + số giây' (đỏ có hại, xanh có lợi) | Xianxia Pixel Pack (willYEE) (CC0); status_ bleed / burn / freeze / golden_shield / paralyze / poison / seal / swift (32 px) | — | — | A (biểu tượng) đứng cạnh số giây; giữ chữ cho trình đọc màn hình |
+
+<!-- /NHOM 16 -->
+
+## Nhóm còn đang làm
+
+- Nhóm 14: vật phẩm (VP, 126 món)
