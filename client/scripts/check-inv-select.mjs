@@ -28,6 +28,12 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Chờ tối đa chừng này ms cho Chrome mở cổng CDP và cho cảnh sẵn sàng. Trước đây 15 s / 16 s: một lượt Chrome khởi động chậm trên runner làm CẢ HAI script đỏ cùng lúc
+ * với "Không tìm thấy Chrome page target" sau 15,3 s (run 45243928886, A ở #1389); các `e2e-*.ts` khác chờ 30 s.
+ */
+const START_WAIT_MS = 60000;
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -99,7 +105,7 @@ async function main() {
   };
   try {
     let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
+    for (const tStart = Date.now(); !page && Date.now() - tStart < START_WAIT_MS;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
         page = (await res.json()).find((t) => t.type === "page") ?? null;
@@ -213,7 +219,7 @@ async function main() {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
       let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
+      for (const tReady = Date.now(); !ready && Date.now() - tReady < START_WAIT_MS;) {
         await sleep(200);
         ready = Boolean(
           await evalJs(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSlowMachine, speedBase } from "./check-move-keys.mjs";
+import { isSlowMachine, latencyLimit, speedBase } from "./check-move-keys.mjs";
 
 describe("check-move-keys: chuẩn tốc độ và nhận diện máy chậm (nit của A ở #1391)", () => {
   it("chuẩn = trung vị 3 giây sau giây khởi động, không phải giây nhanh nhất", () => {
@@ -31,5 +31,21 @@ describe("check-move-keys: chuẩn tốc độ và nhận diện máy chậm (ni
   it("đã chậm ở khung nhìn trước thì chậm ở mọi khung nhìn sau (sticky), kể cả khi khung nhìn này đo nhanh", () => {
     expect(isSlowMachine({ base: 158, frameMs: 17, sticky: true })).toBe(true);
     expect(isSlowMachine({ base: 158, frameMs: 17, sticky: false })).toBe(false);
+  });
+
+  it("giới hạn độ trễ phím: 6 khung hình, sàn 150 ms (run 45244896458 của A: trung vị 161 ms ở khung 36 ms đỏ vì giới hạn cũ 4 x khung = 150)", () => {
+    expect(latencyLimit(16.7)).toBe(150); // máy nhanh giữ sàn như cũ
+    expect(latencyLimit(25)).toBe(150); // A đo 101 ms: xanh
+    expect(latencyLimit(36)).toBe(216);
+    expect(161).toBeLessThanOrEqual(latencyLimit(36)); // số của runner
+    expect(197).toBeGreaterThan(latencyLimit(25)); // một độ trễ xấu thật ở khung nhanh vẫn đỏ
+    expect(Math.max(150, 4 * 36)).toBeLessThan(161); // công thức cũ KHÔNG chứa số này (ghi lại vì sao đổi)
+    // không giảm theo khung hình
+    let prev = 0;
+    for (const f of [10, 20, 25, 30, 36, 50, 80, 150]) {
+      const l = latencyLimit(f);
+      expect(l).toBeGreaterThanOrEqual(prev);
+      prev = l;
+    }
   });
 });

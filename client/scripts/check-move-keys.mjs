@@ -31,6 +31,12 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Chờ tối đa chừng này ms cho Chrome mở cổng CDP và cho cảnh sẵn sàng. Trước đây 15 s / 16 s: một lượt Chrome khởi động chậm trên runner làm CẢ HAI script đỏ cùng lúc
+ * với "Không tìm thấy Chrome page target" sau 15,3 s (run 45243928886, A ở #1389); các `e2e-*.ts` khác chờ 30 s.
+ */
+const START_WAIT_MS = 60000;
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -62,6 +68,14 @@ const SLOW_FRAME_MS = 40;
 export function speedBase(windows) {
   const rest = windows.slice(1).sort((a, b) => a - b);
   return rest[Math.floor(rest.length / 2)];
+}
+
+/**
+ * Giới hạn độ trễ nhấn phím -> nhân vật nhích (ms). Độ trễ thật ≈ 4 khung hình + nhiễu (đo: khung 25 ms -> 101 ms; khung 36 ms -> 146-161 ms), nên `4 x khung` làm giới hạn
+ * tụt về đúng sàn 150 ms ở khung ~36 ms (run 45244896458 của A ở #1389: trung vị 161 > 150). 6 khung chừa ~50% nhiễu; khung <= 25 ms giữ sàn 150 ms như cũ.
+ */
+export function latencyLimit(frameMs) {
+  return Math.max(150, 6 * frameMs);
 }
 
 /** Máy có chậm không: đã chậm ở khung nhìn trước (`sticky`), hoặc chuẩn thấp, hoặc khung hình dài. Chậm chỉ NỚI các ca đo tốc độ, không bỏ ca nào. */
@@ -135,7 +149,7 @@ async function main() {
   };
   try {
     let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
+    for (const tStart = Date.now(); !page && Date.now() - tStart < START_WAIT_MS;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
         page = (await res.json()).find((t) => t.type === "page") ?? null;
@@ -196,7 +210,7 @@ async function main() {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
       let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
+      for (const tReady = Date.now(); !ready && Date.now() - tReady < START_WAIT_MS;) {
         await sleep(200);
         ready = Boolean(
           await evalJs(
@@ -550,7 +564,7 @@ async function main() {
       console.log("  [9] độ trễ từ lúc nhấn phím đến lúc thấy nhân vật nhích");
       // Độ trễ không thể nhỏ hơn vài khung hình: ở khung chậm (runner WebGL phần mềm) đo khung hình rồi nới ngưỡng theo đó.
       const frameMs = await measureFrameMs();
-      const latLimit = Math.max(150, 4 * frameMs);
+      const latLimit = latencyLimit(frameMs);
       const lat = [];
       for (let i = 0; i < 10; i++) {
         await reset();
@@ -604,7 +618,7 @@ async function main() {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
       let ready2 = false;
-      for (let i = 0; i < 80 && !ready2; i++) {
+      for (const tReady2 = Date.now(); !ready2 && Date.now() - tReady2 < START_WAIT_MS;) {
         await sleep(200);
         ready2 = Boolean(
           await evalJs(
