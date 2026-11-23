@@ -115,4 +115,45 @@ NPC để bổ sung sau.
 
 ## Từ cấm
 
-<!-- do Dev G viết, issue #1199 — để trống -->
+> Khác ba bảng trên (thuật ngữ **chuẩn** cần viết ĐÚNG): đây là danh sách chữ **cấm tuyệt đối**
+> trong NỘI DUNG GAME — KHÔNG có dạng viết nào hợp lệ. Máy đọc được ở `shared/src/glossary-banned.ts`
+> (`BANNED_TERMS` + `bannedViolations(text)`); bảng dưới viết tay khớp, thêm chữ cấm thì thêm dòng trong
+> module đó rồi cập nhật bảng này. Issue #1199.
+
+**Phạm vi áp dụng (quan trọng — tránh dương tính giả):** CHỈ áp cho NỘI DUNG GAME (hội thoại NPC, tên
+vật phẩm / chiêu / quái / NPC / trùm, mô tả, lời nhiệm vụ...). **KHÔNG** áp cho chú thích tác quyền,
+`CREDITS.md`, `docs/NGUON_NOI_DUNG.md`, hay chính các tệp test (nơi nêu tên cấm để cấm / kiểm chúng —
+ví dụ `no-foreign-names.test.ts` và `glossary-banned.test.ts` được loại khỏi bộ quét tên ngoại lai).
+Dev F nối `bannedViolations` vào `npm run check:content` (Phần 3 #1200) chỉ quét chữ hiển thị game theo phạm vi này.
+
+### Tên riêng của truyện / game khác (cấm)
+
+> Thế giới Tiên Giới giữ nguyên; KHÔNG mượn nhân vật, tông phái, môn phái, tự viện, quốc gia của game /
+> truyện khác làm của Tiên Giới (AGENTS.md "Asset nguồn 3"). Danh sách từ những chỗ đã xác nhận rò rỏ:
+> AGENTS.md, `skills-kim-tho.test.ts` (`VKTT_PROPER`), và ví dụ người dùng trong issue #1199.
+
+| Chữ cấm | Lý do |
+|---|---|
+| Thanh Vân Môn / Thanh Vân Kiếm Tông | tông phái của Vạn Kiếp Tu Tiên |
+| Bắc Minh | môn phái của Vạn Kiếp Tu Tiên |
+| Huyền Vũ Môn | môn phái của Vạn Kiếp Tu Tiên |
+| Kim Đạo Tự | tự viện của Vạn Kiếp Tu Tiên |
+| Đan Hà Cốc | cốc (địa danh tông phái) của Vạn Kiếp Tu Tiên |
+| Hàn Lập | nhân vật của tiên hiệp khác (Phàm Nhân Tu Tiên) |
+
+> CHƯA phủ hết — gặp rò rỏ mới (tên nhân vật / tông phái truyện khác) thì THÊM dòng vào `BANNED_TERMS`,
+> đừng bịa danh sách rộng không có bằng chứng. Matcher KHÔNG phân biệt hoa / thường nên mọi cách viết đều bị bắt.
+
+### Từ hiện đại lạc văn phong (cấm, nhất là trong lời thoại)
+
+| Chữ cấm | Nên dùng thay |
+|---|---|
+| ok | được / vâng / phải vậy |
+| level | cấp / cảnh giới |
+| boss | trùm |
+
+> Matcher khớp ranh giới từ nên KHÔNG báo oan chữ hợp lệ chứa chuỗi con (vd "ok" KHÔNG bám "book";
+> "minh" riêng lẻ KHÔNG bám "Bắc Minh").
+
+**Chữ Hán / CJK KHÔNG liệt kê ở đây:** đã bị `ngon-ngu.test.ts` (quy tắc a) chặn trên TẤT CẢ chữ hiển thị
+game — nối trùng chỉ dư thừa. Bộ từ cấm này chỉ lo tên riêng Latinh + từ hiện đại.
