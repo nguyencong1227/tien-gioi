@@ -280,7 +280,8 @@ function damagePlayer(
     if (spareFromNetDeath(w, sid, p, c)) return;
     // Trong phòng bí cảnh: gục KHÔNG mất kiếp (bị đẩy ra, mất lượt; quyết định 11/11/2026, systems/dungeon.ts `dungeonFall`)
     if (dungeonFall(w, sid, p, c)) return;
-    // Trong ĐẤU TRƯỜNG chặn đường (mục 52): gục cũng KHÔNG mất kiếp (`arenaFall`)
+    // Trong ĐẤU TRƯỜNG chặn đường: khi luân hồi bật, gục lúc đang đánh = CHẾT THẬT (mục 53): `arenaFall` trả false để `beginLimbo` chạy ngay sau;
+    // nhánh nằm-rồi-đứng-dậy (không mất kiếp) chỉ còn khi luân hồi tắt (bản thử / bench) hoặc gục ngoài lúc đánh
     if (arenaFall(w, sid, p, c)) return;
     // Chết thật = luân hồi (docs/THIET_KE_LUAN_HOI.md): nhân vật của kiếp mất hẳn, linh hồn vào Hoàng Tuyền
     if (w.reincarnate) return beginLimbo(w, sid, p, c);

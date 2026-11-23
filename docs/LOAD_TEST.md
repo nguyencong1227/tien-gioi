@@ -2271,7 +2271,7 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
 | | Tệp hỏng (`*.hong-*`) | 0 | 0 | 0 | **ĐẠT** |
 | **Bảo toàn Linh thạch** | Đối chiếu sổ cái tiền tệ | Ví đầu 29.600 -> ví 11.479 + kho 8.420 = 19.899 (giảm 9.701, không vượt trần ban đầu, 0 ví âm; chưa có bộ đếm thả ra/tiêu) | **Đo chặt từ harness:** Ban đầu **29.600** + Thả ra **15.401** - Tiêu **35.580** = **9.421** = ví cuối **9.421**; Ví 9.421 + kho tông môn 8.740 = 18.161 <= trần 45.001; **lệch ví bot: 0** | Khớp sổ cái từng đồng, lệch ví bot = 0 | **ĐẠT** |
 | **Nội dung M7** | Chiêu thức Nguyên Anh | — | 999 lượt thi triển, **6/6** chiêu Nguyên Anh bắt buộc có lượt | Đủ 6/6 | **ĐẠT** |
-| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT; bằng chứng nghiêng về harness (#1301), game vẫn vận chiêu Xích Mãng khi bot đứng đúng chỗ** |
+| **Độ phủ chiêu trùm** | Tiêu chí `--boss` | — | **0/4** chiêu Xích Mãng thi triển (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`). Tổng thấy 3 lượt chiêu trùm khác (`mua_bang` 1, `doi_lao` 1, `vung_bang` 1). | Đủ 4/4 chiêu Xích Mãng | ❌ **KHÔNG ĐẠT ở lần 2; chạy lại trên `575a3887` ĐẠT 4/4 ở 10 phút và 30 phút (41.4; n = 1 mỗi cấu hình); 0/4 chưa tái hiện, chưa giải thích (#1301)** |
 
 ---
 
@@ -2287,8 +2287,34 @@ npm run soak -w server -- --bots=100 --minutes=10 --ambush
    - Hàng đợi ghi nhân vật luôn giải phóng ngay (`writesInflight = 0`, `writesOldestAgeMs = 0`, 0 lỗi ghi).
    - `kiem-save` kiểm toán toàn bộ 100 nhân vật, 100 chân linh và 4 tông môn đạt **0 lỗi vi phạm**, không sinh tệp cách ly `*.hong-*`.
    - Kết quả đo từ harness ở lần 2 chứng minh tính bảo toàn tiền tệ tuyệt đối: `29.600 (ban đầu) + 15.401 (thả ra) - 35.580 (tiêu) = 9.421 (ví cuối)`, sai số lệch ví bot = 0.
-4. **Vấn đề tiêu chí độ phủ chiêu trùm `--boss` (KHÔNG ĐẠT; bằng chứng nghiêng về harness, Refs #1301):**
+4. **Vấn đề tiêu chí độ phủ chiêu trùm `--boss` (KHÔNG ĐẠT ở lần 2; chạy lại ĐẠT, chưa giải thích được lần 0/4, Refs #1301):**
    - Harness ở lần chạy 30 phút báo kết luận tổng thể là **KHÔNG ĐẠT (FAIL)** do vi phạm tiêu chí độ phủ chiêu trùm: 0/4 chiêu của trùm Xích Mãng (`quat_duoi`, `phun_doc`, `cuon_minh`, `goi_ran_con`) được thi triển lần nào trong suốt 30 phút.
-   - **Bằng chứng nghiêng về harness; nguyên nhân trong `soak.ts` mới CHƯA chứng minh (Issue #1301):** Dev A chạy harness cũ (`a6026256`, #1001) trên cùng mã game `main` hiện tại, 10 phút, 100 bot, `--boss --m7`: **12 lượt chiêu trùm**, gồm **9 lượt của Xích Mãng** (`quat_duoi` 4, `cuon_minh` 3, `phun_doc` 2) và 3 lượt của trùm khác (`doi_lao`, `mua_bang`, `vung_bang`, mỗi chiêu 1). Lần đối chứng này cũng báo KHÔNG ĐẠT vì thiếu `goi_ran_con` (3 / 4 chiêu; chiêu này chỉ xuất hiện ở giai đoạn 2 khi rắn con bị hạ nên thiếu là ngẫu nhiên, mục 38 cũng chỉ thấy 1 lượt / 10 phút), và KHÔNG phải so sánh A / B sạch (khác mã harness VÀ khác thời lượng: 10 phút so với 30 phút; hai log cùng ghi `--m7 --boss` và cùng phân bổ kịch bản, cờ `--sect` không phải khác biệt vì `soak.ts` chỉ nhận cờ này để tương thích dòng lệnh).
-   - **Kết luận hợp lệ từ dữ liệu:** game VẪN vận chiêu Xích Mãng khi bot đứng đúng chỗ; bot săn trùm của harness mới không còn tiếp cận Xích Mãng. Nguyên nhân cụ thể trong `soak.ts` mới là **NGHI, đang điều tra ở #1301** (khối `bossHunt` bị thụt lề thêm một cấp trong diff sau #1281 / CD10b, hoặc nhánh đấu trường / chặn đường chạy trước nhánh săn trùm).
-   - **Kết luận cho hồ sơ Ứng viên phát hành RC (Refs #1290):** Các tiêu chí ổn định và bảo toàn tiền ĐẠT; tiêu chí `--boss` KHÔNG ĐẠT, bằng chứng nghiêng về harness chứ chưa chứng minh được nguyên nhân; game vẫn vận chiêu khi bot đứng đúng chỗ; issue theo dõi #1301.
+   - **Đối chứng harness cũ (A, 10 phút, `892325c5`, `--bots=100 --boss --m7`):** 12 lượt chiêu trùm = **9 lượt của Xích Mãng** (`quat_duoi` 4, `cuon_minh` 3, `phun_doc` 2) + 3 lượt của trùm khác (`doi_lao`, `mua_bang`, `vung_bang`, mỗi chiêu 1); thiếu `goi_ran_con` (3 / 4 chiêu; chiêu này chỉ xuất hiện ở giai đoạn 2 khi rắn con bị hạ, mục 38 cũng chỉ thấy 1 lượt / 10 phút) nên cũng báo KHÔNG ĐẠT. Khác lần 2 ở mã harness VÀ thời lượng (cờ `--sect` không phải khác biệt: `soak.ts` chỉ nhận để tương thích dòng lệnh).
+   - **Chạy lại bằng harness MỚI (A, `main` `575a3887`; `soak.ts` KHÔNG đổi so với `892325c5`, game chỉ khác dữ liệu +4 chiêu của #1299), cùng tham số `--bots=100 --m7 --boss`:** 10 phút ĐẠT, 23 lượt, 4 / 4 chiêu Xích Mãng (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); **30 phút ĐẠT toàn bộ**, 14 lượt, 4 / 4 (`quat_duoi` 6, `phun_doc` 5, `cuon_minh` 2, `goi_ran_con` 1): số đo ở 41.4. Không tái hiện được 0 / 4.
+   - **Kết luận hợp lệ từ dữ liệu:** harness mới KHÔNG hỏng chắc chắn (2 / 3 lần chạy đạt 4 / 4, kể cả đủ 30 phút); lần 0 / 4 là một lần chưa tái hiện và **chưa giải thích**: ngẫu nhiên (vị trí / đường đi bot săn trùm; bot săn trùm đi thẳng, không dò đường quanh vách), +4 chiêu (khó xảy ra, chưa loại) hoặc lỗi harness vẫn chưa loại được. Chưa có chứng cứ lỗi game (game vận chiêu Xích Mãng ở 3 / 4 lần chạy) nhưng cũng chưa loại được vì mỗi cấu hình chỉ chạy một lần. Điều tra tiếp ở #1301 (dòng thời gian chiêu trùm do C thêm).
+   - **Kết luận cho hồ sơ Ứng viên phát hành RC (Refs #1290):** các tiêu chí ổn định và bảo toàn tiền ĐẠT ở CẢ HAI lần 30 phút đầy đủ của A (`892325c5` và `575a3887`); tiêu chí `--boss` KHÔNG ĐẠT ở lần 2 (0 / 4, chưa giải thích) và ĐẠT 4 / 4 ở lần chạy lại 30 phút trên đầu `main` mới nhất; theo dõi ở #1301.
+
+### 41.4. Chạy lại trên `main` `575a3887` (Dev A, 22/11/2026, Refs #1301)
+
+Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=30 --m7 --boss --out=/tmp/a-soak-ab-new30m.json` (không `--keep-data`; đã tắt êm SIGTERM, `code=0`). Thêm một lần 10 phút cùng tham số (`/tmp/a-soak-ab-new10m.json`) làm đối chứng A / B: `soak.ts` không đổi giữa `892325c5` và `575a3887`, chỉ khác +4 chiêu dữ liệu (#1299).
+
+| Chỉ số | Lần 2 (`892325c5`) | Lần 3 (`575a3887`, 30 phút) | Ngưỡng | Đánh giá |
+|---|---:|---:|---:|:---:|
+| Bot khởi tạo -> kết thúc | 100 -> 100 | 100 -> 100 (rớt 0) | rớt <= 5% | **ĐẠT** |
+| VmRSS ban đầu / sau 5 phút / cuối | 176,93 / 211,85 / 213,52 MB | 190,48 / 224,38 / 224,89 MB | — | — |
+| Tăng sau warmup | +1,67 MB | +0,51 MB | <= 50 MB | **ĐẠT** |
+| Dốc nửa sau (OLS) | +0,023 MB/phút | +0,004 MB/phút | <= 1,00 MB/phút | **ĐẠT** |
+| Tick p95 phòng tệ nhất (TB / max) | 1,59 / 2,31 ms | 1,61 / 2 ms | <= 10 ms | **ĐẠT** |
+| Tick overrun (> 50 ms) | 0 | 0 | 0 | **ĐẠT** |
+| Độ trễ vòng lặp p99 | 26,4 ms | 30,1 ms | <= 100 ms | **ĐẠT** |
+| Băng thông nhận TB (p95) | 149 (175) B/tick | 148 (174) B/tick | <= 600 B/tick | **ĐẠT** |
+| Cảnh báo / lỗi log / lỗi `/metrics` | 0 / 0 / 0 | 0 / 0 / 0 | 0 | **ĐẠT** |
+| `kiem-save` (nhân vật / chân linh / tông môn) | 0 lỗi (100 / 100 / 4) | 0 lỗi (100 / 100 / 4) | 0 | **ĐẠT** |
+| Tệp hỏng `*.hong-*` | 0 | 0 | 0 | **ĐẠT** |
+| Sổ Linh thạch | 29.600 + 15.401 - 35.580 = 9.421 = ví cuối | 29.600 + 15.498 - 33.993 = 11.105 = ví cuối (kho 8.920, trần 45.098) | lệch ví bot = 0 | **ĐẠT** (lệch 0) |
+| Nội dung M7 | 999 lượt, 6 / 6 chiêu Nguyên Anh | 1.221 lượt, 6 / 6 chiêu Nguyên Anh | đủ 6 / 6 | **ĐẠT** |
+| Chiêu trùm `--boss` | **0 / 4** (3 lượt trùm khác) | **4 / 4**, 14 lượt: `quat_duoi` 6, `phun_doc` 5, `cuon_minh` 2, `goi_ran_con` 1 | đủ 4 / 4 | **ĐẠT** |
+
+Đối chứng 10 phút (cùng tham số, `575a3887`): PASS, 23 lượt, 4 / 4 (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); nhóm săn trùm (Bot 001-015): 13 / 15 bot có lượt thi triển.
+
+Giới hạn: mỗi cấu hình chạy MỘT lần (n = 1) nên không ước được tỉ lệ chập chờn của `--boss`; thử bằng kho tệp (không qua PostgreSQL). Tải chồng lên hai lần chạy (theo Dev B, kiểm bằng `ps`): lần 10 phút (09:34:27-09:44:30) bị `npm test` đầy đủ của B (09:34:11-09:35:49, `nice 10`) chồng 82 giây đầu cộng build client ~10 giây (~09:36:45); lần 30 phút (09:46:07-10:16:28) bị soak 100 bot của C (PID 2451046, 09:42:16-09:52:33) chồng 6,5 phút đầu, B không chạy gì nặng trong 09:46-10:16. Cả hai lần có tải chồng đều ĐẠT 4/4 nên tải chồng không làm trượt tiêu chí `--boss` ở hai lần này; n = 1 nên chưa đủ để nói `--boss` nhạy hay không nhạy với tải. Số tick của lần 3 chỉ để kiểm 'vẫn trong ngưỡng xa', số tick sạch hơn là của lần 2.

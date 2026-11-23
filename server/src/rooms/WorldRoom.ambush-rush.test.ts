@@ -336,10 +336,17 @@ describe("WorldRoom ambush rush (CD10b, Issue #1281)", () => {
     await waitFor(() => w.hub.ambushes.size === 0, 6000, "sổ vé dọn về 0 phòng");
     expect(w.hub.ambushes.size).toBe(0);
 
-    // Khẳng định toàn bộ phòng Colyseus đấu trường đã đóng hoàn toàn (matchMaker.query)
-    const activeRoomsAfter = await matchMaker.query({
-      name: roomNameOf(arenaMapIdOf(DEFAULT_MAP_ID)),
-    });
+    // Khẳng định toàn bộ phòng Colyseus đấu trường đã đóng hoàn toàn (matchMaker.query). KHÔNG khẳng định NGAY: vé được dọn trước khi
+    // người chơi kịp rời phòng và Colyseus gỡ phòng khỏi danh sách (CI chạy chồng nhiều lần: một lần đỏ với 8 phòng còn `clients: 1`),
+    // nên chờ THEO ĐIỀU KIỆN (có trần `WAIT_FLOOR_MS`); phòng rò thật thì hết hạn chờ vẫn đỏ.
+    const queryArenaRooms = () =>
+      matchMaker.query({ name: roomNameOf(arenaMapIdOf(DEFAULT_MAP_ID)) });
+    let activeRoomsAfter = await queryArenaRooms();
+    const roomsDeadline = Date.now() + WAIT_FLOOR_MS;
+    while (activeRoomsAfter.length > 0 && Date.now() < roomsDeadline) {
+      await sleep(50);
+      activeRoomsAfter = await queryArenaRooms();
+    }
     expect(activeRoomsAfter).toHaveLength(0);
 
     // 9. Kiểm tra hồ sơ lưu trên đĩa của cả 24 người
