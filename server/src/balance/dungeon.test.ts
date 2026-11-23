@@ -1,7 +1,7 @@
 // Cân bằng Bí cảnh Linh Hư (M3 bước 4c-2): số liệu trong shared/ phải đạt mục tiêu thiết kế (docs/THIET_KE_BI_CANH.md mục 6).
 // Sửa số liệu trùm / thưởng mà test này đỏ thì xem lại docs/CAN_BANG.md mục "Bí cảnh" (chạy `npm run can-bang -w server`).
 import { describe, expect, it } from "vitest";
-import { MONSTER_BY_ID } from "@tien-gioi/shared";
+import { DROP_TABLES, ITEMS, MONSTER_BY_ID, type DropEntry } from "@tien-gioi/shared";
 import {
   ASSUME_DUNGEON,
   LINH_HU,
@@ -11,6 +11,7 @@ import {
   runMinutes,
   summarizeFights,
 } from "./dungeon";
+import { expectedLootValue, monsterEconomy } from "./simulate";
 
 const { realm, tier } = realmTierOfStep(LINH_HU.minStep);
 const RUNS = 12;
@@ -107,6 +108,57 @@ describe("trận đánh trùm (mô phỏng bằng mã server thật, ca khó: đ
     // quét số liệu (ghi đè) cũng được trả lại
     fightBoss(LINH_HU, 2, { realm, tier, seed: 1, bossHp: 5000, bossAtk: 1 });
     expect(MONSTER_BY_ID[LINH_HU.boss].hp).toBe(hp);
+  });
+});
+
+/** Chạy `fn` khi quái `monsterId` có thêm một lần rơi `entry` (sách chiêu), rồi trả bảng rơi về như cũ. */
+function withExtraDrop<T>(monsterId: string, entry: DropEntry, fn: () => T): T {
+  const table = DROP_TABLES[monsterId] ?? (DROP_TABLES[monsterId] = []);
+  table.push(entry);
+  try {
+    return fn();
+  } finally {
+    table.pop();
+  }
+}
+
+describe("sách chiêu không làm vỡ cổng 15-20 phút (#1340)", () => {
+  // Một quyển BẤT KỲ (đủ giá trị bán để nhìn thấy): chiêu mới gắn sách vào quái cho Linh thạch / phút cao nhất là ca đã làm cổng đỏ (D, #1337)
+  const book = ITEMS.find((i) => i.type === "book")!.id;
+  const extra: DropEntry = { itemId: book, chance: 0.05, min: 1, max: 1 };
+
+  it("thêm sách chiêu vào Hắc Hổ (mẫu số của cổng) KHÔNG đổi `coinMinutes`, dù Linh thạch / phút thô của nó tăng", () => {
+    const base = dungeonValue(LINH_HU, 3, realm, tier).coinMinutes;
+    const rawBefore = monsterEconomy(MONSTER_BY_ID.ho, realm, tier)!.totalCoinPerHour;
+    withExtraDrop("ho", extra, () => {
+      // đối chứng: sách THẬT sự làm phình thu nhập thô (nếu không thì test này không chứng minh gì)
+      expect(monsterEconomy(MONSTER_BY_ID.ho, realm, tier)!.totalCoinPerHour).toBeGreaterThan(
+        rawBefore + 1,
+      );
+      expect(dungeonValue(LINH_HU, 3, realm, tier).coinMinutes).toBeCloseTo(base, 9);
+    });
+  });
+
+  it("sách rơi từ trùm bí cảnh cũng không làm đổi `coinNet` (loại ở cả hai vế)", () => {
+    const base = dungeonValue(LINH_HU, 3, realm, tier).coinNet;
+    const lootBefore = expectedLootValue(LINH_HU.boss);
+    withExtraDrop(LINH_HU.boss, { ...extra, chance: 1 }, () => {
+      expect(expectedLootValue(LINH_HU.boss)).toBeGreaterThan(lootBefore + 1);
+      expect(dungeonValue(LINH_HU, 3, realm, tier).coinNet).toBeCloseTo(base, 9);
+    });
+  });
+
+  it("đồ KHÔNG phải sách vẫn tính (đan, nguyên liệu): thêm một món thường vào Hắc Hổ làm `coinMinutes` giảm", () => {
+    const base = dungeonValue(LINH_HU, 3, realm, tier).coinMinutes;
+    withExtraDrop("ho", { itemId: "hoi_huyet_dan", chance: 0.5, min: 1, max: 1 }, () => {
+      expect(dungeonValue(LINH_HU, 3, realm, tier).coinMinutes).toBeLessThan(base - 0.01);
+    });
+  });
+
+  it("bảng rơi được trả về như cũ sau mỗi ca (không rò sang test khác)", () => {
+    const before = JSON.stringify(DROP_TABLES.ho);
+    withExtraDrop("ho", extra, () => undefined);
+    expect(JSON.stringify(DROP_TABLES.ho)).toBe(before);
   });
 });
 

@@ -133,6 +133,22 @@ export function ambushHuntExpPerMin(step: unknown): number {
 }
 
 /**
+ * Linh thạch / phút của người săn quái tốt nhất ở từng bậc (thang `stepOf`, 0 = Phàm Nhân ... 18 = Nguyên Anh tầng cuối): thước đo chung cho giá bỏ chạy và thưởng thắng
+ * Linh thạch, để "N phút" nghĩa là N phút săn quái ở CHÍNH bậc đó (giống `AMBUSH_HUNT_EXP_PER_MIN` cho tu vi). SINH từ cùng mô phỏng (`monsterEconomy.totalCoinPerHour / 60`
+ * của người săn quái tốt nhất mỗi bậc trong `server/src/balance/simulate.ts`: best coin hunter = best exp hunter ở mọi bậc, nên tỉ lệ coin/tu vi gần như không đổi theo bậc);
+ * `chan-duong.test.ts` buộc bảng này khớp bản sinh, đổi số liệu quái / đồ làm lệch thì test đỏ và in ra bảng đúng để dán lại. CD6b chốt (comment #1066 7078639156).
+ */
+export const AMBUSH_HUNT_COIN_PER_MIN: readonly number[] = [
+  18, 23, 25, 27, 28, 30, 49, 62, 67, 72, 83, 86, 89, 263, 272, 280, 289, 292, 296,
+];
+
+/** Linh thạch / phút săn ở bậc `step` (kẹp vào bảng: bậc ngoài bảng lấy bậc gần nhất; không phải số hữu hạn -> bậc 0). Thuần. */
+export function ambushHuntCoinPerMin(step: unknown): number {
+  const s = Math.min(wholeNonNeg(step), AMBUSH_HUNT_COIN_PER_MIN.length - 1);
+  return AMBUSH_HUNT_COIN_PER_MIN[s];
+}
+
+/**
  * Giá TU VI khi bỏ chạy, tính bằng PHÚT SĂN (`ambushHuntExpPerMin`) của bậc hiện tại, theo thời điểm. Luôn NHỎ HƠN thưởng thắng của mức thấp nhất (`AMBUSH_REWARD_MIN.normal` = 4 phút): thắng luôn
  * lợi hơn bỏ chạy và người chơi đang yếu không bị dồn vào "Chiến" vì bỏ chạy đắt hơn cả thưởng (thua = chết thật, mục 53). CD6b chốt.
  */
@@ -157,11 +173,17 @@ export function ambushRewardExp(step: unknown, tier: unknown): number {
   if (!isAmbushTier(tier)) return 0;
   return Math.round(AMBUSH_REWARD_MIN[tier] * ambushHuntExpPerMin(step));
 }
-/** Giá Linh thạch: `AMBUSH_COIN_BASE` x `AMBUSH_COIN_GROWTH`^(bậc) x hệ số thời điểm. TẠM: CD6 chốt (mục tiêu ~6-8 / 12-16 con quái cùng bậc). */
-export const AMBUSH_COIN_BASE = 30;
-export const AMBUSH_COIN_GROWTH = 1.18;
-export const AMBUSH_COIN_MULT: Readonly<Record<AmbushPriceStage, number>> = { offer: 1, mid: 2 };
-/** Sàn của giá Linh thạch: dù chỉnh `AMBUSH_COIN_BASE` / `AMBUSH_COIN_GROWTH` thế nào, bỏ chạy bằng Linh thạch không bao giờ rẻ hơn mức này (không thành "phí không đáng kể"). Hiện nhỏ hơn mọi giá thật nên chưa chạm tới. */
+
+/**
+ * Thưởng LINH THẠCH khi thắng, tính bằng PHÚT SĂN của bậc người chơi, theo mức kẻ địch (cùng khuôn phút săn như `AMBUSH_REWARD_MIN` cho tu vi, KHÔNG nhân `ARENA_REWARD_MULT`,
+ * KHÔNG `rollCoin`: đỡ gọi `Math.random` trong luồng tick). Trộn theo `AMBUSH_TIER_WEIGHTS` ~ 4,8 phút săn / lần chặn: thu nhập Linh thạch thêm từ chặn đường nằm trong 20-40% so
+ * săn quái cùng bậc (khung kiểm ở `chan-duong.ts`, ⚠️ ngoài khung). Thắng luôn lợi hơn bỏ chạy (4/6/10 > 2/3 phút). CD6b chốt (comment #1066 7078639156).
+ */
+export function ambushRewardCoin(step: unknown, tier: unknown): number {
+  if (!isAmbushTier(tier)) return 0;
+  return Math.round(AMBUSH_REWARD_MIN[tier] * ambushHuntCoinPerMin(step));
+}
+/** Sàn của giá Linh thạch: bỏ chạy bằng Linh thạch không bao giờ rẻ hơn mức này (không thành "phí không đáng kể"). Nhỏ hơn mọi giá thật ở bậc hợp lệ nên chưa chạm tới. */
 export const AMBUSH_FLEE_MIN_COIN = 5;
 
 const wholeNonNeg = (v: unknown): number =>
@@ -176,12 +198,12 @@ export function ambushExpPrice(step: unknown, expInBar: unknown, stage: AmbushPr
   return Math.min(raw, wholeNonNeg(expInBar));
 }
 
-/** Giá LINH THẠCH khi bỏ chạy ở bậc `step` (thang bậc của `realms.ts`, kẹp >= 0): `BASE x GROWTH^step x hệ số`, không dưới `AMBUSH_FLEE_MIN_COIN`. Thuần. */
+/**
+ * Giá LINH THẠCH khi bỏ chạy ở bậc `step`: `AMBUSH_EXP_PRICE_MIN[stage]` phút săn (`ambushHuntCoinPerMin`) — offer 2 phút, mid 3 phút (cùng khuôn phút săn như giá tu vi, KHÔNG
+ * còn hệ số x2 giữa trận). Không dưới `AMBUSH_FLEE_MIN_COIN`. Giữ chữ ký `(step, stage)` để server chốt giá gắn với lời đề nghị. Thuần.
+ */
 export function ambushCoinPrice(step: unknown, stage: AmbushPriceStage): number {
-  const s = wholeNonNeg(step);
-  const raw = Math.round(
-    AMBUSH_COIN_BASE * Math.pow(AMBUSH_COIN_GROWTH, s) * AMBUSH_COIN_MULT[stage],
-  );
+  const raw = Math.round(AMBUSH_EXP_PRICE_MIN[stage] * ambushHuntCoinPerMin(step));
   return Math.max(AMBUSH_FLEE_MIN_COIN, raw);
 }
 

@@ -13,3 +13,8 @@ vitest.log
 .DS_Store
 .env.local
 e2e-logs*/
+tmp/ai-playtest/
+
+# Python: bộ công cụ đồ hoạ (client/scripts/art/*.py) không để lại bản biên dịch
+__pycache__/
+*.pyc

@@ -33,10 +33,18 @@ import {
   ASSUME,
   bestGear,
   bestOption,
+  expectedBookValue,
   expectedCoinDrop,
   expectedLootValue,
   monsterEconomy,
 } from "./simulate";
+
+/**
+ * Linh thạch kỳ vọng mỗi con quái KHÔNG tính sách chiêu rơi (#1340). Cổng "một lượt bí cảnh ≈ 15-20 phút săn tốt nhất" đo giá trị bí cảnh so với thu nhập săn quái; sách chiêu là phần thu nhập
+ * thêm cố ý (người dùng đã chốt tốc độ ở mục 30) và mỗi chiêu mới làm nó phình, nên bị loại ở CẢ HAI vế (quái / trùm trong bí cảnh lẫn quái đem so) để hai phía nhất quán.
+ */
+const coinNoBooks = (id: string) =>
+  expectedCoinDrop(id) + expectedLootValue(id) - expectedBookValue(id);
 
 /** Giả định riêng của bí cảnh (đổi ở đây nếu thấy không giống người chơi thật). */
 export const ASSUME_DUNGEON = {
@@ -260,10 +268,10 @@ export function dungeonValue(
   let mobCoin = 0;
   let mobExp = 0;
   for (const [id, n] of mobs) {
-    mobCoin += n * (expectedCoinDrop(id) + expectedLootValue(id));
+    mobCoin += n * coinNoBooks(id);
     mobExp += n * killExp(MONSTER_BY_ID[id], realm, tier);
   }
-  const bossCoin = expectedCoinDrop(def.boss) + expectedLootValue(def.boss);
+  const bossCoin = coinNoBooks(def.boss);
   const itemsEv = def.reward.items.reduce((a, i) => a + i.chance * i.qty * sellPrice(i.itemId), 0);
   const potionCost = ASSUME_DUNGEON.potions * buyPrice("hoi_huyet_dan");
   const coinNet = def.reward.coin + itemsEv + (bossCoin + mobCoin) / party - potionCost;
@@ -273,7 +281,12 @@ export function dungeonValue(
   let huntCoinPerMin = 0;
   for (const id of ["lang", "ho", "mang"]) {
     const e = monsterEconomy(MONSTER_BY_ID[id], realm, tier);
-    if (e) huntCoinPerMin = Math.max(huntCoinPerMin, e.totalCoinPerHour / 60);
+    // KHÔNG tính sách chiêu (#1340): trừ phần sách khỏi Linh thạch / giờ của loại quái này
+    if (e)
+      huntCoinPerMin = Math.max(
+        huntCoinPerMin,
+        (e.totalCoinPerHour - e.killsPerHour * expectedBookValue(id)) / 60,
+      );
   }
   return {
     coinNet,

@@ -1243,6 +1243,36 @@ export interface QuestAcceptMsg {
 export interface QuestTurnInMsg {
   questId: string;
 }
+/**
+ * Server -> client (chỉ chủ nhân vật), tin `questReward`: THƯỞNG THẬT vừa trao khi trả nhiệm vụ (QUYET_DINH_M3 mục 66, issue #1327).
+ * Trước đây trả nhiệm vụ chỉ có toast "Hoàn thành: <tên>": tu vi cộng lặng lẽ, đồ vào túi lặng lẽ, người chơi không biết đã nhận gì.
+ * Server gửi MỘT tin NGAY SAU khi trao thưởng (cùng lúc với `quests` / `inv`), bằng `questRewardMsg`; client vẽ bảng thưởng từ tin này,
+ * KHÔNG tự tính từ `QuestDef.rewards` (tu vi thật đã nhân hệ số tông môn / thử nghiệm, nên khác số gốc).
+ */
+export interface QuestRewardMsg {
+  questId: string;
+  /** Tu vi THẬT đã cộng (sau hệ số tông môn / thử nghiệm), số nguyên >= 0; 0 = nhiệm vụ này không thưởng tu vi */
+  exp: number;
+  /** Linh thạch đã cộng, số nguyên >= 0; 0 = không có (hiện `QuestReward` chưa có Linh thạch: mục 66.4 của E / D có thể thêm) */
+  coin: number;
+  /** Vật phẩm đã vào túi (đúng thứ tự `QuestReward.items`); rỗng = không có */
+  items: { itemId: string; qty: number }[];
+}
+
+/**
+ * Dựng tin `questReward` từ định nghĩa nhiệm vụ và SỐ THẬT đã cộng. `exp` / `coin` là số server đã cộng vào người chơi (không phải số gốc trong dữ liệu);
+ * giá trị không hợp lệ (âm, lẻ, NaN, vô hạn) hạ về 0 / làm tròn xuống thành số nguyên không âm để tin luôn hợp lệ. Vật phẩm được SAO CHÉP (không dùng chung object với bảng dữ liệu).
+ */
+export function questRewardMsg(def: QuestDef, exp: number, coin = 0): QuestRewardMsg {
+  const whole = (n: number) => (Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
+  return {
+    questId: def.id,
+    exp: whole(exp),
+    coin: whole(coin),
+    items: (def.rewards.items ?? []).map((i) => ({ itemId: i.itemId, qty: i.qty })),
+  };
+}
+
 export interface QuestAbandonMsg {
   questId: string;
 }
