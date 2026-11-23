@@ -166,7 +166,7 @@ describe("Tài liệu rà soát khớp số tệp thật (M6, #411)", () => {
     expect(doc("CREDITS.md")).toContain(
       `quét qua script tự động (\`npm run check:credits\`):** ${scanned.length} tệp`,
     );
-    expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`(${scanned.length} tệp tĩnh =`);
+    expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`(${scanned.length} tệp tĩnh`);
     expect(doc("docs/RA_SOAT_TAI_SAN.md")).toContain(`**${scanned.length} tệp**`);
   });
 

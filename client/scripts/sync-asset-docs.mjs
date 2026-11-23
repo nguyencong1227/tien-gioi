@@ -1,7 +1,7 @@
 /* global process */
 /**
  * Script đồng bộ số đếm tài sản và danh sách icon vào CREDITS.md và docs/RA_SOAT_TAI_SAN.md
- * giữa các cặp dấu đánh dấu (markers), theo Issue #1368.
+ * giữa các cặp dấu đánh dấu (markers), theo Issue #1368, #1371.
  *
  * Chạy độc lập: node client/scripts/sync-asset-docs.mjs
  * Hoặc tự động chạy sau: npm run assets -w client
@@ -42,7 +42,18 @@ export function scanFiles(dir) {
 }
 
 /**
+ * Kiểm tra xem nội dung có chứa dấu xung đột git chưa được giải quyết hay không.
+ */
+export function checkConflictMarkers(content, filename) {
+  if (/^(<{7}|={7}|>{7})/m.test(content)) {
+    return `${filename} chứa dấu xung đột git chưa được giải quyết (<<<<<<< / ======= / >>>>>>>).`;
+  }
+  return null;
+}
+
+/**
  * Thay thế nội dung giữa marker: <!-- NAME:START -->...<!-- NAME:END -->
+ * Ném lỗi nếu thiếu marker hoặc phát hiện marker xuất hiện nhiều hơn 1 lần (xung đột merge sót).
  */
 export function replaceMarker(content, markerName, newInner) {
   const startTag = `<!-- ${markerName}:START -->`;
@@ -51,6 +62,13 @@ export function replaceMarker(content, markerName, newInner) {
   const e = content.indexOf(endTag);
   if (s === -1 || e === -1) {
     throw new Error(`Không tìm thấy cặp marker ${startTag} và ${endTag}`);
+  }
+  const s2 = content.indexOf(startTag, s + 1);
+  const e2 = content.indexOf(endTag, e + 1);
+  if (s2 !== -1 || e2 !== -1) {
+    throw new Error(
+      `Phát hiện marker ${markerName} xuất hiện nhiều hơn một lần (nghi ngờ xung đột git chưa giải quyết sạch)`,
+    );
   }
   return content.slice(0, s + startTag.length) + newInner + content.slice(e);
 }
@@ -204,31 +222,80 @@ export function generateRaSoatItemRows(orderedItems, currentRaSoatContent) {
 /**
  * Đồng bộ nội dung vào CREDITS.md và docs/RA_SOAT_TAI_SAN.md
  * @param {{ checkOnly?: boolean }} options
- * @returns {{ changed: boolean, errors: string[] }}
+ * @returns {{ changed: boolean, errors: string[], stats: object }}
  */
 export function syncAssetDocs(options = {}) {
   const stats = collectAssetStats();
   const errors = [];
   let anyChanged = false;
 
-  // 1. Cập nhật CREDITS.md
+  // 1. Kiểm tra dấu xung đột git trước tiên
   let credits = fs.readFileSync(CREDITS_FILE, "utf8");
+  const conflictCredits = checkConflictMarkers(credits, "CREDITS.md");
+  if (conflictCredits) errors.push(conflictCredits);
+
+  let raSoat = fs.readFileSync(RA_SOAT_FILE, "utf8");
+  const conflictRaSoat = checkConflictMarkers(raSoat, "docs/RA_SOAT_TAI_SAN.md");
+  if (conflictRaSoat) errors.push(conflictRaSoat);
+
+  if (errors.length > 0) {
+    if (options.checkOnly) {
+      return { changed: false, errors, stats };
+    }
+    throw new Error(errors.join("\n"));
+  }
+
   const origCredits = credits;
+  const origRaSoat = raSoat;
 
-  const itemFilesList = stats.itemFiles.map((f) => `\`${f}\``).join(", ");
+  try {
+    // 2. Cập nhật CREDITS.md
+    const itemFilesList = stats.itemFiles.map((f) => `\`${f}\``).join(", ");
 
-  credits = replaceMarker(credits, "AUTO-CREDITS-ITEM-COUNT", `${stats.itemCount} tệp`);
-  credits = replaceMarker(credits, "AUTO-CREDITS-ITEMS", itemFilesList);
-  credits = replaceMarker(
-    credits,
-    "AUTO-CREDITS-TOTAL-STATIC-HEADING",
-    `- **Tổng số tệp tài nguyên tĩnh quét qua script tự động (\`npm run check:credits\`):** ${stats.totalScanned} tệp`,
-  );
-  credits = replaceMarker(
-    credits,
-    "AUTO-CREDITS-ASSETS-DIR",
-    `  - \`client/public/assets/\`: ${stats.assetsCount} tệp (1 tileset, 2 atlas, ${stats.itemCount} biểu tượng vật phẩm, ${stats.aiCount} ảnh AI ở \`assets/ai/\`: \`login_bg.webp\` và 5 thẻ bản đồ, mục 7).`,
-  );
+    credits = replaceMarker(credits, "AUTO-CREDITS-ITEM-COUNT", `${stats.itemCount} tệp`);
+    credits = replaceMarker(credits, "AUTO-CREDITS-ITEMS", itemFilesList);
+    credits = replaceMarker(
+      credits,
+      "AUTO-CREDITS-TOTAL-STATIC-HEADING",
+      `- **Tổng số tệp tài nguyên tĩnh quét qua script tự động (\`npm run check:credits\`):** ${stats.totalScanned} tệp`,
+    );
+    credits = replaceMarker(
+      credits,
+      "AUTO-CREDITS-ASSETS-DIR",
+      `  - \`client/public/assets/\`: ${stats.assetsCount} tệp (1 tileset, 2 atlas, ${stats.itemCount} biểu tượng vật phẩm, ${stats.aiCount} ảnh AI ở \`assets/ai/\`: \`login_bg.webp\` và 5 thẻ bản đồ, mục 7).`,
+    );
+
+    // 3. Cập nhật docs/RA_SOAT_TAI_SAN.md
+    const itemRows = generateRaSoatItemRows(stats.itemFiles, raSoat);
+
+    raSoat = replaceMarker(raSoat, "AUTO-RA-SOAT-ITEM-ROWS", "\n" + itemRows + "\n");
+    raSoat = replaceMarker(
+      raSoat,
+      "AUTO-RA-SOAT-HEADER",
+      `## 2. Bảng thống kê chi tiết tài sản (${stats.totalScanned} tệp tĩnh; các mô-đun vẽ bằng mã ở mục 2c)`,
+    );
+    raSoat = replaceMarker(
+      raSoat,
+      "AUTO-RA-SOAT-ATLAS-HEADER",
+      `### 2b. Khung atlas (tệp 2-3) sau NPC \`tran_uy\` (D7 #755, E): ${stats.totalAtlasFrames} khung, toàn bộ sinh bằng \`gen-assets.mjs\``,
+    );
+    raSoat = replaceMarker(
+      raSoat,
+      "AUTO-RA-SOAT-ATLAS-ITEM-ROW",
+      `| \`item-*\` | ${stats.itemAtlasFrames} | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |`,
+    );
+    raSoat = replaceMarker(
+      raSoat,
+      "AUTO-RA-SOAT-SUMMARY-ROW",
+      `| Tệp tĩnh quét (\`client/public/assets\`, \`icons\`, \`fonts\`) | **${stats.totalScanned} tệp** (3 trong \`assets/\` + ${stats.aiCount} ảnh AI \`assets/ai/\` (\`login_bg.webp\` + 5 thẻ bản đồ) + ${stats.itemCount} icon + ${stats.iconsCount} icon PWA + ${stats.fontsCount} phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |`,
+    );
+  } catch (err) {
+    if (options.checkOnly) {
+      errors.push(err.message);
+      return { changed: false, errors, stats };
+    }
+    throw err;
+  }
 
   if (credits !== origCredits) {
     anyChanged = true;
@@ -238,34 +305,6 @@ export function syncAssetDocs(options = {}) {
       errors.push("CREDITS.md chưa khớp bản sinh tài sản tự động.");
     }
   }
-
-  // 2. Cập nhật docs/RA_SOAT_TAI_SAN.md
-  let raSoat = fs.readFileSync(RA_SOAT_FILE, "utf8");
-  const origRaSoat = raSoat;
-
-  const itemRows = generateRaSoatItemRows(stats.itemFiles, raSoat);
-
-  raSoat = replaceMarker(raSoat, "AUTO-RA-SOAT-ITEM-ROWS", "\n" + itemRows + "\n");
-  raSoat = replaceMarker(
-    raSoat,
-    "AUTO-RA-SOAT-HEADER",
-    `## 2. Bảng thống kê chi tiết tài sản (${stats.totalScanned} tệp tĩnh = 6 ảnh AI (\`login_bg.webp\` và 5 thẻ bản đồ, #513) + 24 của M4 + 5 phông (#331) + 15 icon Kim Đan (M6) + 14 icon ba ô riêng + 12 icon kinh quyển (M7.4 #505) + 12 icon Hàn Vân Lĩnh (M7.5 #506) + 6 icon kinh quyển đợt 2 (#654) + 3 icon đan hộ đạo (#763) + 9 icon phù (#817) + 6 icon kinh quyển Kim / Thổ (CT6 lát 1, #1051) + 6 icon chiêu dạng mới (CT9 lát 1, #1054) + 7 icon kinh quyển hệ Mộc/Thủy (CT7 #1052) + 6 icon kinh quyển Hỏa / Băng / Âm / Lôi / Phong (CT8 lát 1) + 5 icon kinh quyển Nguyên Anh (CT8 lát 2) + 5 icon kinh quyển vô sắc (CT8 lát 3) + 4 icon kinh quyển Kim / Thổ (CT17 lát 1, G) + 2 icon kinh quyển Mộc (CT17 lát 2, G) + 2 icon kinh quyển Lôi (CT15 đợt 2, #1185, D); các mô-đun vẽ bằng mã ở mục 2c)`,
-  );
-  raSoat = replaceMarker(
-    raSoat,
-    "AUTO-RA-SOAT-ATLAS-HEADER",
-    `### 2b. Khung atlas (tệp 2-3) sau NPC \`tran_uy\` (D7 #755, E): ${stats.totalAtlasFrames} khung (492 sau 2 kinh quyển Lôi CT15 đợt 2, D; 490 sau 2 kinh quyển Mộc CT17 lát 2, G; 488 sau 4 kinh quyển Kim / Thổ CT17 lát 1, G; 484 sau 5 kinh quyển vô sắc CT8 lát 3; 478 sau 5 kinh quyển Nguyên Anh CT8 lát 2; 473 sau 6 kinh quyển Hỏa / Băng / Âm / Lôi / Phong CT8 lát 1; 467 sau 7 kinh quyển hệ Mộc/Thủy CT7 #1052; 460 sau 6 chiêu dạng mới CT9 lát 1 #1054; 454 sau 6 kinh quyển Kim / Thổ CT6 #1051; 448 sau chín phù #817 = 337 sau M6 + 14 icon ba ô riêng + 12 icon kinh quyển + 50 khung năm quái Hàn Vân Lĩnh + 12 icon + 3 NPC Hàn Vân Trạm + 6 icon kinh quyển đợt 2 + 1 NPC Lò đan + 3 icon đan hộ đạo + 1 NPC Bàn phù + 9 icon phù, rồi + 6 icon kinh quyển Kim / Thổ, rồi + 6 icon chiêu dạng mới, rồi + 7 icon kinh quyển Mộc/Thủy, rồi + 6 icon kinh quyển Hỏa / Băng / Âm / Lôi / Phong, rồi + 5 kinh quyển Nguyên Anh CT8 lát 2, rồi + 5 kinh quyển vô sắc CT8 lát 3, rồi + 4 kinh quyển Kim / Thổ CT17 lát 1, rồi + 2 kinh quyển Mộc CT17 lát 2, rồi + 2 kinh quyển Lôi CT15 đợt 2), toàn bộ sinh bằng \`gen-assets.mjs\``,
-  );
-  raSoat = replaceMarker(
-    raSoat,
-    "AUTO-RA-SOAT-ATLAS-ITEM-ROW",
-    `| \`item-*\` | ${stats.itemAtlasFrames} | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |`,
-  );
-  raSoat = replaceMarker(
-    raSoat,
-    "AUTO-RA-SOAT-SUMMARY-ROW",
-    `| Tệp tĩnh quét (\`client/public/assets\`, \`icons\`, \`fonts\`) | **${stats.totalScanned} tệp** (3 trong \`assets/\` + ${stats.aiCount} ảnh AI \`assets/ai/\` (\`login_bg.webp\` + 5 thẻ bản đồ) + ${stats.itemCount} icon + ${stats.iconsCount} icon PWA + ${stats.fontsCount} phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |`,
-  );
 
   if (raSoat !== origRaSoat) {
     anyChanged = true;
