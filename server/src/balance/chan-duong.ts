@@ -13,6 +13,7 @@ import {
   AMBUSH_COOLDOWN_MS,
   AMBUSH_DAY_CAP,
   AMBUSH_EXP_PRICE_MIN,
+  AMBUSH_HUNT_COIN_PER_MIN,
   AMBUSH_HUNT_EXP_PER_MIN,
   AMBUSH_REWARD_MIN,
   AMBUSH_FLEE_CHANNEL_MS,
@@ -34,6 +35,7 @@ import {
   getMap,
   statsFor,
   stepOf,
+  WILD_MONSTERS,
   type AmbushFoeGroup,
   type AmbushTier,
 } from "@tien-gioi/shared";
@@ -51,7 +53,7 @@ import { applyStats } from "../systems/progression";
 import { addPlayer, makeWorld } from "../systems/test-helpers";
 import { tickWorld } from "../systems/tick";
 import { ASSUME_DUNGEON, realmTierOfStep, seeded } from "./dungeon";
-import { bestGear, bestOption } from "./simulate";
+import { bestGear, bestOption, monsterEconomy } from "./simulate";
 
 /** Giả định riêng của chặn đường (đổi ở đây nếu thấy không giống người chơi thật). */
 export const ASSUME_AMBUSH = {
@@ -404,6 +406,25 @@ export function huntExpPerMinTable(steps: number = AMBUSH_HUNT_EXP_PER_MIN.lengt
   for (let step = 0; step < steps; step++) {
     const { realm, tier } = realmTierOfStep(step);
     out.push(Math.round(bestOption(realm, tier).rate * 60));
+  }
+  return out;
+}
+
+/**
+ * Linh thạch / phút của người săn quái tốt nhất ở từng bậc 0..`steps - 1` (làm tròn), SINH từ `monsterEconomy` (totalCoinPerHour / 60 của con có thu nhập cao nhất mỗi bậc): bản gốc của
+ * `AMBUSH_HUNT_COIN_PER_MIN` ở `shared/` (`chan-duong.test.ts` buộc hai bên khớp). Best coin hunter = best exp hunter ở mọi bậc (cùng id quái), nhưng vẫn tìm riêng theo coin để khoá bảng coin
+ * ĐỘC LẬP với bảng tu vi: đổi số liệu rơi đồ / giá bán làm lệch coin mà KHÔNG đụng exp thì test vẫn bắt được.
+ */
+export function huntCoinPerMinTable(steps: number = AMBUSH_HUNT_COIN_PER_MIN.length): number[] {
+  const out: number[] = [];
+  for (let step = 0; step < steps; step++) {
+    const { realm, tier } = realmTierOfStep(step);
+    let best = 0;
+    for (const m of WILD_MONSTERS) {
+      const e = monsterEconomy(m, realm, tier);
+      if (e && e.totalCoinPerHour > best) best = e.totalCoinPerHour;
+    }
+    out.push(Math.round(best / 60));
   }
   return out;
 }

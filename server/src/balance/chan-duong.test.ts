@@ -5,6 +5,7 @@ import {
   AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_FOES,
   AMBUSH_DAY_CAP,
+  AMBUSH_HUNT_COIN_PER_MIN,
   AMBUSH_HUNT_EXP_PER_MIN,
   AMBUSH_TIER_WEIGHTS,
   ambushRewardExp,
@@ -32,6 +33,7 @@ import {
   type AmbushFight,
   type GroupSummary,
   type SensitivityRow,
+  huntCoinPerMinTable,
   huntExpPerMinTable,
   upliftByRealm,
 } from "./chan-duong";
@@ -310,6 +312,18 @@ describe("CD6b: bảng tu vi / phút săn và thưởng theo phút", () => {
   });
   it("huntExpPerMinTable: mỗi bậc là tu vi / phút (= bestOption x 60, làm tròn), bậc cao hơn Luyện Khí săn nhanh hơn Phàm Nhân", () => {
     const t = huntExpPerMinTable(4);
+    expect(t).toHaveLength(4);
+    for (const v of t) expect(v).toBeGreaterThan(0);
+    expect(t[3]).toBeGreaterThan(t[0]);
+  });
+  it("AMBUSH_HUNT_COIN_PER_MIN của shared/ KHỚP bản sinh từ monsterEconomy (nếu đỏ: đổi số liệu rơi đồ / giá bán làm lệch; dán bảng mới ở thông báo vào shared/src/ambush.ts)", () => {
+    const fresh = huntCoinPerMinTable();
+    expect([...AMBUSH_HUNT_COIN_PER_MIN], `bảng đúng hiện nay:\n[${fresh.join(", ")}]`).toEqual(
+      fresh,
+    );
+  });
+  it("huntCoinPerMinTable: mỗi bậc là linh thạch / phút (= totalCoinPerHour / 60 của người săn tốt nhất, làm tròn), bậc cao hơn Luyện Khí kiếm nhiều hơn Phàm Nhân", () => {
+    const t = huntCoinPerMinTable(4);
     expect(t).toHaveLength(4);
     for (const v of t) expect(v).toBeGreaterThan(0);
     expect(t[3]).toBeGreaterThan(t[0]);
