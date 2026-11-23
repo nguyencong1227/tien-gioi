@@ -206,13 +206,15 @@ describe("giá bỏ chạy", () => {
   it("Linh thạch bỏ chạy: tính bằng PHÚT SĂN của bậc (offer 2 phút, mid 3 phút), không theo con quái", () => {
     expect(AMBUSH_EXP_PRICE_MIN.offer).toBe(2);
     expect(AMBUSH_EXP_PRICE_MIN.mid).toBe(3);
-    // bậc 13 (Kim Đan sơ kỳ): 264 Linh thạch / phút săn
-    expect(ambushHuntCoinPerMin(13)).toBe(264);
-    expect(ambushCoinPrice(13, "offer")).toBe(2 * 264);
-    expect(ambushCoinPrice(13, "mid")).toBe(3 * 264);
-    // bậc 3 (Luyện Khí tầng 3): 27 Linh thạch / phút
-    expect(ambushCoinPrice(3, "offer")).toBe(2 * 27);
-    expect(ambushCoinPrice(3, "mid")).toBe(3 * 27);
+    // Đọc Linh thạch / phút săn TỪ BẢNG, không ghim số: bảng đổi mỗi lần thêm sách / đồ / quái (hai PR cùng thêm sách thì git ghép "sạch" mà số ghim SAI, #1337);
+    // việc giữ bảng khớp bản sinh là của `balance/chan-duong.test.ts`, ở đây chỉ kiểm giá = số phút x Linh thạch / phút của đúng bậc.
+    const c13 = AMBUSH_HUNT_COIN_PER_MIN[13]; // bậc 13 (Kim Đan sơ kỳ)
+    expect(ambushHuntCoinPerMin(13)).toBe(c13);
+    expect(ambushCoinPrice(13, "offer")).toBe(2 * c13);
+    expect(ambushCoinPrice(13, "mid")).toBe(3 * c13);
+    const c3 = AMBUSH_HUNT_COIN_PER_MIN[3]; // bậc 3 (Luyện Khí tầng 3)
+    expect(ambushCoinPrice(3, "offer")).toBe(2 * c3);
+    expect(ambushCoinPrice(3, "mid")).toBe(3 * c3);
     // cùng số phút ở mọi bậc: giá tỉ lệ với Linh thạch / phút săn của bậc đó (không phải % thanh)
     for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++)
       expect(ambushCoinPrice(s, "mid")).toBe(Math.round(3 * AMBUSH_HUNT_COIN_PER_MIN[s]));
@@ -255,9 +257,10 @@ describe("giá bỏ chạy", () => {
       expect(ambushHuntCoinPerMin(bad), String(bad)).toBe(AMBUSH_HUNT_COIN_PER_MIN[0]);
   });
   it("thưởng Linh thạch: phút săn của bậc x mức (4 / 6 / 10), mức lạ = 0", () => {
-    expect(ambushRewardCoin(13, "normal")).toBe(4 * 264);
-    expect(ambushRewardCoin(13, "elite")).toBe(6 * 264);
-    expect(ambushRewardCoin(13, "leader")).toBe(10 * 264);
+    const c13 = AMBUSH_HUNT_COIN_PER_MIN[13]; // đọc từ bảng, không ghim số (xem ca "Linh thạch bỏ chạy")
+    expect(ambushRewardCoin(13, "normal")).toBe(4 * c13);
+    expect(ambushRewardCoin(13, "elite")).toBe(6 * c13);
+    expect(ambushRewardCoin(13, "leader")).toBe(10 * c13);
     for (const bad of ["boss", "", null, undefined, 3, "constructor", "__proto__"])
       expect(ambushRewardCoin(13, bad), String(bad)).toBe(0);
     for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++) {
