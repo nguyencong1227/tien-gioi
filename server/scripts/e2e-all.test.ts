@@ -623,6 +623,41 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       }
     });
 
+    it("runE2eAll kết hợp --only, --skip, --shard và --dry-run: lọc trước rồi mới chia shard (#1404)", async () => {
+      const logs: string[] = [];
+      const logSpy = vi.spyOn(console, "log").mockImplementation((msg: string) => {
+        logs.push(msg);
+      });
+
+      try {
+        // Tập hợp 3 script có thật trong package.json: e2e:bi-canh, e2e:pk, e2e:xa-hoi
+        // Khi --skip pk: tập được chọn sau khi lọc là [e2e:bi-canh, e2e:xa-hoi]
+        // Khi chia shard 1/2: index 1 lấy phần tử thứ nhất -> [e2e:bi-canh] (đúng 1 script)
+        // Nếu chia shard trước rồi mới lọc (hoặc toRun = selected): kết quả sẽ khác
+        const code = await runE2eAll([
+          "--only",
+          "bi-canh,pk,xa-hoi",
+          "--skip",
+          "pk",
+          "--shard",
+          "1/2",
+          "--dry-run",
+        ]);
+        expect(code).toBe(0);
+
+        const parseDryRunScripts = (lines: string[]): string[] => {
+          return lines
+            .filter((line) => /^\s+\d+\.\s+e2e/.test(line))
+            .map((line) => line.trim().replace(/^\d+\.\s+/, ""));
+        };
+
+        const scripts = parseDryRunScripts(logs);
+        expect(scripts).toEqual(["e2e:bi-canh"]);
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
     it("runE2eAll khi shard rỗng (--only chan-duong --shard 2/2) thoát mã 0 và ghi REPORT.md thành công", async () => {
       const tempLogsDir = path.join(os.tmpdir(), `tg-e2e-empty-shard-${Date.now()}`);
       try {
