@@ -17,22 +17,26 @@ import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import {
+  addCoin,
   AMBUSH_COOLDOWN_MS,
   AMBUSH_DAY_CAP,
   COIN_CAP,
   DEFAULT_ORIGIN,
   DUNGEON_DAILY_REWARDS,
+  DUNGEON_MAPS,
   EQUIP_SLOTS,
   INVENTORY_SLOTS,
   ITEM_BY_ID,
   LEARNABLE_SLOTS,
   LEARNABLE_SKILLS,
+  MAPS,
   QUEST_BY_ID,
   REALMS,
   SKILL_BY_ID,
   SKILL_MAX_LEVEL,
   dayKey,
   emptyInventory,
+  equipSlotOpen,
   masteryNeedOf,
   sanitizeSkillBook,
   skillMaxLevelOf,
@@ -279,6 +283,58 @@ const ADVERSARIAL: Record<string, unknown>[] = [
   patched(baseSave(), { tier: 999 }),
   patched(baseSave(), { exp: -50 }),
   patched(baseSave(), { mapId: "ban_do_khong_co" }),
+  // Trang bị ĐÚNG id nhưng SAI ô (bỏ kiểm `equip.slot !== slot` trong sanitizeEquipment → lọt)
+  patched(baseSave(), {
+    equipment: { weapon: equipItemIdFor("robe"), robe: equipItemIdFor("weapon") },
+  }),
+  // Tầng chiêu vượt trần / âm / không hữu hạn cho chiêu HỢP LỆ (bỏ levelClamp → lọt)
+  patched(baseSave(), { skills: { learned: { [BASE_SKILL_ID]: 999 } } }),
+  patched(baseSave(), { skills: { learned: { [BASE_SKILL_ID]: -4 } } }),
+  // Ô chiêu trỏ chiêu CHƯA học (bỏ kiểm `learned` ở ô → lọt)
+  patched(baseSave(), {
+    skills: { learned: { [BASE_SKILL_ID]: 1 }, slots: [UNKNOWN_SKILL_ID, "", "", ""] },
+  }),
+  patched(baseSave(), {
+    skills: {
+      learned: { [BASE_SKILL_ID]: 1 },
+      slots: [LEARNABLE_SKILLS.find((s) => s.id !== BASE_SKILL_ID)!.id, "", "", ""],
+    },
+  }),
+  // Một chiêu ở HAI ô (bỏ `used.has(id)` → lọt)
+  patched(baseSave(), {
+    skills: { learned: { [BASE_SKILL_ID]: 1 }, slots: [BASE_SKILL_ID, BASE_SKILL_ID, "", ""] },
+  }),
+  // Bộ đếm kiếp vượt LIFE_CAP (bỏ `Math.min(LIFE_CAP, ..)` → lọt)
+  patched(baseSave(), { life: { playMs: 1e15, kills: 1e15, bossKills: 1e14 } }),
+  // Điểm luyện cho chiêu CHƯA học (phải bị bỏ)
+  patched(baseSave(), {
+    skills: {
+      learned: {},
+      mastery: { [LEARNABLE_SKILLS.find((s) => skillMaxLevelOf(s) > 1)!.id]: 5 },
+    },
+  }),
+  // Nhiệm vụ: id có thật nhưng bước / tiến độ rác; `done` có id lạ (bỏ kẹp / bỏ lọc → lọt)
+  patched(baseSave(), {
+    quests: {
+      active: [{ id: someQuestId(false), step: 9999, count: -3 }],
+      done: ["zzz_nv_la", someQuestId(false)],
+      daily: {},
+    },
+  }),
+  // Ô trang bị CHƯA MỞ ở cảnh giới (pháp bảo cho người Phàm Nhân): sanitizeEquipment phải bỏ
+  patched(baseSave(), { realm: 0, tier: 0, equipment: { treasure: equipItemIdFor("treasure") } }),
+  // mapId là bí cảnh (phòng tạm của một run): phải về bản đồ thường
+  patched(baseSave(), { mapId: DUNGEON_MAPS[0]!.id }),
+  // limbo: keepable quá trần 30 + endedLifeId quá dài (sanitizeLimbo phải cắt)
+  patched(baseSave(), {
+    limbo: {
+      endedLifeId: "x".repeat(200),
+      summary: { kiep: 1, realm: REALM },
+      keepable: Array.from({ length: 50 }, () => equipItemIdFor("weapon")),
+    },
+  }),
+  // Bộ đếm kiếp: bossKills > kills (sanitizeLife phải ép bossKills <= kills)
+  patched(baseSave(), { life: { playMs: 1, kills: 3, bossKills: 50 } }),
   // limbo / dungeonDaily / ambushDaily rác (bỏ kẹp → audit đỏ)
   // limbo: endedLifeId + realm hợp lệ — sanitize KHÔNG ép `endedLifeId` ≥8 hay realm về REALMS.length (audit nghiêm hơn sanitize ở biên, KHÔNG phải lỗi kho). Chỉ stress kiep âm + keepable item lạ: bỏ Math.max(1,..)/lọc equip nào thì audit đỏ nhánh đó.
   patched(baseSave(), {
@@ -291,6 +347,7 @@ const ADVERSARIAL: Record<string, unknown>[] = [
 
 // ---------- Dựng lại hồ sơ hợp lệ từ rác (giống luồng nạp thật) ----------
 
+// CHỈ cho realm / tier: kẹp THAY THẾ của test, KHÔNG phải mã game (WorldRoom.onJoin chỉ `Math.min(save.realm, ...)`, không chặn dưới / NaN). Đừng coi các ca realm / tier là canh mã game.
 const intClamp = (v: unknown, lo: number, hi: number): number =>
   typeof v === "number" && Number.isFinite(v) && Number.isInteger(v)
     ? Math.min(hi, Math.max(lo, v))
@@ -315,7 +372,7 @@ function cleanSave(raw: unknown): SavedPlayer {
   const tier = intClamp(r.tier, 0, REALMS[realm]!.tiers.length - 1);
   const exp =
     typeof r.exp === "number" && Number.isFinite(r.exp) && r.exp >= 0 ? Math.floor(r.exp) : 0;
-  const coin = intClamp(r.coin, 0, COIN_CAP);
+  const coin = addCoin(0, (r.coin ?? 0) as number); // ĐÚNG như WorldRoom.onJoin: hàm thật của shared, không tự kẹp trong test
   const q = sanitizeQuests(r.quests);
   const daily: Record<string, string> = {};
   for (const [id, d] of Object.entries(q.daily)) if (isDayKey(d)) daily[id] = d;
@@ -371,6 +428,11 @@ function assertStructural(c: SavedPlayer, where: string) {
   expect(Number.isInteger(c.coin) && c.coin >= 0 && c.coin <= COIN_CAP, `${where}: coin`).toBe(
     true,
   );
+  // Nhân vật chỉ ở bản đồ THƯỜNG (bí cảnh là phòng tạm: id đó trong file phải về Lạc Hà)
+  expect(
+    MAPS.some((m) => m.id === c.mapId),
+    `${where}: mapId ${c.mapId} không phải bản đồ thường`,
+  ).toBe(true);
   // Túi đúng 24 ô, mỗi ô hợp lệ
   expect(c.inventory.length, `${where}: túi 24 ô`).toBe(INVENTORY_SLOTS);
   for (const slot of c.inventory) {
@@ -382,13 +444,17 @@ function assertStructural(c: SavedPlayer, where: string) {
     ).toBe(true);
   }
   // Trang bị: mỗi ô hoặc rỗng hoặc id trang bị đúng ô (trang bị là trường optional nên cast qua record để index theo biến)
-  const equip = c as unknown as Record<string, string | undefined>;
+  const equip = (c.equipment ?? {}) as Record<string, string | undefined>;
   for (const slot of EQUIP_SLOTS) {
     const id = equip[slot];
-    if (id)
+    if (id) {
       expect(ITEM_BY_ID[id]?.equip?.slot === slot, `${where}: trang bị sai ô ${slot}=${id}`).toBe(
         true,
       );
+      expect(equipSlotOpen(slot, c.realm), `${where}: ô ${slot} chưa mở ở realm ${c.realm}`).toBe(
+        true,
+      );
+    }
   }
   // Sổ chiêu: tầng [1, skillMaxLevelOf] ⊆ [1, SKILL_MAX_LEVEL]; ô đúng 4; id đã học
   const sk = c.skills;
@@ -405,6 +471,8 @@ function assertStructural(c: SavedPlayer, where: string) {
     if (id === "") continue;
     expect(sk.learned[id] !== undefined, `${where}: ô chiêu chiêu chưa học ${id}`).toBe(true);
   }
+  const usedSlots = sk.slots.filter((id) => id !== "");
+  expect(new Set(usedSlots).size, `${where}: một chiêu ở hai ô`).toBe(usedSlots.length);
   // mastery: mỗi điểm nguyên >= 0 và < cần để lên tầng (hoặc không có khoá nếu không luyện được)
   for (const [id, pts] of Object.entries(sk.mastery ?? {})) {
     const def = SKILL_BY_ID[id];
@@ -416,12 +484,39 @@ function assertStructural(c: SavedPlayer, where: string) {
     ).toBe(true);
     if (need !== null)
       expect(pts < need, `${where}: mastery ${id}=${pts} >= cần ${need}`).toBe(true);
-    else expect(true, `${where}: mastery cho chiêu không luyện được phải bị bỏ`).toBe(true);
+    else
+      expect.fail(
+        `${where}: mastery cho chiêu chưa học / không luyện được (${id}=${pts}) phải bị bỏ`,
+      );
   }
+  // Sổ nhiệm vụ: id có thật, bước trong [0, số bước], tiến độ nguyên >= 0; `done` chỉ id có thật
+  for (const a of c.quests?.active ?? []) {
+    const def = QUEST_BY_ID[a.id];
+    expect(def, `${where}: nhiệm vụ đang làm lạ ${a.id}`).toBeTruthy();
+    expect(
+      Number.isInteger(a.step) && a.step >= 0 && a.step <= def!.steps.length,
+      `${where}: bước nhiệm vụ ${a.id}=${a.step}`,
+    ).toBe(true);
+    expect(Number.isInteger(a.count) && a.count >= 0, `${where}: count ${a.id}=${a.count}`).toBe(
+      true,
+    );
+  }
+  for (const id of c.quests?.done ?? [])
+    expect(QUEST_BY_ID[id], `${where}: nhiệm vụ đã xong lạ ${id}`).toBeTruthy();
   // life / limbo / dungeonDaily / ambushDaily / ambushUntil đã được kẹp (không ném, hợp lệ)
   expect(typeof c.life.playMs === "number", `${where}: life.playMs`).toBe(true);
-  if (c.limbo)
+  expect(c.life.bossKills <= c.life.kills, `${where}: life.bossKills > kills`).toBe(true);
+  // LIFE_CAP của store.ts (hằng không export nên chép số: 10^12); đổi bên đó thì sửa ở đây
+  for (const v of [c.life.playMs, c.life.kills, c.life.bossKills])
+    expect(
+      Number.isInteger(v) && v >= 0 && v <= 1_000_000_000_000,
+      `${where}: life vượt trần`,
+    ).toBe(true);
+  if (c.limbo) {
     expect(typeof c.limbo.endedLifeId === "string", `${where}: limbo.endedLifeId`).toBe(true);
+    expect(c.limbo.endedLifeId.length <= 64, `${where}: limbo.endedLifeId dài quá 64`).toBe(true);
+    expect(c.limbo.keepable.length <= 30, `${where}: limbo.keepable quá 30 món`).toBe(true);
+  }
   if (c.dungeonDaily)
     expect(
       Number.isInteger(c.dungeonDaily.rewards) &&
@@ -480,7 +575,7 @@ function checkOne(garbage: unknown, where: string) {
 
 describe("fuzz hồ sơ lưu: rác -> làm sạch -> audit sạch, idempotent, không ô nhiễm nguyên mẫu", () => {
   it.each(SEEDS)(
-    "hạt %i: %d hồ sơ rác đều làm sạch được, audit sạch, bất động, không ô nhiễm",
+    `hạt %i: ${STEPS} hồ sơ rác đều làm sạch được, audit sạch, bất động, không ô nhiễm`,
     (seed) => {
       const rand = rng(seed);
       const base = baseSave();
@@ -494,6 +589,16 @@ describe("fuzz hồ sơ lưu: rác -> làm sạch -> audit sạch, idempotent, k
     ADVERSARIAL.forEach((g, i) => checkOne(g, `đối kháng ${i}`));
   });
 
+  it("tự kiểm tính chất (4): một ô nhiễm nguyên mẫu GIẢ phải bị checkOne bắt (các sanitize* khó tự gây ô nhiễm nên cần ca này để (4) có răng)", () => {
+    (Object.prototype as Record<string, unknown>).polluted = true;
+    try {
+      expect(() => checkOne(baseSave(), "tự kiểm")).toThrow(/ô nhiễm/);
+    } finally {
+      delete (Object.prototype as Record<string, unknown>).polluted;
+    }
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
   it("chứa đủ nhánh rác (đổi kiểu / số cực trị / prototype / id lạ / object lồng sâu) trên mọi trường", () => {
     // Đảm bảo bộ sinh thực sự chạm các nhánh nguy hiểm (tránh test pass rộng).
     const rand = rng(3);
@@ -502,7 +607,10 @@ describe("fuzz hồ sơ lưu: rác -> làm sạch -> audit sạch, idempotent, k
     for (let i = 0; i < STEPS; i++) {
       const g = mutate(rand, base);
       for (const f of FUZZ_FIELDS)
-        if (g[f] !== (base as unknown as Record<string, unknown>)[f]) seen[f] = (seen[f] ?? 0) + 1;
+        if (
+          JSON.stringify(g[f]) !== JSON.stringify((base as unknown as Record<string, unknown>)[f])
+        )
+          seen[f] = (seen[f] ?? 0) + 1;
     }
     for (const f of FUZZ_FIELDS)
       expect(seen[f] ?? 0, `trường "${f}" chưa lần nào bị đột biến`).toBeGreaterThan(0);
@@ -565,10 +673,10 @@ describe("store.ts: loadPlayer / savePlayer với tệp thật", () => {
     // `savePlayer` luôn đóng dấu updatedAt = now nên bỏ trường đó khi so: dữ liệu (không tính thời điểm ghi) phải bất động
     const strip = (o: SavedPlayer) => JSON.stringify({ ...o, updatedAt: undefined });
     expect(strip(b!), "lưu->nạp lại bất động (trừ updatedAt)").toBe(strip(a!));
-    await fs.rm(dir, { recursive: true, force: true });
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     process.env.DATA_DIR = prev; // trả DATA_DIR về giá trị gốc, KHÔNG để lại cho test khác
+    await fs.rm(dir, { recursive: true, force: true }); // dọn kể cả khi ca trên đỏ
   });
 });
