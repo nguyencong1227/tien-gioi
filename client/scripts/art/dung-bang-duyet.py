@@ -228,6 +228,17 @@ class Loaders:
         w = im.width // n
         return im.crop((idx * w, 0, idx * w + w, im.height))
 
+    # Vật phẩm (nhóm 14, G + B): chỉ nguồn CÔNG KHAI. Xianxia `icons/icon_xianxia_<loại>_<nn>.png` (32 px, 6 PHẨM mỗi loại: 00 thấp -> 05 cao) và `ui/ui_xianxia_item_<tên>.png` (đồ dùng);
+    # Ninja Adventure `content/weapon/<tên>/sprite.png` (vũ khí / sách phép nhỏ, KHÔNG cần đổi màu theo cảnh giới như nhân vật)
+    def xian_icon(self, base, idx=0):
+        return load(f"{XIAN}/icons/icon_xianxia_{base}_{max(0, min(5, idx)):02d}.png")
+
+    def xian_item(self, name):
+        return load(f"{XIAN}/ui/ui_xianxia_item_{name}.png")
+
+    def ninja_weapon(self, w):
+        return load(f"{NINJA}/content/weapon/{w}/sprite.png")
+
 
 # ---------------------------------------------------------------- tờ ảnh
 class Cell:
@@ -601,6 +612,100 @@ def _xslider(X):
     return [sl, _fit_h(X("ui_xianxia_01_check_off.png"), 30), _fit_h(X("ui_xianxia_01_check_on.png"), 30)]
 
 
+# Vật phẩm (nhóm 14, 126 món): mã VP-001..126 LIÊN TỤC theo thứ tự đan / phù, kinh quyển, trang bị, nguyên liệu; chia thành các tờ <= VP_SHEET_ROWS hàng (một tờ 126 hàng cao ~24k px khó duyệt).
+# CHỈ nguồn công khai (hiện tại trong atlas + Xianxia CC0 + Ninja CC0): KHÔNG ô gói riêng, tờ công khai == tờ đầy đủ. Chỉ đề xuất hình HỢP NGHĨA (kiếm -> kiếm, phù -> bùa, đan -> bình đan, sách -> ngọc giản);
+# loại gói không có (áo, giày, nguyên liệu quái) để TRỐNG, khuyến nghị giữ hiện tại, thay vì nhét hũ / hòm cho đủ ô.
+VP_SHEET_ROWS = 30
+VP_GROUPS = [("dan-phu", "đan dược / phù"), ("kinh-quyen", "kinh quyển"), ("trang-bi", "trang bị"), ("nguyen-lieu", "nguyên liệu")]
+VP_EQUIP_KIND = [  # hậu tố tên -> (loại, mô tả); thứ tự quan trọng: "Ngoa" / "Bội" / "Phù" / "Kiếm" / "Bào" / còn lại = pháp bảo
+    ("Kiếm", "kiếm"), ("Bào", "áo"), ("Ngoa", "giày"), ("Bội", "ngọc bội"), ("Phù", "hộ phù"),
+]
+
+
+def vp_group_of(it):
+    if it["type"] == "book":
+        return "kinh-quyen"
+    if it["type"] == "equip":
+        return "trang-bi"
+    if it["type"] == "material":
+        return "nguyen-lieu"
+    return "dan-phu"  # consumable: đan + phù
+
+
+def vp_equip_kind(name):
+    last = name.split()[-1]
+    for suf, kind in VP_EQUIP_KIND:
+        if last == suf:
+            return kind
+    return "pháp bảo"  # Ấn / Châu / Chung...
+
+
+def vp_row(L, code, it):
+    t, rar = it["type"], it.get("rarityName") or "Phàm phẩm"
+    ri = it["rarity"]
+    cur = cell(L, "", "cur", lambda iid=it["id"]: L.cur("item-" + iid), f"hiện tại ({rar})", 32)
+    none = lambda letter, src: Cell(letter, src, [], "", 32)
+    c = Cell("C", "xian", [], "gói mục 68 (đang kiểm giấy phép)", 32)
+    if t == "equip":
+        kind = vp_equip_kind(it["name"])
+        if kind == "kiếm":
+            a = cell(L, "A", "xian", lambda: L.xian_icon("blade_01", ri), f"Xianxia kiếm / đao, phẩm {ri} (CC0)", 32)
+            b = cell(L, "B", "ninja", lambda: L.ninja_weapon("big_sword"), "Ninja: đại kiếm (CC0)", 32)
+            rec = "A (6 phẩm tăng dần)"
+        elif kind == "hộ phù":
+            a = cell(L, "A", "xian", lambda: L.xian_item("talisman"), "Xianxia: bùa (CC0)", 32)
+            b = cell(L, "B", "xian", lambda: L.xian_icon("relic_02", ri), f"Xianxia: pháp khí loại 2, phẩm {ri} (CC0)", 32)
+            rec = "A (bùa)"
+        elif kind == "ngọc bội":
+            a = cell(L, "A", "xian", lambda: L.xian_item("token"), "Xianxia: lệnh bài (CC0)", 32)
+            b = cell(L, "B", "xian", lambda: L.xian_icon("relic_02", 3), "Xianxia: chuỗi hạt (CC0)", 32)
+            rec = "giữ hiện tại; A nếu muốn lệnh bài"
+        elif kind == "pháp bảo":
+            a = cell(L, "A", "xian", lambda: L.xian_icon("relic_02", ri), f"Xianxia: pháp khí loại 2, phẩm {ri} (CC0)", 32)
+            b = cell(L, "B", "xian", lambda: L.xian_icon("relic_01", ri), f"Xianxia: pháp khí loại 1, phẩm {ri} (CC0)", 32)
+            rec = "A (6 phẩm tăng dần)"
+        else:  # áo, giày: gói không có
+            a, b = none("A", "xian"), none("B", "ninja")
+            rec = f"KHÔNG nguồn nào có {kind}: giữ hiện tại"
+    elif t == "book":
+        a = cell(L, "A", "xian", lambda: L.xian_item("jade_slip"), "Xianxia: ngọc giản (CC0)", 32)
+        b = cell(L, "B", "ninja", lambda: L.ninja_weapon("book"), "Ninja: sách phép (CC0)", 32)
+        rec = "giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung"
+    elif t == "consumable" and it["id"].startswith("phu_"):
+        a = cell(L, "A", "xian", lambda: L.xian_item("talisman"), "Xianxia: bùa (CC0)", 32)
+        b = cell(L, "B", "xian", lambda: L.xian_item("token"), "Xianxia: lệnh bài (CC0)", 32)
+        rec = "A (bùa)"
+    elif t == "consumable":
+        a = cell(L, "A", "xian", lambda: L.xian_item("pill_bottle"), "Xianxia: bình đan (CC0)", 32)
+        b = cell(L, "B", "xian", lambda: L.xian_item("gourd"), "Xianxia: hồ lô (CC0)", 32)
+        rec = "A (bình đan)"
+    else:  # nguyên liệu từ quái
+        a, b = none("A", "xian"), none("B", "ninja")
+        rec = "KHÔNG nguồn nào có: giữ hiện tại"
+    return dict(code=code, name=it["name"], rec=rec, cur=cur, opts=[a, b, c])
+
+
+def group_vp(L, names):
+    """Vật phẩm: các tờ `14-vat-pham-<nhóm>[-<n>]` (<= `VP_SHEET_ROWS` hàng mỗi tờ), mã VP-001..126 liên tục theo thứ tự nhóm."""
+    items = names["items"]
+    by = {g: [it for it in items if vp_group_of(it) == g] for g, _ in VP_GROUPS}
+    by["trang-bi"].sort(key=lambda it: (it["rarity"], it["name"]))  # phẩm thấp -> cao
+    sheets, n = [], 0
+    for g, label in VP_GROUPS:
+        rows = []
+        for it in by[g]:
+            n += 1
+            rows.append(vp_row(L, f"VP-{n:03d}", it))
+        parts_n = max(1, -(-len(rows) // VP_SHEET_ROWS))  # số tờ = trần chia; chia ĐỀU để không có tờ chỉ vài hàng
+        size = -(-len(rows) // parts_n)
+        chunks = [rows[i : i + size] for i in range(0, len(rows), size)]
+        for k, ch in enumerate(chunks, 1):
+            suffix = f"-{k}" if len(chunks) > 1 else ""
+            part = f" (tờ {k}/{len(chunks)})" if len(chunks) > 1 else ""
+            sheets.append((f"14-vat-pham-{g}{suffix}", f"Nhóm 14 — Vật phẩm (VP), {label}{part}: {ch[0]['code']} .. {ch[-1]['code']}", ch))
+    return sheets
+
+
 def md_for(code_group, title, rows):
     out = [f"## {title}", "", f"Tờ ảnh: `{code_group}.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/{code_group}-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).", "",
            "| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |", "|---|---|---|---|---|---|---|"]
@@ -669,7 +774,7 @@ def main():
     one = lambda t: [t]
     builders = {
         "10": lambda: one(group_nv(L)), "11": lambda: one(group_npc(L, names)), "12": lambda: one(group_quai(L, names)),
-        "13": lambda: one(group_trum(L, names)), "15": lambda: group_hu(L, names), "16": lambda: group_ui(L, names),
+        "13": lambda: one(group_trum(L, names)), "14": lambda: group_vp(L, names), "15": lambda: group_hu(L, names), "16": lambda: group_ui(L, names),
     }
     built = {}
     for g in a.groups.split(","):

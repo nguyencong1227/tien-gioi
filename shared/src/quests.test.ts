@@ -335,7 +335,9 @@ describe("thưởng nhiệm vụ bằng kinh quyển (M7.4)", () => {
 
 describe("tin thưởng trả nhiệm vụ `questReward` (mục 66, #1327)", () => {
   const withItems = QUESTS.find((q) => (q.rewards.items?.length ?? 0) > 0)!;
-  const noItems = QUESTS.find((q) => !q.rewards.items?.length)!;
+  // Nhiệm vụ KHÔNG có đồ thưởng: dựng mẫu tổng quát (không dựa vào dữ liệu thật — M66.4 #1333 đã cho mọi nhiệm vụ nộp đồ vật phẩm,
+  // nên không còn nhiệm vụ nào thiếu đồ trong QUESTS; hợp đồng vẫn phải xử lý được trường hợp này).
+  const noItems = { ...withItems, rewards: { exp: 5 } };
 
   it("mang đúng id, tu vi thật đã cộng và vật phẩm theo thứ tự dữ liệu", () => {
     const m = questRewardMsg(withItems, 123);

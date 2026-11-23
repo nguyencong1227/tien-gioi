@@ -948,7 +948,8 @@ export const QUESTS: QuestDef[] = [
     giver: "cao_thi",
     desc: "Nộp 5 nanh sói.",
     steps: [{ kind: "collect", itemId: "nanh_soi", count: 5 }],
-    rewards: { exp: 50 },
+    // M66.4 (#1333): trước chỉ thưởng tu vi (im lặng); thêm đan dược hợp bậc để cảm thấy có phần. Collect quest phải có vật phẩm (xem quest-collect-rewards.test.ts).
+    rewards: { exp: 50, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
     minRealm: { realm: 1, tier: 0 },
     daily: true,
     talk: {
@@ -1015,7 +1016,8 @@ export const QUESTS: QuestDef[] = [
     giver: "tran_uy",
     desc: "Nộp 8 da hổ.",
     steps: [{ kind: "collect", itemId: "da_ho", count: 8 }],
-    rewards: { exp: 500 },
+    // M66.4 (#1333): trước chỉ thưởng tu vi; thêm đan dược hợp bậc Trúc Cơ. Collect quest phải có vật phẩm (xem quest-collect-rewards.test.ts).
+    rewards: { exp: 500, items: [{ itemId: "hoi_linh_dan", qty: 2 }] },
     minRealm: { realm: 2, tier: 1 },
     daily: true,
     talk: {
@@ -1065,7 +1067,8 @@ export const QUESTS: QuestDef[] = [
     giver: "tram_truong",
     desc: "Nộp 6 độc nang.",
     steps: [{ kind: "collect", itemId: "doc_nang", count: 6 }],
-    rewards: { exp: 900 },
+    // M66.4 (#1333): trước chỉ thưởng tu vi; thêm đan dược hợp bậc Kim Đan. Collect quest phải có vật phẩm (xem quest-collect-rewards.test.ts).
+    rewards: { exp: 900, items: [{ itemId: "hoi_huyet_dan", qty: 2 }] },
     minRealm: { realm: 3, tier: 1 },
     daily: true,
     talk: {
@@ -1111,7 +1114,8 @@ export const QUESTS: QuestDef[] = [
     giver: "tram_truong_han",
     desc: "Nộp 6 Độc tước nang cho trạm.",
     steps: [{ kind: "collect", itemId: "doc_tuoc_nang", count: 6 }],
-    rewards: { exp: 5400 },
+    // M66.4 (#1333): trước chỉ thưởng tu vi; thêm đan dược hợp bậc Nguyên Anh. Collect quest phải có vật phẩm (xem quest-collect-rewards.test.ts).
+    rewards: { exp: 5400, items: [{ itemId: "dai_hoi_huyet_dan", qty: 2 }] },
     minRealm: { realm: 4, tier: 1 },
     daily: true,
     talk: {
