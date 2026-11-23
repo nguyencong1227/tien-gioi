@@ -202,6 +202,7 @@ import {
 } from "../dungeon";
 import { respawnDeathText } from "../death-text";
 import { dropSourceIn, hopLabel, nextHop, questGoal, type NavHop } from "../quest-nav";
+import { npcMarkerStyle } from "../npc-marker";
 import { clientCanChallenge } from "../duel";
 import { replayEarlyMessages } from "../early-messages";
 import { sound } from "../audio";
@@ -2859,12 +2860,15 @@ export class WorldScene extends Phaser.Scene {
 
     for (const [id, ne] of this.npcs) {
       const marker = npcMarker(id, qLog, qCtx);
-      if (marker === "!" || marker === "?") {
-        ne.markerText.setText(marker).setVisible(true);
-        ne.markerAura.setVisible(true);
-        const col = marker === "?" ? 0x6ad06a : 0xffd700;
-        ne.markerAura.setFillStyle(col, 0.25).setStrokeStyle(1.6, col, 0.9);
-        ne.markerText.setColor(marker === "?" ? "#6ad06a" : "#ffe08a");
+      const style = npcMarkerStyle(marker);
+      if (style) {
+        // "?" (đã đủ, về trả) VÀNG tươi và to hơn "!" (mục 66): npc-marker.ts
+        ne.markerText.setText(marker).setVisible(true).setColor(style.text).setScale(style.scale);
+        ne.markerAura
+          .setVisible(true)
+          .setFillStyle(style.aura, style.auraAlpha)
+          .setStrokeStyle(1.6, style.aura, 0.9)
+          .setScale(style.scale);
       } else {
         ne.markerText.setVisible(false);
         ne.markerAura.setVisible(false);
