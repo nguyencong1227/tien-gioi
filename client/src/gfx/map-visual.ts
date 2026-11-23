@@ -246,3 +246,24 @@ export function mapVisualEnabled(
     return true;
   }
 }
+
+/**
+ * Độ sâu của lớp `over` (tán cây phủ trên đầu nhân vật). Thực thể xếp theo `y` (<= `worldH`); hiệu ứng chung (`fx`, vòng chọn mục tiêu, tia kiếm khí) ở ĐÚNG `worldH`; nhãn / khiên ở `worldH + 1` trở lên.
+ * Tán ở NGAY DƯỚI `worldH` (lệch 0,01): phủ mọi thực thể, nhưng hiệu ứng chiêu / vòng chọn quái KHÔNG bị tán che mất (A nêu ở #1346).
+ */
+export const visualOverDepth = (worldH: number): number => worldH - 0.01;
+
+/** Thời gian làm mờ chuyển từ nền cũ sang lớp hình mới (ms). */
+export const VISUAL_FADE_MS = 350;
+
+/**
+ * Kế hoạch chuyển nền cũ -> lớp hình mới khi gói + ảnh về MUỘN sau khi cảnh đã vẽ nền cũ: có nền cũ và người chơi không bật "giảm chuyển động" thì làm mờ dần (lớp mới từ trong suốt
+ * lên đặc, nền cũ gỡ SAU khi xong) để không nháy một cái; không thì thay ngay.
+ */
+export function visualFadePlan(
+  hadLegacy: boolean,
+  reducedMotion: boolean,
+): { fade: boolean; ms: number } {
+  const fade = hadLegacy && !reducedMotion;
+  return { fade, ms: fade ? VISUAL_FADE_MS : 0 };
+}

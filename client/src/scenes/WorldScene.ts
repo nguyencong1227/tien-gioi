@@ -60,6 +60,8 @@ import {
   sanitizeVisualMap,
   visualImageFits,
   visualPackPaths,
+  visualFadePlan,
+  visualOverDepth,
   visualRows,
   visualTextureKey,
   type VisualMap,
@@ -622,6 +624,8 @@ export class WorldScene extends Phaser.Scene {
   visualLayers: Phaser.Tilemaps.TilemapLayer[] = [];
   private visualTilemaps: Phaser.Tilemaps.Tilemap[] = [];
   private visualSeq = 0;
+  /** Số lần đã làm mờ chuyển từ nền cũ sang lớp hình (công khai cho script kiểm `?debug`). */
+  visualFades = 0;
   /** Ánh sáng môi trường + vignette (M5.3 #332 bước 2b): hai ảnh phủ cố định theo màn hình, hiện theo hồ sơ chất lượng. */
   lightAmbient?: Phaser.GameObjects.Image;
   lightVignette?: Phaser.GameObjects.Image;
@@ -1098,7 +1102,7 @@ export class WorldScene extends Phaser.Scene {
           if (!ok || stale()) return;
           this.visualMap = vm;
           this.visualMapId = id;
-          this.buildMapVisuals();
+          this.buildMapVisuals(true); // về muộn sau khi nền cũ đã hiện: làm mờ chuyển, không nháy
         },
       );
     });
@@ -1106,7 +1110,7 @@ export class WorldScene extends Phaser.Scene {
 
   /**
    * Dựng ba lớp hình Tiled từ `visualMap` (đã kiểm) + texture đã nạp: ground (-10), decor (-9, thân cây / đá / bụi dưới chân), over (tán cây PHỦ TRÊN đầu nhân vật: thực thể xếp độ sâu theo `y` <= `worldH`,
-   * tán ở `worldH + 0.5`, nhãn / báo ở `worldH + 5` trở lên). Ô nguồn 16 px phóng `TILE / 16` lần. Trả `false` (không dựng gì) khi chưa đủ điều kiện: khi đó lớp ô cũ vẽ như trước.
+   * tán ở `worldH - 0.01` NGAY DƯỚI hiệu ứng chung / vòng chọn (`worldH`) để chúng không bị tán che; nhãn / báo ở `worldH + 1` trở lên). Ô nguồn 16 px phóng `TILE / 16` lần. Trả `false` (không dựng gì) khi chưa đủ điều kiện: khi đó lớp ô cũ vẽ như trước.
    */
   private buildTiledVisual(): boolean {
     const vm = this.visualMap;
@@ -1140,43 +1144,69 @@ export class WorldScene extends Phaser.Scene {
       this.visualLayers.push(layer);
       return true;
     };
-    const ok = mk(vm.ground, -10) && mk(vm.decor, -9) && mk(vm.over, this.map.worldH + 0.5);
+    const ok =
+      mk(vm.ground, -10) && mk(vm.decor, -9) && mk(vm.over, visualOverDepth(this.map.worldH));
     if (!ok) this.destroyTiledVisual();
     return ok;
   }
 
-  private buildMapVisuals() {
-    this.destroyTiledVisual();
-    this.groundWash?.destroy();
+  /** Tháo mọi đối tượng của cách vẽ nền CŨ (lớp ô, trang trí, nước, màu phủ) ra khỏi trạng thái cảnh và trả về để gỡ ngay hoặc gỡ sau khi làm mờ. */
+  private detachLegacyVisual(): { destroy(): void }[] {
+    const out: { destroy(): void }[] = [];
+    const take = <T extends { destroy(): void }>(o: T | undefined) => {
+      if (o) out.push(o);
+    };
+    take(this.groundWash);
+    take(this.mapLayer);
+    take(this.mapTilemap);
+    take(this.waterLayer);
+    take(this.waterTilemap);
+    take(this.decorLayer);
+    take(this.decorTilemap);
     this.groundWash = undefined;
-    // 1. Hủy lớp ô cũ nếu có
-    if (this.mapLayer) {
-      this.mapLayer.destroy();
-      this.mapLayer = undefined;
-    }
-    if (this.mapTilemap) {
-      this.mapTilemap.destroy();
-      this.mapTilemap = undefined;
-    }
-    if (this.waterLayer) {
-      this.waterLayer.destroy();
-      this.waterLayer = undefined;
-    }
-    if (this.waterTilemap) {
-      this.waterTilemap.destroy();
-      this.waterTilemap = undefined;
-    }
-    if (this.decorLayer) {
-      this.decorLayer.destroy();
-      this.decorLayer = undefined;
-    }
-    if (this.decorTilemap) {
-      this.decorTilemap.destroy();
-      this.decorTilemap = undefined;
+    this.mapLayer = undefined;
+    this.mapTilemap = undefined;
+    this.waterLayer = undefined;
+    this.waterTilemap = undefined;
+    this.decorLayer = undefined;
+    this.decorTilemap = undefined;
+    return out;
+  }
+
+  /**
+   * Dựng nền của bản đồ hiện tại. `fade`: gọi lúc gói + ảnh lớp hình về MUỘN (nền cũ đã hiện): lớp hình mới hiện dần từ trong suốt, nền cũ gỡ sau khi xong (`visualFadePlan`:
+   * bỏ qua khi giảm chuyển động). Các lần gọi khác (vào cảnh, qua cổng) thay ngay.
+   */
+  private buildMapVisuals(fade = false) {
+    this.destroyTiledVisual();
+    // 1. Tháo nền cũ; còn dùng được cho cách vẽ cũ thì DỰNG LẠI từ đầu bên dưới (như trước), còn lớp hình sẵn sàng thì gỡ (ngay hoặc sau khi mờ xong)
+    const legacy = this.detachLegacyVisual();
+    const tiled = this.buildTiledVisual();
+    const plan = visualFadePlan(legacy.length > 0, getQuality().reducedMotion);
+    if (tiled && fade && plan.fade) {
+      this.visualFades++;
+      const fresh = [...this.visualLayers]; // bản sao: nếu dựng lại giữa chừng thì tween chạy trên lớp đã gỡ (vô hại)
+      for (const l of fresh) l.setAlpha(0);
+      this.tweens.add({
+        targets: fresh,
+        alpha: 1,
+        duration: plan.ms,
+        onComplete: () => {
+          for (const o of legacy) {
+            try {
+              o.destroy();
+            } catch {
+              // đã bị gỡ cùng cảnh
+            }
+          }
+        },
+      });
+    } else {
+      for (const o of legacy) o.destroy();
     }
 
     // 2. Dựng nền: lớp hình Tiled nếu đã sẵn sàng (S3b), ngược lại cách cũ (lớp ô + trang trí + nước)
-    if (!this.buildTiledVisual()) {
+    if (!tiled) {
       // 2a. Dựng tilemap mới
       const data: number[][] = [];
       const mw = this.map.def.w;

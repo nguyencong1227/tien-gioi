@@ -8,13 +8,16 @@ import {
   VISUAL_MAX_CELLS,
   VISUAL_TILE,
   fetchVisualJson,
+  VISUAL_FADE_MS,
   VISUAL_STORAGE_KEY,
   loadVisualTexture,
   mapVisualEnabled,
   sanitizeVisualMap,
   visualImageFits,
+  visualFadePlan,
   visualImageWidth,
   visualMinImageHeight,
+  visualOverDepth,
   visualPackPaths,
   visualRows,
   visualTextureKey,
@@ -410,5 +413,23 @@ describe("mapVisualEnabled (cờ bật / tắt lớp hình mới)", () => {
       },
     };
     expect(mapVisualEnabled("", evil)).toBe(true);
+  });
+});
+
+describe("độ sâu lớp over và làm mờ chuyển", () => {
+  it("over NGAY DƯỚI worldH (phủ mọi thực thể y <= worldH, nhưng fx / vòng chọn ở đúng worldH nằm TRÊN tán)", () => {
+    const worldH = 3072;
+    const over = visualOverDepth(worldH);
+    expect(over).toBeLessThan(worldH); // fx / targetRing / tia kiếm khí ở worldH không bị che
+    expect(over).toBeGreaterThan(worldH - 1); // vẫn trên mọi thực thể xếp theo y
+    expect(over).toBeGreaterThan(-9); // trên decor
+  });
+  it("làm mờ chỉ khi CÓ nền cũ và KHÔNG giảm chuyển động", () => {
+    expect(visualFadePlan(true, false)).toEqual({ fade: true, ms: VISUAL_FADE_MS });
+    expect(visualFadePlan(true, true)).toEqual({ fade: false, ms: 0 });
+    expect(visualFadePlan(false, false)).toEqual({ fade: false, ms: 0 });
+    expect(visualFadePlan(false, true)).toEqual({ fade: false, ms: 0 });
+    expect(VISUAL_FADE_MS).toBeGreaterThan(100);
+    expect(VISUAL_FADE_MS).toBeLessThan(1000);
   });
 });
