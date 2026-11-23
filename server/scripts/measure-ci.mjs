@@ -1,5 +1,5 @@
-// Đo thời lượng CI: thống kê thời lượng job 'check' (cả dạng cũ và dạng sharded mới) cùng các bước chi tiết (Issue #945, #1377).
-// Cách chạy: node server/scripts/measure-ci.mjs [--limit=50]
+// Đo thời lượng CI: thống kê thời lượng job 'check' (cả dạng cũ và dạng sharded mới) cùng các bước chi tiết (Issue #945, #1377, #1380).
+// Cách chạy: node server/scripts/measure-ci.mjs [--limit=50] [--branch=main]
 /* global console */
 import { execSync } from "node:child_process";
 import process from "node:process";
@@ -82,16 +82,26 @@ export function analyzeRunJobs(run, jobs = []) {
   // Lượt mới (sharded)
   const lintJob = jobs.find((j) => j.name === "Lint & Typecheck");
   const buildJob = jobs.find((j) => j.name === "Build Client");
+
+  const lintDuration = getJobDuration(lintJob);
+  const buildJobDuration = getJobDuration(buildJob);
+  const checkSummaryDuration = getJobDuration(checkJob);
+
+  // Thu thập động mọi job khớp ^Test \(
+  const testJobs = {};
+  for (const j of jobs) {
+    if (j.name && /^Test \(/i.test(j.name)) {
+      testJobs[j.name] = getJobDuration(j);
+    }
+  }
+
   const test1Job = jobs.find((j) => j.name === "Test (1/3)");
   const test2Job = jobs.find((j) => j.name === "Test (2/3)");
   const test3Job = jobs.find((j) => j.name === "Test (3/3)");
 
-  const lintDuration = getJobDuration(lintJob);
-  const buildJobDuration = getJobDuration(buildJob);
   const test1Duration = getJobDuration(test1Job);
   const test2Duration = getJobDuration(test2Job);
   const test3Duration = getJobDuration(test3Job);
-  const checkSummaryDuration = getJobDuration(checkJob);
 
   // Lượt cũ (steps trong job check)
   const steps = checkJob?.steps || [];
@@ -123,6 +133,7 @@ export function analyzeRunJobs(run, jobs = []) {
     // Chi tiết sharded
     lintDuration,
     buildJobDuration,
+    testJobs,
     test1Duration,
     test2Duration,
     test3Duration,
@@ -144,15 +155,23 @@ export function analyzeRunJobs(run, jobs = []) {
 async function main() {
   const args = process.argv.slice(2);
   let limit = 50;
+  let branchFilter = null;
   for (const arg of args) {
     if (arg.startsWith("--limit=")) {
       limit = Number.parseInt(arg.slice("--limit=".length), 10) || 50;
     }
+    if (arg.startsWith("--branch=")) {
+      branchFilter = arg.slice("--branch=".length);
+    }
   }
 
-  console.log(`Đang lấy danh sách các lượt chạy CI gần nhất (tối đa ${limit + 20} để lọc)...`);
+  const branchMsg = branchFilter ? ` trên nhánh '${branchFilter}'` : "";
+  console.log(
+    `Đang lấy danh sách các lượt chạy CI gần nhất${branchMsg} (tối đa ${limit + 20} để lọc)...`,
+  );
+  const branchFlag = branchFilter ? `-b "${branchFilter}"` : "";
   const rawRuns = execSync(
-    `gh run list --workflow=ci.yml -L ${limit + 25} --json databaseId,status,conclusion,createdAt,headBranch,event`,
+    `gh run list --workflow=ci.yml ${branchFlag} -L ${limit + 25} --json databaseId,status,conclusion,createdAt,headBranch,event`,
     { encoding: "utf-8" },
   );
   const allRuns = JSON.parse(rawRuns);
@@ -208,6 +227,12 @@ async function main() {
     );
     console.log("| Nhánh kiểm tra / Job | Min | TB | Median | p95 | MAX |");
     console.log("|---|---:|---:|---:|---:|---:|");
+
+    // Thu thập danh sách tên test jobs động
+    const dynamicTestJobNames = Array.from(
+      new Set(shardedRuns.flatMap((r) => Object.keys(r.testJobs || {}))),
+    ).sort();
+
     const shardedRows = [
       {
         name: "Lint & Typecheck",
@@ -217,12 +242,10 @@ async function main() {
         name: "Build Client",
         s: stats(shardedRuns.map((r) => r.buildJobDuration).filter(Boolean)),
       },
-      { name: "Test (1/3)", s: stats(shardedRuns.map((r) => r.test1Duration).filter(Boolean)) },
-      {
-        name: "Test (2/3) (thanh dài nhất)",
-        s: stats(shardedRuns.map((r) => r.test2Duration).filter(Boolean)),
-      },
-      { name: "Test (3/3)", s: stats(shardedRuns.map((r) => r.test3Duration).filter(Boolean)) },
+      ...dynamicTestJobNames.map((name) => ({
+        name,
+        s: stats(shardedRuns.map((r) => r.testJobs?.[name]).filter(Boolean)),
+      })),
       {
         name: "check (tổng hợp)",
         s: stats(shardedRuns.map((r) => r.checkSummaryDuration).filter(Boolean)),

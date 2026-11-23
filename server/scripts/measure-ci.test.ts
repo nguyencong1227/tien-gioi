@@ -166,6 +166,11 @@ describe("measure-ci: thống kê đo thời lượng CI", () => {
     expect(res.totalDuration).toBe(205);
     expect(res.lintDuration).toBe(84);
     expect(res.buildJobDuration).toBe(49);
+    expect(res.testJobs).toEqual({
+      "Test (1/3)": 123,
+      "Test (2/3)": 196,
+      "Test (3/3)": 120,
+    });
     expect(res.test1Duration).toBe(123);
     expect(res.test2Duration).toBe(196);
     expect(res.test3Duration).toBe(120);
