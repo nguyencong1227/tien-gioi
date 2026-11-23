@@ -210,7 +210,7 @@ describe("bất biến cân bằng", () => {
 
   it("thưởng tu vi không hơn giá bỏ chạy là CẢNH BÁO (bỏ chạy đắt hơn cả thưởng), KHÔNG phải vi phạm: thắng +R luôn hơn bỏ chạy -P", () => {
     const priceWarn = (s: GroupSummary) =>
-      ambushBalanceWarnings([s]).filter((w) => w.includes("bỏ chạy đắt hơn"));
+      ambushBalanceWarnings([s]).filter((w) => w.includes("thưởng tu vi"));
     const dear: GroupSummary = { ...easy, winExp: easy.fleeExp, realSeconds: 45 };
     expect(ambushBalanceViolations([dear])).toEqual([]);
     expect(priceWarn(dear).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
@@ -220,11 +220,40 @@ describe("bất biến cân bằng", () => {
     expect(priceWarn(none)).toEqual([]);
   });
 
-  it("DỮ LIỆU THẬT (CD6b): ở mọi bậc giá bỏ chạy giữa trận NHỎ hơn thưởng thắng thấp nhất: không bầy nào bị cảnh báo 'bỏ chạy đắt hơn cả thưởng'", () => {
+  it("thưởng Linh thạch không hơn giá bỏ chạy là CẢNH BÁO (CD6b PR2), KHÔNG phải vi phạm; hai phía TU VI / LINH THẠCH độc lập, không nhầm lẫn", () => {
+    const coinWarn = (s: GroupSummary) =>
+      ambushBalanceWarnings([s]).filter((w) => w.includes("thưởng Linh thạch"));
+    const dear: GroupSummary = { ...easy, winCoin: easy.fleeCoin, realSeconds: 45 };
+    expect(ambushBalanceViolations([dear])).toEqual([]); // cảnh báo, KHÔNG phải vi phạm
+    expect(coinWarn(dear).join("\n")).toContain("bỏ chạy đắt hơn cả thưởng");
+    const cheap: GroupSummary = { ...easy, winCoin: easy.fleeCoin + 1, realSeconds: 45 };
+    expect(coinWarn(cheap)).toEqual([]);
+    const none: GroupSummary = { ...easy, winCoin: 0, realSeconds: 45 }; // chưa có thưởng thắng nào: không cảnh báo
+    expect(coinWarn(none)).toEqual([]);
+    // đột biến lẫn: chỉ đổi winExp (KHÔNG đổi winCoin) thì chỉ cảnh báo TU VI, KHÔNG đụng phía Linh thạch -> hai kiểm độc lập
+    const crossExp: GroupSummary = {
+      ...easy,
+      winExp: easy.fleeExp,
+      winCoin: easy.fleeCoin + 1,
+      realSeconds: 45,
+    };
+    expect(coinWarn(crossExp)).toEqual([]);
+    expect(
+      ambushBalanceWarnings([crossExp]).filter((w) => w.includes("thưởng tu vi")),
+    ).toHaveLength(1);
+  });
+
+  it("DỮ LIỆU THẬT (CD6b): ở mọi bậc giá bỏ chạy TU VI giữa trận NHỎ hơn thưởng thắng thấp nhất: không bầy nào bị cảnh báo 'bỏ chạy đắt hơn' (tu vi)", () => {
     const sums = AMBUSH_FOES.map((g) => ({
       ...summarizeGroup(g, 1),
     }));
-    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("bỏ chạy đắt hơn"));
+    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("thưởng tu vi"));
+    expect(dear).toEqual([]);
+  });
+
+  it("DỮ LIỆU THẬT (CD6b PR2): ở mọi bậc giá bỏ chạy LINH THẠCH giữa trận NHỎ hơn thưởng thắng thấp nhất (payRewards = ambushRewardCoin): không bầy nào bị cảnh báo 'bỏ chạy đắt hơn' (Linh thạch)", () => {
+    const sums = AMBUSH_FOES.map((g) => summarizeGroup(g, 1)); // fightAmbush chạy payRewards THẬT (đã đổi sang ambushRewardCoin)
+    const dear = ambushBalanceWarnings(sums).filter((w) => w.includes("thưởng Linh thạch"));
     expect(dear).toEqual([]);
   });
 
