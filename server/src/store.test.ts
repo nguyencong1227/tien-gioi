@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { DEFAULT_MAP_ID, DUNGEON_MAPS, MAPS, getMap } from "@tien-gioi/shared";
+import { ARENA_MAPS, DEFAULT_MAP_ID, DUNGEON_MAPS, MAPS, REALMS, getMap } from "@tien-gioi/shared";
 import { profileRowOf, sanitizeLimbo, type SavedPlayer } from "./store";
 
 const dir = mkdtempSync(path.join(tmpdir(), "tien-gioi-store-"));
@@ -133,6 +133,65 @@ describe("mapIdOf: chỗ ở của nhân vật là bản đồ thường", () =>
     for (const m of DUNGEON_MAPS) {
       expect(getMap(m.id)).toBeDefined(); // chính vì tra được mà mapIdOf phải loại
       expect(store.mapIdOf({ mapId: m.id })).toBe(DEFAULT_MAP_ID);
+    }
+  });
+});
+
+describe("mapIdOf: đấu trường chặn đường cũng không phải chỗ ở", () => {
+  it("id đấu trường (getMap tra được, phòng chỉ mở cho đúng một vé) về Lạc Hà như bí cảnh, không đưa tới phòng không vào được", () => {
+    expect(ARENA_MAPS.length).toBeGreaterThan(0);
+    for (const m of ARENA_MAPS) {
+      expect(getMap(m.id), m.id).toBeDefined(); // chính vì tra được mà mapIdOf phải loại
+      expect(store.mapIdOf({ mapId: m.id }), m.id).toBe(DEFAULT_MAP_ID);
+    }
+  });
+});
+
+describe("sanitizeProgress: cảnh giới / tầng / tu vi từ file lưu không được tin", () => {
+  const top = REALMS.length - 1;
+  const topTier = REALMS[top].tiers.length - 1;
+
+  it("hồ sơ hợp lệ giữ nguyên (số lẻ làm tròn xuống)", () => {
+    expect(store.sanitizeProgress({ realm: 1, tier: 2, exp: 123 })).toEqual({
+      realm: 1,
+      tier: 2,
+      exp: 123,
+    });
+    expect(store.sanitizeProgress({ realm: 1.9, tier: 2.9, exp: 99.9 })).toEqual({
+      realm: 1,
+      tier: 2,
+      exp: 99,
+    });
+  });
+
+  it("thiếu / NaN / sai kiểu / âm: về 0 (trước đây `Math.min(undefined | NaN | -1, ...)` làm `REALMS[realm].tiers` ném TypeError)", () => {
+    for (const bad of [undefined, null, NaN, "2", "abc", {}, [], true, -1, -Infinity]) {
+      const r = store.sanitizeProgress({ realm: bad, tier: bad, exp: bad });
+      expect(r, String(bad)).toEqual({ realm: 0, tier: 0, exp: 0 });
+    }
+    expect(store.sanitizeProgress({})).toEqual({ realm: 0, tier: 0, exp: 0 });
+  });
+
+  it("vượt trần: realm về cảnh giới cao nhất, tier về tầng cuối của CẢNH GIỚI ĐÓ; tu vi không có trần trên", () => {
+    expect(store.sanitizeProgress({ realm: 999, tier: 999, exp: 5 })).toMatchObject({
+      realm: top,
+      tier: topTier,
+    });
+    expect(store.sanitizeProgress({ realm: Infinity, tier: Infinity })).toMatchObject({
+      realm: top,
+      tier: topTier,
+    });
+    // tier kẹp theo số tầng của cảnh giới đã kẹp (Phàm Nhân ít tầng hơn Nguyên Anh)
+    const r0 = store.sanitizeProgress({ realm: 0, tier: 999 });
+    expect(r0.tier).toBe(REALMS[0].tiers.length - 1);
+    expect(store.sanitizeProgress({ exp: 1e15 }).exp).toBe(1e15);
+    expect(store.sanitizeProgress({ exp: Infinity }).exp).toBe(0); // vô cùng không phải số hợp lệ (khoá một người chơi vĩnh viễn)
+  });
+
+  it("bất động: làm sạch lại cho đúng kết quả cũ", () => {
+    for (const raw of [{ realm: -4, tier: 77, exp: -3 }, { realm: 2.7, tier: 1.2, exp: 8.8 }, {}]) {
+      const once = store.sanitizeProgress(raw);
+      expect(store.sanitizeProgress(once)).toEqual(once);
     }
   });
 });

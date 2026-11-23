@@ -3,6 +3,7 @@ export * from "./map";
 export * from "./tiled";
 export * from "./game";
 export * from "./items";
+export * from "./item-sources";
 export * from "./skills";
 export * from "./skill-kit";
 export * from "./skill-violations";
