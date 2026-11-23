@@ -611,5 +611,30 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const code = await runE2eAll(["--dry-run", "--shard", "1/2"]);
       expect(code).toBe(0);
     });
+
+    it("runE2eAll khi shard rỗng (--only chan-duong --shard 2/2) thoát mã 0 và ghi REPORT.md thành công", async () => {
+      const tempLogsDir = path.join(os.tmpdir(), `tg-e2e-empty-shard-${Date.now()}`);
+      try {
+        const code = await runE2eAll([
+          "--only",
+          "chan-duong",
+          "--shard",
+          "2/2",
+          "--logs",
+          tempLogsDir,
+        ]);
+        expect(code).toBe(0);
+
+        // Đảm bảo thư mục logs và file REPORT.md được tạo thành công để bước upload-artifact không bị lỗi
+        const reportFile = path.join(tempLogsDir, "REPORT.md");
+        expect(existsSync(reportFile)).toBe(true);
+        const reportContent = readFileSync(reportFile, "utf-8");
+        expect(reportContent).toContain("# Báo cáo E2E Toàn diện");
+      } finally {
+        if (existsSync(tempLogsDir)) {
+          rmSync(tempLogsDir, { recursive: true, force: true });
+        }
+      }
+    });
   });
 });
