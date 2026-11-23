@@ -102,7 +102,8 @@ export interface LimboRecord {
   credited: boolean;
 }
 
-const LIFE_CAP = 1_000_000_000_000;
+/** Trần các bộ đếm kiếp (ms chơi / kills / bossKills): hằng dùng chung ở store.ts và test hồ sơ lưu (đừng để hai nơi lệch). */
+export const LIFE_CAP = 1_000_000_000_000;
 
 const int = (v: unknown, max = LIFE_CAP): number =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(0, Math.floor(v))) : 0;
