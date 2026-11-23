@@ -909,6 +909,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Băng + Âm Trúc Cơ, Huyền phẩm (CT8 lát 1, A): rơi hiếm từ quái Trúc Cơ
     { itemId: bookIdOf("han_bang_nhat_chuong"), chance: 0.0035, min: 1, max: 1 },
     { itemId: bookIdOf("minh_anh_phuc_chuong"), chance: 0.0035, min: 1, max: 1 },
+    // Âm Trúc Cơ, Huyền phẩm (lô 1 Âm #1186, E): rơi hiếm từ quái Trúc Cơ (Hắc Hổ `ho` — cổng 15-20 phút giữ bởi `balance/dungeon.test.ts`, sách KHÔNG tính vào mẫu số)
+    { itemId: bookIdOf("tich_da_phan_anh"), chance: 0.0035, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
@@ -937,6 +939,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thu_thuy_kiem_anh"), chance: 0.012, min: 1, max: 1 }, // Kim + Thủy (CT6 lát 1)
     { itemId: bookIdOf("phi_kiem_tam_lien"), chance: 0.008, min: 1, max: 1 }, // đạn bay Kim (CT9 lát 1)
     { itemId: bookIdOf("hoi_phong_lien_chuong"), chance: 0.005, min: 1, max: 1 }, // Phong Kim Đan (CT8 lát 1)
+    // Âm Kim Đan, Huyền phẩm (lô 1 Âm #1186, E): rơi hiếm từ quái Kim Đan
+    { itemId: bookIdOf("thuc_phat_am_trao"), chance: 0.005, min: 1, max: 1 },
   ],
   thach_quy: [
     { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
@@ -976,6 +980,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("hon_phien_tuong"), chance: 0.006, min: 1, max: 1 }, // tượng Âm (CT9 lát 1)
     { itemId: bookIdOf("minh_vu_lac_hon"), chance: 0.006, min: 1, max: 1 }, // quạt Âm Nguyên Anh (CT8 lát 2)
+    // Âm Nguyên Anh, Địa phẩm (lô 1 Âm #1186, E): rơi hiếm từ quái Nguyên Anh
+    { itemId: bookIdOf("kho_mach_dan_luu"), chance: 0.005, min: 1, max: 1 },
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },
