@@ -54,6 +54,20 @@ const NOMINAL_PX_S = 150;
 const SLOW_MIN_PX = 15;
 /** Thời gian một khung hình (ms) vượt mức này (dưới ~25 FPS) coi là khung chậm, dù tốc độ đo được còn cao. */
 const SLOW_FRAME_MS = 40;
+
+/**
+ * Chuẩn tốc độ (px / giây) từ các giây giữ phím D đã đo: BỎ giây đầu (khởi động) rồi lấy TRUNG VỊ của các giây còn lại.
+ * Không lấy giây nhanh nhất: máy tải nặng đo 87 / 95 / 95 / 150 thì một giây bốc 150 px làm chuẩn cao hơn mức thật, mọi ngưỡng tỉ lệ đòi quá cao (A, nit ở #1391).
+ */
+export function speedBase(windows) {
+  const rest = windows.slice(1).sort((a, b) => a - b);
+  return rest[Math.floor(rest.length / 2)];
+}
+
+/** Máy có chậm không: đã chậm ở khung nhìn trước (`sticky`), hoặc chuẩn thấp, hoặc khung hình dài. Chậm chỉ NỚI các ca đo tốc độ, không bỏ ca nào. */
+export function isSlowMachine({ base, frameMs, sticky = false }) {
+  return sticky || base < SLOW_PX || frameMs > SLOW_FRAME_MS;
+}
 /** Khung chậm: chờ tối đa chừng này ms cho một ca "đi đủ" (thay vì đồng hồ cố định). */
 const SLOW_WAIT_MS = 5000;
 /** Khung chậm: một giây giữ phím mà nhích được ít nhất MỘT bước (≈ 7,9 px) là không khựng; lỗi khựng thật là đứng im cả giây. */
@@ -112,6 +126,9 @@ async function main() {
     { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
   );
   let failures = 0;
+  // Máy đã bị đo là chậm ở MỘT khung nhìn thì coi là chậm ở mọi khung nhìn sau (A, nit ở #1391: máy tải nặng, khung nhìn 2 đo 87 / 95 / 95 / 150 px
+  // nên không bị coi là chậm, ngưỡng tỉ lệ 0,4 x 150 = 60 đòi hơn mức thật 55 px ở ca thanh trượt).
+  let machineSlow = false;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
@@ -278,7 +295,7 @@ async function main() {
         return Math.hypot(b.x - a.x, b.y - a.y) < 1;
       };
       await sleep(300);
-      // Chuẩn tốc độ = giây NHANH NHẤT trong 3 giây sau một giây khởi động bỏ đi: ở khung chậm (runner WebGL phần mềm, vừa tải trang / đổi bảng phím)
+      // Chuẩn tốc độ = TRUNG VỊ của 3 giây sau một giây khởi động bỏ đi: ở khung chậm (runner WebGL phần mềm, vừa tải trang / đổi bảng phím)
       // giây đầu đi ít hơn hẳn các giây sau (đo thật: 32-47 px so với 158 px), nên lấy giây đầu làm chuẩn thì mọi ngưỡng tỉ lệ đều sai.
       /** Thời gian trung bình một khung hình (ms), đo bằng `requestAnimationFrame` trong 600 ms. */
       const measureFrameMs = async () =>
@@ -297,13 +314,15 @@ async function main() {
         await up("KeyD");
         await sleep(60);
       }
-      const base = Math.max(...windows.slice(1));
+      // Chuẩn = TRUNG VỊ của 3 giây sau giây khởi động (không phải giây nhanh nhất: một giây bốc lên 150 px giữa 87 / 95 / 95 làm mọi ngưỡng tỉ lệ đòi quá cao)
+      const base = speedBase(windows);
       // Khung chậm: mỗi khung hình chỉ tiến MỘT bước 8 px (server xử lý một bước cho mỗi input), nên tốc độ tỉ lệ với FPS và dao động theo tải máy;
       // không thể đòi px / giây cố định. Khi đó mọi ca "đi đủ nhanh" chỉ đòi CÓ ĐI (chờ theo điều kiện), ca "không giật tăng tốc" bỏ qua.
-      const slow = base < SLOW_PX || frameMs0 > SLOW_FRAME_MS;
+      const slow = isSlowMachine({ base, frameMs: frameMs0, sticky: machineSlow });
       if (slow) {
+        machineSlow = true;
         console.log(
-          `  ⚠ khung chậm: khung hình ${frameMs0.toFixed(0)} ms, giữ D 1 giây đi ${base.toFixed(0)} px (chậm nếu khung > ${SLOW_FRAME_MS} ms hoặc < ${SLOW_PX} px): các ca đo tốc độ chỉ đòi có đi >= ${SLOW_MIN_PX} px, ca không-giật-tăng-tốc dùng trần danh nghĩa`,
+          `  ⚠ khung chậm: khung hình ${frameMs0.toFixed(0)} ms, giữ D 1 giây đi ${base.toFixed(0)} px (chậm nếu khung > ${SLOW_FRAME_MS} ms hoặc chuẩn < ${SLOW_PX} px, hoặc đã chậm ở khung nhìn trước): các ca đo tốc độ chỉ đòi có đi >= ${SLOW_MIN_PX} px, ca không-giật-tăng-tốc dùng trần danh nghĩa`,
         );
       }
       /** Ngưỡng "đi đủ": khung nhanh = `frac` × chuẩn; khung chậm = vài bước (chỉ cần chứng minh có đi). */
