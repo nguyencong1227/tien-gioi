@@ -21,6 +21,8 @@ NINJA = "/mnt/data/assets-src/ninja-adventure"
 XIAN = "/mnt/data/assets-work/b-duyet/xianxia/Xianxia_Pixel_Pack"
 WUXIA = "/mnt/data/assets-private/work/wuxia-rts/Wuxia_RTS_Pixel_Lite_v1.0"
 SUNNY = "/mnt/data/assets-private/work/sunnyside/Sunnyside_World_ASSET_PACK_V2.1/Sunnyside_World_Assets"
+HICON = "/mnt/data/assets-private/work/hoantdz-icons/Wuxia_Pixel_Icons_Mega_FREE_Sample_v1.0.0"
+BB = "/mnt/data/assets-private/work/hoantdz-battlebacks/Wuxia_Xianxia_Pixel_Battlebacks_100_v1.0.0"
 
 VIEW = 3  # phóng nguyên số thêm để xem
 BG = (26, 24, 33)
@@ -36,6 +38,8 @@ SRC = {
     "xian": ("Xianxia Pixel Pack (willYEE)", "CC0", False, "NHÌN NGANG (2D cuộn ngang)"),
     "wuxia": ("Wuxia RTS Lite (DQYYY)", "riêng: cấm phân phối lại / huấn luyện AI", True, "top-down 8 hướng"),
     "sunny": ("Sunnyside World Free", "riêng: cấm đóng gói lại / huấn luyện AI", True, "nhìn ngang, 16 px"),
+    "hicon": ("HOANTDZ Wuxia Pixel Icons (mẫu miễn phí)", "riêng: cấm bán lại / phân phối lại / huấn luyện AI", True, "icon 32 px, 5 bậc"),
+    "bb": ("HOANTDZ Wuxia & Xianxia Battlebacks 100", "riêng: cấm phân phối lại / huấn luyện AI; ảnh do AI tạo", True, "ảnh nền 640x360"),
 }
 
 
@@ -238,6 +242,40 @@ class Loaders:
 
     def ninja_weapon(self, w):
         return load(f"{NINJA}/content/weapon/{w}/sprite.png")
+
+    # HOANTDZ Wuxia Icons (RIÊNG): chỉ mục `_Index/sample_icons.csv` (2000 icon, 5 bậc T1..T5); `hicon_pick` chọn icon theo bộ lọc + BẬC GẦN NHẤT, `nth` xoay vòng giữa các họ (tất định)
+    _hicon_cache = None
+
+    def hicon_rows(self):
+        if Loaders._hicon_cache is None:
+            import csv
+
+            Loaders._hicon_cache = list(csv.DictReader(open(f"{HICON}/_Index/sample_icons.csv", encoding="utf8")))
+        return Loaders._hicon_cache
+
+    def hicon_pick(self, pack=None, category=None, slot=None, name_has=None, tier=1, nth=0):
+        cand = [
+            r for r in self.hicon_rows()
+            if (pack is None or r["pack"] == pack) and (category is None or r["category"] == category) and (slot is None or r["slot"] == slot)
+            and (name_has is None or name_has.lower() in r["name_en"].lower())
+        ]
+        if not cand:
+            raise KeyError("hicon")
+        best = min(abs(int(r["tier_rank"]) - tier) for r in cand)
+        cand = sorted((r for r in cand if abs(int(r["tier_rank"]) - tier) == best), key=lambda r: r["asset_id"])
+        return cand[nth % len(cand)]
+
+    def hicon_image(self, row):
+        return load(f"{HICON}/{row['icon'].replace('64px', '32px', 1)}")
+
+    # HOANTDZ Battlebacks (RIÊNG): cảnh theo mã BBnn-mm; ảnh gốc 640x360 (bản `01_Native`)
+    def battleback(self, bid):
+        import csv
+
+        for r in csv.DictReader(open(f"{BB}/_Index/all_battlebacks.csv", encoding="utf8")):
+            if r["id"] == bid:
+                return load(f"{BB}/{r['path_640x360']}"), r["name_en"]
+        raise KeyError(bid)
 
 
 # ---------------------------------------------------------------- tờ ảnh
@@ -613,7 +651,7 @@ def _xslider(X):
 
 
 # Vật phẩm (nhóm 14, 126 món): mã VP-001..126 LIÊN TỤC theo thứ tự đan / phù, kinh quyển, trang bị, nguyên liệu; chia thành các tờ <= VP_SHEET_ROWS hàng (một tờ 126 hàng cao ~24k px khó duyệt).
-# CHỈ nguồn công khai (hiện tại trong atlas + Xianxia CC0 + Ninja CC0): KHÔNG ô gói riêng, tờ công khai == tờ đầy đủ. Chỉ đề xuất hình HỢP NGHĨA (kiếm -> kiếm, phù -> bùa, đan -> bình đan, sách -> ngọc giản);
+# Phương án A / B CHỈ nguồn công khai (atlas + Xianxia CC0 + Ninja CC0); phương án C = icon HOANTDZ (gói RIÊNG, che trên tờ công khai). Chỉ đề xuất hình HỢP NGHĨA (kiếm -> kiếm, phù -> bùa, đan -> bình đan, sách -> ngọc giản);
 # loại gói không có (áo, giày, nguyên liệu quái) để TRỐNG, khuyến nghị giữ hiện tại, thay vì nhét hũ / hòm cho đủ ô.
 VP_SHEET_ROWS = 30
 VP_GROUPS = [("dan-phu", "đan dược / phù"), ("kinh-quyen", "kinh quyển"), ("trang-bi", "trang bị"), ("nguyen-lieu", "nguyên liệu")]
@@ -640,48 +678,67 @@ def vp_equip_kind(name):
     return "pháp bảo"  # Ấn / Châu / Chung...
 
 
-def vp_row(L, code, it):
+def vp_row(L, code, it, nth=0):
     t, rar = it["type"], it.get("rarityName") or "Phàm phẩm"
     ri = it["rarity"]
     cur = cell(L, "", "cur", lambda iid=it["id"]: L.cur("item-" + iid), f"hiện tại ({rar})", 32)
     none = lambda letter, src: Cell(letter, src, [], "", 32)
-    c = Cell("C", "xian", [], "gói mục 68 (đang kiểm giấy phép)", 32)
+
+    def hic(**kw):
+        """Tuỳ chọn C = icon HOANTDZ (RIÊNG, che trên tờ công khai); bậc theo phẩm: phẩm 0..4 -> T1..T5. Không có icon hợp thì ô TRỐNG."""
+        try:
+            r = L.hicon_pick(tier=ri + 1, nth=nth, **kw)
+        except KeyError:
+            return Cell("C", "hicon", [], "", 32)
+        return Cell("C", "hicon", [L.hicon_image(r)], f'{r["name_en"]} [{r["asset_id"]}]', 32)
+
+    c = Cell("C", "hicon", [], "", 32)
     if t == "equip":
         kind = vp_equip_kind(it["name"])
         if kind == "kiếm":
             a = cell(L, "A", "xian", lambda: L.xian_icon("blade_01", ri), f"Xianxia kiếm / đao, phẩm {ri} (CC0)", 32)
             b = cell(L, "B", "ninja", lambda: L.ninja_weapon("big_sword"), "Ninja: đại kiếm (CC0)", 32)
-            rec = "A (6 phẩm tăng dần)"
+            c = hic(pack="02_Weapons_Companions", slot="weapon")
+            rec = "A (6 phẩm tăng dần) hoặc C (5 bậc, 8 họ)"
         elif kind == "hộ phù":
             a = cell(L, "A", "xian", lambda: L.xian_item("talisman"), "Xianxia: bùa (CC0)", 32)
             b = cell(L, "B", "xian", lambda: L.xian_icon("relic_02", ri), f"Xianxia: pháp khí loại 2, phẩm {ri} (CC0)", 32)
-            rec = "A (bùa)"
+            c = hic(pack="03_Accessories", slot="amulet")
+            rec = "A (bùa) hoặc C (bùa hộ thân 5 bậc)"
         elif kind == "ngọc bội":
             a = cell(L, "A", "xian", lambda: L.xian_item("token"), "Xianxia: lệnh bài (CC0)", 32)
             b = cell(L, "B", "xian", lambda: L.xian_icon("relic_02", 3), "Xianxia: chuỗi hạt (CC0)", 32)
-            rec = "giữ hiện tại; A nếu muốn lệnh bài"
+            c = hic(pack="03_Accessories", slot="pendant")
+            rec = "giữ hiện tại; C (mặt dây 5 bậc) nếu muốn đổi"
         elif kind == "pháp bảo":
             a = cell(L, "A", "xian", lambda: L.xian_icon("relic_02", ri), f"Xianxia: pháp khí loại 2, phẩm {ri} (CC0)", 32)
             b = cell(L, "B", "xian", lambda: L.xian_icon("relic_01", ri), f"Xianxia: pháp khí loại 1, phẩm {ri} (CC0)", 32)
-            rec = "A (6 phẩm tăng dần)"
-        else:  # áo, giày: gói không có
+            c = hic(pack="03_Accessories", slot="ring")
+            rec = "A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc)"
+        else:  # áo, giày: gói công khai không có; C (HOANTDZ) có đủ 5 bậc
             a, b = none("A", "xian"), none("B", "ninja")
-            rec = f"KHÔNG nguồn nào có {kind}: giữ hiện tại"
+            c = hic(pack="01_Armor_Equipment", slot="chest" if kind == "áo" else "boots")
+            rec = f"C ({kind} 5 bậc, 8 họ; gói công khai KHÔNG có {kind}) hoặc giữ hiện tại"
     elif t == "book":
         a = cell(L, "A", "xian", lambda: L.xian_item("jade_slip"), "Xianxia: ngọc giản (CC0)", 32)
         b = cell(L, "B", "ninja", lambda: L.ninja_weapon("book"), "Ninja: sách phép (CC0)", 32)
-        rec = "giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung"
+        c = hic(category="Martial Arts Manuals")
+        rec = "giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau"
     elif t == "consumable" and it["id"].startswith("phu_"):
         a = cell(L, "A", "xian", lambda: L.xian_item("talisman"), "Xianxia: bùa (CC0)", 32)
         b = cell(L, "B", "xian", lambda: L.xian_item("token"), "Xianxia: lệnh bài (CC0)", 32)
-        rec = "A (bùa)"
+        c = hic(category="Talismans")
+        rec = "A (bùa) hoặc C (bùa 5 bậc)"
     elif t == "consumable":
         a = cell(L, "A", "xian", lambda: L.xian_item("pill_bottle"), "Xianxia: bình đan (CC0)", 32)
         b = cell(L, "B", "xian", lambda: L.xian_item("gourd"), "Xianxia: hồ lô (CC0)", 32)
-        rec = "A (bình đan)"
-    else:  # nguyên liệu từ quái
+        c = hic(category="Alchemy & Poisons")
+        rec = "A (bình đan) hoặc C (viên đan 5 bậc)"
+    else:  # nguyên liệu từ quái: chỉ nanh / xương / ngọc có hình hợp
         a, b = none("A", "xian"), none("B", "ninja")
-        rec = "KHÔNG nguồn nào có: giữ hiện tại"
+        keyword = {"nanh_soi": ("Hunting", "Fang"), "tuong_cot": ("Hunting", "Bone"), "thien_han_chau": ("Mining", "")}.get(it["id"])
+        c = hic(category=keyword[0], name_has=keyword[1] or None) if keyword else Cell("C", "hicon", [], "", 32)
+        rec = "C (hình hợp nghĩa)" if keyword else "KHÔNG nguồn nào có: giữ hiện tại"
     return dict(code=code, name=it["name"], rec=rec, cur=cur, opts=[a, b, c])
 
 
@@ -691,11 +748,15 @@ def group_vp(L, names):
     by = {g: [it for it in items if vp_group_of(it) == g] for g, _ in VP_GROUPS}
     by["trang-bi"].sort(key=lambda it: (it["rarity"], it["name"]))  # phẩm thấp -> cao
     sheets, n = [], 0
+    seen = {}  # (loại, phẩm) -> số vật phẩm đã gặp: `nth` xoay vòng giữa các họ icon của gói C (tất định, mỗi món một họ khác)
     for g, label in VP_GROUPS:
         rows = []
         for it in by[g]:
             n += 1
-            rows.append(vp_row(L, f"VP-{n:03d}", it))
+            key = (it["type"], vp_equip_kind(it["name"]) if it["type"] == "equip" else it["id"].startswith("phu_"), it["rarity"])
+            nth = seen.get(key, 0)
+            seen[key] = nth + 1
+            rows.append(vp_row(L, f"VP-{n:03d}", it, nth))
         parts_n = max(1, -(-len(rows) // VP_SHEET_ROWS))  # số tờ = trần chia; chia ĐỀU để không có tờ chỉ vài hàng
         size = -(-len(rows) // parts_n)
         chunks = [rows[i : i + size] for i in range(0, len(rows), size)]
@@ -704,6 +765,63 @@ def group_vp(L, names):
             part = f" (tờ {k}/{len(chunks)})" if len(chunks) > 1 else ""
             sheets.append((f"14-vat-pham-{g}{suffix}", f"Nhóm 14 — Vật phẩm (VP), {label}{part}: {ch[0]['code']} .. {ch[-1]['code']}", ch))
     return sheets
+
+
+# Nền / màn tải / Hoàng Tuyền (nhóm 17, mục 69 bổ sung 23/11): hình HIỆN TẠI là ảnh trong repo (SDXL của nhóm) hoặc ảnh chụp màn hình; phương án A / B / C đều lấy từ gói RIÊNG
+# "HOANTDZ Wuxia & Xianxia Battlebacks 100" (cảnh pixel art 640x360, ảnh do AI tạo theo công bố của tác giả; cấm phân phối lại -> che trên tờ công khai). Mọi hình đưa về CAO 180 điểm ảnh.
+NEN_H = 180
+NEN_ROWS = [  # (tên, hiện tại: ("ai", tệp) | ("shot", tệp) | None, A, B, C, khuyến nghị)
+    ("Màn đăng nhập (đỉnh núi sương sớm, tháp gỗ nhìn ra biển mây)", ("ai", "login_bg.webp"), "BB04-01", "BB03-01", "BB03-05", "giữ hiện tại (ảnh SDXL của nhóm, đúng tả); A / B / C nếu muốn nền pixel art"),
+    ("Thẻ bản đồ Lạc Hà Trấn (thị trấn nhà gỗ bên sông, hoa đào)", ("ai", "the_lac_ha.webp"), "BB01-03", "BB01-06", "BB02-05", "giữ hiện tại; A (cầu đá bên kênh lúc hoàng hôn) gần ý nhất"),
+    ("Thẻ bản đồ Hắc Phong Cốc (hẻm núi xám, tháp canh đổ nát)", ("ai", "the_hac_phong.webp"), "BB06-08", "BB02-10", "BB06-04", "giữ hiện tại; A (tàn tích pháo đài tối) gần ý nhất"),
+    ("Thẻ bản đồ Linh Hư Bí Cảnh (hang ngọc lam, nấm phát sáng)", ("ai", "the_linh_hu.webp"), "BB04-06", "BB08-09", "BB08-03", "A hoặc B (hang tinh thể) gần ý nhất; giữ hiện tại cũng ổn"),
+    ("Thẻ bản đồ Âm Sương Trạch (đầm lầy sương rêu, cây chết)", ("ai", "the_am_suong.webp"), "BB02-07", "BB08-07", "BB06-06", "giữ hiện tại; B (đầm sương) gần ý nhất"),
+    ("Thẻ bản đồ Hàn Vân Lĩnh (băng nguyên, hồ đóng băng)", ("ai", "the_han_van.webp"), "BB09-06", "BB09-07", "BB09-08", "A / B / C đều hợp; giữ hiện tại cũng ổn"),
+    ("Thẻ trùm Xích Mãng (trăn đỏ trên đá rêu dưới hoa đào)", ("trum", "the_xich_mang.webp"), "BB08-06", "BB02-03", "BB10-01", "giữ hiện tại (có trăn); nền gói chỉ là cảnh, KHÔNG có trùm"),
+    ("Thẻ trùm Hắc Giao (giao long đen ở bãi đầm sương)", ("trum", "the_hac_giao.webp"), "BB10-06", "BB08-02", "BB10-03", "giữ hiện tại (có giao long); nền gói chỉ là cảnh"),
+    ("Thẻ trùm Thiên Hàn Vương (khối băng khổng lồ trên hồ băng)", ("trum", "the_thien_han_vuong.webp"), "BB09-10", "BB09-08", "BB09-06", "giữ hiện tại; nền gói chỉ là cảnh"),
+    ("Thẻ trùm Linh Hư Yêu Vương (hươu lam ngọc trong hang ngọc)", ("trum", "the_yeu_vuong.webp"), "BB08-04", "BB08-10", "BB04-06", "giữ hiện tại; nền gói chỉ là cảnh"),
+    ("Nền HOÀNG TUYỀN (màn gục / luân hồi: cầu Nại Hà, Quỷ Môn, điện Diêm La)", ("shot", "limbo-1280x720.png"), "BB07-04", "BB07-05", "BB07-06", "A (cầu Nại Hà), B (Quỷ Môn), C (điện Diêm La): hợp đúng chủ đề, hiện tại là màn tối đơn giản"),
+    ("Nền đấu trường chặn đường (mục 52)", ("shot", "chan-duong-dau-truong-desktop-hd.png"), "BB10-07", "BB10-01", "BB10-10", "A / B / C đều hợp; cần chọn một phong cách chung"),
+    ("Nền trùm thế giới (chưa có nền riêng)", None, "BB10-04", "BB10-08", "BB10-09", "chưa có hình hiện tại; A (đỉnh sét thiên kiếp) hợp trùm thế giới"),
+]
+
+
+def to_height(im, h=NEN_H):
+    im = trim(im) if im.mode == "RGBA" and im.getbbox() else im
+    return im.resize((max(1, round(im.width * h / im.height)), h), Image.LANCZOS)
+
+
+def group_nen(L, names):
+    rows = []
+    for i, (name, cur_src, a, b, c, rec) in enumerate(NEN_ROWS, 1):
+        if cur_src is None:
+            cur = Cell("", "cur", [], "chưa có nền riêng", None, 1, note="chưa có nền riêng")
+        else:
+            kind, f = cur_src
+            path = {
+                "ai": os.path.join(ROOT, "client/public/assets/ai", f),
+                "trum": os.path.join(ROOT, "client/public/packs/art-trum", f),
+                "shot": os.path.join(SHOT, f),
+            }[kind]
+            cur = cell(L, "", "cur", lambda p=path: to_height(load(p)), f"hiện tại: {os.path.basename(path)}", None, 1)
+
+        def opt(letter, bid):
+            def getter():
+                im, nm = L.battleback(bid)
+                return to_height(im)
+
+            def capof():
+                try:
+                    return f"{bid}: {L.battleback(bid)[1]} (ảnh AI)"
+                except KeyError:
+                    return bid
+
+            return cell(L, letter, "bb", getter, capof(), None, 1)
+
+        rows.append(dict(code=f"NEN-{i:02d}", name=name, rec=rec, top=True, cur=cur, opts=[opt("A", a), opt("B", b), opt("C", c)],
+                         sub="HIỆN TẠI = ảnh trong repo / ảnh chụp màn hình; A / B / C = cảnh của gói riêng HOANTDZ Battlebacks (AI tạo, che trên tờ công khai), đều cao 180 điểm ảnh" if i == 1 else None))
+    return [("17-nen", "Nhóm 17 — Nền / màn tải / Hoàng Tuyền (NEN): HIỆN TẠI và ba cảnh pixel art của gói riêng", rows)]
 
 
 def md_for(code_group, title, rows):
@@ -721,7 +839,7 @@ def md_for(code_group, title, rows):
     return "\n".join(out) + "\n"
 
 
-PENDING = {"14": "vật phẩm (VP, 126 món)", "15": "hiệu ứng chiêu (HU, 57 chiêu)", "16": "giao diện (UI)"}
+PENDING = {"14": "vật phẩm (VP, 126 món)", "15": "hiệu ứng chiêu (HU, 57 chiêu)", "16": "giao diện (UI)", "17": "nền / màn tải / Hoàng Tuyền (NEN)"}
 
 
 def upsert_md(path, built):
@@ -774,7 +892,7 @@ def main():
     one = lambda t: [t]
     builders = {
         "10": lambda: one(group_nv(L)), "11": lambda: one(group_npc(L, names)), "12": lambda: one(group_quai(L, names)),
-        "13": lambda: one(group_trum(L, names)), "14": lambda: group_vp(L, names), "15": lambda: group_hu(L, names), "16": lambda: group_ui(L, names),
+        "13": lambda: one(group_trum(L, names)), "14": lambda: group_vp(L, names), "15": lambda: group_hu(L, names), "16": lambda: group_ui(L, names), "17": lambda: group_nen(L, names),
     }
     built = {}
     for g in a.groups.split(","):

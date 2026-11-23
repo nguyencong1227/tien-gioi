@@ -29,17 +29,15 @@ describe("dung-bang-duyet.py: ranh giới giấy phép (đọc mã, chạy mọi
     return m![1];
   };
 
-  it("hai gói cấm phân phối lại (Wuxia, Sunnyside) được đánh dấu RIÊNG (True); hiện tại + Ninja + Xianxia là công khai (False)", () => {
-    expect(srcRow("wuxia")).toMatch(/, True, /);
-    expect(srcRow("sunny")).toMatch(/, True, /);
+  it("bốn gói cấm phân phối lại (Wuxia, Sunnyside, HOANTDZ icon, HOANTDZ nền) được đánh dấu RIÊNG (True); hiện tại + Ninja + Xianxia là công khai (False)", () => {
+    for (const k of ["wuxia", "sunny", "hicon", "bb"]) expect(srcRow(k), k).toMatch(/, True, /);
     for (const k of ["cur", "ninja", "xian"]) expect(srcRow(k), k).toMatch(/, False, /);
   });
 
   it("gói CC0 ghi đúng giấy phép CC0; gói riêng ghi 'cấm'", () => {
     expect(srcRow("ninja")).toContain('"CC0"');
     expect(srcRow("xian")).toContain('"CC0"');
-    expect(srcRow("wuxia")).toContain("cấm");
-    expect(srcRow("sunny")).toContain("cấm");
+    for (const k of ["wuxia", "sunny", "hicon", "bb"]) expect(srcRow(k), k).toContain("cấm");
   });
 
   it("tờ công khai thay MỌI ô của gói riêng bằng khung trống (điều kiện `public and private`)", () => {
@@ -70,10 +68,47 @@ describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu
       );
   });
 
-  it("nhóm 14 chỉ dùng nguồn CÔNG KHAI: không ô gói riêng (wuxia / sunny) nào trong group_vp", () => {
-    const body = code.slice(code.indexOf("def vp_row("), code.indexOf("def md_for("));
+  it("nhóm 14: phương án A / B CHỈ nguồn công khai (xian / ninja); gói riêng chỉ xuất hiện ở ô C (hicon), không wuxia / sunny / bb", () => {
+    const body = code.slice(code.indexOf("def vp_row("), code.indexOf("def group_vp("));
     expect(body.length).toBeGreaterThan(500);
-    expect(body).not.toMatch(/"wuxia"|"sunny"/);
+    expect(body).not.toMatch(/"wuxia"|"sunny"|"bb"/);
+    const ab = [...body.matchAll(/cell\(L, "([AB])", "(\w+)"/g)];
+    expect(ab.length).toBeGreaterThan(10);
+    for (const m of ab) expect(["xian", "ninja"], `ô ${m[1]} dùng nguồn ${m[2]}`).toContain(m[2]);
+    // mọi chỗ nhắc "hicon" đều là ô C (che ở tờ công khai)
+    const all = body.match(/"hicon"/g)?.length ?? 0;
+    const inC = body.match(/Cell\("C", "hicon"/g)?.length ?? 0;
+    expect(all).toBeGreaterThan(2);
+    expect(inC).toBe(all);
+  });
+});
+
+describe("dung-bang-duyet.py: nhóm 17 (nền / màn tải / Hoàng Tuyền), phần đọc mã / tài liệu (chạy mọi máy)", () => {
+  const repo = path.join(here, "..", "..", "..");
+
+  it("DUYET_TUNG_PHAN.md có khối nhóm 17 với NEN-01.. liên tục (đủ ít nhất 10 mã, có Hoàng Tuyền) và tờ công khai có thật", () => {
+    const doc = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+    const blk = /<!-- NHOM 17 -->([\s\S]*?)<!-- \/NHOM 17 -->/.exec(doc);
+    expect(blk, "thiếu khối NHOM 17").toBeTruthy();
+    const codes = [...blk![1].matchAll(/^\| (NEN-\d{2}) \|/gm)].map((m) => m[1]);
+    expect(codes.length).toBeGreaterThanOrEqual(10);
+    expect(codes).toEqual(codes.map((_, i) => `NEN-${String(i + 1).padStart(2, "0")}`));
+    expect(blk![1]).toMatch(/HOÀNG TUYỀN/);
+    expect(fs.statSync(path.join(repo, "docs/art/huong-moi/17-nen.png")).size).toBeGreaterThan(
+      10_000,
+    );
+  });
+
+  it("nhóm 17: MỌI phương án A / B / C là cảnh của gói riêng `bb` (che ở tờ công khai); hình hiện tại là ảnh trong repo / ảnh chụp", () => {
+    const body = code.slice(code.indexOf("def group_nen("), code.indexOf("def md_for("));
+    expect(body.length).toBeGreaterThan(500);
+    expect(body).toContain('cell(L, letter, "bb"');
+    expect(body).not.toMatch(/"wuxia"|"sunny"|"hicon"|"xian"|"ninja"/);
+    // mọi mã cảnh BBnn-mm trong bảng NEN_ROWS tồn tại trong định dạng của gói
+    const rows = code.slice(code.indexOf("NEN_ROWS = ["), code.indexOf("def to_height("));
+    const ids = [...rows.matchAll(/"(BB\d{2}-\d{2})"/g)].map((m) => m[1]);
+    expect(ids.length).toBeGreaterThanOrEqual(30);
+    for (const id of ids) expect(id).toMatch(/^BB(0[1-9]|10)-(0[1-9]|10)$/);
   });
 });
 
@@ -147,7 +182,7 @@ describe.skipIf(!hasPillow)("dung-bang-duyet.py: hàm nine() (9-slice) dựng đ
   });
 });
 
-describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-16)", () => {
+describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
   let dir = "";
   let pub = "";
   let priv = "";
@@ -184,7 +219,7 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-16)", () => {
         "-I",
         SCRIPT,
         "--groups",
-        "10,11,12,13,14,15,16",
+        "10,11,12,13,14,15,16,17",
         "--public",
         pub,
         "--private",
@@ -274,34 +309,53 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-16)", () => {
   it("MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ)", () => {
     const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
     const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
-    expect(sheets.length).toBeGreaterThanOrEqual(21); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16)
+    expect(sheets.length).toBeGreaterThanOrEqual(22); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16) + 1 (nhóm 17)
     for (const f of sheets) {
       const inRepo = fs.readFileSync(path.join(repoDir, f));
       expect(
         inRepo.equals(fs.readFileSync(path.join(pub, f))),
-        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
+        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16,17 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
       ).toBe(true);
     }
   });
 
-  it("nhóm 14 (vật phẩm): sáu tờ, tổng đúng số vật phẩm, KHÔNG ô gói riêng, tờ công khai == tờ đầy đủ từng byte", () => {
+  it("nhóm 14 (vật phẩm): sáu tờ <= 30 hàng, tổng đúng số vật phẩm; ô C (icon HOANTDZ, gói riêng) có ở mọi tờ có món hợp, tờ công khai KHÁC tờ đầy đủ đúng khi có ô riêng", () => {
     const out = String(run.stdout);
     const lines = out.split("\n").filter((l) => l.startsWith("ĐÃ DỰNG 14-vat-pham-"));
     expect(lines.length).toBe(6);
     let total = 0;
+    let privTotal = 0;
     for (const l of lines) {
       const m = /ĐÃ DỰNG (14-vat-pham-[a-z-]+\d?) (\d+) mã \(ô gói riêng: (\d+)\)/.exec(l);
       expect(m, l).toBeTruthy();
-      total += Number(m![2]);
-      expect(m![3], l).toBe("0");
-      expect(Number(m![2]), l).toBeLessThanOrEqual(30); // tờ không quá cao
+      const rows = Number(m![2]);
+      const priv_ = Number(m![3]);
+      total += rows;
+      privTotal += priv_;
+      expect(rows, l).toBeLessThanOrEqual(30); // tờ không quá cao
+      // mọi vật phẩm trừ NGUYÊN LIỆU quái có ô C (gói icon có đủ đan, phù, sách, trang bị 5 bậc); nguyên liệu chỉ nanh / xương / ngọc
+      if (!m![1].includes("nguyen-lieu")) expect(priv_, l).toBe(rows);
+      else expect(priv_, l).toBeGreaterThan(0);
       const a = fs.readFileSync(path.join(pub, `${m![1]}.png`));
       const b = fs.readFileSync(path.join(priv, `${m![1]}-day-du.png`));
       expect(
         a.equals(b),
-        `${m![1]}: tờ công khai phải == tờ đầy đủ (nhóm 14 không dùng gói riêng)`,
-      ).toBe(true);
+        `${m![1]}: ô riêng ${priv_} nên tờ công khai ${priv_ ? "phải KHÁC" : "phải == "} tờ đầy đủ`,
+      ).toBe(priv_ === 0);
     }
     expect(total).toBe(ITEMS.length);
+    expect(privTotal).toBeGreaterThan(100);
+  });
+
+  it("nhóm 17 (nền): 13 mã, 39 ô gói riêng (3 phương án x 13), tờ công khai KHÁC tờ đầy đủ", () => {
+    const out = String(run.stdout);
+    const m = /ĐÃ DỰNG 17-nen (\d+) mã \(ô gói riêng: (\d+)\)/.exec(out);
+    expect(m, "thiếu dòng nhóm 17").toBeTruthy();
+    expect(Number(m![1])).toBeGreaterThanOrEqual(10);
+    expect(Number(m![2])).toBe(Number(m![1]) * 3);
+    const a = fs.readFileSync(path.join(pub, "17-nen.png"));
+    const b = fs.readFileSync(path.join(priv, "17-nen-day-du.png"));
+    expect(a.length).toBeGreaterThan(10_000);
+    expect(a.equals(b), "gói riêng lọt ra tờ công khai").toBe(false);
   });
 });
