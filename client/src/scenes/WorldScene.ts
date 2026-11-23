@@ -2467,6 +2467,7 @@ export class WorldScene extends Phaser.Scene {
     reg("toast", (m: ToastMsg) => ui.toast(m));
     reg("inv", (m: InvMsg) => ui.onInv(m));
     reg("quests", (m: QuestsMsg) => ui.onQuests(m));
+    reg("questReward", (m: unknown) => ui.onQuestReward(m));
     reg("dialog", (m: DialogMsg) => ui.onDialog(m));
     reg("party", (m: PartyMsg) => ui.onParty(m));
     reg("partyInvited", (m: PartyInvitedMsg) => ui.onPartyInvited(m));
