@@ -8,7 +8,9 @@ import {
   VISUAL_MAX_CELLS,
   VISUAL_TILE,
   fetchVisualJson,
+  VISUAL_STORAGE_KEY,
   loadVisualTexture,
+  mapVisualEnabled,
   sanitizeVisualMap,
   visualImageFits,
   visualImageWidth,
@@ -359,5 +361,34 @@ describe("fetchVisualJson", () => {
 describe("hằng số", () => {
   it("ô tileset nhúng 16 px (khớp ảnh dựng bởi dung-tileset-world.py)", () => {
     expect(VISUAL_TILE).toBe(16);
+  });
+});
+
+describe("mapVisualEnabled (cờ bật / tắt lớp hình mới)", () => {
+  const store = (v: string | null) => ({
+    getItem: (k: string) => (k === VISUAL_STORAGE_KEY ? v : null),
+  });
+  it("mặc định BẬT (không tham số, không khoá lưu, hoặc không có localStorage)", () => {
+    expect(mapVisualEnabled("", store(null))).toBe(true);
+    expect(mapVisualEnabled("?debug=1", null)).toBe(true);
+  });
+  it("?visual=0 tắt, ?visual=1 bật và THẮNG khoá lưu", () => {
+    expect(mapVisualEnabled("?visual=0", store(null))).toBe(false);
+    expect(mapVisualEnabled("?visual=0", store("1"))).toBe(false);
+    expect(mapVisualEnabled("?visual=1", store("0"))).toBe(true);
+  });
+  it("khoá lưu '0' tắt; giá trị khác (rác) vẫn bật", () => {
+    expect(mapVisualEnabled("", store("0"))).toBe(false);
+    expect(mapVisualEnabled("", store("1"))).toBe(true);
+    expect(mapVisualEnabled("", store("off"))).toBe(true);
+    expect(mapVisualEnabled("?visual=2", store("0"))).toBe(false);
+  });
+  it("trình duyệt chặn localStorage (getItem ném): không ném, mặc định bật", () => {
+    const evil = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+    };
+    expect(mapVisualEnabled("", evil)).toBe(true);
   });
 });

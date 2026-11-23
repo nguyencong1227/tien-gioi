@@ -225,3 +225,24 @@ export async function fetchVisualJson(
     if (timer) clearTimeout(timer);
   }
 }
+
+/** Khoá `localStorage` để người chơi tắt lớp hình mới (`"0"` = tắt). */
+export const VISUAL_STORAGE_KEY = "tg.mapVisual";
+
+/**
+ * Lớp hình Tiled có bật không: `?visual=0` tắt, `?visual=1` bật (thắng khoá lưu); không có thì khoá `localStorage` `"0"` tắt; mặc định BẬT (nhưng chỉ vẽ khi gói
+ * `map:<id>` THẬT SỰ có ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
+ */
+export function mapVisualEnabled(
+  search: string,
+  storage: { getItem(k: string): string | null } | null,
+): boolean {
+  try {
+    const q = new URLSearchParams(search).get("visual");
+    if (q === "0") return false;
+    if (q === "1") return true;
+    return storage?.getItem(VISUAL_STORAGE_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
