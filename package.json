@@ -2,7 +2,7 @@
   "name": "tien-gioi",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "workspaces": [
     "shared",
     "server",
