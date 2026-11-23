@@ -994,6 +994,9 @@ const BOOKS = {
   kinh_thiem_to_cong: [0x6fae5a, 0xd8ecc0],
   kinh_doan_truong_chi_phap: [0x3f7a44, 0xb4dca0],
   kinh_kho_moc_phung_xuan_quyet: [0x7ab866, 0xe0f0cc],
+  // Mộc (CT17 lát 2, G): bìa xanh theo hệ, không dấu
+  kinh_me_hon_huong_quyet: [0x5a8f52, 0xd4ecc4],
+  kinh_man_da_hoa_kinh: [0x84b86c, 0xe2f0d2],
   // Hỏa / Băng / Âm / Lôi / Phong (CT8 lát 1, A): bìa theo hệ, không dấu để tránh chữ
   kinh_liet_diem_chuong: [0xd9433b, 0xffd0a0],
   kinh_xich_tuoc_phu: [0xc8352c, 0xffe0a8],
