@@ -173,65 +173,52 @@ describe("vitest.sequencer: cân bằng shard theo thời lượng (#1380)", () 
     expect(check3.reason).toContain("bị trùng lặp");
   });
 
-  describe("WeightedSequencer class: kiểm tra shard() và đột biến index lệch", () => {
-    it("trả về toàn bộ tệp khi không cấu hình shard hoặc shard.count <= 1", async () => {
-      const seq = new WeightedSequencer({} as any);
-      (seq as any).ctx = { config: { root: "/repo" } };
-
-      const mockSpecs = [{ moduleId: "/repo/a.test.ts" }, { moduleId: "/repo/b.test.ts" }];
-
-      // Không có config.shard
-      const res1 = await seq.shard(mockSpecs);
-      expect(res1).toEqual(mockSpecs);
-
-      // count = 1
-      (seq as any).ctx = { config: { root: "/repo", shard: { index: 1, count: 1 } } };
-      const res2 = await seq.shard(mockSpecs);
-      expect(res2).toEqual(mockSpecs);
+  describe("WeightedSequencer.shard (nối với config.shard)", () => {
+    it("ba shard i/3 qua shard() thật: hợp = mọi tệp, mỗi tệp đúng một shard, không shard nào rỗng", async () => {
+      const root = process.cwd();
+      const all = findTestFiles(root);
+      const specs = all.map((f) => ({ moduleId: path.join(root, f) }));
+      const seen = new Map<string, number>();
+      for (const index of [1, 2, 3]) {
+        const ctx = { config: { root, shard: { index, count: 3 } } };
+        const seq = new WeightedSequencer(ctx as never);
+        const mine = (await seq.shard(specs as never)) as { moduleId: string }[];
+        expect(mine.length).toBeGreaterThan(0);
+        for (const s of mine) {
+          const rel = path.relative(root, s.moduleId).replace(/\\/g, "/");
+          expect(seen.has(rel), `${rel} trùng`).toBe(false);
+          seen.set(rel, index);
+        }
+      }
+      expect([...seen.keys()].sort()).toEqual([...all].sort());
     });
 
-    it("phân chia shard chính xác theo index (1-based)", async () => {
-      const seq1 = new WeightedSequencer({} as any);
-      const seq2 = new WeightedSequencer({} as any);
-      const seq3 = new WeightedSequencer({} as any);
-
-      (seq1 as any).ctx = { config: { root: "/repo", shard: { index: 1, count: 3 } } };
-      (seq2 as any).ctx = { config: { root: "/repo", shard: { index: 2, count: 3 } } };
-      (seq3 as any).ctx = { config: { root: "/repo", shard: { index: 3, count: 3 } } };
-
-      const mockSpecs = [
-        { moduleId: "/repo/server/src/rooms/WorldRoom.test.ts" },
-        { moduleId: "/repo/server/src/balance/can-bang-sync.test.ts" },
-        { moduleId: "/repo/server/scripts/red-team.test.ts" },
+    it("không có config.shard thì trả nguyên danh sách; count = 1 cũng vậy", async () => {
+      const root = process.cwd();
+      const specs = [
+        { moduleId: path.join(root, "a.test.ts") },
+        { moduleId: path.join(root, "b.test.ts") },
       ];
-
-      const shard1 = await seq1.shard(mockSpecs);
-      const shard2 = await seq2.shard(mockSpecs);
-      const shard3 = await seq3.shard(mockSpecs);
-
-      // Mỗi shard phải có đúng 1 trong 3 tệp
-      expect(shard1.length).toBe(1);
-      expect(shard2.length).toBe(1);
-      expect(shard3.length).toBe(1);
-
-      const all = [...shard1, ...shard2, ...shard3];
-      expect(all.length).toBe(3);
+      const none = new WeightedSequencer({ config: { root } } as never);
+      expect(await none.shard(specs as never)).toHaveLength(2);
+      const one = new WeightedSequencer({
+        config: { root, shard: { index: 1, count: 1 } },
+      } as never);
+      expect(await one.shard(specs as never)).toHaveLength(2);
     });
 
     it("đột biến index lệch: index out of bounds trả về mảng rỗng []", async () => {
-      const seq = new WeightedSequencer({} as any);
+      const root = process.cwd();
+      const seq = new WeightedSequencer({
+        config: { root, shard: { index: 4, count: 3 } },
+      } as never);
+      const mockSpecs = [{ moduleId: path.join(root, "a.test.ts") }];
+      expect(await seq.shard(mockSpecs as never)).toEqual([]);
 
-      // index = 4 trong khi count = 3
-      (seq as any).ctx = { config: { root: "/repo", shard: { index: 4, count: 3 } } };
-      const mockSpecs = [{ moduleId: "/repo/a.test.ts" }, { moduleId: "/repo/b.test.ts" }];
-
-      const resHigh = await seq.shard(mockSpecs);
-      expect(resHigh).toEqual([]);
-
-      // index = 0 (Vitest shard index là 1-based)
-      (seq as any).ctx = { config: { root: "/repo", shard: { index: 0, count: 3 } } };
-      const resZero = await seq.shard(mockSpecs);
-      expect(resZero).toEqual([]);
+      const seqZero = new WeightedSequencer({
+        config: { root, shard: { index: 0, count: 3 } },
+      } as never);
+      expect(await seqZero.shard(mockSpecs as never)).toEqual([]);
     });
   });
 });
