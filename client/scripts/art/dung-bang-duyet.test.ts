@@ -186,12 +186,14 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
   let dir = "";
   let pub = "";
   let priv = "";
+  let namesFile = "";
   let run: ReturnType<typeof spawnSync>;
   beforeAll(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-bang-duyet-"));
     pub = path.join(dir, "pub");
     priv = path.join(dir, "priv");
     const names = path.join(dir, "names.json");
+    namesFile = names;
     fs.writeFileSync(
       names,
       JSON.stringify({
@@ -358,4 +360,41 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     expect(a.length).toBeGreaterThan(10_000);
     expect(a.equals(b), "gói riêng lọt ra tờ công khai").toBe(false);
   });
+
+  it("RÒ RỈ: tờ công khai KHÔNG phụ thuộc điểm ảnh của gói riêng (thay MỌI ảnh dưới /mnt/data/assets-private bằng màu đặc, dựng lại: tờ công khai giữ nguyên từng byte)", () => {
+    const pub2 = path.join(dir, "pub-magenta");
+    const priv2 = path.join(dir, "priv-magenta");
+    const prog = [
+      "import importlib.util, sys",
+      "sys.dont_write_bytecode = True",
+      `spec = importlib.util.spec_from_file_location("m", ${JSON.stringify(SCRIPT)})`,
+      "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
+      "from PIL import Image",
+      "orig = m.load",
+      "def fake(p):",
+      "    im = orig(p)",
+      "    return Image.new('RGBA', im.size, (255, 0, 255, 255)) if str(p).startswith('/mnt/data/assets-private/') else im",
+      "m.load = fake",
+      `sys.argv = ['x', '--groups', '10,11,12,13,14,15,16,17', '--public', ${JSON.stringify(pub2)}, '--private', ${JSON.stringify(priv2)}, '--names', ${JSON.stringify(namesFile)}]`,
+      "m.main()",
+    ].join("\n");
+    const r = spawnSync("python3", ["-I", "-c", prog], { encoding: "utf8" });
+    expect(r.status, String(r.stderr)).toBe(0);
+    const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
+    expect(sheets.length).toBeGreaterThanOrEqual(22);
+    for (const f of sheets) {
+      expect(
+        fs.readFileSync(path.join(pub, f)).equals(fs.readFileSync(path.join(pub2, f))),
+        `${f}: tờ công khai THAY ĐỔI khi ảnh gói riêng đổi = điểm ảnh gói riêng đã lọt ra tờ công khai`,
+      ).toBe(true);
+    }
+    // đối chứng: tờ ĐẦY ĐỦ thì CÓ phụ thuộc (phép thử có nghĩa), ít nhất ở một tờ có ô gói riêng
+    const fullDiffers = fs
+      .readdirSync(priv)
+      .filter((f) => f.endsWith("-day-du.png"))
+      .some(
+        (f) => !fs.readFileSync(path.join(priv, f)).equals(fs.readFileSync(path.join(priv2, f))),
+      );
+    expect(fullDiffers, "đối chứng: tờ đầy đủ phải đổi khi ảnh gói riêng đổi").toBe(true);
+  }, 120_000);
 });
