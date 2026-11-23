@@ -93,6 +93,29 @@ describe("NetSlowDetector", () => {
     expect(d.poll(300_000 + SLOW_POLL_MS)).toBe(false);
   });
 
+  it("luồng chính bị chặn > SLOW_STALE_POLL_MS GIỮA lúc ping kẹt: quãng chặn không tính, nhưng vẫn báo sau SLOW_AFTER_MS kể từ lúc chạy lại (không mất mốc chờ)", () => {
+    const d = new NetSlowDetector();
+    d.poll(0);
+    d.noteSend(100); // ping duy nhất (nhịp tim không gửi ping mới khi chưa có pong)
+    expect(firstSlow(d, 500, 1000)).toBeNull(); // chưa đủ ngưỡng
+    // luồng chính bị chặn 3 giây: poll kế cách xa hơn SLOW_STALE_POLL_MS
+    const back = 1000 + 3000;
+    expect(d.poll(back)).toBe(false); // không báo nhầm ngay lúc quay lại
+    const t = firstSlow(d, back + SLOW_POLL_MS, back + 20_000);
+    expect(t).not.toBeNull(); // mạng vẫn đứng: PHẢI báo (trước đây mốc bị xoá và chip không bao giờ hiện)
+    expect(t!).toBeGreaterThan(back + SLOW_AFTER_MS);
+    expect(t!).toBeLessThanOrEqual(back + SLOW_AFTER_MS + SLOW_POLL_MS);
+  });
+
+  it("luồng chính bị chặn rồi tin về lại (pong / patch): không báo", () => {
+    const d = new NetSlowDetector();
+    d.poll(0);
+    d.noteSend(100);
+    expect(d.poll(5000)).toBe(false);
+    d.noteInbound(); // tin dồn trong bộ đệm socket tới ngay sau quãng chặn
+    expect(firstSlow(d, 5000 + SLOW_POLL_MS, 60_000)).toBeNull();
+  });
+
   it("sau reset thì sạch; thời gian hỏng (NaN) không báo", () => {
     const d = new NetSlowDetector();
     d.poll(0);
@@ -209,6 +232,23 @@ describe("NetSlowMonitor", () => {
     h.advance(SLOW_MIN_SHOW_MS + 1000);
     expect(h.calls).toEqual([true, false]);
     expect(h.mon.isSlow()).toBe(false);
+    h.mon.stop();
+  });
+
+  it("nhịp tim chỉ gửi MỘT ping rồi chờ pong; luồng chính bị chặn 3 giây giữa lúc mạng đứng: chip vẫn hiện (E2E đêm 23/11, e2e:nhip-tim Ca 6)", () => {
+    const h = harness();
+    h.mon.start();
+    h.advance(1000);
+    h.fr.pong(); // máy chủ hiểu ping
+    h.fr.room.send("ping", { t: 1 }); // ping kẹt: không còn ping nào gửi thêm cho tới khi có pong
+    h.advance(500);
+    // luồng chính bị chặn 3 giây (các hẹn giờ không chạy), rồi chạy lại
+    h.setNow(10_000 + 1000 + 500 + 3000);
+    h.advance(SLOW_POLL_MS);
+    expect(h.calls).toEqual([]); // vừa quay lại: chưa có bằng chứng
+    h.advance(SLOW_AFTER_MS + SLOW_POLL_MS);
+    expect(h.calls).toEqual([true]);
+    expect(h.mon.isSlow()).toBe(true);
     h.mon.stop();
   });
 

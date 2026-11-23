@@ -20,7 +20,7 @@ export const NET_LOST_TEXT = "Mất kết nối — nhân vật đang được b
 export const NET_BACK_TEXT = "Đã kết nối lại.";
 /** Chip đã hiện thì giữ ít nhất chừng này (ms) kể cả khi tin đã về lại (không nhấp nháy). */
 export const SLOW_MIN_SHOW_MS = 1500;
-/** Lần `poll` trước cách quá chừng này (tab ẩn, máy treo, luồng chính bị chặn): không đủ bằng chứng về mạng, bỏ mốc chờ cũ. */
+/** Lần `poll` trước cách quá chừng này (tab ẩn, máy treo, luồng chính bị chặn): quãng đã qua không phải bằng chứng về mạng, đếm lại thời gian chờ từ lúc này (không bỏ mốc: xem `poll`). */
 export const SLOW_STALE_POLL_MS = 2000;
 /** Chu kỳ `poll` của bộ theo dõi (ms). */
 export const SLOW_POLL_MS = 500;
@@ -52,8 +52,11 @@ export class NetSlowDetector {
   poll(now: number): boolean {
     if (!Number.isFinite(now)) return false;
     if (now - this.lastPoll > SLOW_STALE_POLL_MS) {
-      // vừa bị treo / ẩn: thời gian chờ đo được là do phía MÌNH không chạy, không phải do mạng
-      this.waitingSince = null;
+      // vừa bị treo / ẩn: thời gian chờ đo được là do phía MÌNH không chạy, không phải do mạng -> không tính quãng đã qua.
+      // Nhưng KHÔNG được bỏ hẳn mốc chờ: nhịp tim chỉ giữ MỘT ping chờ tại một thời điểm (không gửi ping mới khi chưa có pong) nên sẽ không có `noteSend` nào đặt lại mốc,
+      // và mạng đang đứng thật thì chip không bao giờ hiện (chỉ còn banner nối lại ở giây 8). Chờ tiếp từ BÂY GIỜ: có tin về thì `noteInbound` xoá như thường,
+      // vẫn lặng im thêm `SLOW_AFTER_MS` thì báo (E2E đêm 23/11: luồng chính Chrome trên runner bị chặn > 2 giây giữa lúc đứng => chip không hiện, e2e:nhip-tim Ca 6 đỏ).
+      if (this.waitingSince !== null) this.waitingSince = now;
       this.shownAt = null;
     }
     this.lastPoll = now;
