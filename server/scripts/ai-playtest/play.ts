@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
+import { NPC_BY_ID, type NpcDef } from "@tien-gioi/shared";
 import { getChromeGpuFlags, killChrome, removeTmpDirs, sleep } from "../e2e-kit";
 import { spawnPlaytestServer, currentHeadSha } from "./server-spawn";
 import {
@@ -45,12 +46,16 @@ const argVal = (args: string[], name: string): string | undefined => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 
+/** Hình dạng chung của một phím thật (đủ cho `press`/`hold`/`down`/`up`); `KEY` và `digitKey` cùng thỏa. */
+type KeySpec = { key: string; code: string; vk: number };
+
 /** Danh sách phím thật cần, đúng mã `code`/`windowsVirtualKeyCode` của Chrome (KeyX -> X, Digit1 -> 1). */
 const KEY = {
   w: { key: "w", code: "KeyW", vk: 87 },
   a: { key: "a", code: "KeyA", vk: 65 },
   s: { key: "s", code: "KeyS", vk: 83 },
   d: { key: "d", code: "KeyD", vk: 68 },
+  f: { key: "f", code: "KeyF", vk: 70 }, // nói chuyện / tương tác (mở hộp thoại NPC)
   b: { key: "b", code: "KeyB", vk: 66 }, // túi đồ
   c: { key: "c", code: "KeyC", vk: 67 }, // nhân vật
   n: { key: "n", code: "KeyN", vk: 78 }, // sổ nhiệm vụ
@@ -59,6 +64,21 @@ const KEY = {
   e: { key: "e", code: "KeyE", vk: 69 }, // cài đặt
   escape: { key: "Escape", code: "Escape", vk: 27 },
 } as const;
+
+/** Phím số `n` (1-9) chọn dòng hội thoại (client: `handlePanelKey` nhận `Digit[1-9]`). */
+function digitKey(n: number): KeySpec {
+  return { key: String(n), code: `Digit${n}`, vk: 48 + n };
+}
+
+/** Đối số chung của `Input.dispatchKeyEvent` từ một phím (`windowsVirtualKeyCode` = `nativeVirtualKeyCode` = vk). */
+function keyBase(k: KeySpec) {
+  return {
+    key: k.key,
+    code: k.code,
+    windowsVirtualKeyCode: k.vk,
+    nativeVirtualKeyCode: k.vk,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tab Chrome điều khiển bằng CDP (gom lỗi console / exception / mạng; thừa kế
@@ -197,7 +217,7 @@ class PlayTab {
   }
 
   /** Phím nhấn rồi nhả (chờ `keyup` thật sự chạy xong trên luồng chính trang, như e2e-ban-phim). */
-  async press(k: (typeof KEY)[keyof typeof KEY]) {
+  async press(k: KeySpec) {
     const prev = Number(
       await this.ev(
         `(() => { if (!window.__ptKeyHooked) { window.__ptKeyHooked = true; window.__ptKeySeq = 0; window.addEventListener('keyup', () => { window.__ptKeySeq++; }); } return window.__ptKeySeq; })()`,
@@ -217,17 +237,22 @@ class PlayTab {
   }
 
   /** Giữ phím `ms` mili giây VÀ ít nhất 4 khung hình Phaser (di chuyển cần phím GIỮ). */
-  async hold(k: (typeof KEY)[keyof typeof KEY], ms: number) {
-    const base = {
-      key: k.key,
-      code: k.code,
-      windowsVirtualKeyCode: k.vk,
-      nativeVirtualKeyCode: k.vk,
-    };
+  async hold(k: KeySpec, ms: number) {
+    const base = keyBase(k);
     await this.send("Input.dispatchKeyEvent", { ...base, type: "rawKeyDown" });
     await Promise.all([sleep(ms), this.waitFrames(4)]);
     await this.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
     await sleep(120);
+  }
+
+  /** Phím XUỐNG (giữ) — cho đi bộ: giữ nhiều phím rồi nhả sau khi tới nơi. KHÔNG chờ hook keyup (khác `press`). */
+  async down(k: KeySpec) {
+    await this.send("Input.dispatchKeyEvent", { ...keyBase(k), type: "rawKeyDown" });
+  }
+
+  /** Phím LÊN (nhả) — cặp với `down` khi đi bộ. */
+  async up(k: KeySpec) {
+    await this.send("Input.dispatchKeyEvent", { ...keyBase(k), type: "keyUp" });
   }
 
   /** Chờ trang vẽ ít nhất `n` khung Phaser (`__scene.game.loop.frame` tăng). */
@@ -399,6 +424,146 @@ const PANEL_STEPS: StepDef[] = PANELS.map((p) => ({
   after: (tab) => closePanel(tab, p),
 }));
 
+// ---------------------------------------------------------------------------
+// Đi bộ tới NPC bằng PHÍM THẬT (WASD): bộ chơi thử KHÔNG có quyền máy chủ nên
+// KHÔNG dịch chuyển tức thời (khác e2e-nguoi-moi). Đọc vị trí dự đoán predX/predY
+// của client, giữ phím về phía đích cho tới khi tới cạnh NPC (btn-talk hiện).
+// ---------------------------------------------------------------------------
+
+/**
+ * Phím GIỮ để đi về phía lệch `(dx, dy)` (dx>0 phải, dy>0 xuống; W A S D). THUẦN — test đột biến được.
+ * `deadzone`: lệch dưới ngưỡng thì KHÔNG giữ phím theo trục đó (đủ gần / dao động nhỏ). Trả mảng 0-2 phím chéo.
+ */
+export function walkKeysToward(dx: number, dy: number, deadzone = 6): readonly KeySpec[] {
+  const keys: KeySpec[] = [];
+  if (dx > deadzone) keys.push(KEY.d);
+  else if (dx < -deadzone) keys.push(KEY.a);
+  if (dy > deadzone) keys.push(KEY.s);
+  else if (dy < -deadzone) keys.push(KEY.w);
+  return keys;
+}
+
+/** Điểm dừng sát NPC (cách `offset` px về phía nam) để btn-talk hiện (trong NPC_RANGE 80px). */
+function npcStand(npc: NpcDef, offset = 20): { x: number; y: number } {
+  return { x: npc.x, y: npc.y + offset };
+}
+
+/**
+ * Đi bộ (WASD thật) từ vị trí hiện tại tới cạnh `npc`, rồi chờ nút Nói chuyện hiện. Ném nếu hết thời gian
+ * (không tới nơi) — bước đỏ kèm lý do, không im lặng bỏ qua. NHẢ MỌI phím trước khi trả / khi lỗi.
+ */
+async function walkToNpc(
+  tab: PlayTab,
+  npc: NpcDef,
+  label: string,
+  opts: { timeout?: number; nearPx?: number; offset?: number } = {},
+): Promise<void> {
+  const target = npcStand(npc, opts.offset);
+  const nearPx = opts.nearPx ?? 26;
+  const deadline = Date.now() + (opts.timeout ?? 20000);
+  let held: readonly KeySpec[] = [];
+  const releaseAll = async () => {
+    for (const k of held) await tab.up(k);
+    held = [];
+  };
+  try {
+    while (Date.now() < deadline) {
+      const pos = await samplePred(tab);
+      const dx = target.x - pos.x;
+      const dy = target.y - pos.y;
+      if (Math.hypot(dx, dy) < nearPx) break;
+      const want = walkKeysToward(dx, dy);
+      // chỉ bấm / nhả các phím THAY ĐỔI (giữ ổn định, tránh gõ lặp làm lệch hướng)
+      for (const k of held) if (!want.some((w) => w.code === k.code)) await tab.up(k);
+      for (const k of want) if (!held.some((x) => x.code === k.code)) await tab.down(k);
+      held = want;
+      await sleep(80);
+    }
+    await releaseAll();
+    await tab.waitFor(
+      `window.__scene.closestNpcId === ${JSON.stringify(npc.id)} && !document.getElementById('btn-talk').hidden`,
+      `đứng cạnh ${label}`,
+      6000,
+    );
+  } catch (err) {
+    await releaseAll();
+    throw err;
+  }
+}
+
+/** Nhãn các lựa chọn hội thoại đang mở (`#dlg-options .dlg-opt-btn`); khớp bằng `includes` (bao gồm chữ số / tag). */
+async function dialogLabels(tab: PlayTab): Promise<string[]> {
+  const raw = await tab.ev(
+    `JSON.stringify([...document.querySelectorAll('#dlg-options .dlg-opt-btn')].map((b) => b.textContent ?? ""))`,
+  );
+  return JSON.parse(String(raw)) as string[];
+}
+
+/** F mở hộp thoại NPC, Enter tua chữ, chờ các dòng lựa chọn; trả nhãn chúng. */
+async function openNpcDialog(tab: PlayTab, npc: NpcDef): Promise<string[]> {
+  await tab.press(KEY.f);
+  await tab.waitFor(modalShown("dialog-modal"), `hộp ${npc.id} mở`, 6000);
+  await tab.press({ key: "Enter", code: "Enter", vk: 13 });
+  await tab.waitFor(
+    `document.querySelectorAll('#dlg-options .dlg-opt-btn').length > 0`,
+    `lựa chọn ${npc.id} hiện`,
+  );
+  return dialogLabels(tab);
+}
+
+/** Chọn dòng hội thoại có chữ `part` bằng PHÍM SỐ (1-9); ném nếu không tìm thấy (bước đỏ kèm nhãn thiếu). */
+async function chooseDialogOpt(tab: PlayTab, labels: string[], part: string): Promise<void> {
+  const i = labels.findIndex((l) => l.includes(part));
+  if (i < 0) throw new Error(`thiếu lựa chọn "${part}" trong ${JSON.stringify(labels)}`);
+  await tab.press(digitKey(i + 1));
+}
+
+/**
+ * Nhiệm vụ chính "Nhập thế" (M66.5, #1339): nhận (Trưởng trấn) -> gặp Hà lão -> trả, TOÀN BỘ trong MỘT phiên
+ * đăng nhập (mỗi bước bộ chơi thử là một đăng nhập mới nên KHÔNG thể tách). Ảnh bảng thưởng do `runStep` chụp
+ * ngay sau khi action trả (bảng vẫn hiện ~6s). Bộ phát hiện (drift/stuck/stall/console) phải xanh, kể cả khung điện thoại.
+ */
+const QUEST_STEPS: StepDef[] = [
+  {
+    id: "quest-nhap-the",
+    scenario: "quests",
+    title:
+      "Nhiệm vụ: nhận Nhập thế (Trưởng trấn) -> gặp Hà lão -> trả, chụp bảng thưởng (xanh cả khung điện thoại)",
+    input: "keyboard",
+    viewports: ["360x640", "915x412", "1366x768"],
+    action: async (tab) => {
+      const truong_tran = NPC_BY_ID.truong_tran;
+      const duoc_su = NPC_BY_ID.duoc_su;
+      // 1. Nhận "Nhập thế" ở Trưởng trấn
+      await walkToNpc(tab, truong_tran, "Trưởng trấn");
+      const opts1 = await openNpcDialog(tab, truong_tran);
+      await chooseDialogOpt(tab, opts1, "Nhận nhiệm vụ: Nhập thế");
+      await tab.waitFor(
+        `window.__ui.getQuestLog().active.some((q) => q.id === "nhap_the")`,
+        "Nhập thế vào sổ nhiệm vụ",
+        8000,
+      );
+      // 2. Đi gặp Hà lão (dược sư) để hoàn thành bước "nói chuyện"
+      await walkToNpc(tab, duoc_su, "Hà lão");
+      await openNpcDialog(tab, duoc_su); // nói chuyện = hoàn thành bước
+      await tab.press(KEY.escape); // đóng hộp
+      await tab.waitFor(`!(${modalShown("dialog-modal")})`, "đóng hộp Hà lão", 5000);
+      // 3. Về trả ở Trưởng trấn -> bảng thưởng hiện
+      await walkToNpc(tab, truong_tran, "Trưởng trấn");
+      const opts3 = await openNpcDialog(tab, truong_tran);
+      await chooseDialogOpt(tab, opts3, "Trả nhiệm vụ: Nhập thế");
+      await tab.waitFor(
+        `!document.getElementById('quest-reward').hidden`,
+        "bảng thưởng trả nhiệm vụ hiện",
+        8000,
+      );
+      await tab.press(KEY.escape); // đóng hộp lời cảm ơn (bảng thưởng vẫn ở trên, auto-hide sau ~6s)
+      await sleep(500); // ổn định ảnh trước khi chụp
+      return [];
+    },
+  },
+];
+
 const STEPS: StepDef[] = [
   {
     id: "enter-game",
@@ -434,6 +599,7 @@ const STEPS: StepDef[] = [
     },
   },
   ...PANEL_STEPS,
+  ...QUEST_STEPS,
 ];
 
 // ---------------------------------------------------------------------------
