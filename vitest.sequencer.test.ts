@@ -221,4 +221,35 @@ describe("vitest.sequencer: cân bằng shard theo thời lượng (#1380)", () 
       expect(await seqZero.shard(mockSpecs as never)).toEqual([]);
     });
   });
+
+  describe("WeightedSequencer.sort: sắp xếp tệp nặng chạy trước (tránh đuôi shard trên CI)", () => {
+    it("sắp xếp theo trọng số giảm dần: can-bang-sync (124s) -> WorldRoom (94s) -> red-team (55s) -> tệp nhẹ (0.6s)", async () => {
+      const root = process.cwd();
+      const seq = new WeightedSequencer({ config: { root } } as never);
+
+      const lightSpec = { moduleId: path.join(root, "server/src/foo-light.test.ts") };
+      const wrSpec = { moduleId: path.join(root, "server/src/rooms/WorldRoom.test.ts") };
+      const cbSpec = {
+        moduleId: path.join(root, "server/src/balance/can-bang-sync.test.ts"),
+      };
+      const rtSpec = { moduleId: path.join(root, "server/scripts/red-team.test.ts") };
+
+      // Đưa vào theo thứ tự xáo trộn / tệp nhẹ trước
+      const input = [lightSpec, wrSpec, rtSpec, cbSpec];
+      const sorted = await seq.sort(input);
+
+      expect(sorted).toEqual([cbSpec, wrSpec, rtSpec, lightSpec]);
+    });
+
+    it("hai tệp cùng trọng số thì sắp xếp ổn định theo moduleId", async () => {
+      const root = process.cwd();
+      const seq = new WeightedSequencer({ config: { root } } as never);
+
+      const specB = { moduleId: path.join(root, "server/src/b-light.test.ts") };
+      const specA = { moduleId: path.join(root, "server/src/a-light.test.ts") };
+
+      const sorted = await seq.sort([specB, specA]);
+      expect(sorted).toEqual([specA, specB]);
+    });
+  });
 });

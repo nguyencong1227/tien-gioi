@@ -32,18 +32,18 @@ import { BaseSequencer } from "vitest/node";
  * Tệp không có trong danh sách được gán trọng số mặc định 0.6 giây và sắp xếp bằng SHA-1.
  */
 export const TEST_WEIGHTS: Record<string, number> = {
+  "server/src/balance/can-bang-sync.test.ts": 124,
   "server/src/rooms/WorldRoom.test.ts": 94,
-  "server/src/balance/can-bang-sync.test.ts": 87,
-  "server/scripts/red-team.test.ts": 54,
+  "server/scripts/red-team.test.ts": 55,
   "server/src/rooms/WorldRoom.arena.test.ts": 37,
   "server/scripts/dungeon-stress.test.ts": 27,
   "server/src/rooms/WorldRoom.dungeon.test.ts": 20,
+  "server/src/balance/chan-duong.test.ts": 18,
   "server/src/balance/search-check.test.ts": 17,
+  "server/src/balance/trum-the-gioi.test.ts": 15,
   "server/src/rooms/WorldRoom.ambush.test.ts": 15,
   "server/scripts/portal-stress.test.ts": 10,
   "server/scripts/duel-stress.test.ts": 9,
-  "server/src/balance/trum-the-gioi.test.ts": 9,
-  "server/src/balance/chan-duong.test.ts": 9,
   "server/src/rooms/WorldRoom.ambush-rush.test.ts": 9,
   "server/src/rooms/WorldRoom.achievements.test.ts": 9,
   "server/scripts/kiem-mat-ket-noi.test.ts": 9,
@@ -51,6 +51,11 @@ export const TEST_WEIGHTS: Record<string, number> = {
   "server/src/rooms/WorldRoom.movement.test.ts": 8,
   "server/src/rooms/WorldRoom.boss.test.ts": 8,
   "server/src/systems/perf.test.ts": 7,
+  "server/src/systems/economy-fuzz.test.ts": 7,
+  "server/src/systems/boss-fuzz.test.ts": 7,
+  "server/src/store-fuzz.test.ts": 6,
+  "server/src/systems/movement-fuzz.test.ts": 6,
+  "server/src/systems/boss-escape-zone.test.ts": 6,
   "server/src/rooms/WorldRoom.duel.test.ts": 5,
 };
 
@@ -125,6 +130,14 @@ export class WeightedSequencer extends BaseSequencer {
 
     const partitioned = partitionFiles(items, count);
     return partitioned[index - 1] ?? [];
+  }
+
+  override async sort(files: any[]): Promise<any[]> {
+    const root = this.ctx.config.root;
+    const w = (s: any) => TEST_WEIGHTS[normalizeRelPath(s.moduleId, root)] ?? 0.6;
+    return [...files].sort(
+      (a, b) => w(b) - w(a) || (a.moduleId < b.moduleId ? -1 : a.moduleId > b.moduleId ? 1 : 0),
+    );
   }
 }
 
