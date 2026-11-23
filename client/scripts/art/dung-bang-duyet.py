@@ -126,6 +126,19 @@ class Loaders:
         w = im.width // n
         return im.crop((idx * w, 0, idx * w + w, im.height))
 
+    # Xianxia icons (CC0): biểu tượng trang bị 32x32, base như "blade_01"/"relic_02", khung icon_xianxia_<base>_<idx>.png
+    def xian_icon(self, base, idx=0):
+        fs = sorted(glob.glob(f"{XIAN}/icons/icon_xianxia_{base}_[0-9][0-9].png"))
+        return load(fs[min(idx, len(fs) - 1)])
+
+    # Ninja Adventure (CC0): vũ khí là sprite nhỏ (KHÔNG cần recolor theo cảnh giới như nhân vật)
+    def ninja_weapon(self, w):
+        return load(f"{NINJA}/content/weapon/{w}/sprite.png")
+
+    # Ninja Adventure (CC0): đồ phá hủy — hũ / hòm / cỏ (vật chứa cho đan dược, nguyên liệu)
+    def ninja_destroy(self, name):
+        return load(f"{NINJA}/content/destroyable/{name}.png")
+
 
 # ---------------------------------------------------------------- tờ ảnh
 class Cell:
@@ -313,6 +326,53 @@ def group_trum(L, names):
     return "13-trum", "Nhóm 13 — Trùm (T): thẻ trùm bằng ảnh AI SDXL giữ nguyên, đây chỉ là THÂN trên bản đồ", rows
 
 
+# Vật phẩm (NHÓM 14): chỉ dùng nguồn CÔNG KHAI (hiện tại trong atlas + Ninja Adventure CC0 + Xianxia CC0) để tờ công khai an toàn.
+# Không gói riêng nào có biểu tượng vật phẩm phù hợp → KHÔNG ô gói riêng; C để trống chờ gói mục 68 (đang kiểm giấy phép).
+VP_ORDER = ["consumable", "book", "equip", "material"]
+VP_LABEL = {"consumable": "đan dược / phù", "book": "kinh quyển", "equip": "trang bị", "material": "nguyên liệu"}
+VP_EQUIP_XIAN = ["blade_01", "dark_01", "heavy_01", "ranged_01", "relic_01"]  # phẩm thấp -> cao = biểu tượng phức tạp dần
+VP_EQUIP_NINJA = ["axe", "big_sword", "club", "bone"]
+
+
+def group_vp(L, names):
+    items = names["items"]
+    blocks = {t: [it for it in items if it["type"] == t] for t in VP_ORDER}
+    rows, n = [], 0
+    for t in VP_ORDER:
+        block = sorted(blocks[t], key=lambda it: it["rarity"]) if t == "equip" else blocks[t]
+        for it in block:
+            n += 1
+            rar = it.get("rarityName") or "Phàm phẩm"
+            if t == "equip":
+                xian_base = VP_EQUIP_XIAN[min(it["rarity"], 4)]
+                a = cell(L, "A", "xian", lambda b=xian_base: L.xian_icon(b), f'Xianxia "{xian_base.split("_")[0]}" CC0', 32)
+                w = VP_EQUIP_NINJA[n % len(VP_EQUIP_NINJA)]
+                b = cell(L, "B", "ninja", lambda ww=w: L.ninja_weapon(ww), f'vũ khí Ninja "{w}" CC0', 32)
+                rec = "A (trang bị theo phẩm)"
+            elif t == "book":
+                a = cell(L, "A", "ninja", lambda: L.ninja_weapon("book"), "sách phép Ninja CC0", 32)
+                b = cell(L, "B", "xian", lambda: L.xian_icon("relic_01"), "di vật Xianxia CC0", 32)
+                rec = "A (sách phép)"
+            elif t == "consumable":
+                a = cell(L, "A", "ninja", lambda: L.ninja_destroy("pot"), "hũ đan Ninja CC0", 32)
+                b = cell(L, "B", "ninja", lambda: L.ninja_destroy("crate"), "hòm Ninja CC0", 32)
+                rec = "A (hũ đan)"
+            else:  # material
+                a = cell(L, "A", "ninja", lambda: L.ninja_destroy("crate"), "hòm nguyên liệu Ninja CC0", 32)
+                b = cell(L, "B", "ninja", lambda: L.ninja_destroy("pot"), "hũ Ninja CC0", 32)
+                rec = "A (hòm nguyên liệu)"
+            rows.append(
+                dict(
+                    code=f"VP-{n:03d}",
+                    name=it["name"],
+                    rec=rec + " — C: gói mục 68 (đang kiểm giấy phép)",
+                    cur=cell(L, "", "cur", lambda iid=it["id"]: L.cur("item-" + iid), f'{VP_LABEL[t]}, {rar}', 32),
+                    opts=[a, b, Cell("C", "xian", [], "gói mục 68 (đang kiểm giấy phép)", 32)],
+                )
+            )
+    return "14-vat-pham", "Nhóm 14 — Vật phẩm (VP): đan dược / kinh quyển / trang bị / nguyên liệu", rows
+
+
 def md_for(code_group, title, rows):
     out = [f"## {title}", "", f"Tờ ảnh: `{code_group}.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/{code_group}-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).", "",
            "| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |", "|---|---|---|---|---|---|---|"]
@@ -346,7 +406,7 @@ def main():
         r = subprocess.run(["npx", "tsx", os.path.join(HERE, "xuat-doi-tuong.ts")], cwd=ROOT, capture_output=True, text=True, check=True)
         names = json.loads(r.stdout)
     L = Loaders()
-    builders = {"10": lambda: group_nv(L), "11": lambda: group_npc(L, names), "12": lambda: group_quai(L, names), "13": lambda: group_trum(L, names)}
+    builders = {"10": lambda: group_nv(L), "11": lambda: group_npc(L, names), "12": lambda: group_quai(L, names), "13": lambda: group_trum(L, names), "14": lambda: group_vp(L, names)}
     md = []
     for g in a.groups.split(","):
         code_group, title, rows = builders[g]()
