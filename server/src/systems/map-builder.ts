@@ -19,7 +19,7 @@ export * from "./map-art-rules";
 /** GID cơ sở cho tileset nhúng 'world' */
 export const TILES_WORLD_FIRSTGID = 10;
 export const TILES_WORLD_COLUMNS = 22;
-export const TILES_WORLD_COUNT = 640;
+export const TILES_WORLD_COUNT = 616;
 
 // Các variant offset trong tileset_floor (cột x hàng ô):
 // Cát: khối (0, 0) -> col 0, row 0
@@ -31,7 +31,7 @@ export const VARIANT_WATER = { col: 0, row: 21 };
 export const VARIANT_STONE = { col: 11, row: 7 };
 
 // GID đơn lẻ cho các vật thể phụ
-export const GID_GRASS = 10;
+export const GID_GRASS = 254;
 export const GID_TREE_TRUNK = 620;
 export const GID_TREE_CANOPY = 621;
 export const GID_ROCK = 622;
