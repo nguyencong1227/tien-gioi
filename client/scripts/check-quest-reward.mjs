@@ -28,14 +28,6 @@ export const VIEWPORTS = [
   { name: "390x844", w: 390, h: 844, dpr: 2, mobile: true },
 ];
 
-/** Sổ nhiệm vụ: "Nhập thế" (đi gặp Hà lão, trả ở Trưởng trấn) ở bước `step` (0 = chưa đủ, 1 = đã đủ). */
-const QUESTS_MSG = (step) => ({
-  active: [{ id: "nhap_the", step, count: step }],
-  done: [],
-  dailyDone: [],
-});
-const EMPTY_QUESTS = { active: [], done: [], dailyDone: [] };
-
 async function main() {
   const shotsArg = process.argv.indexOf("--shots");
   const shotsDir = shotsArg >= 0 ? path.resolve(process.argv[shotsArg + 1]) : null;
@@ -163,15 +155,6 @@ async function main() {
       await evalJs(`window.__scene.room.send = () => {}; 1`);
       return true;
     };
-    const toasts = () =>
-      evalJs(`Array.from(document.querySelectorAll("#toast p")).map((p) => p.textContent)`);
-    const readyToasts = async () => (await toasts()).filter((t) => t.startsWith("ĐÃ ĐỦ"));
-    const markerOf = (npcId) =>
-      evalJs(`(() => {
-        const ne = window.__scene.npcs.get(${JSON.stringify(npcId)});
-        if (!ne) return null;
-        return { text: ne.markerText.text, color: ne.markerText.style.color, visible: ne.markerText.visible, scale: ne.markerText.scaleX, auraScale: ne.markerAura.scaleX };
-      })()`);
     const shot = async (name) => {
       if (!shotsDir) return;
       const s = await send("Page.captureScreenshot", { format: "webp", quality: 80 });
