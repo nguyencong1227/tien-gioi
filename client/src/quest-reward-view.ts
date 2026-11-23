@@ -1,6 +1,7 @@
 // Bảng thưởng khi TRẢ nhiệm vụ (QUYET_DINH_M3 mục 66, issue #1327): trước đây trả xong chỉ có toast "Hoàn thành: <tên>", tu vi cộng lặng lẽ, đồ vào túi lặng lẽ. Server (PR #1331) gửi MỘT tin
 // `questReward` với số THẬT đã cộng; file này làm sạch tin (không tin mạng) và dựng các dòng hiển thị. Hàm thuần, không đụng DOM: `ui.ts` chỉ vẽ.
 import { CURRENCY_NAME, ITEM_BY_ID, questDefAny, type QuestRewardMsg } from "@tien-gioi/shared";
+import { questReadyToast } from "./quest-log";
 
 /** Trần số vật phẩm hiển thị / trần mỗi số: tin hợp lệ không bao giờ vượt, đây là hàng rào cho tin hỏng. */
 export const QUEST_REWARD_MAX_ITEMS = 12;
@@ -75,4 +76,15 @@ export function questRewardView(msg: QuestRewardMsg): QuestRewardView {
   if (msg.coin > 0) lines.push({ kind: "coin", text: `+${fmt(msg.coin)} ${CURRENCY_NAME}` });
   if (lines.length === 0) lines.push({ kind: "note", text: "Nhiệm vụ này không có phần thưởng" });
   return { title: def ? `Hoàn thành: ${def.title}` : "Hoàn thành nhiệm vụ", lines };
+}
+
+/**
+ * Toast của CHÍNH nhiệm vụ vừa trả mà bảng thưởng đã nói rồi: dòng "Hoàn thành: <tên>" (máy chủ gửi ngay trước `questReward`, trùng tiêu đề bảng) và dòng
+ * "ĐÃ ĐỦ: <tên> — về gặp ..." (client báo khi đủ mục tiêu, ở lại 6 s nên còn nằm đó nếu trả nhanh). Hai dòng này nằm ở 16 % chiều cao, đè lên bảng (ở 64 px)
+ * và che dòng vật phẩm (ảnh chơi thử AI v0.5.4), nên `ui.ts` gỡ chúng khi bảng hiện. Toast của nhiệm vụ KHÁC, hay của việc khác, thì giữ nguyên.
+ */
+export function isQuestRewardEchoToast(text: string, questId: string): boolean {
+  const def = questDefAny(questId);
+  if (!def) return false;
+  return text === `Hoàn thành: ${def.title}` || text === questReadyToast(def);
 }
