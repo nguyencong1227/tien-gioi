@@ -130,7 +130,7 @@ Tờ ảnh: `14-vat-pham-dan-phu.png` (công khai: hiện tại + CC0) và `/mnt
 | VP-018 | Kim Lân Độc Phù | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | — | A (bùa) |
 | VP-019 | Tốc Phong Phù | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | — | A (bùa) |
 
-## Nhóm 14 — Vật phẩm (VP), kinh quyển (tờ 1/2): VP-020 .. VP-048
+## Nhóm 14 — Vật phẩm (VP), kinh quyển (tờ 1/2): VP-020 .. VP-049
 
 Tờ ảnh: `14-vat-pham-kinh-quyen-1.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-kinh-quyen-1-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
@@ -165,112 +165,114 @@ Tờ ảnh: `14-vat-pham-kinh-quyen-1.png` (công khai: hiện tại + CC0) và 
 | VP-046 | Thiết Sa Chưởng | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-047 | Ngũ Chướng Huyền Công | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-048 | Hủ Thủy Chưởng | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-049 | Triền Xà Thủ | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 
-## Nhóm 14 — Vật phẩm (VP), kinh quyển (tờ 2/2): VP-049 .. VP-076
+## Nhóm 14 — Vật phẩm (VP), kinh quyển (tờ 2/2): VP-050 .. VP-078
 
 Tờ ảnh: `14-vat-pham-kinh-quyen-2.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-kinh-quyen-2-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
 | Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
 |---|---|---|---|---|---|---|
-| VP-049 | Triền Xà Thủ | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-050 | Hắc Sa Độc Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-051 | Thi Độc Âm Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-052 | Thiềm Tô Công | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-053 | Đoạn Trường Chỉ Pháp | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 | VP-054 | Khô Mộc Phùng Xuân Quyết | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-055 | Liệt Diễm Chưởng | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-056 | Xích Tước Phù Lục | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-057 | Phượng Cầu Hoàng Quyết | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-058 | Hàn Băng Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-059 | Minh Ảnh Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-060 | Điện Mâu Quyết | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-061 | Hồi Phong Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-062 | Thiên La Lôi Trận | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-063 | Chưởng Tâm Lôi | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-064 | Vạn Thú Triều Phong | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-065 | Minh Vũ Kiếm Quyết | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-066 | Huyết Ảnh Chỉ | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-067 | Sư Tử Hống | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-068 | Cầm Long Thủ | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-069 | Hóa Huyết Đại Pháp | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-070 | Long Tượng Bá Thể | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-071 | Độc Đằng Phục Kinh | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-072 | Tam Liên Kiếm Quyết | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-073 | Liệt Diễm Trận Đồ | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-074 | Liên Châu Lôi Kinh | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-075 | Hồn Phiên Trận Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
-| VP-076 | Phá Sơn Quyền Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-055 | Mạn Đà Hoa Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-056 | Mê Hồn Hương Quyết | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-057 | Liệt Diễm Chưởng | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-058 | Xích Tước Phù Lục | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-059 | Phượng Cầu Hoàng Quyết | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-060 | Hàn Băng Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-061 | Minh Ảnh Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-062 | Điện Mâu Quyết | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-063 | Hồi Phong Chưởng | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-064 | Thiên La Lôi Trận | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-065 | Chưởng Tâm Lôi | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-066 | Vạn Thú Triều Phong | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-067 | Minh Vũ Kiếm Quyết | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-068 | Huyết Ảnh Chỉ | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-069 | Sư Tử Hống | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-070 | Cầm Long Thủ | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-071 | Hóa Huyết Đại Pháp | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-072 | Long Tượng Bá Thể | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-073 | Độc Đằng Phục Kinh | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-074 | Tam Liên Kiếm Quyết | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-075 | Liệt Diễm Trận Đồ | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-076 | Liên Châu Lôi Kinh | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-077 | Hồn Phiên Trận Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
+| VP-078 | Phá Sơn Quyền Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | — | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho cả 57 quyển nên chỉ hợp làm bìa chung |
 
-## Nhóm 14 — Vật phẩm (VP), trang bị (tờ 1/2): VP-077 .. VP-095
+## Nhóm 14 — Vật phẩm (VP), trang bị (tờ 1/2): VP-079 .. VP-097
 
 Tờ ảnh: `14-vat-pham-trang-bi-1.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-trang-bi-1-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
 | Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
 |---|---|---|---|---|---|---|
-| VP-077 | Lang Nha Kiếm | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 0 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-078 | Lang Nha Phù | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 0 (CC0) | — | A (bùa) |
-| VP-079 | Thố Nhung Bào | hiện tại (Phàm phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
-| VP-080 | Hắc Hổ Bào | hiện tại (Linh phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
-| VP-081 | Hắc Hổ Kiếm | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 1 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-082 | Hổ Bộ Ngoa | hiện tại (Linh phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
-| VP-083 | Hổ Hồn Phù | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 1 (CC0) | — | A (bùa) |
-| VP-084 | Thố Nguyệt Bội | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
-| VP-085 | Mãng Hành Ngoa | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
-| VP-086 | Mãng Tinh Bội | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
-| VP-087 | Mãng Đảm Phù | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 2 (CC0) | — | A (bùa) |
-| VP-088 | Xích Lân Bào | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
-| VP-089 | Xích Mãng Kiếm | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 2 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-090 | Huyền Quy Kiếm | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 3 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-091 | Hàn Băng Ấn | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
-| VP-092 | Hấp Linh Châu | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
-| VP-093 | Hồ Tâm Phù | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | — | A (bùa) |
-| VP-094 | Hộ Thân Ấn | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
-| VP-095 | Quy Giáp Bào | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-079 | Lang Nha Kiếm | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 0 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-080 | Lang Nha Phù | hiện tại (Phàm phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 0 (CC0) | — | A (bùa) |
+| VP-081 | Thố Nhung Bào | hiện tại (Phàm phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-082 | Hắc Hổ Bào | hiện tại (Linh phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-083 | Hắc Hổ Kiếm | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 1 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-084 | Hổ Bộ Ngoa | hiện tại (Linh phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
+| VP-085 | Hổ Hồn Phù | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 1 (CC0) | — | A (bùa) |
+| VP-086 | Thố Nguyệt Bội | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
+| VP-087 | Mãng Hành Ngoa | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
+| VP-088 | Mãng Tinh Bội | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
+| VP-089 | Mãng Đảm Phù | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 2 (CC0) | — | A (bùa) |
+| VP-090 | Xích Lân Bào | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-091 | Xích Mãng Kiếm | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 2 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-092 | Huyền Quy Kiếm | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 3 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-093 | Hàn Băng Ấn | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
+| VP-094 | Hấp Linh Châu | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
+| VP-095 | Hồ Tâm Phù | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | — | A (bùa) |
+| VP-096 | Hộ Thân Ấn | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
+| VP-097 | Quy Giáp Bào | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
 
-## Nhóm 14 — Vật phẩm (VP), trang bị (tờ 2/2): VP-096 .. VP-113
+## Nhóm 14 — Vật phẩm (VP), trang bị (tờ 2/2): VP-098 .. VP-115
 
 Tờ ảnh: `14-vat-pham-trang-bi-2.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-trang-bi-2-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
 | Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
 |---|---|---|---|---|---|---|
-| VP-096 | Quy Tức Phù | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | — | A (bùa) |
-| VP-097 | Sương Hồ Bào | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
-| VP-098 | Sương Linh Bội | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
-| VP-099 | Sương Vân Ngoa | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
-| VP-100 | Sương Vũ Kiếm | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 3 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-101 | Xích Diễm Ấn | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
-| VP-102 | Giao Châu Bội | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
-| VP-103 | Giao Long Phù | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | — | A (bùa) |
-| VP-104 | Giao Lân Bào | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
-| VP-105 | Giao Ảnh Ngoa | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
-| VP-106 | Hàn Lang Bào | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
-| VP-107 | Hàn Tinh Bội | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
-| VP-108 | Hàn Vũ Kiếm | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 4 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-109 | Hắc Giao Kiếm | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 4 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
-| VP-110 | Phong Hành Bội | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
-| VP-111 | Phong Nha Phù | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | — | A (bùa) |
-| VP-112 | Tuyết Hành Ngoa | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
-| VP-113 | Định Tâm Chung | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | — | A (6 phẩm tăng dần) |
+| VP-098 | Quy Tức Phù | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | — | A (bùa) |
+| VP-099 | Sương Hồ Bào | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-100 | Sương Linh Bội | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
+| VP-101 | Sương Vân Ngoa | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
+| VP-102 | Sương Vũ Kiếm | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 3 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-103 | Xích Diễm Ấn | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 3 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 3 (CC0) | — | A (6 phẩm tăng dần) |
+| VP-104 | Giao Châu Bội | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
+| VP-105 | Giao Long Phù | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | — | A (bùa) |
+| VP-106 | Giao Lân Bào | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-107 | Giao Ảnh Ngoa | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
+| VP-108 | Hàn Lang Bào | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có áo: giữ hiện tại |
+| VP-109 | Hàn Tinh Bội | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
+| VP-110 | Hàn Vũ Kiếm | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 4 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-111 | Hắc Giao Kiếm | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia kiếm / đao, phẩm 4 (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: đại kiếm (CC0) | — | A (6 phẩm tăng dần) |
+| VP-112 | Phong Hành Bội | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: lệnh bài (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: chuỗi hạt (CC0) | — | giữ hiện tại; A nếu muốn lệnh bài |
+| VP-113 | Phong Nha Phù | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: bùa (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | — | A (bùa) |
+| VP-114 | Tuyết Hành Ngoa | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có giày: giữ hiện tại |
+| VP-115 | Định Tâm Chung | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | — | A (6 phẩm tăng dần) |
 
-## Nhóm 14 — Vật phẩm (VP), nguyên liệu: VP-114 .. VP-126
+## Nhóm 14 — Vật phẩm (VP), nguyên liệu: VP-116 .. VP-128
 
 Tờ ảnh: `14-vat-pham-nguyen-lieu.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-nguyen-lieu-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
 | Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
 |---|---|---|---|---|---|---|
-| VP-114 | Lông thỏ | hiện tại (Phàm phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-115 | Nanh sói | hiện tại (Phàm phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-116 | Da hổ | hiện tại (Linh phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-117 | Vảy mãng | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-118 | Sương mao | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-119 | Quy giáp | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-120 | Độc nang | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-121 | Giao lân | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-122 | Hàn Lang mao | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-123 | Phong Nha vũ | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-124 | Tượng cốt | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-125 | Độc tước nang | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
-| VP-126 | Thiên Hàn châu | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-116 | Lông thỏ | hiện tại (Phàm phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-117 | Nanh sói | hiện tại (Phàm phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-118 | Da hổ | hiện tại (Linh phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-119 | Vảy mãng | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-120 | Sương mao | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-121 | Quy giáp | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-122 | Độc nang | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-123 | Giao lân | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-124 | Hàn Lang mao | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-125 | Phong Nha vũ | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-126 | Tượng cốt | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-127 | Độc tước nang | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-128 | Thiên Hàn châu | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 
 <!-- /NHOM 14 -->
 
