@@ -29,9 +29,10 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, mẫu can-ban
     try {
       // Đột biến 1: sửa sai số lượng icon trong CREDITS.md
       const mutatedCredits = origCredits.replace(
-        "<!-- AUTO-CREDITS-ITEM-COUNT:START -->130 tệp<!-- AUTO-CREDITS-ITEM-COUNT:END -->",
+        /<!-- AUTO-CREDITS-ITEM-COUNT:START -->[\s\S]*?<!-- AUTO-CREDITS-ITEM-COUNT:END -->/,
         "<!-- AUTO-CREDITS-ITEM-COUNT:START -->999 tệp<!-- AUTO-CREDITS-ITEM-COUNT:END -->",
       );
+      expect(mutatedCredits).not.toBe(origCredits);
       fs.writeFileSync(creditsFile, mutatedCredits, "utf8");
       const res1 = syncAssetDocs({ checkOnly: true });
       expect(res1.errors.length).toBeGreaterThan(0);
@@ -40,9 +41,10 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, mẫu can-ban
       // Khôi phục CREDITS, đột biến RA_SOAT
       fs.writeFileSync(creditsFile, origCredits, "utf8");
       const mutatedRaSoat = origRaSoat.replace(
-        "<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->| `item-*` | 130 |",
-        "<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->| `item-*` | 999 |",
+        /<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->[\s\S]*?<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:END -->/,
+        "<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->| `item-*` | 999 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:END -->",
       );
+      expect(mutatedRaSoat).not.toBe(origRaSoat);
       fs.writeFileSync(raSoatFile, mutatedRaSoat, "utf8");
       const res2 = syncAssetDocs({ checkOnly: true });
       expect(res2.errors.length).toBeGreaterThan(0);
