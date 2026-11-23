@@ -30,10 +30,10 @@ const MONSTER_REALM: Readonly<Record<string, number>> = {
 };
 
 /**
- * Chiêu Trúc Cơ (`reqRealm` 2) hiện CHỈ rơi từ quái Nguyên Anh (Độc Tước): có từ trước khi có test này (rarity 2, độc chuyên về Hàn Vân). Không thêm id mới vào đây:
- * chiêu mới phải có ít nhất một nơi rơi cùng bậc (hoặc hơn đúng một bậc). Bớt được thì bớt (thêm nơi rơi Trúc Cơ rồi xoá id khỏi danh sách).
+ * Danh sách tồn đọng: chiêu `rarity >= 2` mà MỌI nơi rơi đều thấp hơn `reqRealm` hoặc cao hơn hai bậc. Hiện RỖNG: `hac_sa_doc_chuong` và `thiem_to_cong` (Trúc Cơ, trước chỉ rơi
+ * từ Độc Tước Nguyên Anh) đã có nơi rơi cùng bậc ở Xích Mãng. KHÔNG thêm id vào đây: chiêu mới phải có ít nhất một nơi rơi cùng bậc (hoặc hơn đúng một bậc).
  */
-const LOW_REALM_ONLY_FROM_HIGHER: readonly string[] = ["hac_sa_doc_chuong", "thiem_to_cong"];
+const LOW_REALM_ONLY_FROM_HIGHER: readonly string[] = [];
 
 /** Mọi (quái, chiêu) có sách chiêu trong bảng rơi. */
 function bookDrops(): { monster: string; skillId: string; reqRealm: number; rarity: number }[] {
