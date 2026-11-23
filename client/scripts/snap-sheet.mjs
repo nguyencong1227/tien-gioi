@@ -240,11 +240,25 @@ try {
               if (!t || !el.contains(t)) foreign++;
             }
           }
+          // Tiêu đề của tấm không được bị ÉP thấp hơn nội dung (ảnh chơi thử AI v0.5.4: tấm là cột flex cao cố định, tiêu đề có min-height nên CO lại khi tấm dài, chữ tràn
+          // ra hai phía và tên bảng Bản đồ cụt mất nửa trên ở 360x640): mọi phần tử con (trừ nút Đóng nổi) phải nằm trong hộp của tiêu đề
+          const hd = el.querySelector(":scope > .inv-head");
+          let headClip = 0;
+          if (hd) {
+            const hr = hd.getBoundingClientRect();
+            for (const k of hd.children) {
+              if (getComputedStyle(k).position === "fixed") continue;
+              const kr = k.getBoundingClientRect();
+              if (kr.height === 0) continue;
+              headClip = Math.max(headClip, hr.top - kr.top, kr.bottom - hr.bottom);
+            }
+          }
           // Danh sách trong tấm (Lò rèn / Cửa hàng / Sổ nhiệm vụ) không được có khung cuộn riêng khi tấm đã tự cuộn (hai thanh cuộn lồng nhau)
           const nestedScroll = [...el.querySelectorAll(".forge-list, .shop-list, #quest-list")].filter((l) =>
             ["auto", "scroll"].includes(getComputedStyle(l).overflowY),
           ).length;
           return JSON.stringify({
+            headClip,
             nestedScroll,
             naturalFits,
             overflowY,
@@ -266,6 +280,10 @@ try {
       check(
         m.docScrollW <= m.iw && m.docScrollH <= m.ih,
         `không thanh cuộn ngoài ý muốn (doc ${m.docScrollW}x${m.docScrollH} / khung ${m.iw}x${m.ih})`,
+      );
+      check(
+        m.headClip <= 1,
+        `tiêu đề không bị ép thấp hơn nội dung (chữ / ảnh lệch ra ngoài hộp tiêu đề ${Math.round(m.headClip)} px)`,
       );
       check(
         m.close.w >= 44 && m.close.h >= 44,

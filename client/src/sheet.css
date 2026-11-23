@@ -103,6 +103,10 @@ html[data-form="phone"] .sheet:not(.sheet-card) > .inv-head {
   position: relative;
   touch-action: none;
   min-height: 48px;
+  /* KHÔNG co: tấm là cột flex cao cố định (đúng bằng màn hình) mà nội dung thường dài hơn, nên mọi con có `min-height` tường minh bị flex CO lại về
+     `min-height` còn chữ tràn ra HAI phía (căn giữa): tên bảng Bản đồ (thẻ minh hoạ + dòng hướng dẫn 3 dòng) cụt mất nửa trên ở 360x640 / 390x844
+     (ảnh chơi thử AI v0.5.4), tiêu đề Cài đặt / Nhân vật / Cửa hàng lệch 4 px. Tấm đã tự cuộn nên không cần co. */
+  flex-shrink: 0;
 }
 html[data-form="phone"] .sheet:not(.sheet-card) > .inv-head::before {
   content: "";
