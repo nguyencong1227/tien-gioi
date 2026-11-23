@@ -25,6 +25,7 @@ import {
   monsterEconomy,
   simulateReincarnationMilestones,
   simulateReincarnationProgression,
+  expectedBookValue,
 } from "./simulate";
 
 describe("đường cong tu luyện", () => {
@@ -203,5 +204,30 @@ describe("cân bằng luân hồi (mô hình, #151)", () => {
     expect(last.ratioToFirstLife).toBeLessThanOrEqual(2.0);
     expect(first.duyenPerHour).toBeGreaterThanOrEqual(25);
     expect(last.duyenPerHour).toBeLessThanOrEqual(60);
+  });
+});
+
+describe("expectedBookValue: giá trị bán kỳ vọng của SÁCH CHIÊU rơi từ một con quái (#1340)", () => {
+  it("quái không rơi sách thì 0; quái rơi sách thì > 0 và không vượt tổng đồ rơi", () => {
+    expect(expectedBookValue("lang")).toBe(0);
+    expect(expectedBookValue("không_có_quái_này")).toBe(0);
+    const ho = expectedBookValue("ho");
+    expect(ho).toBeGreaterThan(0);
+    expect(ho).toBeLessThanOrEqual(expectedLootValue("ho"));
+  });
+
+  it('chỉ tính vật phẩm `type: "book"`: đan `kinh_chi_dan` (tiền tố kinh_) và đồ thường KHÔNG tính', () => {
+    const table = DROP_TABLES.lang;
+    const before = expectedBookValue("lang");
+    table.push(
+      { itemId: "kinh_chi_dan", chance: 1, min: 1, max: 1 },
+      { itemId: "hoi_huyet_dan", chance: 1, min: 1, max: 1 },
+    );
+    try {
+      expect(expectedBookValue("lang")).toBe(before);
+      expect(expectedLootValue("lang")).toBeGreaterThan(before);
+    } finally {
+      table.length -= 2;
+    }
   });
 });

@@ -23,6 +23,7 @@ import {
   type MonsterKind,
   COIN_DROPS,
   DROP_TABLES,
+  ITEM_BY_ID,
   sellPrice,
   buyPrice,
   calcDuyen,
@@ -227,6 +228,20 @@ export function expectedLootValue(monsterKind: string): number {
   for (const e of drops) {
     const qty = e.chance * ((e.min + e.max) / 2);
     val += qty * sellPrice(e.itemId);
+  }
+  return val;
+}
+
+/**
+ * Giá trị bán kỳ vọng của SÁCH CHIÊU (`type: "book"`) rơi từ 1 con quái, đã gồm trong `expectedLootValue`. Tách riêng để các phép đo "bí cảnh đáng bao nhiêu
+ * phút săn quái" (`balance/dungeon.ts`, #1340) có thể bỏ sách khỏi mẫu số: mỗi chiêu mới gắn sách vào quái cho Linh thạch / phút cao nhất làm mẫu số phình
+ * và đẩy cổng 15-20 phút tụt khỏi khoảng dù thu nhập thật không đổi. (`kinh_chi_dan` là đan, không phải sách chiêu: không tính.)
+ */
+export function expectedBookValue(monsterKind: string): number {
+  let val = 0;
+  for (const e of DROP_TABLES[monsterKind] ?? []) {
+    if (ITEM_BY_ID[e.itemId]?.type !== "book") continue;
+    val += e.chance * ((e.min + e.max) / 2) * sellPrice(e.itemId);
   }
   return val;
 }
