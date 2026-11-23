@@ -6,7 +6,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   npm run build -w client && node client/scripts/check-map-visual.mjs [--shots <thư mục>] [--vp <khung>]
  *
  * Dựng một BẢN SAO của client/dist trong thư mục tạm (không đụng dist / public), rồi thử bốn tình huống bằng cách đổi gói `map:lac_ha` trong bản sao:
- *   (1) gói CÓ ảnh tileset + `visual.json` hợp lệ -> ba lớp hình (ground -10 / decor -9 / over worldH + 0.5, phóng 2 lần), lớp ô cũ + trang trí + nước KHÔNG còn;
+ *   (1) gói CÓ ảnh tileset + `visual.json` hợp lệ -> ba lớp hình (ground -10 / decor -9 / over worldH - 0.01, phóng 2 lần), lớp ô cũ + trang trí + nước KHÔNG còn;
+ *   (1b) `?debug` KHÔNG kèm `?visual` -> vẽ cách cũ (mặc định tắt ở `?debug` để các script đo / E2E có cảnh ổn định);
  *   (2) `?visual=0` -> vẽ cách cũ (cờ tắt thắng gói);
  *   (3) gói CHƯA có ảnh trong manifest -> vẽ cách cũ, không lỗi;
  *   (4) `visual.json` hỏng (hợp lệ về băm nhưng sai nội dung) -> vẽ cách cũ, không lỗi.
@@ -208,7 +209,7 @@ async function main() {
       });
       await evalJs("window.__isOldPage = true");
       await send("Page.navigate", {
-        url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`,
+        url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`, // ?debug mặc định TẮT lớp hình: ca cần lớp hình truyền &visual=1
       });
       let ready = false;
       for (let i = 0; i < 80 && !ready; i++) {
@@ -238,6 +239,9 @@ async function main() {
           layers: s.visualLayers.length,
           scale: s.visualLayers[0]?.scaleX ?? null,
           depths: s.visualLayers.map((l) => l.depth),
+          alphas: s.visualLayers.map((l) => l.alpha),
+          fades: s.visualFades,
+          fxDepth: s.fx ? s.map.worldH : null,
           worldH: s.map.worldH,
           legacy: Boolean(s.mapLayer),
           decor: Boolean(s.decorLayer),
@@ -258,7 +262,7 @@ async function main() {
       // (1) gói có ảnh + visual.json hợp lệ -> ba lớp hình
       if (haveImage) {
         setPack({ image: true, visualBuf: visual0 });
-        if (!(await loadPage(vp, "", true))) {
+        if (!(await loadPage(vp, "&visual=1", true))) {
           console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
           failures++;
           continue;
@@ -270,16 +274,39 @@ async function main() {
           s.depths.length === 3 &&
             s.depths[0] === -10 &&
             s.depths[1] === -9 &&
-            s.depths[2] === s.worldH + 0.5,
-          `độ sâu ground -10 / decor -9 / over worldH + 0.5 (trên thực thể, dưới nhãn): ${JSON.stringify(s.depths)}`,
+            s.depths[2] === s.worldH - 0.01,
+          `độ sâu ground -10 / decor -9 / over worldH - 0.01 (trên thực thể, DƯỚI fx và nhãn): ${JSON.stringify(s.depths)}`,
         );
+        check(s.fades === 1, `gói về muộn sau nền cũ: làm mờ chuyển ĐÚNG MỘT lần (${s.fades})`);
         check(!s.legacy && !s.decor && !s.water, "lớp ô cũ, trang trí cũ và nước cũ KHÔNG còn");
+        await sleep(900); // làm mờ chuyển (350 ms) đã xong: lớp hình đặc hẳn, nền cũ đã gỡ khỏi danh sách hiển thị
+        const done = await evalJs(`(() => {
+          const s = window.__scene;
+          const legacyAlive = s.children.list.filter((o) => o.type === "TilemapLayer" && !s.visualLayers.includes(o)).length;
+          return { alphas: s.visualLayers.map((l) => l.alpha), legacyAlive };
+        })()`);
+        check(
+          done.alphas.length === 3 && done.alphas.every((a) => a === 1),
+          `sau khi làm mờ chuyển, ba lớp hình đặc hẳn (alpha 1): ${JSON.stringify(done.alphas)}`,
+        );
+        check(
+          done.legacyAlive === 0,
+          `không còn lớp ô cũ nào trong danh sách hiển thị (${done.legacyAlive})`,
+        );
         check(s.texW === 396, `texture ảnh tileset nạp, rộng 396: ${s.texW}`);
         check(
           exceptions.length === 0,
           `không lỗi JS (${exceptions.length}): ${exceptions[0] ?? ""}`,
         );
         await shot(`ban-do-hinh-moi-${vp.name}.webp`);
+
+        // (1b) ?debug KHÔNG kèm ?visual: mặc định TẮT (cảnh cũ ổn định cho các script đo / E2E dùng ?debug) dù gói có ảnh
+        if (!(await loadPage(vp, "", false))) {
+          failures++;
+          continue;
+        }
+        const dbg = await state();
+        check(dbg.layers === 0 && dbg.legacy, "?debug không kèm ?visual: vẽ cách cũ dù gói có ảnh");
 
         // (2) cờ tắt thắng gói
         if (!(await loadPage(vp, "&visual=0", false))) {
@@ -297,7 +324,7 @@ async function main() {
 
       // (3) gói chưa có ảnh trong manifest
       setPack({ image: false, visualBuf: visual0 });
-      if (!(await loadPage(vp, "", false))) {
+      if (!(await loadPage(vp, "&visual=1", false))) {
         failures++;
         continue;
       }
@@ -308,7 +335,7 @@ async function main() {
       // (4) visual.json hỏng (băm khớp nội dung, nhưng nội dung sai)
       if (haveImage) {
         setPack({ image: true, visualBuf: Buffer.from('{"width":96,"height":96,"layers":"x"}') });
-        if (!(await loadPage(vp, "", false))) {
+        if (!(await loadPage(vp, "&visual=1", false))) {
           failures++;
           continue;
         }

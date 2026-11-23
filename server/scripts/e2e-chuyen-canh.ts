@@ -137,7 +137,9 @@ async function main() {
         throw err;
       }
     };
-    const url = `http://127.0.0.1:${PORT}/?debug=1`;
+    // E2E_VISUAL=1: chạy cùng hành trình nhưng bật LỚP HÌNH Tiled (?visual=1; ?debug mặc định tắt) và kiểm lớp hình thay cho lớp trang trí cũ (S3b, #1206)
+    const VISUAL = process.env.E2E_VISUAL === "1";
+    const url = `http://127.0.0.1:${PORT}/?debug=1${VISUAL ? "&visual=1" : ""}`;
     const ev = (expr: string) => T.ev(expr) as Promise<any>;
 
     // Lưu sẵn nhân vật 1 cạnh Bắc Môn Quan (như chặng 2 cạnh Vọng Trạch Quan và chặng 3 cạnh Lăng Hàn Quan)
@@ -264,16 +266,27 @@ async function main() {
     const checkDest = async (mapId: string) => {
       await sleep(800);
       const dest =
-        await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
+        await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, vis: s.visualLayers.length, visFades: s.visualFades, visTex: s.textures.exists('map-visual:' + s.map.def.id), staleTex: ['lac_ha', 'hac_phong', 'am_suong', 'han_van'].filter((m) => m !== s.map.def.id && s.textures.exists('map-visual:' + m)), fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
         decorKey: s.decorLayer ? s.decorLayer.tileset[0].image.key : '', portals: s.map.portals.length, portalVisuals: s.portalVisuals.length,
         zone: document.getElementById('minimap-zone')?.textContent || '', town: s.map.def.townName, wild: s.map.def.wildName }; } catch (e) { return { err: String((e && e.stack) || e) }; } })()`);
       must(!dest.err, `đọc trạng thái bản đồ đích (${dest.err})`);
       must(dest.mapId === mapId, `đang ở bản đồ ${mapId} (${dest.mapId})`);
-      must(dest.decor, "bản đồ đích có lớp trang trí");
-      must(
-        dest.decorKey === `decor-${mapId}`,
-        `lớp trang trí dùng kiểu của ${mapId} (${dest.decorKey})`,
-      );
+      if (VISUAL) {
+        // Lớp hình Tiled thay lớp trang trí cũ: đủ ba lớp của ĐÚNG bản đồ đích, texture của bản đồ đích có, texture các bản đồ đã rời đã xoá (không rò)
+        must(dest.vis === 3, `bản đồ đích có ba lớp hình Tiled (${dest.vis})`);
+        must(!dest.decor, "lớp hình thay lớp trang trí cũ (không còn decorLayer)");
+        must(dest.visTex, `texture lớp hình của ${mapId} đã nạp`);
+        must(
+          dest.staleTex.length === 0,
+          `texture lớp hình của bản đồ đã rời đã xoá (còn: ${dest.staleTex.join(",") || "không"})`,
+        );
+      } else {
+        must(dest.decor, "bản đồ đích có lớp trang trí");
+        must(
+          dest.decorKey === `decor-${mapId}`,
+          `lớp trang trí dùng kiểu của ${mapId} (${dest.decorKey})`,
+        );
+      }
       must(dest.light === 1, "bản đồ đích có ánh sáng / vignette");
       must(dest.fog > 0, `bản đồ đích có sương (${dest.fog} mảng)`);
       must(
