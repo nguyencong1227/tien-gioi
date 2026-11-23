@@ -9320,7 +9320,7 @@
         "h": 24
       }
     },
-    "item-han_lang_mao": {
+    "item-kinh_loi_hoa_pha_ta_chuong": {
       "frame": {
         "x": 132,
         "y": 1454,
@@ -9340,7 +9340,7 @@
         "h": 24
       }
     },
-    "item-phong_nha_vu": {
+    "item-kinh_chan_hon_loi_phap": {
       "frame": {
         "x": 158,
         "y": 1454,
@@ -9360,7 +9360,7 @@
         "h": 24
       }
     },
-    "item-tuong_cot": {
+    "item-han_lang_mao": {
       "frame": {
         "x": 184,
         "y": 1454,
@@ -9380,7 +9380,7 @@
         "h": 24
       }
     },
-    "item-doc_tuoc_nang": {
+    "item-phong_nha_vu": {
       "frame": {
         "x": 210,
         "y": 1454,
@@ -9400,7 +9400,7 @@
         "h": 24
       }
     },
-    "item-thien_han_chau": {
+    "item-tuong_cot": {
       "frame": {
         "x": 236,
         "y": 1454,
@@ -9420,7 +9420,7 @@
         "h": 24
       }
     },
-    "item-han_vu_kiem": {
+    "item-doc_tuoc_nang": {
       "frame": {
         "x": 262,
         "y": 1454,
@@ -9440,7 +9440,7 @@
         "h": 24
       }
     },
-    "item-han_lang_bao": {
+    "item-thien_han_chau": {
       "frame": {
         "x": 288,
         "y": 1454,
@@ -9460,7 +9460,7 @@
         "h": 24
       }
     },
-    "item-phong_nha_phu": {
+    "item-han_vu_kiem": {
       "frame": {
         "x": 314,
         "y": 1454,
@@ -9480,7 +9480,7 @@
         "h": 24
       }
     },
-    "item-thuong_hoi_huyet_dan": {
+    "item-han_lang_bao": {
       "frame": {
         "x": 340,
         "y": 1454,
@@ -9500,7 +9500,7 @@
         "h": 24
       }
     },
-    "item-thuong_hoi_linh_dan": {
+    "item-phong_nha_phu": {
       "frame": {
         "x": 366,
         "y": 1454,
@@ -9520,7 +9520,7 @@
         "h": 24
       }
     },
-    "item-dot_pha_dan": {
+    "item-thuong_hoi_huyet_dan": {
       "frame": {
         "x": 392,
         "y": 1454,
@@ -9540,7 +9540,7 @@
         "h": 24
       }
     },
-    "item-kinh_chi_dan": {
+    "item-thuong_hoi_linh_dan": {
       "frame": {
         "x": 418,
         "y": 1454,
@@ -9560,7 +9560,7 @@
         "h": 24
       }
     },
-    "item-duong_anh_dan": {
+    "item-dot_pha_dan": {
       "frame": {
         "x": 444,
         "y": 1454,
@@ -9580,7 +9580,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_dan": {
+    "item-kinh_chi_dan": {
       "frame": {
         "x": 470,
         "y": 1454,
@@ -9600,7 +9600,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_cuonghuyet": {
+    "item-duong_anh_dan": {
       "frame": {
         "x": 496,
         "y": 1454,
@@ -9620,7 +9620,7 @@
         "h": 24
       }
     },
-    "item-phu_kim_phicham": {
+    "item-phu_hoa_dan": {
       "frame": {
         "x": 522,
         "y": 1454,
@@ -9640,7 +9640,7 @@
         "h": 24
       }
     },
-    "item-phu_kim_toagia": {
+    "item-phu_hoa_cuonghuyet": {
       "frame": {
         "x": 548,
         "y": 1454,
@@ -9660,7 +9660,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_lieutiem": {
+    "item-phu_kim_phicham": {
       "frame": {
         "x": 574,
         "y": 1454,
@@ -9680,7 +9680,7 @@
         "h": 24
       }
     },
-    "item-phu_loi_loino": {
+    "item-phu_kim_toagia": {
       "frame": {
         "x": 600,
         "y": 1454,
@@ -9700,7 +9700,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_tammoi": {
+    "item-phu_hoa_lieutiem": {
       "frame": {
         "x": 2,
         "y": 1480,
@@ -9720,7 +9720,7 @@
         "h": 24
       }
     },
-    "item-phu_moc_kimlan": {
+    "item-phu_loi_loino": {
       "frame": {
         "x": 28,
         "y": 1480,
@@ -9740,7 +9740,7 @@
         "h": 24
       }
     },
-    "item-phu_tho_tocphong": {
+    "item-phu_hoa_tammoi": {
       "frame": {
         "x": 54,
         "y": 1480,
@@ -9760,9 +9760,49 @@
         "h": 24
       }
     },
-    "swordbeam": {
+    "item-phu_moc_kimlan": {
       "frame": {
         "x": 80,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_tho_tocphong": {
+      "frame": {
+        "x": 106,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "swordbeam": {
+      "frame": {
+        "x": 132,
         "y": 1480,
         "w": 48,
         "h": 16
@@ -9782,7 +9822,7 @@
     },
     "dot": {
       "frame": {
-        "x": 130,
+        "x": 182,
         "y": 1480,
         "w": 16,
         "h": 16

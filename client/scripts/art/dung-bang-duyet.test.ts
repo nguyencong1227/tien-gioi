@@ -321,10 +321,10 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     }
   });
 
-  it("nhóm 14 (vật phẩm): sáu tờ <= 30 hàng, tổng đúng số vật phẩm; ô C (icon HOANTDZ, gói riêng) có ở mọi tờ có món hợp, tờ công khai KHÁC tờ đầy đủ đúng khi có ô riêng", () => {
+  it("nhóm 14 (vật phẩm): từ sáu tờ trở lên, mỗi tờ <= 30 hàng, tổng đúng số vật phẩm; ô C (icon HOANTDZ, gói riêng) có ở mọi tờ có món hợp, tờ công khai KHÁC tờ đầy đủ đúng khi có ô riêng", () => {
     const out = String(run.stdout);
     const lines = out.split("\n").filter((l) => l.startsWith("ĐÃ DỰNG 14-vat-pham-"));
-    expect(lines.length).toBe(6);
+    expect(lines.length).toBeGreaterThanOrEqual(6); // số tờ tăng khi một nhóm vượt bội của 30 hàng (kinh quyển 59 -> 61 thành 3 tờ)
     let total = 0;
     let privTotal = 0;
     for (const l of lines) {
