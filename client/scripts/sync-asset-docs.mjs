@@ -86,6 +86,29 @@ export function extractMarker(content, markerName) {
 }
 
 /**
+ * Đọc nội dung theirs từ chuỗi trực tiếp, đường dẫn tệp tạm (tránh giới hạn ARG_MAX/E2BIG khi tài liệu lớn),
+ * hoặc biến môi trường chuỗi dự phòng.
+ */
+export function resolveTheirsContent(direct, fileEnvKey, strEnvKey) {
+  if (typeof direct === "string" && direct.length > 0) {
+    return direct;
+  }
+  const filePath = fileEnvKey ? process.env[fileEnvKey] : null;
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      return fs.readFileSync(filePath, "utf8");
+    } catch {
+      // bỏ qua nếu lỗi đọc
+    }
+  }
+  const strEnv = strEnvKey ? process.env[strEnvKey] : null;
+  if (typeof strEnv === "string" && strEnv.length > 0) {
+    return strEnv;
+  }
+  return "";
+}
+
+/**
  * Thu thập số liệu tài sản hiện tại từ đĩa
  * @param {{ extraCreditsContent?: string }} options
  */
@@ -97,7 +120,11 @@ export function collectAssetStats(options = {}) {
 
   // Đọc thứ tự xuất hiện hiện tại trong CREDITS.md (kèm bản theirs nếu có) để giữ thứ tự ổn định
   let orderedItems = [...itemFilesOnDisk];
-  const extraCredits = options.extraCreditsContent || process.env.THEIRS_CREDITS || "";
+  const extraCredits = resolveTheirsContent(
+    options.extraCreditsContent,
+    "THEIRS_CREDITS_FILE",
+    "THEIRS_CREDITS",
+  );
   let creditsContent = "";
   if (fs.existsSync(CREDITS_FILE)) {
     creditsContent = fs.readFileSync(CREDITS_FILE, "utf8");
@@ -187,7 +214,7 @@ export function generateRaSoatItemRows(
 
   // Đọc mô tả hiện có từ currentRaSoatContent + extraRaSoatContent
   // Bản của mình (currentRaSoatContent) đứng trước nên thắng khi trùng id
-  const extra = extraRaSoatContent || process.env.THEIRS_RA_SOAT || "";
+  const extra = resolveTheirsContent(extraRaSoatContent, "THEIRS_RA_SOAT_FILE", "THEIRS_RA_SOAT");
   const combinedRaSoat = currentRaSoatContent + "\n" + extra;
   const descMap = new Map();
   const lines = combinedRaSoat.split("\n");
@@ -244,8 +271,16 @@ export function generateRaSoatItemRows(
  * @returns {{ changed: boolean, errors: string[], stats: object }}
  */
 export function syncAssetDocs(options = {}) {
-  const extraCredits = options.extraCreditsContent || process.env.THEIRS_CREDITS || "";
-  const extraRaSoat = options.extraRaSoatContent || process.env.THEIRS_RA_SOAT || "";
+  const extraCredits = resolveTheirsContent(
+    options.extraCreditsContent,
+    "THEIRS_CREDITS_FILE",
+    "THEIRS_CREDITS",
+  );
+  const extraRaSoat = resolveTheirsContent(
+    options.extraRaSoatContent,
+    "THEIRS_RA_SOAT_FILE",
+    "THEIRS_RA_SOAT",
+  );
   const stats = collectAssetStats({ extraCreditsContent: extraCredits });
   const errors = [];
   let anyChanged = false;

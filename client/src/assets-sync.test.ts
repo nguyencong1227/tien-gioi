@@ -3,10 +3,15 @@
 // với số liệu tài sản thực tế: thêm icon vào gen-assets.mjs mà quên chạy lại lệnh thì CI đỏ ngay
 // (theo Issue #1368, mẫu can-bang-sync.test.ts, bảo vệ chống sót xung đột merge #1371).
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { generateRaSoatItemRows, syncAssetDocs } from "../scripts/sync-asset-docs.mjs";
+import {
+  generateRaSoatItemRows,
+  resolveTheirsContent,
+  syncAssetDocs,
+} from "../scripts/sync-asset-docs.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "../..");
@@ -34,6 +39,41 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu 
     // 2. Icon kinh_b.png mới từ nhánh theirs: giữ nguyên mô tả và tác giả chi tiết của theirs
     expect(rows).toContain("Mô tả B từ theirs");
     expect(rows).toContain("Tác giả B theirs");
+  });
+
+  it("resolveTheirsContent: đọc được nội dung từ đường dẫn tệp tạm (tránh E2BIG) và chuỗi dự phòng", () => {
+    // 1. Chuỗi truyền trực tiếp có độ ưu tiên cao nhất
+    expect(resolveTheirsContent("nội dung trực tiếp", "THEIRS_TEST_FILE", "THEIRS_TEST_STR")).toBe(
+      "nội dung trực tiếp",
+    );
+
+    // 2. Đọc từ tệp tạm khi direct rỗng
+    const tmpFile = path.join(os.tmpdir(), `tien-gioi-test-theirs-tmp-${Date.now()}.md`);
+    try {
+      fs.writeFileSync(tmpFile, "mô tả từ tệp tạm trong tmpdir", "utf8");
+      process.env.THEIRS_TEST_FILE = tmpFile;
+      delete process.env.THEIRS_TEST_STR;
+      expect(resolveTheirsContent("", "THEIRS_TEST_FILE", "THEIRS_TEST_STR")).toBe(
+        "mô tả từ tệp tạm trong tmpdir",
+      );
+
+      // 3. Dự phòng biến môi trường chuỗi khi không có file
+      delete process.env.THEIRS_TEST_FILE;
+      process.env.THEIRS_TEST_STR = "mô tả từ biến chuỗi";
+      expect(resolveTheirsContent("", "THEIRS_TEST_FILE", "THEIRS_TEST_STR")).toBe(
+        "mô tả từ biến chuỗi",
+      );
+
+      // 4. File cấu hình nhưng không tồn tại trên đĩa thì bỏ qua và rơi vào chuỗi
+      process.env.THEIRS_TEST_FILE = "/duong/dan/khong/ton/tai.md";
+      expect(resolveTheirsContent("", "THEIRS_TEST_FILE", "THEIRS_TEST_STR")).toBe(
+        "mô tả từ biến chuỗi",
+      );
+    } finally {
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+      delete process.env.THEIRS_TEST_FILE;
+      delete process.env.THEIRS_TEST_STR;
+    }
   });
 
   it("đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi", () => {
