@@ -66,10 +66,54 @@ describe("describeStep (chữ bước đang làm của nhiệm vụ)", () => {
     expect(r.text).toBe(questReadyText(def));
   });
 
-  it("đã qua hết các bước nhưng có bước thu thập mà túi thiếu đồ: (hành vi gốc) 'Đã hoàn thành', ready", () => {
+  it("đã qua hết các bước nhưng bước thu thập thiếu đồ (lỡ vứt): KHÔNG ready, nói rõ còn thiếu đồ gì và có / cần", () => {
     const def = QUESTS.find((q) => q.steps.some((s) => s.kind === "collect"))!;
+    const st = def.steps.find((s) => s.kind === "collect") as { itemId: string; count: number };
     const prog: QuestProgress = { id: def.id, step: def.steps.length, count: 0 };
-    expect(describeStep(def, prog, ctx())).toEqual({ text: "Đã hoàn thành", ready: true });
+    const r = describeStep(def, prog, ctx());
+    expect(r.ready).toBe(false);
+    expect(r.text).toBe(`Cần đủ ${ITEM_BY_ID[st.itemId]!.name}: 0/${st.count} để trả nhiệm vụ`);
+  });
+
+  it("thiếu MỘT PHẦN đồ: số 'có' theo túi thật; đủ rồi thì sẵn sàng trả như cũ", () => {
+    const def = QUESTS.find((q) => q.steps.some((s) => s.kind === "collect" && s.count >= 2))!;
+    const st = def.steps.find((s) => s.kind === "collect" && s.count >= 2) as {
+      itemId: string;
+      count: number;
+    };
+    const prog: QuestProgress = { id: def.id, step: def.steps.length, count: 0 };
+    const inv = emptyInventory();
+    inv[0] = { itemId: st.itemId, qty: st.count - 1 };
+    const part = describeStep(def, prog, { realm: 0, tier: 0, inv });
+    expect(part.ready).toBe(false);
+    expect(part.text).toContain(`${st.count - 1}/${st.count}`);
+    // đủ đồ cho MỌI bước thu thập: sẵn sàng trả (chữ do questReadyText)
+    const full = emptyInventory();
+    def.steps.forEach((s, i) => {
+      if (s.kind === "collect") full[i] = { itemId: s.itemId, qty: s.count };
+    });
+    expect(describeStep(def, prog, { realm: 0, tier: 0, inv: full })).toEqual({
+      text: questReadyText(def),
+      ready: true,
+    });
+  });
+
+  it("hai bước thu thập, một bước đã đủ đồ: nói đúng món CÒN THIẾU (không nhắc món đã đủ)", () => {
+    const base = QUESTS.find((q) => q.steps.some((s) => s.kind === "collect"))!;
+    const [a, b] = Object.keys(ITEM_BY_ID).slice(0, 2) as [string, string];
+    const def: QuestDef = {
+      ...base,
+      steps: [
+        { kind: "collect", itemId: a, count: 2 },
+        { kind: "collect", itemId: b, count: 3 },
+      ],
+    };
+    const inv = emptyInventory();
+    inv[0] = { itemId: a, qty: 2 }; // món A đủ, món B chưa có
+    const r = describeStep(def, { id: def.id, step: 2, count: 0 }, { realm: 0, tier: 0, inv });
+    expect(r.ready).toBe(false);
+    expect(r.text).toBe(`Cần đủ ${ITEM_BY_ID[b]!.name}: 0/3 để trả nhiệm vụ`);
+    expect(r.text).not.toContain(ITEM_BY_ID[a]!.name);
   });
 
   it("bước không tồn tại (tiến độ hỏng, vượt quá số bước nhưng chưa đủ điều kiện trả): 'Đã hoàn thành'", () => {
