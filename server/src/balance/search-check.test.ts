@@ -161,8 +161,10 @@ describe("searchRun: thợ săn bất tử trong World thật", () => {
 
   it("biết hết bản đồ không bao giờ chậm hơn nhìn hẹp ở loài thưa (cùng hạt giống)", () => {
     const mean = (x: number[]) => x.reduce((s, v) => s + v, 0) / x.length;
+    // Trung bình trên 4 hạt giống (không phải một): một hạt giống duy nhất đổi quỹ đạo mỗi khi bảng rơi của Xích Mãng thêm / bớt một dòng (mỗi dòng gọi thêm `Math.random`),
+    // nên thêm sách chiêu vào Xích Mãng từng làm hạt giống 1 đỏ (15,1 > 14,3) dù hạt 2-8 đều chênh 1,5-4 lần. Cách đo 4 hạt: ~11 (biết hết) so với ~16-24 (nhìn hẹp).
     const of = (v: (typeof SEARCH_VIEWS)[keyof typeof SEARCH_VIEWS]) =>
-      mean(searchRun("lac_ha", "mang", 3, 0, 6, 1, v).searches);
+      mean([1, 2, 3, 4].flatMap((seed) => searchRun("lac_ha", "mang", 3, 0, 6, seed, v).searches));
     const all = of(SEARCH_VIEWS.all);
     expect(all).toBeLessThan(of(SEARCH_VIEWS.pc));
     expect(all).toBeLessThan(of(SEARCH_VIEWS.phone));
