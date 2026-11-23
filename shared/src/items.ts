@@ -923,6 +923,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Vô sắc Trúc Cơ, Huyền phẩm (CT8 lát 3, A): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ vì bí cảnh đòi thưởng >= 15 phút săn quái tốt nhất cùng bậc (`balance/dungeon.test.ts` đỏ ở 14,86 khi thêm 0,3 % x 2 vào Hắc Hổ)
     { itemId: bookIdOf("su_tu_hong"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("cam_long_khau"), chance: 0.006, min: 1, max: 1 },
+    // Lôi Trúc Cơ, Huyền phẩm (CT15 đợt 2, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ — Hắc Hổ là con săn Linh thạch/phút cao nhất cùng bậc, thêm sách vào nó đẩy denominator của `balance/dungeon.test.ts` lên làm bí cảnh Linh Hư < 15 phút (đỏ ở 14,90)
+    { itemId: bookIdOf("loi_hoa_pha_ta_chuong"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -987,6 +989,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thien_la_loi_cam"), chance: 0.006, min: 1, max: 1 }, // Lôi gắn dấu, Địa phẩm (CT8 lát 2)
     { itemId: bookIdOf("chuong_tam_loi_bao"), chance: 0.006, min: 1, max: 1 }, // Lôi kích dấu (CT8 lát 2)
     { itemId: bookIdOf("bach_thu_khieu_phong"), chance: 0.006, min: 1, max: 1 }, // Phong tăng tốc đồng đội (CT8 lát 2)
+    // Lôi Nguyên Anh gắn dấu (CT15 đợt 2, D #1185): rơi hiếm từ Phong Nha (quái Nguyên Anh), giữ số Linh thạch / giờ mục 30
+    { itemId: bookIdOf("chan_hon_loi_phap"), chance: 0.006, min: 1, max: 1 },
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
