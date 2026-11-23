@@ -925,6 +925,15 @@ async function main() {
     out(`  ✓ Máy chủ ghi nhận beatMs=${sp6.ctrl.beatMs} của client; mạng thông: không ghost oan`);
     const t6 = Date.now();
     proxy.setStall(true);
+    // E2E_JANK_MS (mặc định 0): chặn luồng chính của trang chừng này ms GIỮA lúc đứng, mô phỏng runner CI chậm (E2E đêm 23/11: luồng chính Chrome bị chặn > SLOW_STALE_POLL_MS
+    // khi ping kẹt => bộ phát hiện từng bỏ mốc chờ và chip không bao giờ hiện). Chip vẫn phải hiện (sau quãng chặn + SLOW_AFTER_MS), trước banner nối lại ở giây 8.
+    const JANK_MS = Math.max(0, Number(process.env.E2E_JANK_MS ?? "0") || 0);
+    if (JANK_MS > 0) {
+      await sleep(900);
+      await tab.ev(
+        `(() => { const e = Date.now() + ${JANK_MS}; while (Date.now() < e) {} return 1; })()`,
+      );
+    }
     await until(
       async () => Boolean((await serverPlayer()).ctrl?.silent),
       "máy chủ coi im lặng quá 3 giây là hồn lìa xác",
