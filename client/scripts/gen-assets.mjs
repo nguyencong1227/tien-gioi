@@ -1025,6 +1025,13 @@ const BOOKS = {
   // Lôi (CT15 đợt 2, #1185, D): bìa theo hệ Lôi (vàng); dấu ấn sinh tự động từ id (#1303)
   kinh_loi_hoa_pha_ta_chuong: [0xe0b040, 0xfff0b0],
   kinh_chan_hon_loi_phap: [0xc8b83c, 0xe6dcff],
+  // Âm (CT16 đợt 2, #1186, E; lô 1 vẽ TRƯỚC dữ liệu): bìa tím đen theo hệ Âm, mỗi quyển một sắc riêng (mực, đêm, kinh mạch độc, tro, trăng đen); dấu ấn sinh tự động từ id (#1303),
+  // riêng "Tịch Dạ Kiếm Quyết" (kiếm đêm tách bóng) có dấu kiếm
+  kinh_thuc_hon_nhat_chi: [0x2e2440, 0xb8a0d8],
+  kinh_tich_da_phan_anh: [0x3a3456, 0xa8b0e0, "kiem"],
+  kinh_kho_mach_dan_luu: [0x322a3a, 0x7fbf9a],
+  kinh_kho_hon_an_than: [0x5a5460, 0xd8d0e0],
+  kinh_am_nguyet_tram_hon: [0x1f1a30, 0xcfc8f0],
 };
 
 /**
