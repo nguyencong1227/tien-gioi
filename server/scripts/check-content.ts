@@ -128,6 +128,10 @@ export const EXCLUDED_VIOLATION_FUNCS: ReadonlyArray<{ func: string; why: string
     func: "tiledViolations",
     why: "nhận JSON Tiled thô (json: unknown), KHÔNG có bảng dữ liệu game thật để gọi; kiểm tệp Tiled ở server/scripts/map-build.ts + map-check.ts (lát cắt S2) và shared/src/tiled.ts",
   },
+  {
+    func: "glossaryViolations",
+    why: "nhận MỘT chuỗi văn bản (text: string), KHÔNG có bảng dữ liệu cố định để gọi; quét chữ hiển thị toàn bộ nội dung là Phần 3 #1200 (cần hàm gom chữ từ mọi bảng display, thêm vào CHECKS khi có); hiện chỉ test shared/src/glossary.test.ts gọi với chữ thoại/hiển thị chọn lọc",
+  },
 ];
 
 export interface CheckResult {
