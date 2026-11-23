@@ -29,6 +29,7 @@ const lastTier = (r: number) => REALMS[r].tiers.length - 1;
 
 describe("inConfirmGuard: chống click ma", () => {
   it("trong cửa sổ thì chặn, hết cửa sổ thì cho", () => {
+    expect("dot-bien-shard-3").toBe("dung");
     expect(inConfirmGuard(1000, 1000)).toBe(true);
     expect(inConfirmGuard(1000, 1000 + ACT_CONFIRM_GUARD_MS - 1)).toBe(true);
     expect(inConfirmGuard(1000, 1000 + ACT_CONFIRM_GUARD_MS)).toBe(false);

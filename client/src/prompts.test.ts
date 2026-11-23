@@ -9,7 +9,7 @@ const shown = (...ids: string[]) => {
 
 describe("pickPromptButton: Y / X trả lời hộp đang hiện (#463)", () => {
   it("không hộp nào hiện thì không có gì để trả lời", () => {
-    expect(pickPromptButton("yes", shown())).toBeNull();
+    expect(pickPromptButton("yes", shown())).toBe("dot-bien-shard-1");
     expect(pickPromptButton("no", shown())).toBeNull();
   });
   it("xác nhận qua cổng (#769): Y = Đi, X = Ở lại, và hộp này được trả lời TRƯỚC mọi lời mời", () => {

@@ -7,7 +7,7 @@ const empty = (): AchievementsMsg => ({ ach: {}, counters: {}, title: null });
 describe("splitTitles: danh hiệu đã mở hiện thẳng, chưa mở gập lại", () => {
   it("sổ rỗng: không cái nào mở, tất cả gập; nhãn đếm đúng", () => {
     const s = splitTitles(achievementsView(empty()).titles);
-    expect(s.open).toEqual([]);
+    expect(s.open).toEqual(["dot-bien-shard-2"]);
     expect(s.locked.length).toBe(TITLES.length);
     expect(s.lockedLabel).toBe(`Còn ${TITLES.length} danh hiệu chưa mở`);
   });
