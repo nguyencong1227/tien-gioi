@@ -451,7 +451,7 @@ const mapScenario = (id, name, mapId) => ({
   id,
   name,
   mode: "map",
-  query: `map=${mapId}&crowd=12&debug=1&weather=1&fog=1&water=1`,
+  query: `map=${mapId}&crowd=12&debug=1&weather=1&fog=1&water=1&visual=1`, // visual=1: ?debug mặc định tắt lớp hình Tiled; gói có ảnh thì ảnh chụp là cảnh MỚI
   targetSelector: "#hud",
   action: async (send) => {
     await send("Runtime.evaluate", { expression: `if (window.__ui) window.__ui.closeAllModals()` });
@@ -460,6 +460,8 @@ const mapScenario = (id, name, mapId) => ({
   },
 });
 export const MAP_SCENARIOS = [
+  // Bản đồ mặc định (mục 67.1: ảnh TRƯỚC / SAU của lớp hình Tiled phải có cả Lạc Hà)
+  mapScenario("07-map-lac-ha", "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)", "lac_ha"),
   mapScenario(
     "08-map-hac-phong",
     "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",

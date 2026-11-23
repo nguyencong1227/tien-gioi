@@ -33,6 +33,17 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
 | Nhân vật & quái cổ trang Á Đông | **Ninja Adventure Asset Pack** | **Pixel-boy & AAA** ([pixel-boy.itch.io/ninja-adventure-asset-pack](https://pixel-boy.itch.io/ninja-adventure-asset-pack)) | **CC0 1.0** |
 | Biểu tượng RPG cổ điển | **496 Pixel Art Icons for Medieval/Fantasy RPG** | **Henrique Lazarini (7Soul1)** ([opengameart.org/content/496-pixel-art-icons-for-medievalfantasy-rpg](https://opengameart.org/content/496-pixel-art-icons-for-medievalfantasy-rpg)) | **CC0 1.0** |
 
+### 2b. Tệp DẪN XUẤT từ Ninja Adventure (CC0) trong gói bản đồ (QUYET_DINH_M3 mục 67.1, issue #1330)
+
+Bốn ảnh tileset của lớp hình bản đồ do nhóm Tiên Giới (Dev B) **sinh bằng mã** `client/scripts/art/dung-tileset-world.py` (tất định: cùng gói gốc + cùng script cho cùng từng byte; test đối chiếu) từ ba tệp của **Ninja Adventure Asset Pack** (Pixel-boy & AAA, **CC0 1.0**): `content/map/tileset_floor.png` (cỏ / đất / cát / băng, đổi màu theo vùng), `content/map/tileset_interior_floor.png` (hoạ tiết đá cuội) và `content/map/tileset_village_abandoned.png` (đáy cây, tảng đá, bụi lá). Tán cây vẽ bằng mã. Tệp dẫn xuất cũng là **CC0 1.0**; không dùng tài nguyên của gói riêng nào (nguồn 4 của AGENTS.md). Tệp nằm trong gói tải `map:<id>` (`client/public/packs/map-<id>/`, tải theo nhu cầu, thiếu thì client vẽ cách cũ).
+
+| Tệp | Nội dung | SHA-256 |
+|---|---|---|
+| `client/public/packs/map-lac_ha/tileset_world.png` | Tileset lớp hình bản đồ Lạc Hà (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `6eec7c3d6a351b1002dbe49f664e78c90081602c684fa83a94ba7ceb538676ee` |
+| `client/public/packs/map-hac_phong/tileset_world.png` | Tileset lớp hình bản đồ Hắc Phong (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `ff4eceb5eb7ae8a50e84da1c4ca00edc56d642985a1fee7d96825db1bb505805` |
+| `client/public/packs/map-am_suong/tileset_world.png` | Tileset lớp hình bản đồ Âm Sương (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `2b027121928e938ce326d0dad5b3abccee43ede1cf1c1042f86157614d0dc7b6` |
+| `client/public/packs/map-han_van/tileset_world.png` | Tileset lớp hình bản đồ Hàn Vân (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `87d4ee965337097654d7f7268d479227c30a76b08273df0805abafb487a660d8` |
+
 ---
 
 ## 3. Tuyên bố tuân thủ bản quyền

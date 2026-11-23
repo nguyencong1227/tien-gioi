@@ -230,19 +230,43 @@ export async function fetchVisualJson(
 export const VISUAL_STORAGE_KEY = "tg.mapVisual";
 
 /**
- * Lớp hình Tiled có bật không: `?visual=0` tắt, `?visual=1` bật (thắng khoá lưu); không có thì khoá `localStorage` `"0"` tắt; mặc định BẬT (nhưng chỉ vẽ khi gói
- * `map:<id>` THẬT SỰ có ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
+ * Lớp hình Tiled có bật không: `?visual=0` tắt, `?visual=1` bật (thắng mọi thứ khác); không có thì **`?debug` mặc định TẮT** (như thời tiết / sương / nước đứng yên ở `?debug`: các
+ * script đo / E2E dùng `?debug` có cảnh cũ ổn định, bật bằng `?visual=1`); không `?debug` thì khoá `localStorage` `"0"` tắt; mặc định BẬT (nhưng chỉ vẽ khi gói `map:<id>` THẬT SỰ có
+ * ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
  */
 export function mapVisualEnabled(
   search: string,
   storage: { getItem(k: string): string | null } | null,
 ): boolean {
   try {
-    const q = new URLSearchParams(search).get("visual");
+    const params = new URLSearchParams(search);
+    const q = params.get("visual");
     if (q === "0") return false;
     if (q === "1") return true;
+    if (params.has("debug")) return false;
     return storage?.getItem(VISUAL_STORAGE_KEY) !== "0";
   } catch {
     return true;
   }
+}
+
+/**
+ * Độ sâu của lớp `over` (tán cây phủ trên đầu nhân vật). Thực thể xếp theo `y` (<= `worldH`); hiệu ứng chung (`fx`, vòng chọn mục tiêu, tia kiếm khí) ở ĐÚNG `worldH`; nhãn / khiên ở `worldH + 1` trở lên.
+ * Tán ở NGAY DƯỚI `worldH` (lệch 0,01): phủ mọi thực thể, nhưng hiệu ứng chiêu / vòng chọn quái KHÔNG bị tán che mất (A nêu ở #1346).
+ */
+export const visualOverDepth = (worldH: number): number => worldH - 0.01;
+
+/** Thời gian làm mờ chuyển từ nền cũ sang lớp hình mới (ms). */
+export const VISUAL_FADE_MS = 350;
+
+/**
+ * Kế hoạch chuyển nền cũ -> lớp hình mới khi gói + ảnh về MUỘN sau khi cảnh đã vẽ nền cũ: có nền cũ và người chơi không bật "giảm chuyển động" thì làm mờ dần (lớp mới từ trong suốt
+ * lên đặc, nền cũ gỡ SAU khi xong) để không nháy một cái; không thì thay ngay.
+ */
+export function visualFadePlan(
+  hadLegacy: boolean,
+  reducedMotion: boolean,
+): { fade: boolean; ms: number } {
+  const fade = hadLegacy && !reducedMotion;
+  return { fade, ms: fade ? VISUAL_FADE_MS : 0 };
 }

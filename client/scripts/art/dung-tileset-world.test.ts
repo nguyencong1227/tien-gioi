@@ -153,6 +153,19 @@ describe.skipIf(!can)("dung-tileset-world.py: dựng thật + tự kiểm", () =
       ).toBe(true);
   });
 
+  it("ảnh tileset_world.png trong gói bản đồ của repo == bản dựng lại từ mã (đổi script hoặc bảng màu mà quên chép ảnh vào gói thì đỏ)", () => {
+    const packs = path.join(here, "../../public/packs");
+    for (const id of ["lac_ha", "hac_phong", "am_suong", "han_van"]) {
+      const built = path.join(dir, `tileset_world_${id}.png`);
+      expect(fs.existsSync(built), `chưa dựng ${id}: ca dựng đủ phải chạy trước`).toBe(true);
+      const inPack = fs.readFileSync(path.join(packs, `map-${id}/tileset_world.png`));
+      expect(
+        inPack.equals(fs.readFileSync(built)),
+        `${id}: ảnh trong gói LỆCH bản dựng lại: chạy dung-tileset-world.py --out <thư mục> rồi chép tileset_world_${id}.png vào client/public/packs/map-${id}/tileset_world.png và npm run build:packs -w client`,
+      ).toBe(true);
+    }
+  });
+
   it("gói gốc thiếu tệp: script lỗi rõ ràng (khác 0), không ghi ảnh dở", () => {
     const empty = fs.mkdtempSync(path.join(os.tmpdir(), "tg-tileset-world-empty-"));
     const out = path.join(empty, "out");

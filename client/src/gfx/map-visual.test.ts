@@ -8,13 +8,16 @@ import {
   VISUAL_MAX_CELLS,
   VISUAL_TILE,
   fetchVisualJson,
+  VISUAL_FADE_MS,
   VISUAL_STORAGE_KEY,
   loadVisualTexture,
   mapVisualEnabled,
   sanitizeVisualMap,
   visualImageFits,
+  visualFadePlan,
   visualImageWidth,
   visualMinImageHeight,
+  visualOverDepth,
   visualPackPaths,
   visualRows,
   visualTextureKey,
@@ -213,6 +216,26 @@ describe("gói bản đồ thật trong repo (client/public/packs/map-<id>/visua
       expect(v!.maxGid, id).toBeGreaterThan(v!.tileset.firstgid);
     }
   });
+  it("mỗi gói CÓ ảnh tileset_world.png khớp visual.json của nó (rộng đúng 396, đủ cao cho gid lớn nhất) và manifest liệt kê cả hai tệp", () => {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(here, "../../public/packs/manifest.json"), "utf8"),
+    ) as { packs: { id: string; files: { path: string }[] }[] };
+    for (const [id, [w, h]] of Object.entries(sizes)) {
+      const png = fs.readFileSync(
+        path.join(here, `../../public/packs/map-${id}/tileset_world.png`),
+      );
+      expect(png.subarray(1, 4).toString(), id).toBe("PNG");
+      const img = { width: png.readUInt32BE(16), height: png.readUInt32BE(20) }; // IHDR
+      const v = sanitizeVisualMap(real(id), w, h)!;
+      expect(
+        visualImageFits(v, img),
+        `${id}: ảnh ${img.width}x${img.height} không khớp visual.json`,
+      ).toBe(true);
+      const files = manifest.packs.find((p) => p.id === `map:${id}`)!.files.map((f) => f.path);
+      expect(files, id).toContain(`map-${id}/tileset_world.png`);
+      expect(files, id).toContain(`map-${id}/visual.json`);
+    }
+  });
   it("sai kích thước bản đồ thì từ chối (nhầm gói của bản đồ khác)", () => {
     expect(sanitizeVisualMap(real("lac_ha"), 128, 96)).toBeNull();
   });
@@ -370,7 +393,15 @@ describe("mapVisualEnabled (cờ bật / tắt lớp hình mới)", () => {
   });
   it("mặc định BẬT (không tham số, không khoá lưu, hoặc không có localStorage)", () => {
     expect(mapVisualEnabled("", store(null))).toBe(true);
-    expect(mapVisualEnabled("?debug=1", null)).toBe(true);
+    expect(mapVisualEnabled("", null)).toBe(true);
+    expect(mapVisualEnabled("?crowd=12", null)).toBe(true);
+  });
+  it("?debug mặc định TẮT (cảnh cũ ổn định cho script đo / E2E); ?visual=1 bật lại, ?visual=0 vẫn tắt", () => {
+    expect(mapVisualEnabled("?debug=1", null)).toBe(false);
+    expect(mapVisualEnabled("?dungeon=mock&debug=1", store(null))).toBe(false);
+    expect(mapVisualEnabled("?debug=1&visual=1", null)).toBe(true);
+    expect(mapVisualEnabled("?debug=1&visual=1", store("0"))).toBe(true);
+    expect(mapVisualEnabled("?debug=1&visual=0", null)).toBe(false);
   });
   it("?visual=0 tắt, ?visual=1 bật và THẮNG khoá lưu", () => {
     expect(mapVisualEnabled("?visual=0", store(null))).toBe(false);
@@ -390,5 +421,23 @@ describe("mapVisualEnabled (cờ bật / tắt lớp hình mới)", () => {
       },
     };
     expect(mapVisualEnabled("", evil)).toBe(true);
+  });
+});
+
+describe("độ sâu lớp over và làm mờ chuyển", () => {
+  it("over NGAY DƯỚI worldH (phủ mọi thực thể y <= worldH, nhưng fx / vòng chọn ở đúng worldH nằm TRÊN tán)", () => {
+    const worldH = 3072;
+    const over = visualOverDepth(worldH);
+    expect(over).toBeLessThan(worldH); // fx / targetRing / tia kiếm khí ở worldH không bị che
+    expect(over).toBeGreaterThan(worldH - 1); // vẫn trên mọi thực thể xếp theo y
+    expect(over).toBeGreaterThan(-9); // trên decor
+  });
+  it("làm mờ chỉ khi CÓ nền cũ và KHÔNG giảm chuyển động", () => {
+    expect(visualFadePlan(true, false)).toEqual({ fade: true, ms: VISUAL_FADE_MS });
+    expect(visualFadePlan(true, true)).toEqual({ fade: false, ms: 0 });
+    expect(visualFadePlan(false, false)).toEqual({ fade: false, ms: 0 });
+    expect(visualFadePlan(false, true)).toEqual({ fade: false, ms: 0 });
+    expect(VISUAL_FADE_MS).toBeGreaterThan(100);
+    expect(VISUAL_FADE_MS).toBeLessThan(1000);
   });
 });
