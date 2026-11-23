@@ -315,15 +315,8 @@ async function main() {
         check(st.selected === 2, "rê tới nút Vứt 1: ô chọn vẫn là ô 2");
         await mouse("mousePressed", drop1.x, drop1.y);
         await mouse("mouseReleased", drop1.x, drop1.y);
-        await sleep(200);
-        st = await state();
-        check(
-          st.confirmOpen && st.confirmText === `Vứt 1 ${longTho}? (còn lại 6)`,
-          `hộp xác nhận nêu đúng món + số lượng: "${st.confirmText}"`,
-        );
-        check(st.drops.length === 0, "chưa gửi dropItem khi chưa xác nhận");
-        check(st.active === "inv-drop-no", `focus ở "Giữ lại" (${st.active})`);
-        // click ma: bấm "Vứt" NGAY sau khi hộp vừa mở (trong cửa sổ chống click ma) thì KHÔNG xác nhận
+        // click ma: bấm "Vứt" NGAY sau khi hộp vừa mở (trong cửa sổ chống click ma 450 ms) thì KHÔNG xác nhận.
+        // Trên CI SwiftShader chậm, bấm ngay lập tức để nằm trong cửa sổ guard:
         const yes = await center("#inv-drop-yes");
         await clickAt(yes.x, yes.y);
         await sleep(100);
@@ -332,6 +325,12 @@ async function main() {
           st.confirmOpen && st.drops.length === 0,
           "bấm Vứt ngay khi hộp vừa mở (click ma): bị bỏ qua, hộp vẫn mở, chưa gửi gì",
         );
+        check(
+          st.confirmOpen && st.confirmText === `Vứt 1 ${longTho}? (còn lại 6)`,
+          `hộp xác nhận nêu đúng món + số lượng: "${st.confirmText}"`,
+        );
+        check(st.drops.length === 0, "chưa gửi dropItem khi chưa xác nhận");
+        check(st.active === "inv-drop-no", `focus ở "Giữ lại" (${st.active})`);
         await shot("xac-nhan-vut");
         await pastGuard();
         check(yes.hit, `nút Vứt trong hộp bấm được (không bị che bởi "${yes.topId}")`);
@@ -452,9 +451,9 @@ async function main() {
         st = await state();
         check(!st.confirmOpen && st.drops.length === 0, "chạm Giữ lại: hộp đóng, không gửi gì");
         await tapAt(all.x, all.y);
-        await sleep(100);
+        // Ngay sau khi hộp mở: chạm Vứt trong cửa sổ chống click ma (bị bỏ qua)
         const yes = await center("#inv-drop-yes");
-        await tapAt(yes.x, yes.y); // ngay sau khi hộp mở: click ma, bị bỏ qua
+        await tapAt(yes.x, yes.y);
         await sleep(100);
         st = await state();
         check(
