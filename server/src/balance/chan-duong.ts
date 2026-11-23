@@ -8,7 +8,9 @@
 //  - "đánh tới cùng": không bao giờ bỏ chạy (cận trên tỉ lệ chết);
 //  - "biết bỏ chạy": khi khí huyết < `fleeBelow` thì bấm Bỏ chạy, phải VẬN `AMBUSH_FLEE_CHANNEL_MS` (không bất khả xâm phạm, vẫn đánh / uống đan); sống qua giây vận thì thoát (trả giá), thắng
 //    trước đó thì thắng, gục trong lúc vận thì chết. Suy ra từ vết khí huyết của trận "tới cùng" (hai cách giống hệt nhau tới hết giây vận) nên không tốn thêm trận.
-// Dùng `Math.random` có hạt giống như `dungeon.ts` nên kết quả cố định. Số liệu bầy là của E / G (CD5). Giá và thưởng TU VI tính bằng PHÚT SĂN của bậc (`AMBUSH_EXP_PRICE_MIN`, `AMBUSH_REWARD_MIN`, bảng `AMBUSH_HUNT_EXP_PER_MIN` sinh từ `bestOption`: CD6b); thưởng Linh thạch vẫn TẠM (`ARENA_REWARD_MULT`): ở đây ĐO và báo vi phạm.
+// Dùng `Math.random` có hạt giống như `dungeon.ts` nên kết quả cố định. Số liệu bầy là của E / G (CD5). Giá và thưởng TU VI + LINH THẠCH đều tính bằng PHÚT SĂN của bậc
+// (`AMBUSH_EXP_PRICE_MIN`, `AMBUSH_REWARD_MIN`, `AMBUSH_HUNT_EXP_PER_MIN` / `AMBUSH_HUNT_COIN_PER_MIN` sinh từ `bestOption` / `monsterEconomy`: CD6b); `payRewards` (`arena.ts`) trả THẬT theo đó
+// (PR2 #1066), nên bảng dưới đây là số thật, không còn phần nào TẠM.
 import {
   AMBUSH_COOLDOWN_MS,
   AMBUSH_DAY_CAP,
@@ -614,8 +616,9 @@ export function ambushBalanceViolations(sums: readonly GroupSummary[] = summariz
 }
 
 /**
- * Cảnh báo (không chặn): (1) thời gian trận ngoài khung; (2) giá bỏ chạy bằng tu vi (`AMBUSH_EXP_PRICE_MIN` phút săn) KHÔNG nhỏ hơn thưởng tu vi của trận thắng (bỏ chạy đắt hơn cả thưởng,
- * người chơi bị dồn vào "Chiến" dù đang yếu); (3) tăng tu vi / phút TRỘN của một cảnh giới ngoài `targets.uplift` (đo bằng ít trận nên sát biên thì nhiễu: xem lại bằng nhiều trận hơn).
+ * Cảnh báo (không chặn): (1) thời gian trận ngoài khung; (2) giá bỏ chạy KHÔNG nhỏ hơn thưởng thắng — cả TU VI (`AMBUSH_EXP_PRICE_MIN` phút săn) lẫn LINH THẠCH (cùng khuôn phút săn): bỏ chạy
+ * đắt hơn cả thưởng thắng, người chơi yếu bị dồn vào "Chiến" (thắng +R luôn hơn bỏ chạy -P nên đây là cảnh báo độ đắt, không phải lỗi dữ liệu); (3) tăng tu vi / phút TRỘN của một cảnh giới
+ * ngoài `targets.uplift` (đo bằng ít trận nên sát biên thì nhiễu: xem lại bằng nhiều trận hơn).
  */
 export function ambushBalanceWarnings(sums: readonly GroupSummary[]): string[] {
   const { min, max } = ASSUME_AMBUSH.targets.seconds;
@@ -628,6 +631,10 @@ export function ambushBalanceWarnings(sums: readonly GroupSummary[]): string[] {
     if (s.winExp > 0 && s.winExp <= s.fleeExp)
       out.push(
         `bầy ${s.group.id}: thưởng tu vi ${f0(s.winExp)} không hơn giá bỏ chạy ${f0(s.fleeExp)} (bỏ chạy đắt hơn cả thưởng thắng)`,
+      );
+    if (s.winCoin > 0 && s.winCoin <= s.fleeCoin)
+      out.push(
+        `bầy ${s.group.id}: thưởng Linh thạch ${f0(s.winCoin)} không hơn giá bỏ chạy ${f0(s.fleeCoin)} (bỏ chạy đắt hơn cả thưởng thắng)`,
       );
   }
   const { min: lo, max: hi } = ASSUME_AMBUSH.targets.uplift;
@@ -719,7 +726,7 @@ ${realmTable}
 
 ### 2. Từng bầy (ở bậc \`minStep\`)
 
-"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi (\`ambushRewardExp\`: phút săn của bậc x mức, CD6b) + Linh thạch (\`ARENA_REWARD_MULT\` TẠM) MỖI trận thắng; giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang ${ASSUME_AMBUSH.expInBarShare * 100}% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
+"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi (\`ambushRewardExp\`: phút săn của bậc x mức, CD6b) + Linh thạch (\`ambushRewardCoin\`: cùng khuôn phút săn, CD6b PR2) MỖI trận thắng; giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang ${ASSUME_AMBUSH.expInBarShare * 100}% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
 
 | Bầy | Bản đồ | Bậc | Mức | Kẻ địch | Thắng / chết / hết giờ | Thắng / thoát / chết | Trận thật | Thưởng thắng | Giá bỏ chạy | Tương đương |
 |---|---|--:|---|---|---|---|--:|---|---|--:|
