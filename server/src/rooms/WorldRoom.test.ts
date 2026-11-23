@@ -48,12 +48,16 @@ import {
   buyPrice,
   sellPrice,
   DEFAULT_MAP_ID,
+  REALMS,
+  arenaMapIdOf,
   HAC_PHONG_ID,
   AM_SUONG_ID,
   HAN_VAN_ID,
   JOIN_WRONG_MAP,
   MAPS,
   getMap,
+  keepSlotsOf,
+  engraveSlotsOf,
   parseWrongMap,
   roomNameOf,
   TRAVEL_COOLDOWN_MS,
@@ -1282,6 +1286,8 @@ describe("nhiệm vụ và NPC", () => {
 
   it("vào game nhận sổ nhiệm vụ; nói chuyện, nhận, làm và trả nhiệm vụ; trả hai lần chỉ thưởng một lần", async () => {
     const { room, quests, dialogs, invs, me } = await join();
+    const rewards: any[] = []; // tin `questReward` (mục 66): bảng thưởng THẬT khi trả
+    room.onMessage("questReward", (m) => rewards.push(m));
     await waitFor(() => quests.length);
     expect(quests[0]).toEqual({ active: [], done: [], dailyDone: [] });
 
@@ -1305,6 +1311,15 @@ describe("nhiệm vụ và NPC", () => {
     expect(me().exp).toBe(QUEST_BY_ID.nhap_the.rewards.exp);
     const pills = invs.at(-1)!.slots.filter((s) => s?.itemId === "hoi_huyet_dan");
     expect(pills.reduce((n, s) => n + s!.qty, 0)).toBe(3);
+    // Trả hai lần chỉ có MỘT tin thưởng, số khớp tu vi / túi đã thấy ở trên
+    expect(rewards).toEqual([
+      {
+        questId: "nhap_the",
+        exp: QUEST_BY_ID.nhap_the.rewards.exp,
+        coin: 0,
+        items: [{ itemId: "hoi_huyet_dan", qty: 3 }],
+      },
+    ]);
   });
 
   it("thoát ra vào lại vẫn giữ tiến độ nhiệm vụ", async () => {
@@ -1914,6 +1929,55 @@ describe("nhiều bản đồ: mỗi bản đồ một phòng (M3 bước 1)", (
     expect(e.code).toBe(JOIN_WRONG_MAP);
     expect(parseWrongMap(e.code, e.message)).toBe(DEFAULT_MAP_ID);
     expect(saveFileOf(name)).toBeUndefined();
+  });
+
+  it("hồ sơ hỏng (realm / tier / exp âm, thiếu, rác): vẫn vào được phòng với giá trị hợp lệ, không ném TypeError ở onAuth / onJoin", async () => {
+    // Trước đây `Math.min(save.realm, ...)` không chặn dưới / NaN nên `REALMS[realm].tiers` ném TypeError: người chơi kẹt không vào được
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ["Hong Am", { realm: -3, tier: -1, exp: -50 }],
+      ["Hong Rac", { realm: "abc", tier: null, exp: "x" }],
+      ["Hong Qua", { realm: 999, tier: 999 }],
+    ];
+    // chân linh mới được tạo ở `onAuth` (`soulOf`) từ cảnh giới đã làm sạch: xoá chân linh để buộc tạo lại, rồi kiểm `best`
+    const soulPath = (n: string) =>
+      path.join(
+        dataDir,
+        "souls",
+        `${createHash("sha1").update(n.normalize("NFC").toLowerCase()).digest("hex")}.json`,
+      );
+    for (const [name, patch] of cases) {
+      await seedSave(name, patch);
+      rmSync(soulPath(name), { force: true });
+      const b = await join(name);
+      const me = b.me();
+      const want =
+        name === "Hong Qua"
+          ? [REALMS.length - 1, REALMS[REALMS.length - 1].tiers.length - 1]
+          : [0, 0];
+      expect([me.realm, me.tier], name).toEqual(want);
+      expect(me.exp, name).toBeGreaterThanOrEqual(0);
+      const soul = JSON.parse(readFileSync(soulPath(name), "utf8"));
+      expect([soul.best.realm, soul.best.tier], `${name}: chân linh`).toEqual(want);
+      expect(Number.isInteger(soul.best.step) && soul.best.step >= 0, `${name}: step`).toBe(true);
+      await b.room.leave(true);
+      rooms.splice(rooms.indexOf(b.room), 1);
+    }
+    // hồ sơ thiếu hẳn trường cảnh giới (xoá khỏi tệp): cũng vào được
+    const name = "Hong Thieu";
+    const full = await seedSave(name, {});
+    const j = JSON.parse(readFileSync(full, "utf8"));
+    delete j.realm;
+    delete j.tier;
+    writeFileSync(full, JSON.stringify(j));
+    const c = await join(name);
+    expect([c.me().realm, c.me().tier]).toEqual([0, 0]);
+  });
+
+  it("hồ sơ mang id đấu trường chặn đường (sửa tay / hỏng): vào phòng Lạc Hà như bí cảnh, không bị đẩy tới phòng chỉ mở cho đúng một vé (kẹt)", async () => {
+    const name = "Ket Dau Truong";
+    await seedSave(name, { mapId: arenaMapIdOf(DEFAULT_MAP_ID) });
+    const b = await join(name); // JOIN_WRONG_MAP (wrong_map:arena_lac_ha) nếu mapIdOf không loại đấu trường
+    expect(serverRoom(b.room).mapId).toBe(DEFAULT_MAP_ID);
   });
 
   it("vị trí lưu rơi vào ô chặn: vào phòng ở chỗ thoáng GẦN nhất (không bị kéo về trấn) và ghi nhật ký kiểm toán map.relocate", async () => {
@@ -2955,6 +3019,33 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(sk.slots).toEqual(["", "", "", ""]);
     expect(playerOf(name).limbo).toBeUndefined();
     expect(playerOf(name).skills.learned).toEqual({ me_tung_bo: 1, hoa_van_kiem: 1 });
+  });
+
+  it("REGEN mục 58 (hanh/hanh1): chân linh MỚI TINH 0 ô giữ / 0 ô khắc + client gửi keep/engrave vượt ô KHÔNG làm kẹt ở Hoàng Tuyền — đầu thai vẫn xong (mã sai: validateRebirth trả null, tin bị từ chối)", async () => {
+    // Tái hiện chính xác `hanh`/`hanh1` (QUYET_DINH_M3 mục 58): kiếp 1, chân linh mới tinh
+    // (unlocks rỗng => keepSlotsOf = engraveSlotsOf = 0), Duyên đã cộng, màn Hoàng Tuyền đã hiện,
+    // nhưng client gửi keep/engrave KHÔNG rỗng (vượt 0 ô) => validateRebirth trả null => "Lựa chọn đầu thai không hợp lệ" + dừng => kẹt.
+    const name = "Luan Hoi Hanh";
+    const a = await join(name);
+    await playAndDie(a);
+    const limbo = await waitFor(() => a.limbos[0]);
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const c = sr.world.ctrl.get(sid);
+    // chân linh mới tinh: KHÔNG mở ô Ký vật, KHÔNG mở ô khắc => 0 / 0 ô (đúng như `hanh`)
+    expect(keepSlotsOf(c.soul.unlocks)).toBe(0);
+    expect(engraveSlotsOf(c.soul.unlocks)).toBe(0);
+    // dù có trang bị chụp được (keepable KHÔNG rỗng) thì 0 ô giữ vẫn khiến giữ lại bị vượt ô
+    expect(limbo.keepable).toContain("hac_ho_kiem");
+    // client (màn Hoàng Tuyền / Tam Sinh Thạch) gửi keep/engrave vượt ô => CŨNG là ca thường sau mục 51
+    a.room.send("rebirth", { keep: ["hac_ho_kiem"], engrave: ["me_tung_bo"] });
+    const reborn = await waitFor(() => a.reborns[0]);
+    expect(reborn.kiep).toBe(2); // KHÔNG kẹt: đầu thai xong, kiếp 2
+    expect(sr.world.ctrl.get(sid).limbo).toBeUndefined();
+    expect(soulOf(name).engraved).toEqual([]); // 0 ô khắc => không khắc gì (không xoá, cũng không thêm)
+    expect(soulOf(name).kiep).toBe(2);
+    // báo người chơi phần đã bỏ bằng toast info ("Đầu thai: ..."), KHÔNG phải toast từ chối khiến màn Hoàng Tuyền đóng sai
+    expect(a.toasts.some((t) => /Đầu thai:/.test(t.text) && t.tone === "info")).toBe(true);
   });
 
   it("đầu thai khoan dung (mục 58): tin xấu (chiêu lạ, quá ô, xuất thân chưa mở) KHÔNG làm kẹt ở Hoàng Tuyền: phần sai bị bỏ, chân linh đã khắc giữ nguyên, có toast báo", async () => {

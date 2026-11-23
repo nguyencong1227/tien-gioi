@@ -49,8 +49,14 @@
 ## 4. Kế hoạch Đo kiểm Tích lũy (Việc còn lại của Issue #752)
 
 Hiện tại tiến độ thu thập số liệu đo lường đạt:
-- **`idle`**: **0/20** lượt (chưa đo).
+- **`idle`**: **10/20** lượt (đo đợt 2: 10/10 lượt XANH 418/418 tệp, 0 chập chờn — `docs/data/flaky-idle.json`, 22/11).
 - **`cpu-load`**: **3/20** lượt (đã đo 3 lượt đạt 100%, cần đo thêm 17 lượt).
 - **`parallel`**: **4/20** phiên bản (đã đo 2 lượt chạy song song = 4 bản, cần đo thêm 8 lượt chạy song song = 16 bản).
+
+### 4.1. Nhật ký Đo lường Chi tiết Đợt 2 — `idle` (Máy rảnh)
+- **Lệnh chạy**: `npm run do-test-chap-chon -w server -- --mode=idle --runs=10 --out=docs/data/flaky-idle.json`
+- **Thời gian**: 2026-11-22T03:34:26Z (lượt Dev F chạy đêm)
+- **Kết quả**: **10/10 lượt ĐẠT 100%** (418/418 tệp test XANH). Thời gian trung bình mỗi lượt: 91.7s. **Không có tệp test nào chập chờn** trong điều kiện máy rảnh.
+- **Nhận xét**: `perf.test.ts` (bao gồm 2 ca "chặn đường" mục 52 dùng `performance.now()` thô + trung bình) KHÔNG đỏ trong 10 lượt idle — ổn định khi máy rảnh; chập chờn của chúng (đợt 1 parallel 2/4) chỉ xuất hiện khi CPU bị preempt nặng (2 bản vitest song song). Đợt parallel tích lũy tiếp theo sẽ xác nhận lại dưới tải nặng hơn.
 
 PR #830 là bước cơ sở (`Refs #752`): cung cấp công cụ `do-test-chap-chon.ts` và vá triệt để 3 ca chập chờn phát hiện ở đợt 1. Mục tiêu $\ge 20$ lượt đo cho mỗi điều kiện sẽ tiếp tục được chạy tích lũy trong các đợt thử tải định kỳ để hoàn thiện báo cáo trước khi đóng chính thức Issue #752.

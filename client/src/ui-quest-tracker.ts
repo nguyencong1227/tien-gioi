@@ -8,6 +8,7 @@ import {
   questReady,
   realmLabel,
   stepProgress,
+  stepSatisfied,
   type QuestCtx,
   type QuestDef,
   type QuestProgress,
@@ -26,6 +27,16 @@ export function describeStep(
 } {
   if (questReady(def, prog, ctx)) {
     return { text: questReadyText(def), ready: true };
+  }
+  // Đã qua hết các bước nhưng CHƯA trả được: chỉ còn một lý do, bước thu thập mà túi đang thiếu (lỡ vứt / bán / dùng đồ sau khi qua bước đó; `questReady` bắt buộc đủ đồ lúc trả).
+  // Trước đây rơi xuống "Đã hoàn thành" kèm `ready` nên thẻ báo xong trong khi NPC không có dấu "?" và máy chủ từ chối nhận: nói rõ còn thiếu gì.
+  if (prog.step >= def.steps.length) {
+    for (const st of def.steps) {
+      if (st.kind !== "collect" || stepSatisfied(st, 0, ctx)) continue;
+      const p = stepProgress(st, 0, ctx);
+      const it = ITEM_BY_ID[st.itemId]?.name ?? st.itemId;
+      return { text: `Cần đủ ${it}: ${p.have}/${p.need} để trả nhiệm vụ`, ready: false };
+    }
   }
   const s = def.steps[prog.step];
   if (!s) return { text: "Đã hoàn thành", ready: true };

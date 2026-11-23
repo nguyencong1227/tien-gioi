@@ -979,34 +979,34 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 
 ### 2. Từng bầy (ở bậc `minStep`)
 
-"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi (`ambushRewardExp`: phút săn của bậc x mức, CD6b) + Linh thạch (`ARENA_REWARD_MULT` TẠM) MỖI trận thắng; giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang 50% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
+"Thắng / chết / hết giờ" là cách tới cùng; "thắng / thoát / chết" là cách biết bỏ chạy. Thưởng = tu vi (`ambushRewardExp`: phút săn của bậc x mức, CD6b) + Linh thạch (`ambushRewardCoin`: cùng khuôn phút săn, CD6b PR2) MỖI trận thắng; giá bỏ chạy giữa trận = tu vi + Linh thạch khi tu vi đang 50% thanh; "ph" là phút săn quái tương đương của thưởng trừ thời gian đánh.
 
 | Bầy | Bản đồ | Bậc | Mức | Kẻ địch | Thắng / chết / hết giờ | Thắng / thoát / chết | Trận thật | Thưởng thắng | Giá bỏ chạy | Tương đương |
 |---|---|--:|---|---|---|---|--:|---|---|--:|
-| lac_ha_soi_le | lac_ha | 0 | thường | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 7 s | 120 + 4 | 20 + 60 | 3,8 ph |
-| lac_ha_soi_bay | lac_ha | 1 | thường | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 192 + 9 | 140 + 71 | 3,9 ph |
-| lac_ha_soi_dan | lac_ha | 3 | thường | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 11 s | 216 + 11 | 162 + 99 | 3,9 ph |
-| lac_ha_ho_le | lac_ha | 5 | thường | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 236 + 19 | 177 + 137 | 3,8 ph |
-| lac_ha_ho_doi | lac_ha | 8 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 452 + 32 | 273 + 226 | 3,9 ph |
-| lac_ha_soi_tinh_anh | lac_ha | 6 | tinh anh | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 534 + 3 | 225 + 162 | 5,8 ph |
-| lac_ha_soi_tinh_anh_doi | lac_ha | 8 | tinh anh | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 17 s | 678 + 13 | 273 + 226 | 5,7 ph |
-| hac_phong_ho_doi | hac_phong | 10 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 9 s | 536 + 37 | 402 + 314 | 3,8 ph |
-| hac_phong_ho_ba | hac_phong | 11 | thường | Hắc Hổ x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 556 + 49 | 417 + 371 | 3,9 ph |
-| hac_phong_quy_chan | hac_phong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 122 | 1.521 + 516 | 3,5 ph |
-| hac_phong_ho_tinh_anh | hac_phong | 11 | tinh anh | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 20 s | 834 + 22 | 417 + 371 | 5,7 ph |
-| hac_phong_ho_tinh_anh_doi | hac_phong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 28 s | 3.138 + 63 | 1.569 + 609 | 5,5 ph |
-| hac_phong_yeu_vuong | hac_phong | 11 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 0% / 100% / 0% | 28 s | 1.390 + 196 | 417 + 371 | -3,5 ph |
-| am_suong_ho_suong | am_suong | 13 | thường | Sương Hồ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.028 + 53 | 1.521 + 516 | 3,8 ph |
-| am_suong_quy_le | am_suong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 122 | 1.521 + 516 | 3,5 ph |
-| am_suong_thiem_doc | am_suong | 15 | thường | Độc Thiềm x1 | 100% / 0% / 0% | 100% / 0% / 0% | 15 s | 2.144 + 122 | 1.608 + 718 | 3,8 ph |
-| am_suong_ho_tinh_anh | am_suong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 23 s | 3.138 + 54 | 1.569 + 609 | 5,6 ph |
-| am_suong_yeu_vuong | am_suong | 13 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 18 s | 5.070 + 214 | 1.521 + 516 | 9,7 ph |
-| han_van_lang_le | han_van | 16 | thường | Hàn Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 2.208 + 128 | 1.656 + 848 | 3,9 ph |
-| han_van_lang_doi | han_van | 18 | thường | Hàn Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 14 s | 1.584 + 338 | 1.188 + 1.180 | 3,8 ph |
-| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 451 | 1.425 + 1.000 | 3,5 ph |
-| han_van_nha_gio | han_van | 16 | thường | Phong Nha x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.208 + 161 | 1.656 + 848 | 3,8 ph |
-| han_van_soi_tuyet | han_van | 16 | tinh anh | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 3.312 + 24 | 1.656 + 848 | 5,9 ph |
-| han_van_yeu_vuong | han_van | 16 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 5.520 + 213 | 1.656 + 848 | 9,8 ph |
+| lac_ha_soi_le | lac_ha | 0 | thường | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 7 s | 120 + 72 | 20 + 54 | 3,8 ph |
+| lac_ha_soi_bay | lac_ha | 1 | thường | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 192 + 92 | 140 + 69 | 3,9 ph |
+| lac_ha_soi_dan | lac_ha | 3 | thường | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 11 s | 216 + 108 | 162 + 81 | 3,9 ph |
+| lac_ha_ho_le | lac_ha | 5 | thường | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 236 + 120 | 177 + 90 | 3,8 ph |
+| lac_ha_ho_doi | lac_ha | 8 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 452 + 268 | 273 + 201 | 3,9 ph |
+| lac_ha_soi_tinh_anh | lac_ha | 6 | tinh anh | Hôi Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 534 + 294 | 225 + 147 | 5,8 ph |
+| lac_ha_soi_tinh_anh_doi | lac_ha | 8 | tinh anh | Hôi Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 17 s | 678 + 402 | 273 + 201 | 5,7 ph |
+| hac_phong_ho_doi | hac_phong | 10 | thường | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 9 s | 536 + 332 | 402 + 249 | 3,8 ph |
+| hac_phong_ho_ba | hac_phong | 11 | thường | Hắc Hổ x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 556 + 344 | 417 + 258 | 3,9 ph |
+| hac_phong_quy_chan | hac_phong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 1.052 | 1.521 + 789 | 3,5 ph |
+| hac_phong_ho_tinh_anh | hac_phong | 11 | tinh anh | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 20 s | 834 + 516 | 417 + 258 | 5,7 ph |
+| hac_phong_ho_tinh_anh_doi | hac_phong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 28 s | 3.138 + 1.632 | 1.569 + 816 | 5,5 ph |
+| hac_phong_yeu_vuong | hac_phong | 11 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 0% / 100% / 0% | 28 s | 1.390 + 860 | 417 + 258 | -3,5 ph |
+| am_suong_ho_suong | am_suong | 13 | thường | Sương Hồ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.028 + 1.052 | 1.521 + 789 | 3,8 ph |
+| am_suong_quy_le | am_suong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 1.052 | 1.521 + 789 | 3,5 ph |
+| am_suong_thiem_doc | am_suong | 15 | thường | Độc Thiềm x1 | 100% / 0% / 0% | 100% / 0% / 0% | 15 s | 2.144 + 1.120 | 1.608 + 840 | 3,8 ph |
+| am_suong_ho_tinh_anh | am_suong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 23 s | 3.138 + 1.632 | 1.569 + 816 | 5,6 ph |
+| am_suong_yeu_vuong | am_suong | 13 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 18 s | 5.070 + 2.630 | 1.521 + 789 | 9,7 ph |
+| han_van_lang_le | han_van | 16 | thường | Hàn Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 2.208 + 1.156 | 1.656 + 867 | 3,9 ph |
+| han_van_lang_doi | han_van | 18 | thường | Hàn Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 14 s | 1.584 + 1.184 | 1.188 + 888 | 3,8 ph |
+| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 1.168 | 1.425 + 876 | 3,5 ph |
+| han_van_nha_gio | han_van | 16 | thường | Phong Nha x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.208 + 1.156 | 1.656 + 867 | 3,8 ph |
+| han_van_soi_tuyet | han_van | 16 | tinh anh | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 3.312 + 1.734 | 1.656 + 867 | 5,9 ph |
+| han_van_yeu_vuong | han_van | 16 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 5.520 + 2.890 | 1.656 + 867 | 9,8 ph |
 
 ### 3. Tu vi / phút so với săn quái
 
