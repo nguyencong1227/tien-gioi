@@ -1032,6 +1032,13 @@ const BOOKS = {
   kinh_kho_mach_dan_luu: [0x322a3a, 0x7fbf9a],
   // "Thực Phách Âm Trảo" (cg2, thay hai quyển cg4 / cg5 đã bỏ theo quy tắc mục 8 `docs/PHAN_CONG_CHIEU_THUC.md`): ba vệt vuốt cào, bìa tím rượu, vệt trảo hồng tro
   kinh_thuc_phat_am_trao: [0x40283a, 0xd49ab8, "trao"],
+  // Thủy (CT15 đợt 2 lát 2, #1185, D; icon vẽ SAU dữ liệu của D, B): bìa theo hệ Thủy nhưng mỗi quyển một sắc riêng để không trùng Bích Thủy / Hư Thủy (0x3b7bd9); dấu ấn sinh tự động từ id (#1303),
+  // riêng "Tỏa Long Thủ" (cầm nã, siết như xích) có dấu vuốt
+  kinh_thai_hoa_bo_nguyen: [0x2f8f9a, 0xf2d8e8], // sương trên cánh hoa: lam ngọc, viền hồng phấn
+  kinh_huyet_co_bi_kinh: [0x4a3a8a, 0xc880d8], // cổ trùng nuôi bằng máu, máu rỉ màu tím
+  kinh_toa_long_cam_na: [0x2c6a8a, 0xb0d8e8, "trao"],
+  kinh_huyet_ti_phuoc_than: [0x2a2f6a, 0xe06070], // tơ máu: chàm đậm, sợi đỏ
+  kinh_no_dao_bai_khong: [0x1f4a8a, 0xe0f4ff], // sóng lớp lớp: biển sâu, bọt trắng
 };
 
 /**
