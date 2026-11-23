@@ -98,6 +98,9 @@ export const FX_CAST_SKILLS = [
   "thuc_giap_phi_tan",
   "thiet_sa_chuong",
   "chuong_vu_phong_lam",
+  // Lôi (CT15 đợt 2, #1185, D)
+  "loi_hoa_pha_ta_chuong",
+  "chan_hon_loi_phap",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
