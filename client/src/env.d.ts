@@ -193,6 +193,11 @@ declare module "*sync-asset-docs.mjs" {
   }
 
   export function scanFiles(dir: string): string[];
+  export function resolveTheirsContent(
+    direct: unknown,
+    fileEnvKey?: string,
+    strEnvKey?: string,
+  ): string;
   export function replaceMarker(content: string, markerName: string, newInner: string): string;
   export function extractMarker(content: string, markerName: string): string | null;
   export function collectAssetStats(): AssetStats;
