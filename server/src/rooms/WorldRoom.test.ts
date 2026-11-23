@@ -1286,6 +1286,8 @@ describe("nhiệm vụ và NPC", () => {
 
   it("vào game nhận sổ nhiệm vụ; nói chuyện, nhận, làm và trả nhiệm vụ; trả hai lần chỉ thưởng một lần", async () => {
     const { room, quests, dialogs, invs, me } = await join();
+    const rewards: any[] = []; // tin `questReward` (mục 66): bảng thưởng THẬT khi trả
+    room.onMessage("questReward", (m) => rewards.push(m));
     await waitFor(() => quests.length);
     expect(quests[0]).toEqual({ active: [], done: [], dailyDone: [] });
 
@@ -1309,6 +1311,15 @@ describe("nhiệm vụ và NPC", () => {
     expect(me().exp).toBe(QUEST_BY_ID.nhap_the.rewards.exp);
     const pills = invs.at(-1)!.slots.filter((s) => s?.itemId === "hoi_huyet_dan");
     expect(pills.reduce((n, s) => n + s!.qty, 0)).toBe(3);
+    // Trả hai lần chỉ có MỘT tin thưởng, số khớp tu vi / túi đã thấy ở trên
+    expect(rewards).toEqual([
+      {
+        questId: "nhap_the",
+        exp: QUEST_BY_ID.nhap_the.rewards.exp,
+        coin: 0,
+        items: [{ itemId: "hoi_huyet_dan", qty: 3 }],
+      },
+    ]);
   });
 
   it("thoát ra vào lại vẫn giữ tiến độ nhiệm vụ", async () => {

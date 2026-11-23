@@ -20,6 +20,7 @@ import {
   countItem,
   dayKey,
   questReady,
+  questRewardMsg,
   type DialogMsg,
   type DialogOption,
   type NpcDef,
@@ -163,7 +164,8 @@ export function turnInQuest(w: World, sid: string, questId: unknown) {
   if (def.daily) c.quests.daily[def.id] = dayKey(w.now);
   else if (!c.quests.done.includes(def.id)) c.quests.done.push(def.id);
 
-  if (def.rewards.exp) gainExp(w, sid, p, def.rewards.exp);
+  // Số tu vi THẬT đã cộng (sau hệ số tông môn / thử nghiệm, trừ phần bị cắt khi chạm đỉnh): `gainExp` trả về, KHÔNG nhân lại ở đây (mục 66)
+  const gotExp = def.rewards.exp ? gainExp(w, sid, p, def.rewards.exp) : 0;
   w.events.toast(sid, { text: `Hoàn thành: ${def.title}`, tone: "good" });
   if (remove.length || add.length) {
     sendInv(
@@ -173,6 +175,8 @@ export function turnInQuest(w: World, sid: string, questId: unknown) {
     );
   }
   sendQuests(w, sid);
+  // Bảng thưởng (mục 66, #1327): MỘT tin mỗi lần trả THÀNH CÔNG, sau khi đã trao (túi đầy thì thoát ở trên, không gửi). Vật phẩm là đúng `add` vừa vào túi.
+  w.events.questReward(sid, questRewardMsg(def, gotExp));
   // Lời cảm ơn + các lựa chọn mới (vd nhiệm vụ tiếp theo trong chuỗi)
   w.events.dialog(sid, { ...buildDialog(w, p, c, r.npc), lines: def.talk.complete });
 }
