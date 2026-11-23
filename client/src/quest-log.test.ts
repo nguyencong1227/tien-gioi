@@ -338,6 +338,8 @@ describe("xem trước thưởng ở hộp thoại NPC (mục 66)", () => {
     expect(dialogRewardOf({ kind: "accept", questId: "khong_co" })).toBeUndefined();
     expect(dialogRewardOf({ kind: "accept", questId: "constructor" })).toBeUndefined();
     expect(dialogRewardOf({ kind: "turnIn", questId: "__proto__" })).toBeUndefined();
+    // lựa chọn KHÔNG phải nhận / trả mà lỡ mang `questId` (dữ liệu hỏng): vẫn không xem trước
+    expect(dialogRewardOf({ kind: "shop", questId: withReward.id } as never)).toBeUndefined();
   });
 });
 
@@ -347,20 +349,21 @@ describe("QuestReadyWatcher: không báo nhầm lúc vào phòng (mục 66)", ()
   const ready: QuestProgress[] = [{ id: talkQ.id, step: talkQ.steps.length, count: 0 }];
   const notReady: QuestProgress[] = [{ id: talkQ.id, step: 0, count: 0 }];
 
-  it("chưa nhận đủ cả túi lẫn sổ: không báo, và KHÔNG lập mốc (tin thứ hai tới vẫn chỉ lập mốc, không báo nhiệm vụ đã đủ từ trước)", () => {
+  it("chưa nhận đủ cả túi lẫn sổ: không báo VÀ không lập mốc (sổ chưa tới nên danh sách còn rỗng; khi sổ tới có nhiệm vụ đã đủ từ trước thì KHÔNG được báo)", () => {
     const w = new QuestReadyWatcher();
     w.noteInv();
-    expect(w.update(ready, ctx)).toEqual([]); // chưa có sổ
+    expect(w.update([], ctx)).toEqual([]); // túi tới trước, sổ nhiệm vụ còn rỗng: nếu lập mốc ở đây thì mốc = {} và nhiệm vụ đã đủ sẽ bị báo nhầm
     w.noteQuests();
-    expect(w.update(ready, ctx)).toEqual([]); // đủ cả hai: lập mốc, nhiệm vụ đã đủ từ trước không báo
+    expect(w.update(ready, ctx)).toEqual([]); // đủ cả hai: giờ mới lập mốc, nhiệm vụ đã đủ từ trước không báo
     expect(w.update(ready, ctx)).toEqual([]);
   });
 
-  it("thứ tự ngược (sổ trước, túi sau) cũng vậy", () => {
+  it("thứ tự ngược (sổ trước, túi sau) cũng vậy: túi chưa tới thì điều kiện 'thu thập' còn tính trên túi rỗng", () => {
     const w = new QuestReadyWatcher();
     w.noteQuests();
-    expect(w.update(ready, ctx)).toEqual([]);
+    expect(w.update(notReady, ctx)).toEqual([]); // chưa có túi: chưa lập mốc
     w.noteInv();
+    expect(w.update(ready, ctx)).toEqual([]); // túi tới, nhiệm vụ đã đủ từ trước: lập mốc, không báo
     expect(w.update(ready, ctx)).toEqual([]);
   });
 
