@@ -1,6 +1,28 @@
 // Sequencer tuỳ biến của Vitest: phân chia shard theo thời lượng (Bin-packing LPT)
 // để cân bằng các shard CI mà vẫn bảo đảm bất biến: mỗi tệp test đúng một shard,
 // không thiếu, không trùng, tệp mới tự động rơi vào đúng một shard (Issue #1380).
+//
+// ============================================================================
+// HƯỚNG DẪN LÀM TƯƠI TEST_WEIGHTS KHI CÓ TEST MỚI NẶNG:
+// 1. Khi nào cần làm tươi:
+//    - Khi thêm tệp test mới có thời gian chạy nặng (> 5-10 giây, ví dụ test stress,
+//      test cân bằng mô phỏng, WorldRoom integration...).
+//    - Hoặc khi thấy thời lượng các shard CI bị lệch (1 shard chạy lâu hơn các shard khác > 20s).
+// 2. Cách đo thời lượng tệp test:
+//    - Đọc từ log CI GitHub Actions: mỗi shard in ra thời gian chạy của từng tệp test.
+//    - Hoặc chạy cục bộ:
+//      `npx vitest run --reporter=verbose` hoặc `npx vitest run --reporter=json`
+//      để lấy thời lượng thực tế (tính theo giây).
+// 3. Cách cập nhật bảng TEST_WEIGHTS:
+//    - Thêm/cập nhật đường dẫn tương đối (chuẩn hoá dấu gạch `/`, tính từ gốc repo)
+//      và thời lượng ước tính (giây, làm tròn) vào đối tượng TEST_WEIGHTS bên dưới.
+//    - Các tệp test nhỏ (< 5s) KHÔNG CẦN thêm vào danh sách; hệ thống tự động gán
+//      trọng số mặc định 0.6s và phân bổ đều bằng SHA-1 hash.
+// 4. Kiểm tra sau khi cập nhật:
+//    - Chạy `npm test vitest.sequencer.test.ts` để xác nhận:
+//      + Mọi bất biến phân chia (hợp đủ, không trùng, không sót) được giữ vững.
+//      + Độ chênh lệch giữa các shard dự kiến <= 10s.
+// ============================================================================
 import crypto from "node:crypto";
 import path from "node:path";
 import { BaseSequencer } from "vitest/node";
