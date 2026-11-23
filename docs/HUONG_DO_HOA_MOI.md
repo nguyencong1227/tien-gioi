@@ -219,3 +219,24 @@ Dựng bằng `python3 -I client/scripts/art/mau-huong-moi.py` (đọc gói ở 
 2. Sau khi người dùng duyệt hình: chọn khoá và lưới ô, điền `PRIVATE_ART` / `PRIVATE_MAP_PACKS` (`privateArtViolations` đối chiếu với lưới của hình thay thế), đóng gói bằng `npm run assets-private:manifest -w server -- <dist> --strict --title ... --url ... --license ...` (gói itch.io hay có tên tệp chứa khoảng trắng: phải đổi tên tay, `manifest` in `BỎ QUA`), khởi động lại máy chủ.
 3. Bước 1 của mục 9 (nền ghép góc) chạy với hình riêng khi có gói, hình thay thế khi thiếu: CI và máy dev không có gói vẫn chạy đủ.
 4. Ghi công: màn Ghi công ở Cài đặt hiện `title` + `url` + `license` của gói đang dùng (`PackController.privateCredits()`); `CREDITS.md` chỉ ghi tên gói + link + "tệp không nằm trong repo".
+
+## 12. Ảnh tileset THẬT của lớp hình (QUYET_DINH_M3 mục 67.1, issue #1330, bước a; B, 23/11/2026)
+
+Người dùng đã **duyệt phần cảnh** (mặt đất, cỏ, bụi, cây, đường đất, nước / hồ, bờ cát, vách đá) nên bố cục GIẢ ĐỊNH ở `server/src/systems/map-builder.ts` được thay bằng ảnh thật. Script tất định `client/scripts/art/dung-tileset-world.py` (cần Pillow + gói gốc ở `/mnt/data/assets-src/ninja-adventure`, commit `6ac78232`) dựng MỘT ảnh cho MỖI bản đồ, cùng bố cục, khác bảng màu: `python3 -I client/scripts/art/dung-tileset-world.py --out <thư mục> --preview <ảnh>`. Ảnh xem 4 vùng: `docs/art/huong-moi/05-tileset-world-4-vung.png` (trái -> phải: Lạc Hà, Hắc Phong, Âm Sương, Hàn Vân).
+
+**Bố cục (22 cột, ô 16 px, ĐÙN MÉP margin 1 / spacing 2 = `createExtrudedWorldTileset`; ảnh 396 x 504, ~14 KB mỗi ảnh):**
+
+| Khối (cột, hàng) | Nội dung | Nguồn |
+|---|---|---|
+| (0, 0) CÁT | 47 ô Wang blob + ô cỏ trơn; đất -> màu cát | khối cỏ / đất của `tileset_floor.png` |
+| (0, 7) ĐẤT | như trên, đất theo màu vùng; **ô cỏ trơn nền = (2, 11)** (cục bộ (2, 4)) | khối cỏ / đất |
+| (0, 21) NƯỚC | 47 ô blob; nền trắng của băng -> trong suốt rồi **NƯỚNG lên ô cỏ trơn** nên mọi ô nước là ô ĐẶC (không cần lớp nền cỏ riêng, không cần đổi cấu trúc lớp của Tiled) | khối băng |
+| còn lại | để trống (trong suốt): vách đá, sàn trấn, cây / tán / đá / bụi cho bước sau | |
+
+**Hai điều tìm ra khi dựng (đã xử lý, test canh):**
+
+1. **Khối băng của gói KHÔNG có ô cho ao đơn độc 1 ô** (mặt nạ 0 của `WANG_BLOB_LUT` = ô cục bộ (3, 3), trống; khối đất thì có). Nếu không xử lý thì ao 1 ô sẽ hiện KHOẢNG TRỐNG. Script tự dựng ô này từ chính "giọt đất" cùng vị trí (đất -> nước, viền trong 1 px -> bọt nước, cỏ giữ nguyên), tất định.
+2. **Khối đất / băng có bố cục KHÁC ở hàng cục bộ 4-5:** hàng 4 của khối băng chỉ có một phần; ô "đầy dự phòng" (0, 4), (1, 4) của khối đất không có ở khối băng. Chỉ 47 ô của `WANG_BLOB_LUT` được đảm bảo ở cả ba khối; script đọc thẳng `shared/src/autotile.ts` để kiểm (không chép bảng).
+
+**Bảng màu vùng** (đổi TỪNG màu của gói: cỏ 4 màu, đất 4, bụi 2, cát 4, nước 2; không chỉnh HSV): Lạc Hà = bảng "tu tiên" đã duyệt (cỏ ngọc dịu, đất vàng, cát nhạt); Hắc Phong = cỏ ô-liu sẫm + đất tro; Âm Sương = cỏ xanh lục xám + bùn nâu xám, nước đục; Hàn Vân = cỏ -> tuyết trắng xanh, đất -> đá lạnh, nước băng. **Việc tiếp theo:** chốt chỉ số ô với C (#1222: `VARIANT_*` đã khớp (0,0) / (0,7) / (0,21); `GID_GRASS` phải là ô (2, 11) = chỉ số 2 + 11 x 22 = 244 cộng `firstgid` chứ KHÔNG phải ô 0; `VARIANT_STONE` (11, 7) và `GID_TREE_*` / `GID_ROCK` / `GID_TALL_GRASS` hiện chưa có ô thật), thêm khối sàn trấn + cây / đá / bụi cỏ, rồi client vẽ (#1206).
+
