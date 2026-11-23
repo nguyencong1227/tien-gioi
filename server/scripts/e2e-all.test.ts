@@ -12,7 +12,9 @@ import {
   formatResultTable,
   getE2eScripts,
   parseCliArgs,
+  parseShard,
   runE2eAll,
+  shardScripts,
   type ScriptResult,
 } from "./e2e-all.js";
 
@@ -415,6 +417,199 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       } catch {
         // Bỏ qua
       }
+    });
+  });
+
+  describe("parseShard (Phân tích và kiểm tra tính hợp lệ cờ --shard M/N, #1404)", () => {
+    it("phân tích thành công các trường hợp hợp lệ", () => {
+      expect(parseShard("1/2")).toEqual({ index: 1, total: 2 });
+      expect(parseShard("2/2")).toEqual({ index: 2, total: 2 });
+      expect(parseShard(" 1/5 ")).toEqual({ index: 1, total: 5 });
+      expect(parseShard("3/10")).toEqual({ index: 3, total: 10 });
+    });
+
+    it("ném lỗi rõ ràng khi định dạng không đúng M/N", () => {
+      expect(() => parseShard("abc")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1-2")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1/2/3")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1/")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("/2")).toThrow(/Định dạng --shard không hợp lệ/);
+    });
+
+    it("ném lỗi rõ ràng khi phạm vi vi phạm 1 <= M <= N", () => {
+      expect(() => parseShard("0/2")).toThrow(/Phạm vi --shard không hợp lệ/);
+      expect(() => parseShard("3/2")).toThrow(/Phạm vi --shard không hợp lệ/);
+      expect(() => parseShard("1/0")).toThrow(/Phạm vi --shard không hợp lệ/);
+      expect(() => parseShard("5/4")).toThrow(/Phạm vi --shard không hợp lệ/);
+    });
+  });
+
+  describe("shardScripts (Chia kịch bản thuần túy pure function, #1404)", () => {
+    const mockScripts = Array.from({ length: 32 }, (_, i) => `e2e:test-${i + 1}`);
+
+    it("chia 32 kịch bản thành 2 shard đồng đều (mỗi shard 16 kịch bản)", () => {
+      const shard1 = shardScripts(mockScripts, 1, 2);
+      const shard2 = shardScripts(mockScripts, { index: 2, total: 2 });
+
+      expect(shard1).toHaveLength(16);
+      expect(shard2).toHaveLength(16);
+      expect(shard1[0]).toBe("e2e:test-1");
+      expect(shard2[0]).toBe("e2e:test-2");
+    });
+
+    it("chia 32 kịch bản thành 3 shard cân bằng (11, 11, 10)", () => {
+      const s1 = shardScripts(mockScripts, 1, 3);
+      const s2 = shardScripts(mockScripts, 2, 3);
+      const s3 = shardScripts(mockScripts, 3, 3);
+
+      expect(s1).toHaveLength(11);
+      expect(s2).toHaveLength(11);
+      expect(s3).toHaveLength(10);
+      expect(s1.length + s2.length + s3.length).toBe(32);
+    });
+
+    it("hoạt động mượt mà với số kịch bản lẻ (ví dụ 33 kịch bản khi thêm kịch bản mới ở PR #1394)", () => {
+      const oddScripts = Array.from({ length: 33 }, (_, i) => `e2e:test-${i + 1}`);
+      const s1 = shardScripts(oddScripts, 1, 2);
+      const s2 = shardScripts(oddScripts, 2, 2);
+
+      expect(s1).toHaveLength(17);
+      expect(s2).toHaveLength(16);
+      expect(s1.length + s2.length).toBe(33);
+    });
+
+    it("bảo toàn bất biến: mọi kịch bản xuất hiện đúng MỘT lần duy nhất qua các shard M = 1..N", () => {
+      const N = 4;
+      const shards = Array.from({ length: N }, (_, i) => shardScripts(mockScripts, i + 1, N));
+
+      // Tập hợp tất cả các kịch bản chạy trên các shard
+      const allSharded: string[] = [];
+      const seen = new Set<string>();
+
+      for (let sIdx = 0; sIdx < N; sIdx++) {
+        for (const script of shards[sIdx]) {
+          // Không kịch bản nào bị trùng lặp
+          expect(seen.has(script)).toBe(false);
+          seen.add(script);
+          allSharded.push(script);
+        }
+      }
+
+      // Kích thước tập hợp phải bằng đúng số kịch bản ban đầu
+      expect(seen.size).toBe(mockScripts.length);
+      // Danh sách sau khi sort phải khớp 100% với ban đầu
+      expect([...allSharded].sort()).toEqual([...mockScripts].sort());
+    });
+
+    it("bảo toàn thứ tự kịch bản ban đầu theo package.json trong mỗi shard", () => {
+      const s1 = shardScripts(mockScripts, 1, 2);
+      const s2 = shardScripts(mockScripts, 2, 2);
+
+      // Chỉ số của từng phần tử trong shard phải tăng dần theo danh sách ban đầu
+      let lastIndexS1 = -1;
+      for (const item of s1) {
+        const currIdx = mockScripts.indexOf(item);
+        expect(currIdx).toBeGreaterThan(lastIndexS1);
+        lastIndexS1 = currIdx;
+      }
+
+      let lastIndexS2 = -1;
+      for (const item of s2) {
+        const currIdx = mockScripts.indexOf(item);
+        expect(currIdx).toBeGreaterThan(lastIndexS2);
+        lastIndexS2 = currIdx;
+      }
+    });
+
+    it("phối hợp đúng với filterScripts (lọc --only và --skip TRƯỚC, rồi mới chia shard)", () => {
+      const all = ["e2e:a", "e2e:b", "e2e:c", "e2e:d", "e2e:e", "e2e:f", "e2e:g", "e2e:h"];
+      // Giả sử có --skip e2e:c, e2e:g
+      const { selected } = filterScripts(all, { skip: ["e2e:c", "e2e:g"] });
+      expect(selected).toEqual(["e2e:a", "e2e:b", "e2e:d", "e2e:e", "e2e:f", "e2e:h"]);
+
+      // Chia 2 shard trên 6 script còn lại
+      const s1 = shardScripts(selected, 1, 2);
+      const s2 = shardScripts(selected, 2, 2);
+
+      expect(s1).toEqual(["e2e:a", "e2e:d", "e2e:f"]);
+      expect(s2).toEqual(["e2e:b", "e2e:e", "e2e:h"]);
+      expect(s1).not.toContain("e2e:c");
+      expect(s2).not.toContain("e2e:g");
+    });
+  });
+
+  describe("Kiểm tra đột biến (Mutation Testing cho Sharding, #1404)", () => {
+    const mockScripts = Array.from({ length: 32 }, (_, i) => `e2e:test-${i + 1}`);
+
+    it("đột biến idx % (N + 1) sẽ làm rớt kịch bản và bị kiểm tra bất biến phát hiện (ĐỎ)", () => {
+      // Hàm đột biến: dùng idx % (N + 1) thay vì idx % N
+      const mutantShard = (scripts: string[], index: number, total: number) => {
+        return scripts.filter((_, idx) => idx % (total + 1) === index - 1);
+      };
+
+      const N = 2;
+      const s1 = mutantShard(mockScripts, 1, N);
+      const s2 = mutantShard(mockScripts, 2, N);
+
+      // Do idx % 3 === 2 bị bỏ rơi (những script ở idx 2, 5, 8, ... không thuộc shard 1 hay 2)
+      const combined = [...s1, ...s2];
+      expect(combined.length).toBeLessThan(mockScripts.length);
+      // Kiểm tra bất biến xác nhận đột biến này làm hỏng tính toàn vẹn
+      expect(combined.length).not.toBe(mockScripts.length);
+    });
+
+    it("đột biến bỏ lọc (trả về toàn bộ script) sẽ làm trùng lặp và bị kiểm tra tính duy nhất phát hiện (ĐỎ)", () => {
+      // Hàm đột biến: không lọc theo shard mà trả về toàn bộ
+      const mutantShard = (scripts: string[], _index: number, _total: number) => {
+        return [...scripts];
+      };
+
+      const N = 2;
+      const s1 = mutantShard(mockScripts, 1, N);
+      const s2 = mutantShard(mockScripts, 2, N);
+
+      // Kiểm tra trùng lặp
+      const seen = new Set<string>();
+      let duplicateFound = false;
+      for (const item of [...s1, ...s2]) {
+        if (seen.has(item)) {
+          duplicateFound = true;
+          break;
+        }
+        seen.add(item);
+      }
+      expect(duplicateFound).toBe(true);
+    });
+  });
+
+  describe("CLI --shard và mã thoát khi sai tham số (#1404)", () => {
+    it("parseCliArgs nhận diện đúng cờ --shard M/N và --shard=M/N", () => {
+      const opts1 = parseCliArgs(["--shard", "1/2"]);
+      expect(opts1.shard).toEqual({ index: 1, total: 2 });
+
+      const opts2 = parseCliArgs(["--shard=2/2"]);
+      expect(opts2.shard).toEqual({ index: 2, total: 2 });
+    });
+
+    it("runE2eAll in thông báo lỗi và thoát mã 2 khi định dạng hoặc phạm vi --shard sai", async () => {
+      // Sai định dạng
+      const code1 = await runE2eAll(["--shard", "invalid-shard"]);
+      expect(code1).toBe(2);
+
+      // Sai phạm vi (M > N)
+      const code2 = await runE2eAll(["--shard", "3/2"]);
+      expect(code2).toBe(2);
+
+      // Sai phạm vi (M < 1)
+      const code3 = await runE2eAll(["--shard", "0/2"]);
+      expect(code3).toBe(2);
+    });
+
+    it("runE2eAll với --dry-run và --shard 1/2 chạy thành công với mã thoát 0", async () => {
+      const code = await runE2eAll(["--dry-run", "--shard", "1/2"]);
+      expect(code).toBe(0);
     });
   });
 });

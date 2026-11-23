@@ -33,9 +33,13 @@ permissions:
 
 jobs:
   e2e:
-    name: Chạy toàn diện 32 kịch bản E2E
+    name: E2E Shard ${{ matrix.shard }}/2
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
 
     steps:
       - name: Checkout mã nguồn
@@ -53,7 +57,7 @@ jobs:
       - name: Build client (harness phục vụ client/dist)
         run: npm run build
 
-      - name: Chạy toàn bộ 32 kịch bản E2E tuần tự (e2e:all)
+      - name: Chạy kịch bản E2E Shard ${{ matrix.shard }}/2 (e2e:all)
         id: e2e
         # Ghi chú về GPU:
         # Cả 32 kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
@@ -69,7 +73,7 @@ jobs:
           IN_NO_RETRY: ${{ inputs.no_retry }}
         run: |
           mkdir -p "$GITHUB_WORKSPACE/e2e-logs"
-          args=(--logs "$GITHUB_WORKSPACE/e2e-logs")
+          args=(--logs "$GITHUB_WORKSPACE/e2e-logs" --shard "${{ matrix.shard }}/2")
 
           if [ -n "$IN_ONLY" ]; then
             if [[ ! "$IN_ONLY" =~ ^[a-z0-9:,_-]*$ ]]; then
@@ -105,6 +109,7 @@ jobs:
         if: always()
         run: |
           if [ -f "$GITHUB_WORKSPACE/e2e-logs/REPORT.md" ]; then
+            echo "## 📊 Kết quả E2E - Shard ${{ matrix.shard }}/2" >> $GITHUB_STEP_SUMMARY
             cat "$GITHUB_WORKSPACE/e2e-logs/REPORT.md" >> $GITHUB_STEP_SUMMARY
           fi
 
@@ -112,7 +117,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-logs-${{ github.sha }}
+          name: e2e-logs-shard-${{ matrix.shard }}-${{ github.sha }}
           path: ${{ github.workspace }}/e2e-logs/
           if-no-files-found: error
           retention-days: 30
