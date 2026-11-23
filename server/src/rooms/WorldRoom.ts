@@ -324,6 +324,7 @@ export class WorldRoom extends Room<WorldState> {
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
+        questReward: (sid, msg) => this.sendTo(sid, "questReward", msg),
         skills: (sid, msg) => this.sendTo(sid, SKILL_MSG.skills, msg),
         status: (sid, msg) => this.sendTo(sid, SKILL_MSG.status, msg),
         dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
