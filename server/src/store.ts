@@ -7,7 +7,9 @@ import {
   DEFAULT_MAP_ID,
   DEFAULT_ORIGIN,
   ITEM_BY_ID,
+  REALMS,
   getMap,
+  isArenaMap,
   isDungeonMap,
   originOf,
   skillOf,
@@ -193,13 +195,35 @@ export interface QuestSave {
 
 /**
  * Bản đồ của nhân vật đã lưu: id của một bản đồ THƯỜNG (`MAPS`), còn lại (thiếu, lạ, sai kiểu) là bản đồ mặc định.
- * Bản đồ bí cảnh cũng là bản đồ `getMap` tra được nhưng là phòng tạm của một run, KHÔNG BAO GIỜ là chỗ ở của nhân vật
- * (docs/THIET_KE_BI_CANH.md mục 4.3): file lưu mang id đó (sửa tay, lỗi, bản cũ) thì về Lạc Hà thay vì bị đưa tới một
- * phòng không có (`world_bi_canh_...` không đăng ký thì client không vào được: kẹt).
+ * Bản đồ bí cảnh và đấu trường chặn đường cũng là bản đồ `getMap` tra được nhưng là phòng tạm (của một run / một vé), KHÔNG
+ * BAO GIỜ là chỗ ở của nhân vật (docs/THIET_KE_BI_CANH.md mục 4.3, THIET_KE_CHAN_DUONG.md mục 5): file lưu mang id đó (sửa tay,
+ * lỗi, bản cũ) thì về Lạc Hà thay vì bị đưa tới một phòng chỉ mở cho đúng run / vé (không có thì client không vào được: kẹt).
  */
 export function mapIdOf(save: Pick<SavedPlayer, "mapId">): string {
   const m = getMap(save.mapId);
-  return m && !isDungeonMap(m.def.id) ? m.def.id : DEFAULT_MAP_ID;
+  return m && !isDungeonMap(m.def.id) && !isArenaMap(m.def.id) ? m.def.id : DEFAULT_MAP_ID;
+}
+
+/**
+ * Cảnh giới / tầng / tu vi đã lưu, làm sạch: không tin file (thiếu, NaN, âm, sai kiểu, số lẻ đều về số nguyên hợp lệ).
+ * `realm` kẹp vào `[0, REALMS.length - 1]`, `tier` vào `[0, số tầng của cảnh giới đó - 1]`, `exp` là số hữu hạn >= 0 (làm tròn xuống;
+ * không có trần trên, như trước). Trước đây `Math.min(save.realm, ...)` không chặn dưới / NaN nên `REALMS[realm].tiers` ném TypeError
+ * ở `onAuth` / `onJoin` (người chơi kẹt không vào được). Thuần.
+ */
+export function sanitizeProgress(save: { realm?: unknown; tier?: unknown; exp?: unknown }): {
+  realm: number;
+  tier: number;
+  exp: number;
+} {
+  const whole = (v: unknown, hi: number): number =>
+    typeof v !== "number" || Number.isNaN(v) ? 0 : Math.min(hi, Math.max(0, Math.floor(v)));
+  const realm = whole(save.realm, REALMS.length - 1);
+  const tier = whole(save.tier, REALMS[realm].tiers.length - 1);
+  const exp =
+    typeof save.exp === "number" && Number.isFinite(save.exp) && save.exp > 0
+      ? Math.floor(save.exp)
+      : 0;
+  return { realm, tier, exp };
 }
 
 export const hashSecret = (s: string) => createHash("sha256").update(s).digest("hex");

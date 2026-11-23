@@ -13,6 +13,7 @@
  */
 import { TILE } from "@tien-gioi/shared";
 import { terrainRGBA, type MapOverview, type Rgb } from "./map-overview";
+import { npcMarkerStyle } from "./npc-marker";
 
 /** Cỡ chữ nhỏ nhất của nhãn trên bản đồ, tính bằng điểm ảnh CSS (đọc được trên điện thoại). */
 export const MIN_FONT_CSS_PX = 12;
@@ -640,8 +641,15 @@ export function drawMapBase(
     ctx.lineWidth = u;
     ctx.stroke();
     obstacles.push({ x: nx - npcR, y: ny - npcR, w: 2 * npcR, h: 2 * npcR });
-    if (big && (!o.compact || o.markerOf?.(n.id))) {
-      const m = o.markerOf?.(n.id) ?? null;
+    const m = o.markerOf?.(n.id) ?? null;
+    // NPC có nhiệm vụ ĐÃ ĐỦ để trả ("?", mục 66): vòng vàng quanh chấm, thấy cả trên bản đồ NHỎ (nhãn chữ chỉ có ở bản đồ lớn)
+    if (m === "?") {
+      ctx.strokeStyle = npcMarkerStyle(m)!.mapColor;
+      ctx.lineWidth = 1.6 * u;
+      circle(ctx, nx, ny, npcR * 1.9);
+      ctx.stroke();
+    }
+    if (big && (!o.compact || m)) {
       label(
         `npc:${n.id}`,
         o.compact ? (m ?? "") : m ? `${m} ${n.name}` : n.name,
@@ -649,7 +657,7 @@ export function drawMapBase(
         ny,
         npcR,
         m ? 80 : 60,
-        m === "?" ? "#9ae59a" : m ? "#ff8a8a" : MAP_COLORS.text,
+        npcMarkerStyle(m)?.mapColor ?? MAP_COLORS.text,
       );
     }
   }

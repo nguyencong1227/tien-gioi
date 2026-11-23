@@ -72,6 +72,7 @@ npm run build        # build client vào client/dist
   - Dữ liệu riêng (túi đồ, nhiệm vụ, Linh thạch) không đưa vào state chung, chỉ gửi cho chủ.
   - Số liệu từ file lưu cũng không tin: nạp qua hàm kẹp / làm sạch (`addCoin`, `sanitizeInventory`...), không gán thẳng.
 - **Đổi `shared/`:** làm PR riêng, chỉ sửa `shared/`, một dev khác review trước khi các bên code tiếp.
+- **Trước mọi PR nội dung chạy `npm run check:content`** (issue #1200, mục 61.2): gom mọi bộ kiểm dữ liệu cấu trúc (chiêu / trùm / chặn đường / nhiệm vụ tông / cửa hàng tông / cổng bản đồ / trùm thế giới / thành tựu / danh hiệu) thành MỘT lệnh, đỏ khi dữ liệu game sai; đã nối CI. Chi tiết bộ kiểm ở `docs/RA_SOAT_NOI_DUNG.md`.
 - **Phiên bản đã ghim:** Colyseus 0.16, `@colyseus/schema` 3, `colyseus.js` 0.16, Phaser 3.90, TypeScript 5.9.
   - Không tự nâng major. Các bản mới (Colyseus 0.18, Phaser 4, TS 7) đổi API.
   - Schema dùng decorator `@type`, cần `experimentalDecorators` + `useDefineForClassFields: false` (đã cấu hình trong `server/tsconfig.json`).

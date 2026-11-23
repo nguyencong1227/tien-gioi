@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   AMBUSH_CHOICES,
-  AMBUSH_COIN_BASE,
-  AMBUSH_COIN_GROWTH,
   AMBUSH_FLEE_CHANNEL_MS,
   AMBUSH_FLEE_MIN_COIN,
   AMBUSH_MIN_PROTOCOL,
@@ -40,10 +38,12 @@ import {
   AMBUSH_MIN_HP_PCT,
   AMBUSH_EXP_PRICE_MIN,
   AMBUSH_HUNT_EXP_PER_MIN,
+  AMBUSH_HUNT_COIN_PER_MIN,
   AMBUSH_REWARD_MIN,
   ambushHuntExpPerMin,
+  ambushHuntCoinPerMin,
   ambushRewardExp,
-  AMBUSH_COIN_MULT,
+  ambushRewardCoin,
 } from "./ambush";
 import { ITEM_BY_ID } from "./items";
 import { PROTOCOL_VERSION } from "./protocol";
@@ -203,29 +203,79 @@ describe("giá bỏ chạy", () => {
     expect(blended).toBeGreaterThan(4);
     expect(blended).toBeLessThan(6);
   });
-  it("Linh thạch: tăng theo bậc, giữa trận = hệ số x giá hộp thoại, có sàn tối thiểu", () => {
-    expect(ambushCoinPrice(0, "offer")).toBe(Math.max(AMBUSH_FLEE_MIN_COIN, AMBUSH_COIN_BASE));
-    let prev = 0;
-    for (let s = 0; s < 12; s++) {
-      const p = ambushCoinPrice(s, "offer");
-      expect(p).toBeGreaterThan(prev);
-      prev = p;
-      // giữa trận cao hơn (không thấp hơn) giá hộp thoại: bỏ chạy sớm luôn rẻ hơn bỏ chạy muộn
-      expect(ambushCoinPrice(s, "mid")).toBeGreaterThan(p);
-    }
-    expect(ambushCoinPrice(5, "offer")).toBe(
-      Math.round(AMBUSH_COIN_BASE * Math.pow(AMBUSH_COIN_GROWTH, 5)),
-    );
-    expect(ambushCoinPrice(5, "mid")).toBe(
-      Math.round(AMBUSH_COIN_BASE * Math.pow(AMBUSH_COIN_GROWTH, 5) * AMBUSH_COIN_MULT.mid),
-    );
-    expect(AMBUSH_COIN_MULT.mid).toBeGreaterThan(AMBUSH_COIN_MULT.offer);
+  it("Linh thạch bỏ chạy: tính bằng PHÚT SĂN của bậc (offer 2 phút, mid 3 phút), không theo con quái", () => {
+    expect(AMBUSH_EXP_PRICE_MIN.offer).toBe(2);
+    expect(AMBUSH_EXP_PRICE_MIN.mid).toBe(3);
+    // bậc 13 (Kim Đan sơ kỳ): 263 Linh thạch / phút săn
+    expect(ambushHuntCoinPerMin(13)).toBe(263);
+    expect(ambushCoinPrice(13, "offer")).toBe(2 * 263);
+    expect(ambushCoinPrice(13, "mid")).toBe(3 * 263);
+    // bậc 3 (Luyện Khí tầng 3): 27 Linh thạch / phút
+    expect(ambushCoinPrice(3, "offer")).toBe(2 * 27);
+    expect(ambushCoinPrice(3, "mid")).toBe(3 * 27);
+    // cùng số phút ở mọi bậc: giá tỉ lệ với Linh thạch / phút săn của bậc đó (không phải % thanh)
+    for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++)
+      expect(ambushCoinPrice(s, "mid")).toBe(Math.round(3 * AMBUSH_HUNT_COIN_PER_MIN[s]));
   });
-  it("Linh thạch: bậc rác coi là 0 (sàn), không NaN", () => {
+  it("Linh thạch bỏ chạy: giữa trận đắt hơn hộp thoại (3 phút > 2 phút), tăng theo bậc", () => {
+    let prev = 0;
+    for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++) {
+      const offer = ambushCoinPrice(s, "offer");
+      expect(offer, `bậc ${s}`).toBeGreaterThan(prev);
+      prev = offer;
+      expect(ambushCoinPrice(s, "mid"), `bậc ${s}`).toBeGreaterThan(offer);
+    }
+  });
+  it("Linh thạch bỏ chạy: KHÔNG dưới sàn; bậc rác coi là sàn, không NaN", () => {
+    for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++) {
+      expect(ambushCoinPrice(s, "offer")).toBeGreaterThanOrEqual(AMBUSH_FLEE_MIN_COIN);
+      expect(ambushCoinPrice(s, "mid")).toBeGreaterThanOrEqual(AMBUSH_FLEE_MIN_COIN);
+    }
     for (const bad of [NaN, -5, Infinity, "3", null, undefined])
       expect(ambushCoinPrice(bad, "offer"), String(bad)).toBe(
-        Math.max(AMBUSH_FLEE_MIN_COIN, AMBUSH_COIN_BASE),
+        Math.max(AMBUSH_FLEE_MIN_COIN, 2 * AMBUSH_HUNT_COIN_PER_MIN[0]),
       );
+  });
+  it("bảng Linh thạch / phút săn: số nguyên dương, tăng dần, bậc ngoài bảng lấy bậc cuối, bậc rác lấy bậc 0", () => {
+    expect(AMBUSH_HUNT_COIN_PER_MIN).toHaveLength(19);
+    for (const v of AMBUSH_HUNT_COIN_PER_MIN) {
+      expect(Number.isInteger(v)).toBe(true);
+      expect(v).toBeGreaterThan(0);
+    }
+    for (let s = 1; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++)
+      expect(AMBUSH_HUNT_COIN_PER_MIN[s], `bậc ${s}`).toBeGreaterThan(
+        AMBUSH_HUNT_COIN_PER_MIN[s - 1],
+      );
+    const last = AMBUSH_HUNT_COIN_PER_MIN[AMBUSH_HUNT_COIN_PER_MIN.length - 1];
+    expect(ambushHuntCoinPerMin(18)).toBe(last);
+    expect(ambushHuntCoinPerMin(19)).toBe(last);
+    expect(ambushHuntCoinPerMin(1e9)).toBe(last);
+    expect(ambushHuntCoinPerMin(2.9)).toBe(AMBUSH_HUNT_COIN_PER_MIN[2]); // làm tròn xuống
+    for (const bad of [NaN, -3, Infinity, "5", null, undefined])
+      expect(ambushHuntCoinPerMin(bad), String(bad)).toBe(AMBUSH_HUNT_COIN_PER_MIN[0]);
+  });
+  it("thưởng Linh thạch: phút săn của bậc x mức (4 / 6 / 10), mức lạ = 0", () => {
+    expect(ambushRewardCoin(13, "normal")).toBe(4 * 263);
+    expect(ambushRewardCoin(13, "elite")).toBe(6 * 263);
+    expect(ambushRewardCoin(13, "leader")).toBe(10 * 263);
+    for (const bad of ["boss", "", null, undefined, 3, "constructor", "__proto__"])
+      expect(ambushRewardCoin(13, bad), String(bad)).toBe(0);
+    for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++) {
+      expect(ambushRewardCoin(s, "normal")).toBeLessThan(ambushRewardCoin(s, "elite"));
+      expect(ambushRewardCoin(s, "elite")).toBeLessThan(ambushRewardCoin(s, "leader"));
+    }
+  });
+  it("thắng Linh thạch luôn lợi hơn bỏ chạy ở MỌI bậc: giá mid < thưởng thấp nhất; giữa trận đắt hơn hộp thoại", () => {
+    for (let s = 0; s < AMBUSH_HUNT_COIN_PER_MIN.length; s++) {
+      expect(ambushCoinPrice(s, "mid"), `bậc ${s}`).toBeLessThan(ambushRewardCoin(s, "normal"));
+      expect(ambushCoinPrice(s, "mid"), `bậc ${s}`).toBeGreaterThan(ambushCoinPrice(s, "offer"));
+    }
+  });
+  it("thưởng Linh thạch trộn theo trọng số mức: ~4,8 phút săn mỗi lần thắng (khung +20-40% thu nhập so săn quái)", () => {
+    let blended = 0;
+    for (const t of AMBUSH_TIERS) blended += (AMBUSH_TIER_WEIGHTS[t] * AMBUSH_REWARD_MIN[t]) / 100;
+    expect(blended).toBeGreaterThan(4);
+    expect(blended).toBeLessThan(6);
   });
   it("ambushPrice: ví đủ -> có giá Linh thạch; ví thiếu 1 -> coin null (chỉ còn tu vi); giá tu vi độc lập với ví", () => {
     const need = ambushCoinPrice(3, "offer");

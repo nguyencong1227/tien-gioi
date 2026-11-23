@@ -38,6 +38,11 @@ jobs:
         shell: bash
         run: npm run test --if-present 2>&1 | tee vitest.log
 
+      # Gom mọi bộ kiểm dữ liệu nội dung (cấu trúc) thành MỘT lệnh; đỏ khi dữ liệu game sai (issue #1200, mục 61.2).
+      # Chạy trước mọi PR nội dung. Nhanh: chỉ gọi các hàm kiểm thuần trong `shared/` với bảng thật (shared main = nguồn TS, tsx dịch trực tiếp).
+      - name: Kiểm dữ liệu nội dung (check:content)
+        run: npm run check:content --if-present
+
       - name: Lưu nhật ký kiểm thử làm artifact khi thất bại hoặc huỷ
         if: failure() || cancelled()
         uses: actions/upload-artifact@v4

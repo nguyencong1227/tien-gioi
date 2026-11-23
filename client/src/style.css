@@ -1016,6 +1016,13 @@ html[data-input="touch"] .mm-foot small {
   flex: none;
   font-size: var(--fs-11);
 }
+/* Xem trước thưởng dưới lựa chọn nhận / trả nhiệm vụ (mục 66): kéo sát lên nút (bù khe 6px của danh sách) để thấy rõ là của nút ngay trên */
+.dlg-opt-reward {
+  margin: -3px 4px 2px;
+  font-size: var(--fs-11);
+  color: var(--gold);
+  opacity: 0.9;
+}
 .dlg-opt-btn:not(:disabled):hover {
   background: rgba(201, 162, 74, 0.38);
   border-color: #ffe08a;
@@ -2368,6 +2375,89 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   100% {
     opacity: 0;
     transform: translateY(-8px);
+  }
+}
+
+/* Bảng thưởng khi TRẢ nhiệm vụ (mục 66, #1327): thẻ nổi giữa phía trên màn hình, KHÔNG chặn thao tác (hộp thoại NPC mở ngay sau đó vẫn dùng được), tự ẩn sau vài giây */
+.quest-reward {
+  position: fixed;
+  z-index: 13;
+  left: 50%;
+  top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  transform: translateX(-50%);
+  min-width: min(260px, 88vw);
+  max-width: min(420px, 94vw);
+  padding: 10px 16px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 162, 74, 0.85);
+  background: rgba(29, 26, 22, 0.94);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.55),
+    0 0 0 3px rgba(201, 162, 74, 0.18);
+  color: var(--paper);
+  pointer-events: none;
+  animation: questRewardIn 0.35s ease-out;
+}
+.quest-reward[hidden] {
+  display: none;
+}
+.qr-title {
+  font-size: var(--fs-15);
+  font-weight: 700;
+  color: #ffe08a;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.qr-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.qr-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.qr-line i {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+}
+.qr-exp {
+  color: #9fe0ff;
+}
+.qr-coin {
+  color: #ffe08a;
+}
+.qr-note {
+  color: #cfc7b3;
+  font-weight: 400;
+}
+@keyframes questRewardIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quest-reward {
+    animation: none;
+  }
+}
+/* Điện thoại: HUD (khí huyết, bản đồ nhỏ) chiếm nửa trên màn hình; hạ bảng xuống khoảng trống giữa màn hình để không che thanh máu / bản đồ */
+@media (pointer: coarse), (max-width: 640px) {
+  .quest-reward {
+    top: 30vh;
   }
 }
 
@@ -4351,6 +4441,7 @@ body.in-limbo #btn-pickup,
 body.in-limbo #btn-talk,
 body.in-limbo #btn-portal,
 body.in-limbo #gain-feed,
+body.in-limbo #quest-reward,
 body.in-limbo #death,
 body.in-limbo #help {
   display: none !important;

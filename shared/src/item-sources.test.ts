@@ -2,6 +2,7 @@
 // (rơi quái / cửa hàng / cửa hàng tông / công thức / thưởng nhiệm vụ + nhiệm vụ tông / đổi NPC / rương bí cảnh), trừ ngoại lệ có chú thích.
 // Nguyên liệu (type "material") phải được ít nhất một công thức / nhiệm vụ / đổi đồ dùng tới (không là nguyên liệu "chết").
 // KHÔNG đổi số dữ liệu game — chỉ kiểm chứng (test chéo). Báo cáo đầy đủ ở docs/KIEM_TOAN_VAT_PHAM.md.
+import { itemSourceViolations } from "./item-sources";
 import { describe, expect, it } from "vitest";
 import {
   DUNGEONS,
@@ -15,126 +16,10 @@ import {
   TRADES,
 } from "./index";
 import { OWNER_GEAR_ITEMS } from "./owner-gear";
+import { AuditTables, NGOAI_LE, Source, consumedBy, orphans, sourcesOf } from "./item-sources";
 
-export type Source =
-  "drop" | "shop" | "recipe" | "quest" | "trade" | "dungeon" | "sect_shop" | "sect_quest";
-
-/** Các bảng dữ liệu mà kiểm toán đọc. Mặc định là bảng THẬT; ca kiểm chứng truyền bảng giả để chứng minh hướng `give` / `get` của TRADES không bị đảo. */
-export interface AuditTables {
-  drops: Record<string, ReadonlyArray<{ itemId: string }>>;
-  shops: ReadonlyArray<{ itemIds: readonly string[] }>;
-  recipes: ReadonlyArray<{
-    output: { itemId: string };
-    inputs: ReadonlyArray<{ itemId: string }>;
-  }>;
-  quests: ReadonlyArray<{
-    rewards: { items?: ReadonlyArray<{ itemId: string }> };
-    steps: ReadonlyArray<{ kind: string; itemId?: string }>;
-  }>;
-  trades: ReadonlyArray<{
-    give: ReadonlyArray<{ itemId: string }>;
-    get: { itemId: string };
-  }>;
-  dungeons: ReadonlyArray<{ reward?: { items: ReadonlyArray<{ itemId: string }> } }>;
-  sectShop: ReadonlyArray<{ itemId: string }>;
-  sectQuests: ReadonlyArray<{
-    byTier: Record<
-      string,
-      {
-        rewards: { items?: ReadonlyArray<{ itemId: string }> };
-        steps: ReadonlyArray<{ kind: string; itemId?: string }>;
-      }
-    >;
-  }>;
-}
-
-const REAL_TABLES: AuditTables = {
-  drops: DROP_TABLES,
-  shops: SHOPS,
-  recipes: RECIPES,
-  quests: QUESTS,
-  trades: TRADES,
-  dungeons: DUNGEONS,
-  sectShop: SECT_SHOP,
-  sectQuests: SECT_QUESTS,
-};
-
-/**
- * Mọi cách vật phẩm `itemId` được NGƯỜI CHƠI NHẬN (không trùng): rơi quái / mua cửa hàng / mua cửa hàng tông / chế thành phẩm / thưởng nhiệm vụ / thưởng nhiệm vụ tông / NPC đổi cho / rương bí cảnh.
- * Dùng cho kiểm tra "mọi vật phẩm có ít nhất MỘT đường vào".
- */
-export function sourcesOf(itemId: string, tables: Partial<AuditTables> = {}): Source[] {
-  const T = { ...REAL_TABLES, ...tables };
-  const out: Source[] = [];
-  // 1. Rơi từ quái (DROP_TABLES)
-  for (const table of Object.values(T.drops)) {
-    if (table.some((d) => d.itemId === itemId)) {
-      out.push("drop");
-      break;
-    }
-  }
-  // 2. Bán ở cửa hàng (SHOPS)
-  if (T.shops.some((s) => s.itemIds.includes(itemId))) out.push("shop");
-  // 3. Thành phẩm công thức (RECIPES)
-  if (T.recipes.some((r) => r.output.itemId === itemId)) out.push("recipe");
-  // 4. Thưởng nhiệm vụ (QUESTS[].rewards.items)
-  if (T.quests.some((q) => q.rewards.items?.some((r) => r.itemId === itemId))) out.push("quest");
-  // 5. NPC đổi cho (TRADES[].get): `get` = vật phẩm NGƯỜI CHƠI NHẬN (máy chủ `systems/npc.ts` `trade()` thêm `[t.get]`); `give` là thứ người chơi NỘP
-  if (T.trades.some((t) => t.get.itemId === itemId)) out.push("trade");
-  // 6. Phần thưởng bí cảnh (DUNGEONS[].reward.items)
-  if (T.dungeons.some((d) => d.reward?.items.some((r) => r.itemId === itemId))) out.push("dungeon");
-  // 7. Mua ở cửa hàng tông môn (SECT_SHOP): món chỉ có ở đây sẽ KHÔNG bị báo mồ côi khi D thay bảng thật (M8.7)
-  if (T.sectShop.some((e) => e.itemId === itemId)) out.push("sect_shop");
-  // 8. Thưởng nhiệm vụ tông (SECT_QUESTS[].byTier[*].rewards.items)
-  if (
-    T.sectQuests.some((t) =>
-      Object.values(t.byTier).some((def) => def.rewards.items?.some((r) => r.itemId === itemId)),
-    )
-  )
-    out.push("sect_quest");
-  return out;
-}
-
-/**
- * Mọi cách nguyên liệu `itemId` bị TIÊU THỤ (không trùng): làm nguyên liệu đầu vào công thức / mục thu thập nhiệm vụ / mục thu thập nhiệm vụ tông / NPC thu lấy khi đổi đồ.
- * Dùng cho kiểm tra "mọi nguyên liệu được ít nhất một nơi dùng tới" (không là nguyên liệu chết).
- */
-export function consumedBy(itemId: string, tables: Partial<AuditTables> = {}): Source[] {
-  const T = { ...REAL_TABLES, ...tables };
-  const out: Source[] = [];
-  // 1. Nguyên liệu đầu vào công thức (RECIPES[].inputs)
-  if (T.recipes.some((r) => r.inputs.some((ing) => ing.itemId === itemId))) out.push("recipe");
-  // 2. Mục thu thập nhiệm vụ (QUESTS[].steps collect)
-  if (T.quests.some((q) => q.steps.some((s) => s.kind === "collect" && s.itemId === itemId)))
-    out.push("quest");
-  // 3. NPC thu lấy khi đổi đồ (TRADES[].give): `give` = nguyên liệu NGƯỜI CHƠI NỘP (máy chủ trừ `t.give`)
-  if (T.trades.some((t) => t.give.some((g) => g.itemId === itemId))) out.push("trade");
-  // 4. Mục thu thập nhiệm vụ tông (SECT_QUESTS[].byTier[*].steps kind collect): nguyên liệu chỉ dùng cho tông sẽ KHÔNG bị báo chết
-  if (
-    T.sectQuests.some((t) =>
-      Object.values(t.byTier).some((def) =>
-        def.steps.some((s) => s.kind === "collect" && s.itemId === itemId),
-      ),
-    )
-  )
-    out.push("sect_quest");
-  return out;
-}
-
-/**
- * Vật phẩm CÓ CHỦ Ý không cần nguồn rơi / bán / chế (ngoại lệ): mỗi mục kèm lý do. Cập nhật khi phát hiện vật phẩm mồ côi hợp lệ.
- * Hiện: KHÔNG có ngoại lệ — mọi vật phẩm đều phải có ít nhất một đường vào (test đỏ nếu thiếu, mở issue dev-a để nối nguồn).
- */
-const NGOAI_LE: Readonly<Record<string, string>> = {};
-
-/** Vật phẩm MỒ CÔI: không có nguồn vào nào VÀ không nằm trong bảng ngoại lệ `ngoaiLe` (nhận tham số để ca kiểm chứng dùng bảng giả). */
-export function orphans(
-  ids: readonly string[],
-  sourcesFor: (id: string) => readonly Source[],
-  ngoaiLe: Readonly<Record<string, string>> = NGOAI_LE,
-): string[] {
-  return ids.filter((id) => sourcesFor(id).length === 0 && !Object.hasOwn(ngoaiLe, id));
-}
+// Các hàm thuần `Source` / `AuditTables` / `sourcesOf` / `consumedBy` / `NGOAI_LE` / `orphans` đã dời sang
+// `./item-sources` (dùng chung với `check:content` ở Phần 2 #1200); test này nhập lại và chỉ giữ các CA KIỂM CHỨNG.
 
 describe("kiểm toán nguồn vật phẩm (issue #751)", () => {
   const sources = Object.fromEntries(ITEMS.map((i) => [i.id, sourcesOf(i.id)]));
@@ -246,5 +131,60 @@ describe("kiểm toán nguồn vật phẩm (issue #751)", () => {
       ).toBe(true);
       expect(NGOAI_LE[id].length, `NGOAI_LE[${id}] thiếu lý do`).toBeGreaterThan(0);
     }
+  });
+});
+
+// RĂNG của `itemSourceViolations` (Phần 2 #1200): dữ liệu GIẢ, mỗi lớp lỗi một ca; xoá / làm yếu một kiểm trong hàm thì ca đó ĐỎ.
+describe("itemSourceViolations: bắt đủ 4 lớp lỗi (dữ liệu giả)", () => {
+  const empty = {
+    drops: {},
+    shops: [],
+    recipes: [],
+    quests: [],
+    trades: [],
+    dungeons: [],
+    sectShop: [],
+    sectQuests: [],
+  };
+  const clean = {
+    items: [
+      { id: "mat", type: "material" },
+      { id: "gear", type: "weapon" },
+    ],
+    tables: {
+      ...empty,
+      drops: { q: [{ itemId: "mat" }] },
+      recipes: [{ output: { itemId: "gear" }, inputs: [{ itemId: "mat" }] }],
+    },
+    ownerGear: [],
+  };
+  it("dữ liệu sạch => rỗng", () => {
+    expect(itemSourceViolations(clean)).toEqual([]);
+  });
+  it("(1) vật phẩm mồ côi bị báo", () => {
+    const v = itemSourceViolations({
+      ...clean,
+      items: [...clean.items, { id: "mocoi", type: "weapon" }],
+    });
+    expect(v.some((m) => m.includes("mồ côi: mocoi"))).toBe(true);
+  });
+  it("(2) owner-gear ngoài ITEMS bị báo", () => {
+    const v = itemSourceViolations({ ...clean, ownerGear: [{ id: "langthang" }] });
+    expect(v.some((m) => m.includes("langthang"))).toBe(true);
+  });
+  it("(3) nguyên liệu chết bị báo", () => {
+    const v = itemSourceViolations({
+      ...clean,
+      items: [...clean.items, { id: "chet", type: "material" }],
+      tables: { ...clean.tables, drops: { q: [{ itemId: "mat" }, { itemId: "chet" }] } },
+    });
+    expect(v.some((m) => m.includes("nguyên liệu chết: chet"))).toBe(true);
+  });
+  it("(4) tham chiếu trỏ vật phẩm lạ bị báo (bảng rơi)", () => {
+    const v = itemSourceViolations({
+      ...clean,
+      tables: { ...clean.tables, drops: { q: [{ itemId: "mat" }, { itemId: "rac" }] } },
+    });
+    expect(v.some((m) => m.includes("DROP_TABLES[q]") && m.includes("rac"))).toBe(true);
   });
 });

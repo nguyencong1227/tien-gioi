@@ -11,6 +11,7 @@ import {
   type GameMap,
   type InvMsg,
   type QuestsMsg,
+  type QuestRewardMsg,
   type WalletMsg,
   type DialogMsg,
   type ToastMsg,
@@ -55,6 +56,7 @@ export function makeWorld(map: GameMap = getMap(DEFAULT_MAP_ID)!, hub?: Hub) {
   const chats: { from: string; text: string; titleId?: string }[] = [];
   const invs: { sid: string; msg: InvMsg }[] = [];
   const quests: { sid: string; msg: QuestsMsg }[] = [];
+  const questRewards: { sid: string; msg: QuestRewardMsg }[] = [];
   const skillMsgs: { sid: string; msg: SkillsMsg }[] = [];
   const statusMsgs: { sid: string; msg: StatusMsg }[] = [];
   const wallets: { sid: string; msg: WalletMsg }[] = [];
@@ -97,6 +99,7 @@ export function makeWorld(map: GameMap = getMap(DEFAULT_MAP_ID)!, hub?: Hub) {
       toast: (sid, msg) => toasts.push({ sid, msg }),
       inv: (sid, msg) => invs.push({ sid, msg }),
       quests: (sid, msg) => quests.push({ sid, msg }),
+      questReward: (sid, msg) => questRewards.push({ sid, msg }),
       skills: (sid, msg) => skillMsgs.push({ sid, msg }),
       status: (sid, msg) => statusMsgs.push({ sid, msg }),
       wallet: (sid, msg) => wallets.push({ sid, msg }),
@@ -136,6 +139,7 @@ export function makeWorld(map: GameMap = getMap(DEFAULT_MAP_ID)!, hub?: Hub) {
     chats,
     invs,
     quests,
+    questRewards,
     skillMsgs,
     statusMsgs,
     wallets,

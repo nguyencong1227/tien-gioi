@@ -10,7 +10,7 @@ Theo quyết định chính thức của Người Dùng (`~/TT/orchestra/QUYET_D
 - **Số phiên bản:** **`v0.5.3`** (tuân thủ quy tắc 10.1 của `docs/TRIEN_KHAI.md` do `PROTOCOL_VERSION` giữ nguyên `6`).
 - **Điểm cắt phát hành:** Cắt từ **đầu nhánh `main`** (bao gồm #1293, #1299 +4 chiêu Kim/Thổ). **Thời điểm cắt:** Cắt **SAU KHI** bộ kiểm thử định kỳ hàng đêm gồm nightly e2e (03:00 giờ VN) và bench (04:00 giờ VN) đạt kết quả **XANH trên ĐÚNG đầu commit đó**; nếu đỏ thì sửa/chạy lại, tuyệt đối không cắt từ đầu commit đỏ.
 - **Bản chất gói phát hành:** Gói này **KHÔNG BẬT MẶC ĐỊNH BẤT KỲ TÍNH NĂNG GAMEPLAY MỚI NÀO**:
-  - `AMBUSH`: **CHƯA BẬT** ở bản này (`AMBUSH=off`). Nếu sau này bật, giữ nguyên mặc định mã nguồn `AMBUSH_MIN_POTIONS=0` (mục 64: người không có đan VẪN bị chặn, hộp thoại cảnh báo rõ "Ngươi không mang Hồi Huyết Đan — nên bỏ chạy", kẻ cầm đầu mạnh cảnh báo khi < 2 đan; KHÔNG đặt 2).
+  - `AMBUSH`: **CHƯA BẬT** ở bản này (`AMBUSH=off`). Nếu sau này bật, giữ nguyên mặc định mã nguồn `AMBUSH_MIN_POTIONS=0` (mục 64: người không có đan VẪN bị chặn, hộp thoại có dòng nhắc túi đan; quyết định ví dụ chữ "Ngươi không mang Hồi Huyết Đan — nên bỏ chạy", còn chữ THẬT của client hôm nay là "Túi không có đan hồi huyết: nên mang ít nhất 2." (`client/src/ambush-view.ts` `ambushPotionNote`), hiện cho MỌI mức khi túi < 2 đan, không riêng kẻ cầm đầu; KHÔNG đặt 2).
   - `WORLD_BOSS`: **CHƯA BẬT** ở bản này (`WORLD_BOSS=off`). Nếu sau này bật, quy tắc giữ nguyên: bị hạ khi đánh trùm thế giới = CHẾT THẬT (mất kiếp) như bản đồ thường (mục 64).
   - `ASSETS_PRIVATE_DIR`: TẮT (chưa nạp gói tài nguyên riêng).
   - Không thêm cảnh giới hay quái vật mới; `PROTOCOL_VERSION` giữ nguyên `6`.
@@ -65,7 +65,7 @@ Các số liệu được đo trực tiếp từ git (ghi kèm lệnh kiểm tra
    - **Chuyển đổi hệ thống bản đồ sang Tiled (S1 / S2 / S3a / S5):** Bốn bản đồ thường (`lac_ha`, `hac_phong`, `am_suong`, `han_van`) nay là tệp JSON tĩnh do máy chủ đọc và client nạp qua chunk `map-files-*.js`, khớp từng byte với bản đồ sinh theo seed cũ (0 spawnZone). `DEFAULT_MAP` chuyển sang đánh dấu `@deprecated` tại `shared/src/map.ts:776`; lưới tiếp cận va chạm `walk-reach` được dựng độc lập lúc tạo phòng.
    - **Cơ chế phục hồi vị trí lưu rơi vào ô vật cản (#1213, #1220):** Nếu vị trí lưu của nhân vật rơi vào ô bị chặn (ví dụ do chỉnh sửa địa hình bản đồ), máy chủ tự động đặt nhân vật vào vị trí di chuyển hợp lệ gần nhất trong bán kính an toàn thay vì kéo giật lùi về điểm sinh ngẫu nhiên trong khu an toàn / trấn của chính bản đồ đó.
 3. **Chỉ xuất hiện khi bật cờ tính năng (Bản chạy thật đang TẮT nên người chơi chưa thấy):**
-   - **Cảnh báo túi đan trong hộp thoại Chặn đường (CHỈ KHI `AMBUSH=on`):** Hộp thoại chủ động nhắc: *Túi không có đan hồi huyết: nên bỏ chạy.* hoặc cảnh báo khi mang dưới 2 đan đối với kẻ cầm đầu mạnh.
+   - **Cảnh báo túi đan trong hộp thoại Chặn đường (CHỈ KHI `AMBUSH=on`):** Hộp thoại có dòng nhắc dưới nút Chiến, chữ thật: *Túi không có đan hồi huyết: nên mang ít nhất 2.* (hoặc *Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.*), hiện cho MỌI mức (thường, tinh anh, cầm đầu) khi túi có dưới 2 đan hồi huyết; chỉ là lời nhắc, không khoá nút Chiến.
    - **Khung ghi công tài nguyên riêng (CHỈ KHI CÓ GÓI):** Nằm trong mục "Giới thiệu và ghi công" của bảng Cài đặt (`client/src/private-credits.ts`), tự động ẩn khi máy chủ chưa cấu hình gói tài nguyên riêng.
 
 ---
@@ -86,7 +86,7 @@ Các số liệu được đo trực tiếp từ git (ghi kèm lệnh kiểm tra
    - Bản chạy thật đã bật theo quyết định M3 mục 57 khoản 2 (cấp bù Duyên cho người chơi cũ). Giữ nguyên cấu hình hiện tại trong `.env.production`.
 4. **Gặp Chặn Đường (`AMBUSH` & `AMBUSH_MIN_POTIONS`):**
    - **Mặc định:** TẮT (`AMBUSH=off`). Người dùng đã quyết định: **CHƯA BẬT** ở bản `v0.5.3` này (mục 65).
-   - Quyết định mục 64 đã chốt: Nếu sau này bật `AMBUSH=on`, giữ nguyên mặc định mã nguồn `AMBUSH_MIN_POTIONS=0`, người không có đan vẫn bị chặn và hộp thoại cảnh báo "nên bỏ chạy" (KHÔNG đặt biến môi trường này thành 2).
+   - Quyết định mục 64 đã chốt: Nếu sau này bật `AMBUSH=on`, giữ nguyên mặc định mã nguồn `AMBUSH_MIN_POTIONS=0`, người không có đan vẫn bị chặn và hộp thoại có dòng nhắc túi đan "nên mang ít nhất 2" (chữ ví dụ "nên bỏ chạy" ở mục 64 chưa được áp vào client) (KHÔNG đặt biến môi trường này thành 2).
 5. **Cập nhật mẫu Docker Compose (`deploy/docker-compose.prod.yml`):**
    - Tệp mẫu compose có thêm cấu hình:
      - Biến môi trường: `ASSETS_PRIVATE_DIR=/assets-private`

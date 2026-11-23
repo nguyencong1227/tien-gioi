@@ -44,8 +44,10 @@ export function applyStats(p: Player, heal: boolean, mult?: StatMult) {
  * đan dược (phần trăm thanh) và thưởng nhiệm vụ (số cố định) không nhân.
  * `PlayerCtrl.testExpMult` (hệ số THỬ NGHIỆM của `TEST_EXP_MULT`, chỉ khi đạo hiệu nằm trong cấu hình, QUYET_DINH_M3 mục 34) nhân SAU CÙNG, lên MỌI
  * nguồn đi qua đây (hạ quái, đả tọa, đan, nhiệm vụ, bí cảnh): hệ số ngoài 1-10 (không bao giờ đặt ra, nhưng đây là chỗ tiền tệ tu vi) bị coi là 1.
+ * Trả về số tu vi THẬT đã cộng (sau mọi hệ số, đã trừ phần bị cắt khi chạm đỉnh / bậc cuối chờ Đột phá): bảng thưởng nhiệm vụ (mục 66) cần đúng số này,
+ * không tự nhân lại hệ số ở chỗ khác (hai nơi nhân dễ lệch). Bước lên bậc nhỏ không làm số này đổi.
  */
-export function gainExp(w: World, sid: string, p: Player, amount: number, scale = 1) {
+export function gainExp(w: World, sid: string, p: Player, amount: number, scale = 1): number {
   amount *= scale;
   // Buff tông môn (M8.3b, mục 12.5): nhân SAU `scale`, TRƯỚC hệ số thử nghiệm; hệ số ngoài khoảng (1, `SECT_BUFF_EXP_MAX`] bị coi là 1 (hàng rào thứ hai sau `sectBuffOf`)
   const sb = w.ctrl.get(sid)?.sectBuff?.exp;
@@ -53,12 +55,15 @@ export function gainExp(w: World, sid: string, p: Player, amount: number, scale 
   const test = w.ctrl.get(sid)?.testExpMult;
   if (test !== undefined && test > 1 && test <= 10) amount *= test;
   if (isPeak(p.realm, p.tier)) {
+    const before = p.exp;
     p.exp = Math.min(p.expMax, p.exp + amount);
-    return;
+    return Math.max(0, p.exp - before);
   }
   p.exp += amount;
+  let lost = 0; // phần vượt đầy ở bậc cuối (chờ Đột phá) bị cắt, không tính là đã cộng
   while (p.exp >= p.expMax) {
     if (isLastTier(p.realm, p.tier)) {
+      lost = p.exp - p.expMax;
       p.exp = p.expMax;
       break;
     } // cần Đột phá
@@ -69,6 +74,7 @@ export function gainExp(w: World, sid: string, p: Player, amount: number, scale 
     w.events.fx({ kind: "levelup", by: sid, x: p.x, y: p.y, major: false });
     refreshQuests(w, sid); // bước "reachRealm"
   }
+  return Math.max(0, amount - lost);
 }
 
 export function setMeditating(w: World, sid: string, on: boolean) {

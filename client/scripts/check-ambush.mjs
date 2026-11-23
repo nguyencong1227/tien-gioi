@@ -498,8 +498,8 @@ try {
   const fightDis0 = (await state()).fight.dis;
   check(fightDis0 === "false", `nút Chiến bật khi túi không đan (${fightDis0})`);
   check(
-    p0.shown && p0.cls && p0.text === "Túi không có đan hồi huyết: nên mang ít nhất 2.",
-    `túi không đan: dòng nhắc đan hiện, nhãn 'hoặc bỏ chạy' nhường chỗ ('${p0.text}')`,
+    p0.shown && p0.cls && p0.text === "Ngươi không mang Hồi Huyết Đan: nên bỏ chạy.",
+    `túi không đan (kẻ thường, trả được giá): dòng nhắc NÊN BỎ CHẠY (mục 64), nhãn 'hoặc bỏ chạy' nhường chỗ ('${p0.text}')`,
   );
   await setPotions(1);
   await sleep(450);
@@ -530,6 +530,40 @@ try {
   check(
     p4.shown && p4.text === "Túi chỉ còn 1 đan hồi huyết: nên mang ít nhất 2.",
     `túi 1 Thượng Hồi Huyết Đan: nhắc 'chỉ còn 1' ('${p4.text}')`,
+  );
+  // kẻ CẦM ĐẦU (mục 64): dưới 2 đan nhấn mạnh rồi cũng "nên bỏ chạy"; cùng `id` nên là cập nhật hộp thoại đang mở
+  const leaderFoe = { name: "Đạo Tặc Đầu Lĩnh", tier: "leader", count: 1 };
+  await setPotions(0);
+  await offer({ foe: leaderFoe });
+  await sleep(450);
+  const q0 = await potion();
+  check(
+    q0.shown && q0.text === "Cầm đầu mạnh, không có đan hồi huyết: nên bỏ chạy.",
+    `kẻ cầm đầu, túi không đan: nhấn mạnh + nên bỏ chạy ('${q0.text}')`,
+  );
+  await setPotions(1);
+  await sleep(450);
+  const q1 = await potion();
+  check(
+    q1.shown && q1.text === "Cầm đầu mạnh, còn 1 đan hồi huyết: nên bỏ chạy.",
+    `kẻ cầm đầu, túi còn 1 đan: nên bỏ chạy ('${q1.text}')`,
+  );
+  await setPotions(2);
+  await sleep(450);
+  const q2 = await potion();
+  check(!q2.shown && q2.text === "", `kẻ cầm đầu, túi đủ 2 đan: KHÔNG nhắc ('${q2.text}')`);
+  // không trả nổi giá bỏ chạy nào (thiếu Linh thạch, thanh tu vi trống): "nên bỏ chạy" là lời khuyên không làm được -> chỉ nhắc mang đan
+  await setPotions(0);
+  await offer({ foe: leaderFoe, price: { exp: 0, coin: { price: 30, enough: false } } });
+  await sleep(450);
+  const q3 = await potion();
+  check(
+    q3.shown && q3.text === "Túi không có đan hồi huyết: nên mang ít nhất 2.",
+    `không trả nổi giá nào: KHÔNG khuyên bỏ chạy ('${q3.text}')`,
+  );
+  check(
+    (await state()).fight.dis === "false",
+    "nút Chiến vẫn BẬT khi dòng nhắc đổi theo mức kẻ chặn (chỉ là lời nhắc)",
   );
   await evalJs(`window.__ui.onAmbushEnd(${JSON.stringify({ result: "canceled" })}); 1`);
   await setPotions(0);

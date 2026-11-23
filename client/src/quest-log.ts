@@ -1,6 +1,7 @@
 import {
   ITEM_BY_ID,
   MAIN_QUEST_START,
+  MAP_BY_ID,
   NPC_BY_ID,
   QUESTS,
   QUEST_BY_ID,
@@ -8,8 +9,13 @@ import {
   SECT_TERMS,
   isSectQuest,
   questDefAny,
+  questReady,
+  type DialogAction,
+  type QuestCtx,
+  type QuestProgress,
   type QuestReward,
 } from "@tien-gioi/shared";
+import { npcMapId } from "./quest-nav";
 
 /**
  * Tab "Đã hoàn thành" của Sổ nhiệm vụ khi chuỗi dài (M6 #409: ~20 nhiệm vụ chính tuyến + nhiệm vụ lặp). Trước đây mỗi nhiệm vụ xong là một
@@ -86,14 +92,98 @@ export function questCardSubtitle(def: { id: string; giver: string; daily?: bool
   return `${npc?.name ?? def.giver} (${QUEST_KIND_LABEL[questKind(def)]})`;
 }
 
-/** Dòng trạng thái khi nhiệm vụ đã xong mọi bước: NPC thường thì tới gặp người giao; nhiệm vụ tông môn thì mở bảng Tông môn, tab Nội vụ để trả (không có NPC để đi tới). */
+/**
+ * Chữ "ĐÃ ĐỦ" khi nhiệm vụ xong mọi bước (QUYET_DINH_M3 mục 66): người chơi tưởng "làm xong mục tiêu" là xong nên PHẢI nói rõ còn việc phải làm (quay về trả) và đi đâu.
+ * NPC thường: "ĐÃ ĐỦ — về gặp <NPC> ở <bản đồ> để trả nhiệm vụ" (bản đồ lạ / không rõ thì bỏ phần "ở ..."; NPC lạ thì "NPC"); nhiệm vụ tông môn trả ở bảng Tông môn,
+ * tab Nội vụ (không có NPC để đi tới).
+ */
 export function questReadyText(def: { giver: string }): string {
+  return `ĐÃ ĐỦ — ${questReadyTail(def)}`;
+}
+
+/** Phần "việc phải làm" dùng chung cho `questReadyText` và `questReadyToast`: "về gặp <NPC> ở <bản đồ> để trả nhiệm vụ" / "mở bảng ... để trả nhiệm vụ". */
+function questReadyTail(def: { giver: string }): string {
   if (def.giver === SECT_QUEST_GIVER)
-    return `Hoàn thành · Mở bảng Tông môn > ${SECT_TERMS.hall} để trả nhiệm vụ`;
+    return `mở bảng Tông môn > ${SECT_TERMS.hall} để trả nhiệm vụ`;
   const npc = Object.prototype.hasOwnProperty.call(NPC_BY_ID, def.giver)
     ? NPC_BY_ID[def.giver]
     : undefined;
-  return `Hoàn thành · Gặp ${npc?.name ?? "NPC"} trả nhiệm vụ`;
+  const mapId = npcMapId(def.giver);
+  const where =
+    mapId !== undefined && Object.prototype.hasOwnProperty.call(MAP_BY_ID, mapId)
+      ? ` ở ${MAP_BY_ID[mapId].name}`
+      : "";
+  return `về gặp ${npc?.name ?? "NPC"}${where} để trả nhiệm vụ`;
+}
+
+/** Id các nhiệm vụ ĐÃ ĐỦ (trả được ngay) trong danh sách đang làm; id lạ / độc bị bỏ. */
+export function readyQuestIds(active: readonly QuestProgress[], ctx: QuestCtx): Set<string> {
+  const ids = new Set<string>();
+  for (const a of active) {
+    const def = questDefAny(a.id);
+    if (def && questReady(def, a, ctx)) ids.add(def.id);
+  }
+  return ids;
+}
+
+/**
+ * Nhiệm vụ VỪA đủ so với lần xem trước (thông báo MỘT lần, mục 66): `prev` là tập nhiệm vụ đã đủ ở lần trước; `null` = chưa có ảnh chụp nào (vừa vào phòng:
+ * nhiệm vụ đã đủ từ trước KHÔNG được báo lại mỗi lần đăng nhập / qua cổng). Trả `notify` (id vừa đủ, theo thứ tự sổ) và `next` (tập mới để lần sau so).
+ * Nhiệm vụ đã đủ mà vẫn đủ thì không báo lại; đủ -> thiếu (lỡ vứt đồ) -> đủ lại thì báo lại.
+ */
+export function newlyReadyQuests(
+  prev: ReadonlySet<string> | null,
+  active: readonly QuestProgress[],
+  ctx: QuestCtx,
+): { notify: string[]; next: Set<string> } {
+  const next = readyQuestIds(active, ctx);
+  if (prev === null) return { notify: [], next };
+  return { notify: [...next].filter((id) => !prev.has(id)), next };
+}
+
+/**
+ * Người theo dõi "nhiệm vụ vừa đủ" của MỘT phiên chơi (mục 66). Chưa có mốc cho tới khi đã nhận CẢ túi lẫn sổ nhiệm vụ lần đầu (server gửi túi rồi sổ ngay khi vào phòng;
+ * điều kiện "thu thập" tính theo túi, nên chỉ có sổ hoặc chỉ có túi thì tính "đã đủ" sai): lần đầu chỉ lập mốc, nhiệm vụ đã đủ từ trước KHÔNG báo lại mỗi lần
+ * đăng nhập / qua cổng. Sau đó mỗi lần `update` trả các id vừa đủ, mỗi id một lần.
+ */
+export class QuestReadyWatcher {
+  private snap: Set<string> | null = null;
+  private gotInv = false;
+  private gotQuests = false;
+
+  /** Đã nhận một tin túi. */
+  noteInv(): void {
+    this.gotInv = true;
+  }
+
+  /** Đã nhận một tin sổ nhiệm vụ. */
+  noteQuests(): void {
+    this.gotQuests = true;
+  }
+
+  /** Gọi sau mỗi lần túi hoặc sổ đổi (đã `note...` tương ứng): id nhiệm vụ cần báo ngay bây giờ. */
+  update(active: readonly QuestProgress[], ctx: QuestCtx): string[] {
+    if (!this.gotInv || !this.gotQuests) return [];
+    const r = newlyReadyQuests(this.snap, active, ctx);
+    this.snap = r.next;
+    return r.notify;
+  }
+}
+
+/** Chữ thông báo MỘT lần khi nhiệm vụ vừa đủ: "ĐÃ ĐỦ: <tên nhiệm vụ> — về gặp <NPC> ở <bản đồ> để trả". */
+export function questReadyToast(def: { title: string; giver: string }): string {
+  return `ĐÃ ĐỦ: ${def.title} — ${questReadyTail(def)}`;
+}
+
+/**
+ * Phần thưởng để XEM TRƯỚC ở hộp thoại NPC (mục 66): lựa chọn nhận / trả nhiệm vụ mang `questId`; lựa chọn khác, id lạ / độc
+ * (`questDefAny` đã chặn `constructor`, `__proto__`) hoặc nhiệm vụ không thưởng gì thì `undefined`. Đây là thưởng GỐC trong dữ liệu: tu vi thật khi trả có thể nhân hệ số
+ * (tông môn / thử nghiệm), nên chữ xem trước ghi rõ "gốc" ở phía hiển thị, còn số thật do bảng thưởng sau khi trả cho biết.
+ */
+export function dialogRewardOf(action: DialogAction): QuestReward | undefined {
+  if (action.kind !== "accept" && action.kind !== "turnIn") return undefined;
+  const r = questDefAny(action.questId)?.rewards;
+  return r && rewardParts(r).length > 0 ? r : undefined;
 }
 
 /** Vị trí của nhiệm vụ trong `QUESTS` = thứ tự chuỗi chính (nhiệm vụ nối nhau theo thứ tự khai báo). */

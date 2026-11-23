@@ -46,7 +46,6 @@ import {
   getMap,
   roomNameOf,
   wrongMapMessage,
-  REALMS,
   addCoin,
   realmLabel,
   type InputMsg,
@@ -97,6 +96,7 @@ import {
   sanitizeLifeId,
   sanitizeLimbo,
   sanitizeOrigin,
+  sanitizeProgress,
   type SavedPlayer,
 } from "../store";
 import { defaultSectStore } from "../sect-store";
@@ -324,6 +324,7 @@ export class WorldRoom extends Room<WorldState> {
         toast: (sid, msg) => this.sendTo(sid, "toast", msg),
         inv: (sid, msg) => this.sendTo(sid, "inv", msg),
         quests: (sid, msg) => this.sendTo(sid, "quests", msg),
+        questReward: (sid, msg) => this.sendTo(sid, "questReward", msg),
         skills: (sid, msg) => this.sendTo(sid, SKILL_MSG.skills, msg),
         status: (sid, msg) => this.sendTo(sid, SKILL_MSG.status, msg),
         dialog: (sid, msg) => this.sendTo(sid, "dialog", msg),
@@ -734,8 +735,7 @@ export class WorldRoom extends Room<WorldState> {
    * Người chơi có từ trước khi có luân hồi được di chuyển lặng lẽ ở đây, vào game lần đầu.
    */
   private soulOf(save: SavedPlayer, identity: Identity): Promise<Soul> {
-    const realm = Math.min(save.realm, REALMS.length - 1);
-    const tier = Math.min(save.tier, REALMS[realm].tiers.length - 1);
+    const { realm, tier } = sanitizeProgress(save);
     const store = WorldRoom.souls ?? defaultSoulStore();
     return store.create(identity.soulKey, (s) => ({
       ...s,
@@ -751,9 +751,10 @@ export class WorldRoom extends Room<WorldState> {
     const { save, identity, soul } = auth;
     const p = new Player();
     p.name = save.name;
-    p.realm = Math.min(save.realm, REALMS.length - 1);
-    p.tier = Math.min(save.tier, REALMS[p.realm].tiers.length - 1);
-    p.exp = save.exp;
+    const progress = sanitizeProgress(save); // không tin file: realm / tier / exp thiếu, NaN, âm đều về số hợp lệ (trước đây ném TypeError)
+    p.realm = progress.realm;
+    p.tier = progress.tier;
+    p.exp = progress.exp;
     // Phòng bí cảnh: luôn xuất hiện ở cổng vào (toạ độ trong file là của Lạc Hà, vô nghĩa ở đây)
     const inRun = this.world.runId !== null || this.world.arena !== null;
     const spot = inRun ? safeSpot(this.world.map) : safeSpot(this.world.map, save.x, save.y);
@@ -763,7 +764,7 @@ export class WorldRoom extends Room<WorldState> {
     p.x = spot.x;
     p.y = spot.y;
     syncPublicPos(p); // người khác thấy ngay chỗ vào, không phải (0, 0)
-    setEquipment(p, sanitizeEquipment(save.equipment, save.realm)); // trước applyStats: chỉ số gồm trang bị (ô chưa mở ở cảnh giới này bị bỏ)
+    setEquipment(p, sanitizeEquipment(save.equipment, p.realm)); // trước applyStats: chỉ số gồm trang bị (ô chưa mở ở cảnh giới này bị bỏ)
     const origin = sanitizeOrigin(save.origin);
     const mult = originMult(origin);
     applyStats(p, true, mult);
