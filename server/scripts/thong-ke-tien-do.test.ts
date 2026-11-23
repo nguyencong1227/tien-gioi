@@ -298,14 +298,15 @@ describe("thong-ke-tien-do: đọc tệp sao lưu .sql.gz (COPY characters)", ()
 describe("thong-ke-tien-do: mô hình tối ưu simulate & buildProgressReport", () => {
   it("getOptimalModel trả về mốc thời gian và ngưỡng cân bằng chuẩn xác", () => {
     const model = getOptimalModel();
-    expect(model.preKdFinishHours).toBeCloseTo(2.86, 1);
-    // #756: việc phụ Âm Sương Trạch Kim Đan +1500 exp (trong ngân sách 2,5%) rút ngắn ~4 phút
-    expect(model.kdHauKyReachHours).toBeCloseTo(5.97, 1);
-    expect(model.kdFinishHours).toBeCloseTo(8.21, 1);
-    // Ngưỡng Kim Đan Hậu kỳ = preKd + 0.7 * (kdHauKyReach - preKd) ~ 5.03h
-    expect(model.kdHauKyThresholdHours).toBeCloseTo(5.03, 1);
-    // Ngưỡng hết Kim Đan = preKd + 4.0 = ~6.84h
-    expect(model.postKdThresholdHours).toBeCloseTo(6.86, 1);
+    // #1333 bước 2 (mục 66.4): thưởng nhiệm vụ một lần nâng lên sàn 5 % / 2 % thanh bậc nhận rút ngắn Trúc Cơ ~2,4 phút, Kim Đan Hậu kỳ ~4 %, hết Kim Đan ~4 %
+    // (trước: 2,86 / 5,97 / 8,21 giờ, ngưỡng 5,03 / 6,86 giờ; #756 từng rút ~4 phút bằng việc phụ Âm Sương +1500 exp)
+    expect(model.preKdFinishHours).toBeCloseTo(2.82, 1);
+    expect(model.kdHauKyReachHours).toBeCloseTo(5.73, 1);
+    expect(model.kdFinishHours).toBeCloseTo(7.87, 1);
+    // Ngưỡng Kim Đan Hậu kỳ = preKd + 0.7 * (kdHauKyReach - preKd) ~ 4.86h
+    expect(model.kdHauKyThresholdHours).toBeCloseTo(4.86, 1);
+    // Ngưỡng hết Kim Đan = preKd + 4.0 = ~6.82h
+    expect(model.postKdThresholdHours).toBeCloseTo(6.82, 1);
   });
 
   it("cảnh báo QUÁ NHANH khi trung vị Kim Đan Hậu kỳ < ngưỡng ~5.03h", () => {

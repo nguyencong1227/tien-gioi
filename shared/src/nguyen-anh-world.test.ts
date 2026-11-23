@@ -360,12 +360,13 @@ describe("Nguyên Anh: chuỗi nhiệm vụ (M7.5c bước 2)", () => {
     expect(prev).toBe(stepOf(4, 2));
   });
 
-  it("thưởng tu vi chuỗi chính Nguyên Anh <= 5 % tổng thanh ba bậc (không biến nhiệm vụ thành đường tắt); nhiệm vụ lặp ~1,4 % thanh mỗi ngày như Kim Đan", () => {
+  it("thưởng tu vi chuỗi chính Nguyên Anh 8-10 % tổng thanh ba bậc (sàn 5 % mỗi nhiệm vụ, #1333; không biến nhiệm vụ thành đường tắt); nhiệm vụ lặp ~1,4 % thanh mỗi ngày như Kim Đan", () => {
     const bars = [0, 1, 2].reduce((a, t) => a + expToNext(4, t), 0);
     let sum = 0;
     for (const id of CHAIN.slice(1)) sum += QUEST_BY_ID[id].rewards.exp ?? 0;
-    expect(sum / bars).toBeGreaterThan(0.03);
-    expect(sum / bars).toBeLessThanOrEqual(0.05);
+    // #1333 bước 2: sàn 5 % thanh bậc nhận cho từng việc chính nâng chuỗi từ 4,9 % lên ~9,5 %; trần chung 10 % (kim-dan-world.test.ts, QUEST_EXP_CAP_MAIN).
+    expect(sum / bars).toBeGreaterThan(0.08);
+    expect(sum / bars).toBeLessThanOrEqual(0.1);
     const daily = DAILY.reduce((a, id) => a + (QUEST_BY_ID[id].rewards.exp ?? 0), 0);
     expect(daily / bars).toBeLessThan(0.02);
     expect(daily / bars).toBeGreaterThan(0.01);

@@ -1,6 +1,6 @@
 // Ba việc phụ ở Vọng Sương Trạm (Kim Đan, D8 #756): mỗi việc một NPC (lai_buon_suong / tho_ren_suong / tram_truong), một tầng Kim Đan
 // (0/1/2), steps chỉ kill/collect trỏ tới quái/vật phẩm CÓ THẬT và THẬT SỰ THU ĐƯỢC ở Âm Sương (Sương Hồ / Thạch Quy / Độc Thiềm;
-// sương mao / quy giáp / độc nang), thưởng exp nhỏ (cả ba <= ~1% tổng thanh Kim Đan, tổng việc phụ <= 2,5%, xem kim-dan-world.test.ts)
+// sương mao / quy giáp / độc nang), thưởng exp nhỏ (cả ba <= 2,5% tổng thanh Kim Đan, tổng việc phụ <= 4%, xem kim-dan-world.test.ts)
 // và KHÔNG QUÁ MỘT kinh quyển rarity <= 2 mỗi việc (rarity 3 chỉ rơi từ quái). Test này là chốt chặn: đột biến dữ liệu phải làm đỏ >= 5 nó.
 import { describe, expect, it } from "vitest";
 import {
@@ -28,7 +28,7 @@ const AM_SUONG_GIVERS = ["lai_buon_suong", "tho_ren_suong", "tram_truong"];
 /**
  * Việc phụ Âm Sương #756: ba việc thu nguyên liệu do lái buôn / thợ rèn / trạm trưởng Vọng Sương giao, thuộc Kim Đan (realm 3),
  * không lặp, không thuộc chuỗi chính, mô tả mở đầu bằng tiền tố việc phụ. `giao_hoan` (trùm Hắc Giao theo đội, cũng tram_truong +
- * realm 3 + tiền tố "Việc phụ") KHÔNG tính ở đây — là việc phụ có sẵn, do kim-dan-world.test.ts giữ tổng exp việc phụ Kim Đan <= 2,5%.
+ * realm 3 + tiền tố "Việc phụ") KHÔNG tính ở đây — là việc phụ có sẵn, do kim-dan-world.test.ts giữ tổng exp việc phụ Kim Đan <= 4%.
  */
 const AM_SUONG_SIDE = QUESTS.filter(
   (q) =>
@@ -109,16 +109,16 @@ describe("việc phụ Âm Sương Trạch (Kim Đan, D8 #756)", () => {
       }
   });
 
-  it("thưởng exp NHỎ: tổng CẢ BA việc <= ~1% tổng thanh Kim Đan (không biến việc phụ thành đường tắt; giữ tổng việc phụ Kim Đan <= 2,5%)", () => {
+  it("thưởng exp NHỎ: tổng CẢ BA việc <= 2,5% tổng thanh Kim Đan (không biến việc phụ thành đường tắt; tổng việc phụ Kim Đan gồm cả giao_hoan <= 4%)", () => {
     const total = AM_SUONG_SIDE.reduce((a, q) => a + (q.rewards.exp ?? 0), 0);
     expect(total, "tổng exp việc phụ Âm Sương").toBeGreaterThan(0);
     expect(
       AM_SUONG_SIDE.every((q) => (q.rewards.exp ?? 0) > 0),
       "mọi việc phải có exp",
     ).toBe(true);
-    // Tổng thanh Kim Đan 3 tầng (0-2); trần ~1% cho ba việc mới (kim-dan-world.test.ts giữ tổng việc phụ <= 2,5% gồm cả giao_hoan).
+    // Tổng thanh Kim Đan 3 tầng (0-2); trần 2,5% cho ba việc này (#1333 bước 2 nâng chúng lên sàn 2% bậc nhận: 1000 + 1200 + 1300 = 2,10%; kim-dan-world.test.ts giữ tổng việc phụ <= 4% gồm cả giao_hoan).
     const bars = [0, 1, 2].reduce((a, t) => a + expToNext(3, t), 0);
-    expect(total / bars, `tổng exp việc phụ ${total}/${bars} vượt ~1%`).toBeLessThanOrEqual(0.01);
+    expect(total / bars, `tổng exp việc phụ ${total}/${bars} vượt 2,5%`).toBeLessThanOrEqual(0.025);
   });
 
   it("thưởng KHÔNG QUÁ MỘT kinh quyển rarity <= 2 mỗi nhiệm vụ; CHỈ rarity <= 2 (rarity 3 chỉ rơi từ quái); quyển dạy chiêu CÓ THẬT và học được ở tầng nhận; mỗi quyển KHÔNG quá một việc phụ Âm Sương", () => {

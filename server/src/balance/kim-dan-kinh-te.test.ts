@@ -73,9 +73,8 @@ describe("kinh tế Kim Đan: chi (phí rèn) cân với thu nhập", () => {
     expect(eco.tiers[0].cumulative).toBeCloseTo(eco.preKimDan + eco.tiers[0].earned, 6);
   });
 
-  it("cày nguyên liệu không chiếm quá ~3/4 thời gian của bậc (mục 30: nguyên liệu rơi theo con mà con chết chậm 1,5 lần nên 55 / 66 / 73 %, trước đó <= 60%)", () => {
-    for (const t of eco.tiers)
-      expect(materialShare(eco, t.tier), t.label).toBeLessThanOrEqual(0.75);
+  it("cày nguyên liệu không chiếm quá ~4/5 thời gian của bậc (mục 30: nguyên liệu rơi theo con mà con chết chậm 1,5 lần nên 55 / 66 / 73 %, trước đó <= 60%; #1333: sàn thưởng nhiệm vụ rút thời gian bậc nên phần cày nguyên liệu nhích lên Hậu kỳ 76,6 %)", () => {
+    for (const t of eco.tiers) expect(materialShare(eco, t.tier), t.label).toBeLessThanOrEqual(0.8);
   });
 
   it("săn trùm theo đội kiếm ít Linh thạch mỗi người hơn săn solo (tiền rơi chia đội, đồ một chủ); bộ III mới cần trùm", () => {

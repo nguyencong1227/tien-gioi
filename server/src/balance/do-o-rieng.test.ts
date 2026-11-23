@@ -74,8 +74,8 @@ describe("độ nhạy: có / không đồ ô riêng", () => {
     expect(off.docTuocDanger - on.docTuocDanger).toBeLessThan(10);
   });
 
-  it("cấu hình hiện hành (tắt) vẫn trong mục tiêu: nhịp Kim Đan 4-7 giờ, Nguyên Anh 4-9 giờ (mục 30: tu vi x2 + máu x1,5, trước đó 5-7 và 6-9), Trúc Cơ ~3 giờ", () => {
-    expect(off.kimDanHours).toBeGreaterThanOrEqual(4);
+  it("cấu hình hiện hành (tắt) vẫn trong mục tiêu: nhịp Kim Đan 3,8-7 giờ (#1333: sàn thưởng nhiệm vụ rút còn ~3,9), Nguyên Anh 4-9 giờ (mục 30: tu vi x2 + máu x1,5, trước đó 5-7 và 6-9), Trúc Cơ ~3 giờ", () => {
+    expect(off.kimDanHours).toBeGreaterThanOrEqual(3.8);
     expect(off.kimDanHours).toBeLessThanOrEqual(7);
     expect(off.nguyenAnhHours).toBeGreaterThanOrEqual(4);
     expect(off.nguyenAnhHours).toBeLessThanOrEqual(9);
