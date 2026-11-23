@@ -65,7 +65,7 @@ jobs:
       - name: Chạy kịch bản E2E Shard ${{ matrix.shard }}/2 (e2e:all)
         id: e2e
         # Ghi chú về GPU:
-        # Cả 32 kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
+        # Toàn bộ các kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
         # Khi phát hiện biến môi trường CI=true (có sẵn trên GitHub Actions), hệ thống tự động
         # thêm cờ --disable-gpu và lùi về phần mềm rasterization SwiftShader của Chrome.
         # Do đó tất cả kịch bản đều chạy ổn định trên ubuntu-latest mà không cần GPU vật lý.

@@ -1,4 +1,4 @@
-// Bộ chạy toàn bộ 32 script E2E của Tiên Giới một lệnh (M7.16, Issue #694, #1386, #1404).
+// Bộ chạy toàn bộ các script E2E của Tiên Giới một lệnh (M7.16, Issue #694, #1386, #1404).
 // Chạy TUẦN TỰ từng script e2e:* (đọc từ server/package.json), timeout mỗi script,
 // hỗ trợ chia shard (--shard M/N) để chạy song song trên nhiều runner CI,
 // tự động dọn sạch toàn bộ cây tiến trình con cháu (tránh mồ côi Chrome detached),
