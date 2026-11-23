@@ -9,6 +9,7 @@
  *
  * Hiện CẢ HAI bảng RỖNG: chưa chọn hình (chờ G kiểm giấy phép từng gói và người dùng tải gói), bộ nạp đã sẵn sàng và có test bằng bảng tiêm.
  */
+import { TILE } from "@tien-gioi/shared";
 import type { PackController } from "./packs";
 
 /** Một khoá texture trong gói riêng. */
@@ -24,6 +25,15 @@ export interface PrivateArtEntry {
 
 /** Khoá texture -> tệp gói riêng. Rỗng cho tới khi chọn hình. */
 export const PRIVATE_ART: Readonly<Record<string, PrivateArtEntry>> = {};
+
+/**
+ * Lưới ô (rộng, cao) của HÌNH THAY THẾ cho mỗi khoá có thể có trong `PRIVATE_ART` (`privateArtViolations(PRIVATE_ART, PRIVATE_ART_FALLBACK_GRID)` PHẢI rỗng,
+ * test canh). Thêm khoá mới vào bảng thì thêm cả lưới ở đây (kèm hình thay thế thật ở nơi dùng). `tileset`: dải ô 8 x 1 của `T`, mỗi ô `TILE` px
+ * (`gfx/private-tileset.ts` thay `/assets/tileset.png`).
+ */
+export const PRIVATE_ART_FALLBACK_GRID: Readonly<Record<string, readonly [number, number]>> = {
+  tileset: [TILE, TILE],
+};
 
 /** Bản đồ -> các gói riêng cần có lúc dựng cảnh (chờ cùng hạn với gói bản đồ). Rỗng cho tới khi chọn hình. */
 export const PRIVATE_MAP_PACKS: Readonly<Record<string, readonly string[]>> = {};
