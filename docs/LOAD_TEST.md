@@ -1974,6 +1974,8 @@ npm run build -w client
 npm run e2e:chieu-dau -w server
 ```
 
+Kiểm chiêu dấu MỚI qua đúng kịch bản này (PR chiêu `mark_loi` của D / E / G, AGENTS.md mục Chiêu thức): đặt `E2E_MARK_SKILL=<id>` để chiêu đó thay Thiên La Lôi Cấm ở ô 2 (chiêu phải có trong `shared` và máy chủ tự kiểm cảnh giới của người thử: Nguyên Anh hậu kỳ), rồi Chưởng Tâm Lôi Bạo vẫn kích dấu và so sát thương với đối chứng. Ví dụ `E2E_MARK_SKILL=chan_hon_loi_phap npm run e2e:chieu-dau -w server` (Âm Lôi Chấn Hồn, #1337: gắn dấu sau 1 lần, chấm "Dấu Lôi", kích dấu x1,54, 0 lỗi console).
+
 ## 36. E2E thật chiêu vận tia / kéo / hộ thể (CT8 lát 3, #1053; `npm run e2e:chieu-vo-sac -w server`)
 
 Năm chiêu VÔ SẮC của CT8 lát 3 dùng LẦN ĐẦU ba cơ chế: chiêu vận trên hình `line` (Huyết Ảnh Xuyên Tâm), kéo `displace pull` (Cầm Long Khấu) và hộ thể `shield` (Long Tượng Hộ Thể). Máy chủ Colyseus thật + Chrome + phím thật (L U I), nhân vật Nguyên Anh hậu kỳ, quái Linh Thố choáng làm bao cát cách 100 px.

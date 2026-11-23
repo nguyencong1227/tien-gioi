@@ -61,7 +61,8 @@ async function press(tab: Tab, slot: 2 | 3 | 4) {
   await tab.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
 }
 
-const MARK = "thien_la_loi_cam"; // ô 2: gắn dấu sét (ground, 80 %)
+/** Chiêu gắn dấu Lôi ở ô 2. Mặc định Thiên La Lôi Cấm (ground, 80 %); `E2E_MARK_SKILL=<id>` thay bằng chiêu `mark_loi` khác (vd `chan_hon_loi_phap`, #1337) để kiểm chiêu dấu MỚI qua đúng đường đã có. */
+const MARK = process.env.E2E_MARK_SKILL ?? "thien_la_loi_cam";
 const STRIKE = "chuong_tam_loi_bao"; // ô 3: kích dấu (cone, combo x1,5)
 const AURA = "bach_thu_khieu_phong"; // ô 4: tăng tốc + hồi phục cho mình và đồng đội
 const BIG_HP = 1_000_000;
@@ -358,7 +359,7 @@ async function main() {
       }
       must(
         monsterHasStatus(world, monId, "mark_loi"),
-        `Thiên La Lôi Cấm gắn được dấu Lôi lên quái sau ${tries} lần (xác suất 0,8 mỗi lần)`,
+        `${skillOf(MARK)!.name} gắn được dấu Lôi lên quái sau ${tries} lần`,
       );
       await T.waitFor(
         `window.__scene.monsterPips(${JSON.stringify(monId)})?.text.includes('Dấu Lôi')`,
