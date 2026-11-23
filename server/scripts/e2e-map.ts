@@ -599,8 +599,8 @@ async function main() {
     const waterDiff = (visA: boolean, visB: boolean) =>
       ev(`new Promise((resolve) => { const s = window.__scene;
         const grab = (v) => new Promise((res) => { s.waterLayer.setVisible(v); const g = s.game, w = g.canvas.width, h = g.canvas.height;
-          setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-            const x = c.getContext('2d'); x.drawImage(img, 0, 0); res(x.getImageData(0, 0, c.width, c.height).data); }), 200); });
+          setTimeout(() => { g.events.once('prerender', window.__e2eHideWater); g.renderer.snapshotArea(0, 0, w, h, (img) => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+            const x = c.getContext('2d'); x.drawImage(img, 0, 0); res(x.getImageData(0, 0, c.width, c.height).data); }); }, 200); });
         grab(${visA}).then((a) => grab(${visB}).then((b) => { let n = 0; const W = s.game.canvas.width, wv = s.cameras.main.worldView, m = s.map;
           for (let i = 0; i < a.length; i += 4) { if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) <= 24) continue;
             const px = (i / 4) % W, py = Math.floor(i / 4 / W), tx = Math.floor((wv.x + (px * wv.width) / W) / 32), ty = Math.floor((wv.y + (py * wv.width) / W) / 32);
@@ -614,11 +614,30 @@ async function main() {
       ev(`(() => { const s = window.__scene;
         if (${hide}) { window.__hiddenAbove = []; for (const o of s.children.list) { if (o !== s.waterLayer && o.depth > s.waterLayer.depth && o.visible) { window.__hiddenAbove.push(o); o.setVisible(false); } } }
         else { for (const o of window.__hiddenAbove || []) o.setVisible(true); window.__hiddenAbove = []; } })(); 1`);
+    // `update()` của cảnh bật lại `root.setVisible(true)` của mọi thực thể MỖI khung nên ẩn một lần ở `hideAboveWater` không giữ tới lúc chụp (A đo đối chứng 395, sát ngưỡng 400, ở #1359):
+    // ẩn LẠI ở `prerender` (sau update, ngay trước khi vẽ) của đúng khung sắp chụp, như ca trang trí / thời tiết ở trên. Đối tượng ẩn thêm được ghi vào `__hiddenAbove` để `hideAboveWater(false)` trả lại.
+    await ev(
+      `window.__e2eHideWater = () => { const s = window.__scene; window.__hiddenAbove = window.__hiddenAbove || [];
+        for (const o of s.children.list) { if (o !== s.waterLayer && o.depth > s.waterLayer.depth && o.visible) { window.__hiddenAbove.push(o); o.setVisible(false); } } }; 1`,
+    );
     // `try / finally`: lỗi giữa chừng (hết giờ CDP, ...) vẫn TRẢ LẠI các đối tượng đã ẩn, không để ca sau chạy trên cảnh trống
     await hideAboveWater(true);
     let wCtl = Number.POSITIVE_INFINITY;
     let wOnOff = 0;
+    let wDummy = -1;
     try {
+      // TỰ KIỂM kỹ thuật ẩn ở `prerender`: một hình vuông tím nằm TRÊN lớp nước, `update` hiện lại và DỊCH nó mỗi khung (như quái đi lại): nếu ảnh chụp còn thấy nó thì hai ảnh
+      // "cùng trạng thái" lệch hàng nghìn điểm ảnh. Có kỹ thuật thì đối chứng 0; đột biến bỏ dòng `once('prerender', ...)` trong `waterDiff` => ĐỎ ở câu khẳng định bên dưới.
+      await ev(`(() => { const s = window.__scene, wv = s.cameras.main.worldView;
+        const r = s.add.rectangle(wv.x + wv.width / 2, wv.y + wv.height / 2, 240, 140, 0xff00ff).setDepth(s.waterLayer.depth + 5);
+        window.__e2eDummy = r; window.__e2eDummyUpd = () => { r.setVisible(true); r.x += 5; }; s.events.on('update', window.__e2eDummyUpd); return 1; })()`);
+      try {
+        wDummy = Number(await waterDiff(true, true));
+      } finally {
+        await ev(
+          `(() => { const s = window.__scene; s.events.off('update', window.__e2eDummyUpd); window.__hiddenAbove = (window.__hiddenAbove || []).filter((o) => o !== window.__e2eDummy); window.__e2eDummy.destroy(); window.__e2eDummy = null; return 1; })()`,
+        );
+      }
       // Vẫn chờ theo điều kiện (đo lại cách 300 ms, tối đa 30 lần, tới khi < 400) phòng nhiễu còn lại (dựng lại sau đổi bậc)
       for (let k = 0; k < 30 && !(wCtl < 400); k++) {
         if (k > 0) await sleep(300);
@@ -629,6 +648,10 @@ async function main() {
       await hideAboveWater(false);
     }
     await ev(`window.__scene.waterLayer.setVisible(true); 1`);
+    must(
+      wDummy >= 0 && wDummy < 400,
+      `ẩn ở prerender giữ được: hình vuông bị update hiện lại + dịch mỗi khung KHÔNG lọt vào ảnh chụp (khác ${wDummy} điểm ảnh, cần < 400)`,
+    );
     must(
       wCtl < 400,
       `đối chứng (chỉ trong ô nước): hai ảnh cùng trạng thái khác ${wCtl} điểm ảnh (< 400)`,
