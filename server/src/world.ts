@@ -11,6 +11,7 @@ import type {
   Inventory,
   InvMsg,
   QuestsMsg,
+  QuestRewardMsg,
   WalletMsg,
   DialogMsg,
   ChatOut,
@@ -248,6 +249,8 @@ export interface WorldEvents {
   inv(sessionId: string, msg: InvMsg): void;
   /** Gửi sổ nhiệm vụ cho đúng người. */
   quests(sessionId: string, msg: QuestsMsg): void;
+  /** Thưởng THẬT vừa trao khi trả nhiệm vụ (mục 66, #1327): cho đúng chủ, MỘT tin mỗi lần trả thành công. */
+  questReward(sessionId: string, msg: QuestRewardMsg): void;
   /** Gửi sổ chiêu + hồi chiêu còn lại cho đúng chủ (không vào state chung; khi đổi và định kỳ, không mỗi tick). */
   skills(sessionId: string, msg: SkillsMsg): void;
   /** Gửi danh sách trạng thái của CHÍNH chủ (kể cả buff) khi có cái thêm / mất / vơi khiên; không mỗi tick. */
