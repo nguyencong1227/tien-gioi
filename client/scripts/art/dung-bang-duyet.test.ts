@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MONSTERS, NPCS } from "../../../shared/src/index";
+import { LEARNABLE_SKILLS, MONSTERS, NPCS } from "../../../shared/src/index";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(here, "dung-bang-duyet.py");
@@ -52,7 +52,7 @@ describe("dung-bang-duyet.py: ranh giới giấy phép (đọc mã, chạy mọi
   });
 });
 
-describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13)", () => {
+describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13 và 15)", () => {
   let dir = "";
   let pub = "";
   let priv = "";
@@ -67,6 +67,13 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13)", () => {
       JSON.stringify({
         npcs: NPCS.map((n) => ({ id: n.id, name: n.name, title: n.title })),
         mons: MONSTERS.map((m) => ({ id: m.id, name: m.name, boss: Boolean(m.boss) })),
+        skills: LEARNABLE_SKILLS.map((k) => ({
+          id: k.id,
+          name: k.name,
+          element: k.element,
+          shape: k.shape,
+          style: k.style ?? null,
+        })),
       }),
     );
     run = spawnSync(
@@ -75,7 +82,7 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13)", () => {
         "-I",
         SCRIPT,
         "--groups",
-        "10,11,12,13",
+        "10,11,12,13,15",
         "--public",
         pub,
         "--private",
@@ -115,5 +122,34 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13)", () => {
     const a = fs.readFileSync(path.join(pub, "13-trum.png"));
     const b = fs.readFileSync(path.join(priv, "13-trum-day-du.png"));
     expect(a.equals(b)).toBe(true);
+  });
+
+  it("nhóm 15 (hiệu ứng chiêu): một tờ MỖI HỆ, tổng đúng số chiêu học được, mỗi hệ có chiêu đều có tờ", () => {
+    const out = String(run.stdout);
+    const byEl = new Map<string, number>();
+    for (const k of LEARNABLE_SKILLS) byEl.set(k.element, (byEl.get(k.element) ?? 0) + 1);
+    let total = 0;
+    for (const [el, n] of byEl) {
+      expect(out, el).toContain(`15-hieu-ung-chieu-${el} ${n} mã`);
+      total += n;
+      expect(fs.statSync(path.join(pub, `15-hieu-ung-chieu-${el}.png`)).size, el).toBeGreaterThan(
+        5_000,
+      );
+    }
+    expect(total).toBe(LEARNABLE_SKILLS.length);
+  });
+
+  it("nhóm 15: tờ có chiêu chém / tia / lao (ô C là Wuxia, gói riêng) thì tờ công khai KHÁC tờ đầy đủ; tờ không có thì GIỐNG", () => {
+    const slash = new Set(["cone", "line", "bolt", "dash"]);
+    const hasSlash = new Map<string, boolean>();
+    for (const k of LEARNABLE_SKILLS)
+      hasSlash.set(k.element, hasSlash.get(k.element) || slash.has(k.shape));
+    for (const [el, yes] of hasSlash) {
+      const a = fs.readFileSync(path.join(pub, `15-hieu-ung-chieu-${el}.png`));
+      const b = fs.readFileSync(path.join(priv, `15-hieu-ung-chieu-${el}-day-du.png`));
+      expect(a.equals(b), `${el}: ${yes ? "gói riêng lọt ra tờ công khai" : "che nhầm"}`).toBe(
+        !yes,
+      );
+    }
   });
 });

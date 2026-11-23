@@ -39,6 +39,14 @@ SRC = {
 }
 
 
+# màu tô theo hệ cho hiệu ứng đơn sắc của Xianxia (chỉ để XEM; màu thật do người dùng / `FX` của game chốt)
+ELEMENT_RGB = {
+    "kim": (240, 210, 100), "moc": (110, 205, 110), "thuy": (80, 160, 240), "hoa": (245, 105, 50), "tho": (205, 160, 90),
+    "bang": (150, 225, 250), "phong": (160, 235, 205), "loi": (180, 130, 255), "am": (155, 95, 195), "none": (235, 235, 235),
+}
+ELEMENT_NAME = {"kim": "Kim", "moc": "Mộc", "thuy": "Thủy", "hoa": "Hỏa", "tho": "Thổ", "bang": "Băng", "phong": "Phong", "loi": "Lôi", "am": "Âm", "none": "Vô sắc"}
+
+
 def _load_module(path, name):
     spec = importlib.util.spec_from_file_location(name, path)
     m = importlib.util.module_from_spec(spec)
@@ -108,6 +116,33 @@ class Loaders:
 
     def xian_portrait(self, role, mood="neutral"):
         return load(f"{XIAN}/characters/xf_npc_{role}_{mood}.png")
+
+    # Xianxia fx: hiệu ứng ĐƠN SẮC (trắng -> xám đậm) 256x256, tô màu theo hệ bằng phép nhân màu (đúng cách README của gói khuyên dùng lúc chạy)
+    def xian_fx(self, name, element, n=3):
+        fs = sorted(glob.glob(f"{XIAN}/fx/{name}_frames/*.png"))
+        if not fs:
+            raise FileNotFoundError(name)
+        # 3 khung quanh ĐỈNH hiệu ứng (25 % / 50 % / 75 %): khung đầu / cuối thường quá nhỏ hoặc mờ để so sánh
+        pick = [fs[min(len(fs) - 1, round((i + 1) * (len(fs) - 1) / (n + 1)))] for i in range(n)] if len(fs) > n else fs
+        r, g, b = ELEMENT_RGB[element]
+        out = []
+        for p in pick:
+            im = load(p)
+            px = im.load()
+            for y in range(im.height):
+                for x in range(im.width):
+                    pr, pg, pb, pa = px[x, y]
+                    if pa:
+                        v = ((pr + pg + pb) / 3) / 255  # độ sáng 0..1 của nét đơn sắc
+                        k = v**0.5  # nâng vùng tối để không chìm vào nền
+                        hi = max(0.0, (v - 0.78) / 0.22) * 0.45  # vùng gần trắng ngả về trắng (lõi sáng)
+                        px[x, y] = tuple(min(255, int(c * k + 255 * hi)) for c in (r, g, b)) + (pa,)
+            out.append(im)
+        return out
+
+    def wuxia_slash(self, n=3):
+        fs = sorted(glob.glob(f"{WUXIA}/05_VFX/Blade_Slash/Frames/*.png"))
+        return [load(fs[round(i * (len(fs) - 1) / max(1, n - 1))]) for i in range(n)]
 
     # Wuxia RTS Lite: Game_Ready_Frames/<Unit>_<Anim>_<Dir>_NN.png (top-down 8 hướng)
     def wuxia(self, group, unit, anim="Idle", direction="South", idx=1):
@@ -313,6 +348,41 @@ def group_trum(L, names):
     return "13-trum", "Nhóm 13 — Trùm (T): thẻ trùm bằng ảnh AI SDXL giữ nguyên, đây chỉ là THÂN trên bản đồ", rows
 
 
+HU_BY_SHAPE = {  # hình chiêu -> hiệu ứng Xianxia hợp hình (anchor: left = tia bắn từ tay, center, bottom = đặt dưới chân)
+    "line": "xf_sword_qi", "bolt": "xf_sword_qi", "chain": "xf_sword_rain", "cone": "xf_moon_arc", "fan": "xf_sword_rain", "nova": "xf_bgan_halo",
+    "dash": "xf_flying_sword", "self": "xf_bell_ward", "aura": "xf_pill_light", "totem": "xf_array_seal", "trap": "xf_talisman",
+    "ground": "xf_star_array", "zone": "xf_array_seal",
+}
+HU_BY_ELEMENT = {  # hệ -> hiệu ứng đặc trưng của hệ
+    "kim": "xf_flying_sword", "moc": "xf_lotus", "thuy": "xf_bgan_waterfall", "hoa": "xf_phoenix", "tho": "xf_stone_spike",
+    "bang": "xf_frost_shard", "phong": "xf_gale_vortex", "loi": "xf_tribulation", "am": "xf_soul_wisp", "none": "xf_taiji",
+}
+
+
+def group_hu(L, names):
+    """Hiệu ứng chiêu: một tờ MỖI HỆ (10 tờ). A = theo HÌNH chiêu, B = theo HỆ (cùng tô màu hệ), C = vệt chém Wuxia (chỉ chiêu chém / tia)."""
+    by_el = {}
+    for sk in names["skills"]:
+        by_el.setdefault(sk["element"], []).append(sk)
+    sheets = []
+    n = 0
+    for el in ("kim", "moc", "thuy", "hoa", "tho", "bang", "phong", "loi", "am", "none"):
+        rows = []
+        for sk in by_el.get(el, []):
+            n += 1
+            fa, fb = HU_BY_SHAPE.get(sk["shape"], "xf_taiji"), HU_BY_ELEMENT[el]
+            slash = sk["shape"] in ("cone", "line", "bolt", "dash")
+            same = fa == fb
+            a = cell(L, "A", "xian", lambda f=fa, e=el: L.xian_fx(f, e), f"{fa[3:]} (theo hình '{sk['shape']}')", 56)
+            b = Cell("B", "xian", [], "", 56) if same else cell(L, "B", "xian", lambda f=fb, e=el: L.xian_fx(f, e), f"{fb[3:]} (theo hệ)", 56)
+            c = cell(L, "C", "wuxia", lambda: L.wuxia_slash(), "vệt chém Blade_Slash (64 px)", 40) if slash else Cell("C", "wuxia", [], "", 56)
+            cur = cell(L, "", "cur", lambda s=sk: L.cur(f"item-kinh_{s['id']}"), "icon kinh quyển; hiệu ứng vẽ bằng mã", 24)
+            rows.append(dict(code=f"HU-{n:02d}", name=f"{sk['name']} ({ELEMENT_NAME[el]}, {sk['shape']})", rec="A (hợp hình); B nếu muốn nét riêng của hệ", cur=cur, opts=[a, b, c]))
+        if rows:
+            sheets.append((f"15-hieu-ung-chieu-{el}", f"Nhóm 15 — Hiệu ứng chiêu, hệ {ELEMENT_NAME[el]} (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ", rows))
+    return sheets
+
+
 def md_for(code_group, title, rows):
     out = [f"## {title}", "", f"Tờ ảnh: `{code_group}.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/{code_group}-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).", "",
            "| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |", "|---|---|---|---|---|---|---|"]
@@ -326,6 +396,38 @@ def md_for(code_group, title, rows):
     for r in rows:
         out.append(f"| {r['code']} | {r['name']} | {r['cur'].cap or '—'} | " + " | ".join(desc(c) for c in r["opts"]) + f" | {r.get('rec', '')} |")
     return "\n".join(out) + "\n"
+
+
+PENDING = {"14": "vật phẩm (VP, 126 món)", "15": "hiệu ứng chiêu (HU, 57 chiêu)", "16": "giao diện (UI)"}
+
+
+def upsert_md(path, built):
+    """Ghi mỗi nhóm vào khối `<!-- NHOM nn -->...<!-- /NHOM nn -->` (thay khối cũ nếu có, chạy lại không nhân đôi); phần ĐANG LÀM tự cập nhật theo nhóm đã có."""
+    import re
+
+    text = open(path, encoding="utf8").read()
+    # bỏ phần ĐANG LÀM cũ (dựng lại ở cuối)
+    text = re.sub(r"\n## Nhóm 14, 15, 16 — ĐANG LÀM.*\Z", "\n", text, flags=re.S)
+    text = re.sub(r"\n## Nhóm còn đang làm.*\Z", "\n", text, flags=re.S)
+    # khối cũ KHÔNG có đánh dấu (bản đầu): bỏ từ tiêu đề nhóm đầu tiên
+    if "<!-- NHOM " not in text and re.search(r"(?m)^## Nhóm 1\d ", text):
+        text = text[: re.search(r"(?m)^## Nhóm 1\d ", text).start()]
+    for g, body in built.items():
+        blk = f"<!-- NHOM {g} -->\n{body}\n<!-- /NHOM {g} -->\n"
+        pat = re.compile(rf"<!-- NHOM {g} -->.*?<!-- /NHOM {g} -->\n", re.S)
+        if pat.search(text):
+            text = pat.sub(lambda _m: blk, text)
+        else:
+            text = text.rstrip("\n") + "\n\n" + blk
+    # sắp lại các khối theo số nhóm
+    blocks = re.findall(r"<!-- NHOM (\d+) -->.*?<!-- /NHOM \1 -->\n", text, flags=re.S)
+    parts = {g: re.search(rf"<!-- NHOM {g} -->.*?<!-- /NHOM {g} -->\n", text, re.S).group(0) for g in blocks}
+    head = text[: text.index("<!-- NHOM ")].rstrip("\n")
+    out = head + "\n\n" + "\n".join(parts[g] for g in sorted(parts, key=int))
+    missing = [g for g in PENDING if g not in parts]
+    if missing:
+        out += "\n## Nhóm còn đang làm\n\n" + "\n".join(f"- Nhóm {g}: {PENDING[g]}" for g in missing) + "\n"
+    open(path, "w", encoding="utf8").write(out)
 
 
 def main():
@@ -346,17 +448,21 @@ def main():
         r = subprocess.run(["npx", "tsx", os.path.join(HERE, "xuat-doi-tuong.ts")], cwd=ROOT, capture_output=True, text=True, check=True)
         names = json.loads(r.stdout)
     L = Loaders()
-    builders = {"10": lambda: group_nv(L), "11": lambda: group_npc(L, names), "12": lambda: group_quai(L, names), "13": lambda: group_trum(L, names)}
-    md = []
+    one = lambda t: [t]
+    builders = {
+        "10": lambda: one(group_nv(L)), "11": lambda: one(group_npc(L, names)), "12": lambda: one(group_quai(L, names)),
+        "13": lambda: one(group_trum(L, names)), "15": lambda: group_hu(L, names),
+    }
+    built = {}
     for g in a.groups.split(","):
-        code_group, title, rows = builders[g]()
-        render_sheet(title, rows, os.path.join(a.public, f"{code_group}.png"), public=True)
-        render_sheet(title, rows, os.path.join(a.private, f"{code_group}-day-du.png"), public=False)
-        md.append(md_for(code_group, title, rows))
-        print("ĐÃ DỰNG", code_group, len(rows), "mã")
+        sheets = builders[g]()
+        for code_group, title, rows in sheets:
+            render_sheet(title, rows, os.path.join(a.public, f"{code_group}.png"), public=True)
+            render_sheet(title, rows, os.path.join(a.private, f"{code_group}-day-du.png"), public=False)
+            print("ĐÃ DỰNG", code_group, len(rows), "mã")
+        built[g] = "\n".join(md_for(cg, t, r) for cg, t, r in sheets)
     if a.md:
-        with open(a.md, "a", encoding="utf8") as f:
-            f.write("\n".join(md))
+        upsert_md(a.md, built)
 
 
 if __name__ == "__main__":
