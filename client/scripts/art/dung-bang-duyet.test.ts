@@ -18,6 +18,9 @@ const SOURCES = [
   "/mnt/data/assets-work/b-duyet/xianxia/Xianxia_Pixel_Pack/characters",
   "/mnt/data/assets-private/work/wuxia-rts/Wuxia_RTS_Pixel_Lite_v1.0/01_Characters",
   "/mnt/data/assets-private/work/sunnyside/Sunnyside_World_ASSET_PACK_V2.1/Sunnyside_World_Assets/Characters",
+  // hai gói HOANTDZ (nhóm 14 ô C icon, nhóm 17 nền): đúng hai tệp chỉ mục mà `Loaders` mở (`HICON` / `BB` ở dung-bang-duyet.py); thiếu thì dựng thật phải BỎ QUA, không đỏ giả
+  "/mnt/data/assets-private/work/hoantdz-icons/Wuxia_Pixel_Icons_Mega_FREE_Sample_v1.0.0/_Index/sample_icons.csv",
+  "/mnt/data/assets-private/work/hoantdz-battlebacks/Wuxia_Xianxia_Pixel_Battlebacks_100_v1.0.0/_Index/all_battlebacks.csv",
 ];
 const can = hasPillow && SOURCES.every((p) => fs.existsSync(p));
 
