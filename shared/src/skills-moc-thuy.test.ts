@@ -6,7 +6,7 @@ import { skillViolations } from "./skill-violations";
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 // Tên riêng (tông phái / quốc gia) của Vạn Kiếp Tu Tiên KHÔNG được làm của Tiên Giới (AGENTS.md, Asset nguồn 3): chữ mô tả dùng nguyên văn nhưng đổi tên riêng sang cách nói trung tính
 const VKTT_PROPER =
-  /Thanh Vân (Môn|Kiếm Tông)|Bắc Minh|Huyền Vũ Môn|Kim Đạo Tự|Đan Hà Cốc|đất Thịnh/;
+  /Thanh Vân (Môn|Kiếm Tông)|Bắc Minh|Huyền Vũ Môn|Kim Đạo Tự|Đan Hà Cốc|đất Thịnh|biển Vĩnh Triều|Vĩnh Triều Hải/;
 
 describe("chiêu nhóm Mộc + Thủy (CT7 #1052)", () => {
   it("đủ các chiêu đã thêm, id duy nhất", () => {

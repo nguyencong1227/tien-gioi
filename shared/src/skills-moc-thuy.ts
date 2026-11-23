@@ -290,7 +290,7 @@ export const SKILLS_MOC_THUY: readonly SkillDef[] = [
     id: "no_dao_bai_khong",
     name: "Nộ Đào Bài Không",
     bookName: "Vĩnh Triều Chưởng",
-    desc: "Chép từ Trung Châu, người soạn tận mắt thấy biển Vĩnh Triều nuốt đất. Chưởng ra từng lớp như sóng, lớp sau nặng hơn lớp trước.",
+    desc: "Chép từ Trung Châu, người soạn tận mắt thấy biển cả nuốt đất. Chưởng ra từng lớp như sóng, lớp sau nặng hơn lớp trước.",
     element: "thuy",
     shape: "cone",
     cooldown: 5000,
