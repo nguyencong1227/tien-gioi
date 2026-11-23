@@ -909,6 +909,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Băng + Âm Trúc Cơ, Huyền phẩm (CT8 lát 1, A): rơi hiếm từ quái Trúc Cơ
     { itemId: bookIdOf("han_bang_nhat_chuong"), chance: 0.0035, min: 1, max: 1 },
     { itemId: bookIdOf("minh_anh_phuc_chuong"), chance: 0.0035, min: 1, max: 1 },
+    // Âm Trúc Cơ, Huyền phẩm (lô 1 Âm #1186, E): rơi hiếm từ quái Trúc Cơ (Hắc Hổ `ho` — cổng 15-20 phút giữ bởi `balance/dungeon.test.ts`, sách KHÔNG tính vào mẫu số)
+    { itemId: bookIdOf("tich_da_phan_anh"), chance: 0.0035, min: 1, max: 1 },
   ],
   mang: [
     { itemId: "vay_mang", chance: 1, min: 2, max: 4 },
@@ -942,6 +944,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thu_thuy_kiem_anh"), chance: 0.012, min: 1, max: 1 }, // Kim + Thủy (CT6 lát 1)
     { itemId: bookIdOf("phi_kiem_tam_lien"), chance: 0.008, min: 1, max: 1 }, // đạn bay Kim (CT9 lát 1)
     { itemId: bookIdOf("hoi_phong_lien_chuong"), chance: 0.005, min: 1, max: 1 }, // Phong Kim Đan (CT8 lát 1)
+    // Âm Kim Đan, Huyền phẩm (lô 1 Âm #1186, E): rơi hiếm từ quái Kim Đan
+    { itemId: bookIdOf("thuc_phat_am_trao"), chance: 0.005, min: 1, max: 1 },
     // Thủy Kim Đan, Huyền phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi hiếm từ Sương Hồ (quái Kim Đan hệ băng, hợp thủy)
     { itemId: bookIdOf("huyet_co_bi_kinh"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("toa_long_cam_na"), chance: 0.006, min: 1, max: 1 },
@@ -986,6 +990,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("hon_phien_tuong"), chance: 0.006, min: 1, max: 1 }, // tượng Âm (CT9 lát 1)
     { itemId: bookIdOf("minh_vu_lac_hon"), chance: 0.006, min: 1, max: 1 }, // quạt Âm Nguyên Anh (CT8 lát 2)
+    // Âm Nguyên Anh, Địa phẩm (lô 1 Âm #1186, E): rơi hiếm từ quái Nguyên Anh
+    { itemId: bookIdOf("kho_mach_dan_luu"), chance: 0.005, min: 1, max: 1 },
     // Thủy Nguyên Anh, Địa phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi hiếm từ Hàn Lang (quái Nguyên Anh hệ thủy, hợp thủy)
     { itemId: bookIdOf("huyet_ti_phuoc_than"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("no_dao_bai_khong"), chance: 0.006, min: 1, max: 1 },
