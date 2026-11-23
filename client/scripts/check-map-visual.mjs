@@ -8,6 +8,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  * Dựng một BẢN SAO của client/dist trong thư mục tạm (không đụng dist / public), rồi thử bốn tình huống bằng cách đổi gói `map:lac_ha` trong bản sao:
  *   (1) gói CÓ ảnh tileset + `visual.json` hợp lệ -> ba lớp hình (ground -10 / decor -9 / over worldH - 0.01, phóng 2 lần), lớp ô cũ + trang trí + nước KHÔNG còn;
  *   (1b) `?debug` KHÔNG kèm `?visual` -> vẽ cách cũ (mặc định tắt ở `?debug` để các script đo / E2E có cảnh ổn định);
+ *   (1c) ô "Cảnh bản đồ kiểu mới" ở Cài đặt: lựa chọn '1' thắng mặc định tắt của `?debug`, bỏ tick -> nền cũ NGAY, tick lại -> lớp hình (làm mờ chuyển);
  *   (2) `?visual=0` -> vẽ cách cũ (cờ tắt thắng gói);
  *   (3) gói CHƯA có ảnh trong manifest -> vẽ cách cũ, không lỗi;
  *   (4) `visual.json` hỏng (hợp lệ về băm nhưng sai nội dung) -> vẽ cách cũ, không lỗi.
@@ -307,6 +308,43 @@ async function main() {
         }
         const dbg = await state();
         check(dbg.layers === 0 && dbg.legacy, "?debug không kèm ?visual: vẽ cách cũ dù gói có ảnh");
+
+        // (1c) ô "Cảnh bản đồ kiểu mới" ở Cài đặt: lựa chọn RÕ RÀNG ('1') thắng mặc định tắt của ?debug; bấm ô thì cảnh đổi NGAY (không tải lại trang)
+        await evalJs(`localStorage.setItem("tg.mapVisual", "1"); 1`);
+        if (!(await loadPage(vp, "", true))) {
+          failures++;
+          continue;
+        }
+        const pref = await state();
+        const chk0 = await evalJs(`document.getElementById("set-map-visual")?.checked`);
+        check(
+          pref.layers === 3 && chk0 === true,
+          `?debug + lựa chọn '1' ở Cài đặt: lớp hình bật, ô được tick (${pref.layers} lớp, ô: ${chk0})`,
+        );
+        await evalJs(`document.getElementById("set-map-visual").click(); 1`);
+        await sleep(700);
+        const offNow = await state();
+        check(
+          offNow.layers === 0 && offNow.legacy,
+          "bỏ tick ô Cài đặt: về nền cũ NGAY, không cần tải lại",
+        );
+        check(
+          (await evalJs(`localStorage.getItem("tg.mapVisual")`)) === "0",
+          "lựa chọn được lưu ('0') để lần sau vẫn tắt",
+        );
+        await evalJs(`document.getElementById("set-map-visual").click(); 1`);
+        await sleep(1500);
+        const onAgain = await state();
+        check(
+          onAgain.layers === 3 && !onAgain.legacy,
+          `tick lại: lớp hình về (làm mờ chuyển), nền cũ gỡ (${onAgain.layers} lớp)`,
+        );
+        check(onAgain.fades >= 2, `làm mờ chuyển lần thứ hai khi bật lại (${onAgain.fades})`);
+        check(
+          exceptions.length === 0,
+          `không lỗi JS khi bật / tắt ở Cài đặt (${exceptions.length}): ${exceptions[0] ?? ""}`,
+        );
+        await evalJs(`localStorage.removeItem("tg.mapVisual"); 1`);
 
         // (2) cờ tắt thắng gói
         if (!(await loadPage(vp, "&visual=0", false))) {

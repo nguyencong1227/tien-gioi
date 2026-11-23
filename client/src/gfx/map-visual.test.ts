@@ -12,6 +12,8 @@ import {
   VISUAL_STORAGE_KEY,
   loadVisualTexture,
   mapVisualEnabled,
+  onMapVisualPref,
+  setMapVisualPref,
   sanitizeVisualMap,
   visualImageFits,
   visualFadePlan,
@@ -403,6 +405,12 @@ describe("mapVisualEnabled (cờ bật / tắt lớp hình mới)", () => {
     expect(mapVisualEnabled("?debug=1&visual=1", store("0"))).toBe(true);
     expect(mapVisualEnabled("?debug=1&visual=0", null)).toBe(false);
   });
+  it("lựa chọn RÕ RÀNG ở Cài đặt ('1' / '0') thắng mặc định của ?debug; ?visual vẫn thắng lựa chọn", () => {
+    expect(mapVisualEnabled("?debug=1", store("1"))).toBe(true);
+    expect(mapVisualEnabled("?debug=1", store("0"))).toBe(false);
+    expect(mapVisualEnabled("?debug=1&visual=0", store("1"))).toBe(false);
+    expect(mapVisualEnabled("", store("0"))).toBe(false);
+  });
   it("?visual=0 tắt, ?visual=1 bật và THẮNG khoá lưu", () => {
     expect(mapVisualEnabled("?visual=0", store(null))).toBe(false);
     expect(mapVisualEnabled("?visual=0", store("1"))).toBe(false);
@@ -439,5 +447,39 @@ describe("độ sâu lớp over và làm mờ chuyển", () => {
     expect(visualFadePlan(false, true)).toEqual({ fade: false, ms: 0 });
     expect(VISUAL_FADE_MS).toBeGreaterThan(100);
     expect(VISUAL_FADE_MS).toBeLessThan(1000);
+  });
+});
+
+describe("setMapVisualPref / onMapVisualPref (ô Cài đặt)", () => {
+  it("ghi '1' / '0' vào khoá lưu và báo mọi người nghe; huỷ đăng ký thì thôi báo", () => {
+    const m = new Map<string, string>();
+    const storage = { setItem: (k: string, v: string) => void m.set(k, v) };
+    const calls: string[] = [];
+    const off = onMapVisualPref(() => calls.push("a"));
+    setMapVisualPref(storage, false);
+    expect(m.get(VISUAL_STORAGE_KEY)).toBe("0");
+    setMapVisualPref(storage, true);
+    expect(m.get(VISUAL_STORAGE_KEY)).toBe("1");
+    expect(calls).toEqual(["a", "a"]);
+    off();
+    setMapVisualPref(storage, true);
+    expect(calls).toHaveLength(2);
+  });
+  it("không bao giờ ném lỗi: lưu bị chặn vẫn báo; một người nghe lỗi không chặn người khác", () => {
+    const evil = {
+      setItem: () => {
+        throw new Error("QuotaExceeded");
+      },
+    };
+    const calls: string[] = [];
+    const offBad = onMapVisualPref(() => {
+      throw new Error("lỗi nghe");
+    });
+    const offGood = onMapVisualPref(() => calls.push("ok"));
+    expect(() => setMapVisualPref(evil, true)).not.toThrow();
+    expect(() => setMapVisualPref(null, false)).not.toThrow();
+    expect(calls).toEqual(["ok", "ok"]);
+    offBad();
+    offGood();
   });
 });
