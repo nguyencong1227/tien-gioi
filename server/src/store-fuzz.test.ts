@@ -20,6 +20,7 @@ import {
   addCoin,
   AMBUSH_COOLDOWN_MS,
   AMBUSH_DAY_CAP,
+  ARENA_MAPS,
   COIN_CAP,
   DEFAULT_ORIGIN,
   DUNGEON_DAILY_REWARDS,
@@ -43,6 +44,7 @@ import {
 } from "@tien-gioi/shared";
 import { auditPlayerSaveData } from "../scripts/audit-saves";
 import {
+  LIFE_CAP,
   loadPlayer,
   mapIdOf,
   savePlayer,
@@ -50,6 +52,7 @@ import {
   sanitizeLifeId,
   sanitizeLimbo,
   sanitizeOrigin,
+  sanitizeProgress,
   type SavedPlayer,
 } from "./store";
 import { sanitizeInventory } from "./systems/inventory";
@@ -257,108 +260,158 @@ function patched(base: SavedPlayer, patch: Record<string, unknown>): Record<stri
 
 const UNKNOWN_SKILL_ID = "zzz_khong_ton_tai_quyen"; // không có trong LEARNABLE_SKILLS / SKILL_BY_ID
 
-/** Bộ input đối kháng: túi qty rác (id hợp lệ), chiêu lạ, mastery vượt trần / âm, coin / realm / tier cực trị. */
-const ADVERSARIAL: Record<string, unknown>[] = [
+/**
+ * Bộ input đối kháng: MỖI mục là `[tên, hồ sơ rác]` — `it.each` chạy mỗi ca thành một test RIÊNG (red kèm tên chiêu / nhánh
+ * kẹp bị phá, không pass rỗng). Tên nêu rõ lần kẹp cần thử để khi đột biến bỏ kẹp đó thì ca tương ứng ĐỎ.
+ */
+const ADVERSARIAL: [string, Record<string, unknown>][] = [
   // Kẹp qty túi: id hợp lệ + số lượng 0 / âm / NaN (bỏ kẹp → lọt audit qty_out_of_range)
-  patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: 0 }] }),
-  patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: -5 }] }),
-  patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: NaN }] }),
-  patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: 2 ** 53 }] }),
+  ["túi qty 0", patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: 0 }] })],
+  ["túi qty âm", patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: -5 }] })],
+  ["túi qty NaN", patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: NaN }] })],
+  [
+    "túi qty 2^53 (vượt stack vật phẩm)",
+    patched(baseSave(), { inventory: [{ itemId: BASE_ITEM_ID, qty: 2 ** 53 }] }),
+  ],
   // Kiểm id chiêu: chiêu lạ trong learned (bỏ kiểm → lọt audit unknown_skill)
-  patched(baseSave(), {
-    skills: { learned: { [BASE_SKILL_ID]: 1, [UNKNOWN_SKILL_ID]: 2 }, slots: ["", "", "", ""] },
-  }),
+  [
+    "learned: chiêu lạ (audit unknown_skill)",
+    patched(baseSave(), {
+      skills: { learned: { [BASE_SKILL_ID]: 1, [UNKNOWN_SKILL_ID]: 2 }, slots: ["", "", "", ""] },
+    }),
+  ],
   // Kẹp mastery: điểm vượt trần / âm (bỏ kẹp → structural mastery đỏ; audit KHÔNG kiểm mastery)
-  patched(baseSave(), {
-    skills: { learned: { [BASE_SKILL_ID]: 1 }, mastery: { [BASE_SKILL_ID]: 1_000_000 } },
-  }),
-  patched(baseSave(), {
-    skills: { learned: { [BASE_SKILL_ID]: 1 }, mastery: { [BASE_SKILL_ID]: -7 } },
-  }),
-  // Kẹp coin / realm / tier cực trị
-  patched(baseSave(), { coin: 2 ** 53 }),
-  patched(baseSave(), { coin: -100 }),
-  patched(baseSave(), { realm: 999 }),
-  patched(baseSave(), { realm: -3 }),
-  patched(baseSave(), { tier: 999 }),
-  patched(baseSave(), { exp: -50 }),
-  patched(baseSave(), { mapId: "ban_do_khong_co" }),
+  [
+    "mastery vượt trần",
+    patched(baseSave(), {
+      skills: { learned: { [BASE_SKILL_ID]: 1 }, mastery: { [BASE_SKILL_ID]: 1_000_000 } },
+    }),
+  ],
+  [
+    "mastery âm",
+    patched(baseSave(), {
+      skills: { learned: { [BASE_SKILL_ID]: 1 }, mastery: { [BASE_SKILL_ID]: -7 } },
+    }),
+  ],
+  // Kẹp coin / realm / tier / exp cực trị (sanitizeProgress — hàm thật của onJoin sau #1322)
+  ["coin 2^53", patched(baseSave(), { coin: 2 ** 53 })],
+  ["coin âm", patched(baseSave(), { coin: -100 })],
+  ["realm 999 (vượt REALMS)", patched(baseSave(), { realm: 999 })],
+  ["realm âm (sanitizeProgress chặn dưới)", patched(baseSave(), { realm: -3 })],
+  ["tier 999", patched(baseSave(), { tier: 999 })],
+  ["exp âm", patched(baseSave(), { exp: -50 })],
+  ["mapId lạ (không có trong MAPS)", patched(baseSave(), { mapId: "ban_do_khong_co" })],
   // Trang bị ĐÚNG id nhưng SAI ô (bỏ kiểm `equip.slot !== slot` trong sanitizeEquipment → lọt)
-  patched(baseSave(), {
-    equipment: { weapon: equipItemIdFor("robe"), robe: equipItemIdFor("weapon") },
-  }),
+  [
+    "trang bị sai ô (sanitizeEquipment bỏ)",
+    patched(baseSave(), {
+      equipment: { weapon: equipItemIdFor("robe"), robe: equipItemIdFor("weapon") },
+    }),
+  ],
   // Tầng chiêu vượt trần / âm / không hữu hạn cho chiêu HỢP LỆ (bỏ levelClamp → lọt)
-  patched(baseSave(), { skills: { learned: { [BASE_SKILL_ID]: 999 } } }),
-  patched(baseSave(), { skills: { learned: { [BASE_SKILL_ID]: -4 } } }),
+  [
+    "tầng chiêu 999 (vượt trần)",
+    patched(baseSave(), { skills: { learned: { [BASE_SKILL_ID]: 999 } } }),
+  ],
+  ["tầng chiêu âm", patched(baseSave(), { skills: { learned: { [BASE_SKILL_ID]: -4 } } })],
   // Ô chiêu trỏ chiêu CHƯA học (bỏ kiểm `learned` ở ô → lọt)
-  patched(baseSave(), {
-    skills: { learned: { [BASE_SKILL_ID]: 1 }, slots: [UNKNOWN_SKILL_ID, "", "", ""] },
-  }),
-  patched(baseSave(), {
-    skills: {
-      learned: { [BASE_SKILL_ID]: 1 },
-      slots: [LEARNABLE_SKILLS.find((s) => s.id !== BASE_SKILL_ID)!.id, "", "", ""],
-    },
-  }),
+  [
+    "ô chiêu trỏ chiêu chưa học",
+    patched(baseSave(), {
+      skills: { learned: { [BASE_SKILL_ID]: 1 }, slots: [UNKNOWN_SKILL_ID, "", "", ""] },
+    }),
+  ],
+  [
+    "ô chiêu trỏ chiêu chưa học (2)",
+    patched(baseSave(), {
+      skills: {
+        learned: { [BASE_SKILL_ID]: 1 },
+        slots: [LEARNABLE_SKILLS.find((s) => s.id !== BASE_SKILL_ID)!.id, "", "", ""],
+      },
+    }),
+  ],
   // Một chiêu ở HAI ô (bỏ `used.has(id)` → lọt)
-  patched(baseSave(), {
-    skills: { learned: { [BASE_SKILL_ID]: 1 }, slots: [BASE_SKILL_ID, BASE_SKILL_ID, "", ""] },
-  }),
+  [
+    "một chiêu ở hai ô",
+    patched(baseSave(), {
+      skills: { learned: { [BASE_SKILL_ID]: 1 }, slots: [BASE_SKILL_ID, BASE_SKILL_ID, "", ""] },
+    }),
+  ],
   // Bộ đếm kiếp vượt LIFE_CAP (bỏ `Math.min(LIFE_CAP, ..)` → lọt)
-  patched(baseSave(), { life: { playMs: 1e15, kills: 1e15, bossKills: 1e14 } }),
+  [
+    "life counters vượt LIFE_CAP",
+    patched(baseSave(), { life: { playMs: 1e15, kills: 1e15, bossKills: 1e14 } }),
+  ],
   // Điểm luyện cho chiêu CHƯA học (phải bị bỏ)
-  patched(baseSave(), {
-    skills: {
-      learned: {},
-      mastery: { [LEARNABLE_SKILLS.find((s) => skillMaxLevelOf(s) > 1)!.id]: 5 },
-    },
-  }),
+  [
+    "mastery cho chiêu chưa học (bị bỏ)",
+    patched(baseSave(), {
+      skills: {
+        learned: {},
+        mastery: { [LEARNABLE_SKILLS.find((s) => skillMaxLevelOf(s) > 1)!.id]: 5 },
+      },
+    }),
+  ],
   // Nhiệm vụ: id có thật nhưng bước / tiến độ rác; `done` có id lạ (bỏ kẹp / bỏ lọc → lọt)
-  patched(baseSave(), {
-    quests: {
-      active: [{ id: someQuestId(false), step: 9999, count: -3 }],
-      done: ["zzz_nv_la", someQuestId(false)],
-      daily: {},
-    },
-  }),
+  [
+    "nhiệm vụ step/count rác + done id lạ",
+    patched(baseSave(), {
+      quests: {
+        active: [{ id: someQuestId(false), step: 9999, count: -3 }],
+        done: ["zzz_nv_la", someQuestId(false)],
+        daily: {},
+      },
+    }),
+  ],
   // Ô trang bị CHƯA MỞ ở cảnh giới (pháp bảo cho người Phàm Nhân): sanitizeEquipment phải bỏ
-  patched(baseSave(), { realm: 0, tier: 0, equipment: { treasure: equipItemIdFor("treasure") } }),
-  // mapId là bí cảnh (phòng tạm của một run): phải về bản đồ thường
-  patched(baseSave(), { mapId: DUNGEON_MAPS[0]!.id }),
+  [
+    "ô trang bị chưa mở ở cảnh giới",
+    patched(baseSave(), { realm: 0, tier: 0, equipment: { treasure: equipItemIdFor("treasure") } }),
+  ],
+  // mapId là bí cảnh (phòng tạm của một run): phải về bản đồ thường (Lạc Hà)
+  ["mapId bí cảnh → Lạc Hà", patched(baseSave(), { mapId: DUNGEON_MAPS[0]!.id })],
+  // mapId là đấu trường chặn đường (phòng tạm của một vé): phải về bản đồ thường (Lạc Hà) — canh nhánh `isArenaMap` của mapIdOf
+  ["mapId đấu trường → Lạc Hà", patched(baseSave(), { mapId: ARENA_MAPS[0]!.id })],
   // limbo: keepable quá trần 30 + endedLifeId quá dài (sanitizeLimbo phải cắt)
-  patched(baseSave(), {
-    limbo: {
-      endedLifeId: "x".repeat(200),
-      summary: { kiep: 1, realm: REALM },
-      keepable: Array.from({ length: 50 }, () => equipItemIdFor("weapon")),
-    },
-  }),
+  [
+    "limbo keepable quá 30 + endedLifeId dài",
+    patched(baseSave(), {
+      limbo: {
+        endedLifeId: "x".repeat(200),
+        summary: { kiep: 1, realm: REALM },
+        keepable: Array.from({ length: 50 }, () => equipItemIdFor("weapon")),
+      },
+    }),
+  ],
   // Bộ đếm kiếp: bossKills > kills (sanitizeLife phải ép bossKills <= kills)
-  patched(baseSave(), { life: { playMs: 1, kills: 3, bossKills: 50 } }),
+  ["life bossKills > kills", patched(baseSave(), { life: { playMs: 1, kills: 3, bossKills: 50 } })],
   // limbo / dungeonDaily / ambushDaily rác (bỏ kẹp → audit đỏ)
   // limbo: endedLifeId + realm hợp lệ — sanitize KHÔNG ép `endedLifeId` ≥8 hay realm về REALMS.length (audit nghiêm hơn sanitize ở biên, KHÔNG phải lỗi kho). Chỉ stress kiep âm + keepable item lạ: bỏ Math.max(1,..)/lọc equip nào thì audit đỏ nhánh đó.
-  patched(baseSave(), {
-    limbo: { endedLifeId: "endedlifex", summary: { kiep: -1, realm: REALM }, keepable: ["zzz"] },
-  }),
-  patched(baseSave(), { dungeonDaily: { day: DAY, rewards: 99999 } }),
-  patched(baseSave(), { ambushDaily: { day: DAY, n: 99999 } }),
-  patched(baseSave(), { ambushUntil: -1000 }),
+  [
+    "limbo kiep âm + keepable item lạ",
+    patched(baseSave(), {
+      limbo: { endedLifeId: "endedlifex", summary: { kiep: -1, realm: REALM }, keepable: ["zzz"] },
+    }),
+  ],
+  [
+    "dungeonDaily rewards quá trần",
+    patched(baseSave(), { dungeonDaily: { day: DAY, rewards: 99999 } }),
+  ],
+  ["ambushDaily n quá trần", patched(baseSave(), { ambushDaily: { day: DAY, n: 99999 } })],
+  ["ambushUntil âm", patched(baseSave(), { ambushUntil: -1000 })],
 ];
 
 // ---------- Dựng lại hồ sơ hợp lệ từ rác (giống luồng nạp thật) ----------
 
-// CHỈ cho realm / tier: kẹp THAY THẾ của test, KHÔNG phải mã game (WorldRoom.onJoin chỉ `Math.min(save.realm, ...)`, không chặn dưới / NaN). Đừng coi các ca realm / tier là canh mã game.
-const intClamp = (v: unknown, lo: number, hi: number): number =>
-  typeof v === "number" && Number.isFinite(v) && Number.isInteger(v)
-    ? Math.min(hi, Math.max(lo, v))
-    : lo;
 const isDayKey = (v: unknown): v is string =>
   typeof v === "string" &&
   /^\d{4}-\d{2}-\d{2}$/.test(v) &&
   Number.isFinite(Date.parse(`${v}T00:00:00Z`));
 
 /**
- * Áp ĐÚNG các hàm `sanitize*` + kẹp vô hướng như `WorldRoom.onJoin` / `persist` để dựng hồ sơ hợp lệ từ rác.
+ * Áp ĐÚNG các hàm `sanitize*` như `WorldRoom.onJoin` / `persist` để dựng hồ sơ hợp lệ từ rác (KHÔNG tự kẹp trong test:
+ * realm / tier / exp đi qua `sanitizeProgress` — hàm thật của mã game sau #1322, nên các ca đối kháng realm / tier / exp
+ * dưới đây canh chính `sanitizeProgress`, đừng coi là kẹp thay thế).
  * `name` / `secretHash` / mốc thời gian là trường danh tính / tin cậy (được kiểm ở lớp đăng ký, không ở đây) nên luôn giữ hợp lệ.
  * `x` / `y` bỏ (persist thường ghi `undefined`; vị trí hợp lệ là việc của bản đồ, không phải của hàm kẹp hồ sơ).
  * `quests.daily`: `sanitizeQuests` giữ nguyên chuỗi ngày nên làm lại ở đây — chỉ giữ ngày hợp lệ (định dạng ngày là của audit).
@@ -368,10 +421,7 @@ function cleanSave(raw: unknown): SavedPlayer {
     raw !== null && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
       : {};
-  const realm = intClamp(r.realm, 0, REALMS.length - 1);
-  const tier = intClamp(r.tier, 0, REALMS[realm]!.tiers.length - 1);
-  const exp =
-    typeof r.exp === "number" && Number.isFinite(r.exp) && r.exp >= 0 ? Math.floor(r.exp) : 0;
+  const { realm, tier, exp } = sanitizeProgress(r); // ĐÚNG như WorldRoom.onJoin (#1322): hàm thật của mã game, không tự kẹp trong test
   const coin = addCoin(0, (r.coin ?? 0) as number); // ĐÚNG như WorldRoom.onJoin: hàm thật của shared, không tự kẹp trong test
   const q = sanitizeQuests(r.quests);
   const daily: Record<string, string> = {};
@@ -506,12 +556,9 @@ function assertStructural(c: SavedPlayer, where: string) {
   // life / limbo / dungeonDaily / ambushDaily / ambushUntil đã được kẹp (không ném, hợp lệ)
   expect(typeof c.life.playMs === "number", `${where}: life.playMs`).toBe(true);
   expect(c.life.bossKills <= c.life.kills, `${where}: life.bossKills > kills`).toBe(true);
-  // LIFE_CAP của store.ts (hằng không export nên chép số: 10^12); đổi bên đó thì sửa ở đây
+  // LIFE_CAP của store.ts (hằng đã export, dùng chung — không chép số, đổi bên đó thì test đỏ ngay)
   for (const v of [c.life.playMs, c.life.kills, c.life.bossKills])
-    expect(
-      Number.isInteger(v) && v >= 0 && v <= 1_000_000_000_000,
-      `${where}: life vượt trần`,
-    ).toBe(true);
+    expect(Number.isInteger(v) && v >= 0 && v <= LIFE_CAP, `${where}: life vượt trần`).toBe(true);
   if (c.limbo) {
     expect(typeof c.limbo.endedLifeId === "string", `${where}: limbo.endedLifeId`).toBe(true);
     expect(c.limbo.endedLifeId.length <= 64, `${where}: limbo.endedLifeId dài quá 64`).toBe(true);
@@ -585,9 +632,8 @@ describe("fuzz hồ sơ lưu: rác -> làm sạch -> audit sạch, idempotent, k
     },
   );
 
-  it("input đối kháng (bỏ kẹp nào thì tính chất đó đỏ): túi qty / chiêu lạ / mastery / coin / realm / limbo ...", () => {
-    ADVERSARIAL.forEach((g, i) => checkOne(g, `đối kháng ${i}`));
-  });
+  // Mỗi ca đối kháng là một test RIÊNG: đỏ kèm tên nhánh kẹp bị phá (không pass rỗng, không lẫn ca khác).
+  it.each(ADVERSARIAL)(`input đối kháng: %s`, (_name, input) => checkOne(input, _name));
 
   it("tự kiểm tính chất (4): một ô nhiễm nguyên mẫu GIẢ phải bị checkOne bắt (các sanitize* khó tự gây ô nhiễm nên cần ca này để (4) có răng)", () => {
     (Object.prototype as Record<string, unknown>).polluted = true;
