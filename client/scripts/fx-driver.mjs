@@ -98,6 +98,9 @@ export const FX_CAST_SKILLS = [
   "thuc_giap_phi_tan",
   "thiet_sa_chuong",
   "chuong_vu_phong_lam",
+  // Mộc (CT17 lát 2, G)
+  "me_hon_huong_quyet",
+  "man_da_hoa_kinh",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */

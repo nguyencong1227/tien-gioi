@@ -53,6 +53,18 @@ import {
 import { getQuality, onQualityChange } from "../gfx/quality";
 import { buildDecorGrid } from "../gfx/map-decor";
 import {
+  VISUAL_TILE,
+  fetchVisualJson,
+  loadVisualTexture,
+  mapVisualEnabled,
+  sanitizeVisualMap,
+  visualImageFits,
+  visualPackPaths,
+  visualRows,
+  visualTextureKey,
+  type VisualMap,
+} from "../gfx/map-visual";
+import {
   isPrivatePackDefId,
   mapPackId,
   mapsNearPortals,
@@ -415,6 +427,15 @@ interface NpcEntity {
 
 const LERP_RATE = 14; // nội suy vị trí người khác / quái
 
+/** `localStorage` hoặc `null` khi trình duyệt chặn (chế độ riêng tư, iframe): không bao giờ ném lỗi. */
+function safeLocalStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export class WorldScene extends Phaser.Scene {
   private players = new Map<string, Entity>();
   private monsters = new Map<string, Entity>();
@@ -592,6 +613,15 @@ export class WorldScene extends Phaser.Scene {
   /** Lớp trang trí tất định (M5.3 #332): tilemap thứ hai, tileset vẽ bằng mã theo kiểu bản đồ. */
   private decorTilemap?: Phaser.Tilemaps.Tilemap;
   decorLayer?: Phaser.Tilemaps.TilemapLayer;
+  /**
+   * Lớp HÌNH Tiled (S3b, #1206 / #1330 mục 67.1): `visual.json` của gói `map:<id>` đã qua kiểm + ảnh tileset hình đã nạp. `undefined` = vẽ cách cũ (lớp ô + trang trí + nước).
+   * Ba tilemap (ground / decor / over) công khai cho script kiểm `?debug`; `visualSeq` chống đua (kết quả của lần xin cũ bị bỏ).
+   */
+  private visualMap?: VisualMap;
+  private visualMapId = "";
+  visualLayers: Phaser.Tilemaps.TilemapLayer[] = [];
+  private visualTilemaps: Phaser.Tilemaps.Tilemap[] = [];
+  private visualSeq = 0;
   /** Ánh sáng môi trường + vignette (M5.3 #332 bước 2b): hai ảnh phủ cố định theo màn hình, hiện theo hồ sơ chất lượng. */
   lightAmbient?: Phaser.GameObjects.Image;
   lightVignette?: Phaser.GameObjects.Image;
@@ -648,8 +678,11 @@ export class WorldScene extends Phaser.Scene {
     this.prefetchPacks();
     // Nền từ gói riêng (mục 63): xin gói, nạp dải ô khi sẵn sàng (kể cả về muộn) rồi dựng lại nền MỘT lần; không có gói thì không làm gì
     this.refreshPrivateTileset();
+    // Lớp hình Tiled (S3b): gói `map:<id>` có `visual.json` + ảnh tileset thì vẽ thay lớp ô cũ; về muộn thì dựng lại MỘT lần
+    this.refreshMapVisual();
     const offPrivateReady = packs().onReady((id) => {
       if (isPrivatePackDefId(id)) this.refreshPrivateTileset();
+      if (id === mapPackId(this.map.def.id)) this.refreshMapVisual();
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, offPrivateReady);
 
@@ -1009,7 +1042,111 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
+  /** Huỷ ba lớp hình Tiled (nếu có). */
+  private destroyTiledVisual() {
+    for (const l of this.visualLayers) l.destroy();
+    for (const t of this.visualTilemaps) t.destroy();
+    this.visualLayers = [];
+    this.visualTilemaps = [];
+  }
+
+  /** Bỏ lớp hình của bản đồ vừa rời: huỷ lớp, quên `visual.json`, xoá texture (gói đã giải phóng), vô hiệu mọi lần xin đang chạy. */
+  private dropMapVisual() {
+    this.visualSeq++;
+    this.destroyTiledVisual();
+    const key = visualTextureKey(this.map.def.id);
+    if (this.textures.exists(key)) this.textures.remove(key);
+    this.visualMap = undefined;
+    this.visualMapId = "";
+  }
+
+  /**
+   * Xin lớp hình Tiled của bản đồ hiện tại: cần cờ bật (`mapVisualEnabled`), gói `map:<id>` đã `ready` và CÓ ảnh tileset trong manifest (gói chưa có ảnh thì không làm gì,
+   * vẽ cách cũ). Tải `visual.json` -> kiểm (`sanitizeVisualMap`, sai là bỏ) -> nạp ảnh (đúng rộng, đủ cao) -> dựng lại nền MỘT lần. Không bao giờ ném lỗi.
+   */
+  private refreshMapVisual() {
+    const id = this.map.def.id;
+    if (this.visualMap && this.visualMapId === id) return;
+    if (!mapVisualEnabled(window.location.search, safeLocalStorage())) return;
+    const p = packs();
+    const pid = mapPackId(id);
+    const st = p.state(pid);
+    if (st === "idle" || st === "failed") {
+      // Bản đồ đầu tiên sau đăng nhập chưa ai xin gói (`takeMapWait` chỉ chạy khi qua cổng): xin ở đây; về xong thì `onReady` gọi lại hàm này
+      void p.ensure(pid);
+      return;
+    }
+    if (st !== "ready") return;
+    const jsonPath = visualPackPaths(id, "tileset_world.png");
+    const jsonUrl = jsonPath ? p.fileUrl(pid, jsonPath.json) : null;
+    if (!jsonPath || !jsonUrl || !p.fileUrl(pid, jsonPath.image)) return; // gói chưa có ảnh tileset: vẽ cách cũ
+    const seq = ++this.visualSeq;
+    const stale = () => seq !== this.visualSeq || !this.sys.isActive() || this.map.def.id !== id;
+    void fetchVisualJson(jsonUrl, fetch.bind(globalThis)).then((raw) => {
+      if (stale()) return;
+      const vm = sanitizeVisualMap(raw, this.map.def.w, this.map.def.h);
+      if (!vm) return;
+      const paths = visualPackPaths(id, vm.tileset.image);
+      const imageUrl = paths ? p.fileUrl(pid, paths.image) : null;
+      if (!imageUrl) return;
+      loadVisualTexture(
+        this,
+        visualTextureKey(id),
+        imageUrl,
+        (img) => visualImageFits(vm, img),
+        (ok) => {
+          if (!ok || stale()) return;
+          this.visualMap = vm;
+          this.visualMapId = id;
+          this.buildMapVisuals();
+        },
+      );
+    });
+  }
+
+  /**
+   * Dựng ba lớp hình Tiled từ `visualMap` (đã kiểm) + texture đã nạp: ground (-10), decor (-9, thân cây / đá / bụi dưới chân), over (tán cây PHỦ TRÊN đầu nhân vật: thực thể xếp độ sâu theo `y` <= `worldH`,
+   * tán ở `worldH + 0.5`, nhãn / báo ở `worldH + 5` trở lên). Ô nguồn 16 px phóng `TILE / 16` lần. Trả `false` (không dựng gì) khi chưa đủ điều kiện: khi đó lớp ô cũ vẽ như trước.
+   */
+  private buildTiledVisual(): boolean {
+    const vm = this.visualMap;
+    const id = this.map.def.id;
+    if (!vm || this.visualMapId !== id) return false;
+    const key = visualTextureKey(id);
+    if (!this.textures.exists(key)) return false;
+    const ts = vm.tileset;
+    const mk = (data: Uint16Array, depth: number) => {
+      const tm = this.make.tilemap({
+        data: visualRows(data, vm.width, vm.height),
+        tileWidth: VISUAL_TILE,
+        tileHeight: VISUAL_TILE,
+      });
+      const set = tm.addTilesetImage(
+        "world",
+        key,
+        VISUAL_TILE,
+        VISUAL_TILE,
+        ts.margin,
+        ts.spacing,
+        ts.firstgid,
+      );
+      const layer = set ? tm.createLayer(0, set, 0, 0) : null;
+      if (!layer) {
+        tm.destroy();
+        return false;
+      }
+      layer.setScale(TILE / VISUAL_TILE).setDepth(depth);
+      this.visualTilemaps.push(tm);
+      this.visualLayers.push(layer);
+      return true;
+    };
+    const ok = mk(vm.ground, -10) && mk(vm.decor, -9) && mk(vm.over, this.map.worldH + 0.5);
+    if (!ok) this.destroyTiledVisual();
+    return ok;
+  }
+
   private buildMapVisuals() {
+    this.destroyTiledVisual();
     this.groundWash?.destroy();
     this.groundWash = undefined;
     // 1. Hủy lớp ô cũ nếu có
@@ -1038,58 +1175,65 @@ export class WorldScene extends Phaser.Scene {
       this.decorTilemap = undefined;
     }
 
-    // 2. Dựng tilemap mới
-    const data: number[][] = [];
-    const mw = this.map.def.w;
-    const mh = this.map.def.h;
-    for (let y = 0; y < mh; y++)
-      data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
-    this.mapTilemap = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
-    // Nền từ gói riêng (mục 63) nếu đã nạp xong, ngược lại hình thay thế `tileset.png` (`gfx/private-tileset.ts`)
-    const tilesetKey = tilesetKeyFor((k) => this.textures.exists(k), TILESET_KEY);
-    const ts = this.mapTilemap.addTilesetImage("tiles", tilesetKey, TILE, TILE, 0, 0)!;
-    this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
-    this.mapLayer.setDepth(-10);
-    // 1b. Màu phủ nền theo kiểu bản đồ (tuyết phủ ở Hàn Vân Lĩnh): một hình chữ nhật phủ cả bản đồ NGAY TRÊN lớp ô, dưới trang trí / nước / thực thể
-    const wash = planTileTint(styleOf(this.styleId()));
-    if (wash)
-      this.groundWash = this.add
-        .rectangle(0, 0, this.map.worldW, this.map.worldH, wash.color, wash.alpha)
-        .setOrigin(0, 0)
-        .setDepth(-9.8);
-
-    // 2b. Lớp trang trí tất định (cỏ, hoa, đá, nấm, bụi): thuần thị giác, sinh từ seed + mapId nên mọi người thấy giống nhau
-    const style = styleOf(this.styleId());
-    const decorGrid = buildDecorGrid(this.map, style);
-    const decorRows: number[][] = [];
-    for (let y = 0; y < mh; y++)
-      decorRows.push(Array.from(decorGrid.subarray(y * mw, (y + 1) * mw)));
-    this.decorTilemap = this.make.tilemap({ data: decorRows, tileWidth: TILE, tileHeight: TILE });
-    const decorKey = ensureDecorTileset(this, this.map.def.id, style);
-    const decorTs = this.decorTilemap.addTilesetImage(
-      decorTilesetKey(this.map.def.id),
-      decorKey,
-      TILE,
-      TILE,
-      0,
-      0,
-    )!;
-    this.decorLayer = this.decorTilemap.createLayer(0, decorTs, 0, 0)!;
-    this.decorLayer.setDepth(-9);
-
-    // 2b'. Mặt nước lấp lánh: một lớp chỉ gồm các ô nước, đốm sáng trôi (vẽ lại ở stepWater)
-    const waterCells = waterGrid(this.map);
-    if (waterCells.some((v) => v !== NO_WATER)) {
-      const waterRows: number[][] = [];
+    // 2. Dựng nền: lớp hình Tiled nếu đã sẵn sàng (S3b), ngược lại cách cũ (lớp ô + trang trí + nước)
+    if (!this.buildTiledVisual()) {
+      // 2a. Dựng tilemap mới
+      const data: number[][] = [];
+      const mw = this.map.def.w;
+      const mh = this.map.def.h;
       for (let y = 0; y < mh; y++)
-        waterRows.push(Array.from(waterCells.subarray(y * mw, (y + 1) * mw)));
-      this.waterTilemap = this.make.tilemap({ data: waterRows, tileWidth: TILE, tileHeight: TILE });
-      const waterTex = ensureWaterTexture(this);
-      drawShimmer(waterTex, style, 0);
-      this.waterPhaseKey = 0;
-      const waterTs = this.waterTilemap.addTilesetImage(WATER_KEY, WATER_KEY, TILE, TILE, 0, 0)!;
-      this.waterLayer = this.waterTilemap.createLayer(0, waterTs, 0, 0)!;
-      this.waterLayer.setDepth(-8);
+        data.push(Array.from(this.map.tiles.subarray(y * mw, (y + 1) * mw)));
+      this.mapTilemap = this.make.tilemap({ data, tileWidth: TILE, tileHeight: TILE });
+      // Nền từ gói riêng (mục 63) nếu đã nạp xong, ngược lại hình thay thế `tileset.png` (`gfx/private-tileset.ts`)
+      const tilesetKey = tilesetKeyFor((k) => this.textures.exists(k), TILESET_KEY);
+      const ts = this.mapTilemap.addTilesetImage("tiles", tilesetKey, TILE, TILE, 0, 0)!;
+      this.mapLayer = this.mapTilemap.createLayer(0, ts, 0, 0)!;
+      this.mapLayer.setDepth(-10);
+      // 1b. Màu phủ nền theo kiểu bản đồ (tuyết phủ ở Hàn Vân Lĩnh): một hình chữ nhật phủ cả bản đồ NGAY TRÊN lớp ô, dưới trang trí / nước / thực thể
+      const wash = planTileTint(styleOf(this.styleId()));
+      if (wash)
+        this.groundWash = this.add
+          .rectangle(0, 0, this.map.worldW, this.map.worldH, wash.color, wash.alpha)
+          .setOrigin(0, 0)
+          .setDepth(-9.8);
+
+      // 2b. Lớp trang trí tất định (cỏ, hoa, đá, nấm, bụi): thuần thị giác, sinh từ seed + mapId nên mọi người thấy giống nhau
+      const style = styleOf(this.styleId());
+      const decorGrid = buildDecorGrid(this.map, style);
+      const decorRows: number[][] = [];
+      for (let y = 0; y < mh; y++)
+        decorRows.push(Array.from(decorGrid.subarray(y * mw, (y + 1) * mw)));
+      this.decorTilemap = this.make.tilemap({ data: decorRows, tileWidth: TILE, tileHeight: TILE });
+      const decorKey = ensureDecorTileset(this, this.map.def.id, style);
+      const decorTs = this.decorTilemap.addTilesetImage(
+        decorTilesetKey(this.map.def.id),
+        decorKey,
+        TILE,
+        TILE,
+        0,
+        0,
+      )!;
+      this.decorLayer = this.decorTilemap.createLayer(0, decorTs, 0, 0)!;
+      this.decorLayer.setDepth(-9);
+
+      // 2b'. Mặt nước lấp lánh: một lớp chỉ gồm các ô nước, đốm sáng trôi (vẽ lại ở stepWater)
+      const waterCells = waterGrid(this.map);
+      if (waterCells.some((v) => v !== NO_WATER)) {
+        const waterRows: number[][] = [];
+        for (let y = 0; y < mh; y++)
+          waterRows.push(Array.from(waterCells.subarray(y * mw, (y + 1) * mw)));
+        this.waterTilemap = this.make.tilemap({
+          data: waterRows,
+          tileWidth: TILE,
+          tileHeight: TILE,
+        });
+        const waterTex = ensureWaterTexture(this);
+        drawShimmer(waterTex, style, 0);
+        this.waterPhaseKey = 0;
+        const waterTs = this.waterTilemap.addTilesetImage(WATER_KEY, WATER_KEY, TILE, TILE, 0, 0)!;
+        this.waterLayer = this.waterTilemap.createLayer(0, waterTs, 0, 0)!;
+        this.waterLayer.setDepth(-8);
+      }
     }
 
     // 2c. Ánh sáng môi trường + vignette theo kiểu bản đồ (hiện theo hồ sơ chất lượng)
@@ -2213,6 +2357,7 @@ export class WorldScene extends Phaser.Scene {
     ui.hideDuelHud();
     // Gói của bản đồ vừa rời không còn cần: giải phóng (nơi giữ texture của gói đó xoá theo `onRelease`); quay lại thì nạp lại từ bộ nhớ đệm
     packs().release(mapPackId(this.map.def.id));
+    this.dropMapVisual();
     this.map = newMap;
     // Qua cổng KHÔNG tạo lại scene: dựng lại sơ đồ nối (nút "đang đứng", ẩn trong bí cảnh) và đưa bản đồ lớn về xem bản đồ mình đứng.
     // `mapWasOpen = false` để nếu bản đồ lớn đang mở thì khung hình sau đặt lại camera / tiêu đề theo bản đồ mới.
@@ -2222,6 +2367,7 @@ export class WorldScene extends Phaser.Scene {
     this.buildMapVisuals();
     ui.setCurrentMapId(newMap.def.id);
     this.refreshPrivateTileset();
+    this.refreshMapVisual();
     this.attachRoom(room);
     this.syncAudioZone();
     this.prefetchPacks();
