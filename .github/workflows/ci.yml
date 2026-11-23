@@ -10,9 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  lint:
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         timeout-minutes: 3
@@ -34,29 +35,85 @@ jobs:
       - name: Kiểm tra định dạng
         run: npx prettier --check .
 
-      - name: Test
-        shell: bash
-        run: npm run test --if-present 2>&1 | tee vitest.log
-
       # Gom mọi bộ kiểm dữ liệu nội dung (cấu trúc) thành MỘT lệnh; đỏ khi dữ liệu game sai (issue #1200, mục 61.2).
       # Chạy trước mọi PR nội dung. Nhanh: chỉ gọi các hàm kiểm thuần trong `shared/` với bảng thật (shared main = nguồn TS, tsx dịch trực tiếp).
       - name: Kiểm dữ liệu nội dung (check:content)
         run: npm run check:content --if-present
 
-      - name: Lưu nhật ký kiểm thử làm artifact khi thất bại hoặc huỷ
-        if: failure() || cancelled()
-        uses: actions/upload-artifact@v4
+  build:
+    name: Build Client
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 3
+
+      - uses: actions/setup-node@v4
         with:
-          name: vitest-test-log
-          path: vitest.log
-          if-no-files-found: ignore
-          retention-days: 7
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
 
       - name: Build client
         run: npm run build
 
       - name: Kiểm tra ngân sách hiệu năng tĩnh
         run: npm run check:budget --if-present
+
+  test:
+    name: Test (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/3", "2/3", "3/3"]
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test shard
+        shell: bash
+        run: npm run test --if-present -- --shard=${{ matrix.shard }} 2>&1 | tee vitest.log
+
+      - name: Lưu nhật ký kiểm thử làm artifact khi thất bại hoặc huỷ
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-test-log-${{ strategy.job-index }}
+          path: vitest.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  check:
+    name: check
+    needs: [lint, build, test]
+    runs-on: ubuntu-latest
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Tổng hợp kết quả kiểm tra
+        run: |
+          set -eu
+          echo "Trạng thái các kiểm tra thành phần:"
+          echo "  - Lint & Typecheck: ${{ needs.lint.result }}"
+          echo "  - Build Client:     ${{ needs.build.result }}"
+          echo "  - Test (shards):    ${{ needs.test.result }}"
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ]; then
+            echo "::error::Một hoặc nhiều kiểm tra thành phần (lint, build, test) không thành công!"
+            exit 1
+          fi
+          echo "Tất cả các kiểm tra thành phần đều đã vượt qua thành công!"
 
   docker:
     name: Docker Build
