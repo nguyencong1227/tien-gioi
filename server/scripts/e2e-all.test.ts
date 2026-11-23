@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   executeScriptOnce,
   extractLastLines,
@@ -12,7 +12,9 @@ import {
   formatResultTable,
   getE2eScripts,
   parseCliArgs,
+  parseShard,
   runE2eAll,
+  shardScripts,
   type ScriptResult,
 } from "./e2e-all.js";
 
@@ -414,6 +416,235 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
         if (existsSync(logFile)) rmSync(logFile);
       } catch {
         // Bỏ qua
+      }
+    });
+  });
+
+  describe("parseShard (Phân tích và kiểm tra tính hợp lệ cờ --shard M/N, #1404)", () => {
+    it("phân tích thành công các trường hợp hợp lệ", () => {
+      expect(parseShard("1/2")).toEqual({ index: 1, total: 2 });
+      expect(parseShard("2/2")).toEqual({ index: 2, total: 2 });
+      expect(parseShard(" 1/5 ")).toEqual({ index: 1, total: 5 });
+      expect(parseShard("3/10")).toEqual({ index: 3, total: 10 });
+    });
+
+    it("ném lỗi rõ ràng khi định dạng không đúng M/N", () => {
+      expect(() => parseShard("abc")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1-2")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1/2/3")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("1/")).toThrow(/Định dạng --shard không hợp lệ/);
+      expect(() => parseShard("/2")).toThrow(/Định dạng --shard không hợp lệ/);
+    });
+
+    it("ném lỗi rõ ràng khi phạm vi vi phạm 1 <= M <= N", () => {
+      expect(() => parseShard("0/2")).toThrow(/Phạm vi --shard không hợp lệ/);
+      expect(() => parseShard("3/2")).toThrow(/Phạm vi --shard không hợp lệ/);
+      expect(() => parseShard("1/0")).toThrow(/Phạm vi --shard không hợp lệ/);
+      expect(() => parseShard("5/4")).toThrow(/Phạm vi --shard không hợp lệ/);
+    });
+  });
+
+  describe("shardScripts (Chia kịch bản thuần túy pure function, #1404)", () => {
+    const mockScripts = Array.from({ length: 32 }, (_, i) => `e2e:test-${i + 1}`);
+
+    it("chia 32 kịch bản thành 2 shard đồng đều (mỗi shard 16 kịch bản)", () => {
+      const shard1 = shardScripts(mockScripts, { index: 1, total: 2 });
+      const shard2 = shardScripts(mockScripts, { index: 2, total: 2 });
+
+      expect(shard1).toHaveLength(16);
+      expect(shard2).toHaveLength(16);
+      expect(shard1[0]).toBe("e2e:test-1");
+      expect(shard2[0]).toBe("e2e:test-2");
+    });
+
+    it("chia 32 kịch bản thành 3 shard cân bằng (11, 11, 10)", () => {
+      const s1 = shardScripts(mockScripts, { index: 1, total: 3 });
+      const s2 = shardScripts(mockScripts, { index: 2, total: 3 });
+      const s3 = shardScripts(mockScripts, { index: 3, total: 3 });
+
+      expect(s1).toHaveLength(11);
+      expect(s2).toHaveLength(11);
+      expect(s3).toHaveLength(10);
+      expect(s1.length + s2.length + s3.length).toBe(32);
+    });
+
+    it("hoạt động mượt mà với số kịch bản lẻ (ví dụ 33 kịch bản khi thêm kịch bản mới ở PR #1394)", () => {
+      const oddScripts = Array.from({ length: 33 }, (_, i) => `e2e:test-${i + 1}`);
+      const s1 = shardScripts(oddScripts, { index: 1, total: 2 });
+      const s2 = shardScripts(oddScripts, { index: 2, total: 2 });
+
+      expect(s1).toHaveLength(17);
+      expect(s2).toHaveLength(16);
+      expect(s1.length + s2.length).toBe(33);
+    });
+
+    it("bảo toàn bất biến: mọi kịch bản xuất hiện đúng MỘT lần duy nhất qua các shard M = 1..N", () => {
+      const N = 4;
+      const shards = Array.from({ length: N }, (_, i) =>
+        shardScripts(mockScripts, { index: i + 1, total: N }),
+      );
+
+      // Tập hợp tất cả các kịch bản chạy trên các shard
+      const allSharded: string[] = [];
+      const seen = new Set<string>();
+
+      for (let sIdx = 0; sIdx < N; sIdx++) {
+        for (const script of shards[sIdx]) {
+          // Không kịch bản nào bị trùng lặp
+          expect(seen.has(script)).toBe(false);
+          seen.add(script);
+          allSharded.push(script);
+        }
+      }
+
+      // Kích thước tập hợp phải bằng đúng số kịch bản ban đầu
+      expect(seen.size).toBe(mockScripts.length);
+      // Danh sách sau khi sort phải khớp 100% với ban đầu
+      expect([...allSharded].sort()).toEqual([...mockScripts].sort());
+    });
+
+    it("bảo toàn thứ tự kịch bản ban đầu theo package.json trong mỗi shard", () => {
+      const s1 = shardScripts(mockScripts, { index: 1, total: 2 });
+      const s2 = shardScripts(mockScripts, { index: 2, total: 2 });
+
+      // Chỉ số của từng phần tử trong shard phải tăng dần theo danh sách ban đầu
+      let lastIndexS1 = -1;
+      for (const item of s1) {
+        const currIdx = mockScripts.indexOf(item);
+        expect(currIdx).toBeGreaterThan(lastIndexS1);
+        lastIndexS1 = currIdx;
+      }
+
+      let lastIndexS2 = -1;
+      for (const item of s2) {
+        const currIdx = mockScripts.indexOf(item);
+        expect(currIdx).toBeGreaterThan(lastIndexS2);
+        lastIndexS2 = currIdx;
+      }
+    });
+
+    it("phối hợp đúng với filterScripts (lọc --only và --skip TRƯỚC, rồi mới chia shard)", () => {
+      const all = ["e2e:a", "e2e:b", "e2e:c", "e2e:d", "e2e:e", "e2e:f", "e2e:g", "e2e:h"];
+      // Giả sử có --skip e2e:c, e2e:g
+      const { selected } = filterScripts(all, { skip: ["e2e:c", "e2e:g"] });
+      expect(selected).toEqual(["e2e:a", "e2e:b", "e2e:d", "e2e:e", "e2e:f", "e2e:h"]);
+
+      // Chia 2 shard trên 6 script còn lại
+      const s1 = shardScripts(selected, { index: 1, total: 2 });
+      const s2 = shardScripts(selected, { index: 2, total: 2 });
+
+      expect(s1).toEqual(["e2e:a", "e2e:d", "e2e:f"]);
+      expect(s2).toEqual(["e2e:b", "e2e:e", "e2e:h"]);
+      expect(s1).not.toContain("e2e:c");
+      expect(s2).not.toContain("e2e:g");
+    });
+  });
+
+  describe("CLI --shard và mã thoát khi sai tham số (#1404)", () => {
+    it("parseCliArgs nhận diện đúng cờ --shard M/N và --shard=M/N", () => {
+      const opts1 = parseCliArgs(["--shard", "1/2"]);
+      expect(opts1.shard).toEqual({ index: 1, total: 2 });
+
+      const opts2 = parseCliArgs(["--shard=2/2"]);
+      expect(opts2.shard).toEqual({ index: 2, total: 2 });
+    });
+
+    it("runE2eAll in thông báo lỗi và thoát mã 2 khi định dạng hoặc phạm vi --shard sai", async () => {
+      // Sai định dạng
+      const code1 = await runE2eAll(["--shard", "invalid-shard"]);
+      expect(code1).toBe(2);
+
+      // Sai phạm vi (M > N)
+      const code2 = await runE2eAll(["--shard", "3/2"]);
+      expect(code2).toBe(2);
+
+      // Sai phạm vi (M < 1)
+      const code3 = await runE2eAll(["--shard", "0/2"]);
+      expect(code3).toBe(2);
+    });
+
+    it("runE2eAll với --dry-run và --shard 1/2 chạy thành công với mã thoát 0", async () => {
+      const code = await runE2eAll(["--dry-run", "--shard", "1/2"]);
+      expect(code).toBe(0);
+    });
+
+    it("runE2eAll với --dry-run nối đúng toRun: hai shard 1/2 và 2/2 rời nhau và hợp lại bằng toàn bộ kịch bản", async () => {
+      const logs: string[] = [];
+      const logSpy = vi.spyOn(console, "log").mockImplementation((msg: string) => {
+        logs.push(msg);
+      });
+
+      try {
+        // Shard 1/2
+        const code1 = await runE2eAll(["--dry-run", "--shard", "1/2"]);
+        expect(code1).toBe(0);
+
+        const dryRun1Lines = [...logs];
+        logs.length = 0;
+
+        // Shard 2/2
+        const code2 = await runE2eAll(["--dry-run", "--shard", "2/2"]);
+        expect(code2).toBe(0);
+
+        const dryRun2Lines = [...logs];
+
+        const parseDryRunScripts = (lines: string[]): string[] => {
+          return lines
+            .filter((line) => /^\s+\d+\.\s+e2e/.test(line))
+            .map((line) => line.trim().replace(/^\d+\.\s+/, ""));
+        };
+
+        const shard1Scripts = parseDryRunScripts(dryRun1Lines);
+        const shard2Scripts = parseDryRunScripts(dryRun2Lines);
+
+        const realPkgPath = path.resolve(__dirname, "../package.json");
+        const realPkg = JSON.parse(readFileSync(realPkgPath, "utf-8"));
+        const allPkgScripts = getE2eScripts(realPkg);
+
+        // (a) Hai danh sách rời nhau hoàn toàn (không có kịch bản nào xuất hiện ở cả 2 shard)
+        const set1 = new Set(shard1Scripts);
+        for (const s of shard2Scripts) {
+          expect(set1.has(s)).toBe(false);
+        }
+
+        // (b) Hợp của chúng = allPkgScripts (cùng độ dài, đủ phần tử)
+        expect(shard1Scripts.length + shard2Scripts.length).toBe(allPkgScripts.length);
+        const union = [...shard1Scripts, ...shard2Scripts].sort();
+        expect(union).toEqual([...allPkgScripts].sort());
+
+        // (c) Shard 1 có phần tử đầu = kịch bản đầu tiên của package.json
+        expect(shard1Scripts[0]).toBe(allPkgScripts[0]);
+        // (d) Shard 2 có phần tử đầu = kịch bản thứ hai của package.json
+        expect(shard2Scripts[0]).toBe(allPkgScripts[1]);
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
+    it("runE2eAll khi shard rỗng (--only chan-duong --shard 2/2) thoát mã 0 và ghi REPORT.md thành công", async () => {
+      const tempLogsDir = path.join(os.tmpdir(), `tg-e2e-empty-shard-${Date.now()}`);
+      try {
+        const code = await runE2eAll([
+          "--only",
+          "chan-duong",
+          "--shard",
+          "2/2",
+          "--logs",
+          tempLogsDir,
+        ]);
+        expect(code).toBe(0);
+
+        // Đảm bảo thư mục logs và file REPORT.md được tạo thành công để bước upload-artifact không bị lỗi
+        const reportFile = path.join(tempLogsDir, "REPORT.md");
+        expect(existsSync(reportFile)).toBe(true);
+        const reportContent = readFileSync(reportFile, "utf-8");
+        expect(reportContent).toContain("# Báo cáo E2E Toàn diện");
+      } finally {
+        if (existsSync(tempLogsDir)) {
+          rmSync(tempLogsDir, { recursive: true, force: true });
+        }
       }
     });
   });
