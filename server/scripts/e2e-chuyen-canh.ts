@@ -219,6 +219,58 @@ async function main() {
       return JSON.stringify(d);
     };
 
+    // QUỸ ĐẠO khi đi bộ (E2E đêm 23/11, run 45134303573: `walkDiag` cho thấy nhân vật đứng yên ở (2020, 2830), cách cổng am_suong_nam ~640 px và cách điểm xuất hiện (1984, 3344)
+    // ~510 px về phía bắc, FPS 4, Chrome ăn ~360% CPU, hai lần thử cùng một chỗ: một dòng cuối không nói được nó ĐI ĐẾN đó thế nào). Mỗi giây ghi vị trí đoán trước (client),
+    // vị trí thật (World), khí huyết / chết, joystick, FPS; kèm sự kiện kiểm toán của phòng (tha chết, dời chỗ, ...). Chỉ in khi hết giờ; không đổi hành vi.
+    const startTrace = async () => {
+      const rows: string[] = [];
+      const t0 = Date.now();
+      const rel = () => `+${((Date.now() - t0) / 1000).toFixed(1)}s`;
+      let world: any = null;
+      let origAudit: any = null;
+      let busy = false;
+      const tick = async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          const page = JSON.parse(
+            String(
+              await ev(`(() => { const s = window.__scene, J = window.__joystick;
+                return JSON.stringify({ sid: s.room.sessionId, roomId: s.room.roomId, p: [Math.round(s.predX), Math.round(s.predY)],
+                  j: J ? [Math.round(J.x * 100) / 100, Math.round(J.y * 100) / 100, J.active] : null, fps: Math.round(s.game?.loop?.actualFps ?? -1) }); })()`),
+            ),
+          );
+          const room = matchMaker.getLocalRoomById(String(page.roomId)) as any;
+          if (room?.world && room.world !== world) {
+            world = room.world;
+            origAudit = world.audit;
+            world.audit = (evName: string, fields: unknown) => {
+              rows.push(`${rel()} [kiểm toán] ${evName} ${JSON.stringify(fields).slice(0, 160)}`);
+              origAudit?.(evName, fields);
+            };
+          }
+          const me = room?.world?.state?.players?.get(String(page.sid));
+          rows.push(
+            `${rel()} khách=${page.p} máy chủ=${me ? `${Math.round(me.x)},${Math.round(me.y)}` : "?"} hp=${me ? Math.round(me.hp) : "?"}${me?.dead ? " CHẾT" : ""} joy=${JSON.stringify(page.j)} fps=${page.fps}`,
+          );
+          if (rows.length > 60) rows.shift();
+        } catch {
+          /* trang đang chuyển cảnh: bỏ mẫu này */
+        } finally {
+          busy = false;
+        }
+      };
+      const timer = setInterval(() => void tick(), 1000);
+      return {
+        dump: () => rows.slice(-40).join("\n    "),
+        stop: () => {
+          clearInterval(timer);
+          // trả `audit` của phòng về nguyên bản (chỉ khi chưa ai đổi sau ta)
+          if (world) world.audit = origAudit;
+        },
+      };
+    };
+
     // Đi bộ tới cổng `id` của bản đồ hiện tại bằng joystick ảo (BFS trên ô) rồi đứng sát tâm cổng
     const walkToPortal = async (id: string) => {
       const P = `window.__scene.map.portals.find((q) => q.id === ${JSON.stringify(id)})`;
@@ -244,6 +296,7 @@ async function main() {
         !(await ev(`window.__walkErr`)),
         `có đường đi bộ tới cổng ${id} (${await ev(`window.__walkErr`)})`,
       );
+      const trace = await startTrace();
       try {
         await T.waitFor(
           `!!window.__scene.nearPortal && Math.hypot(window.__scene.predX - ${P}.x, window.__scene.predY - ${P}.y) < ${WALK_NEAR_PX}`,
@@ -253,7 +306,10 @@ async function main() {
       } catch (err) {
         // Chỉ chẩn đoán rồi ném lại đúng lỗi gốc: lần đỏ trên CI (22/11, 90 s ở am_suong_nam, 2/2 lần, không tái hiện được ở máy dev) chỉ để lại một dòng timeout
         out(`  (chẩn đoán đi bộ tới cổng ${id}: ${await walkDiag(id)})`);
+        out(`  (quỹ đạo đi bộ, mỗi giây một mẫu:\n    ${trace.dump()})`);
         throw err;
+      } finally {
+        trace.stop();
       }
       ok(`đã tới gần cổng ${id} sau ${await ev(`window.__walkLen`)} ô`);
       await ev(
