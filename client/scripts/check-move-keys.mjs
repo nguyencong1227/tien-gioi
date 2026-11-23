@@ -240,12 +240,6 @@ async function main() {
       };
       await sleep(300);
       await reset();
-      // Khởi động trước một nhịp để WebGL shader compilation trên môi trường không GPU (SwiftShader/CI) ổn định
-      await down("KeyD");
-      await sleep(1000);
-      await up("KeyD");
-      await sleep(200);
-      await reset();
       await down("KeyD");
       await sleep(1000);
       const base = (await pos()).x;
@@ -481,10 +475,9 @@ async function main() {
       }
       lat.sort((a, b) => a - b);
       const med = lat[Math.floor(lat.length / 2)];
-      const maxLat = process.env.CI ? 250 : 150;
       check(
-        lat[0] >= 0 && med <= maxLat,
-        `độ trễ nhấn phím -> nhích: trung vị ${med} ms (<= ${maxLat}), lớn nhất ${lat[lat.length - 1]} ms`,
+        lat[0] >= 0 && med <= 150,
+        `độ trễ nhấn phím -> nhích: trung vị ${med} ms (<= 150), lớn nhất ${lat[lat.length - 1]} ms`,
       );
     }
 
@@ -580,25 +573,23 @@ async function main() {
           return p;
         };
         console.log("  [10] bảng phím đã đổi: phím mới đi, phím cũ không đi");
-        // Khởi động ngắn một nhịp để WebGL shader compilation ổn định trên trang mới nạp
-        await holdKey("KeyL", 400);
-        const MIN = 20;
-        const r = await holdKey("KeyL", 700);
+        const MIN = 30;
+        const r = await holdKey("KeyL", 600);
         check(
           r.x > MIN && Math.abs(r.y) < 1,
           `L = đi phải (${r.x.toFixed(0)}, ${r.y.toFixed(0)} px)`,
         );
-        const l = await holdKey("KeyJ", 700);
+        const l = await holdKey("KeyJ", 600);
         check(
           l.x < -MIN && Math.abs(l.y) < 1,
           `J = đi trái (${l.x.toFixed(0)}, ${l.y.toFixed(0)} px)`,
         );
-        const u = await holdKey("KeyI", 700);
+        const u = await holdKey("KeyI", 600);
         check(
           u.y < -MIN && Math.abs(u.x) < 1,
           `I = đi lên (${u.x.toFixed(0)}, ${u.y.toFixed(0)} px)`,
         );
-        const d = await holdKey("KeyK", 700);
+        const d = await holdKey("KeyK", 600);
         check(
           d.y > MIN && Math.abs(d.x) < 1,
           `K = đi xuống (${d.x.toFixed(0)}, ${d.y.toFixed(0)} px)`,
