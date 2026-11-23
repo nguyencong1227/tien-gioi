@@ -126,11 +126,18 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13 và 15)", 
 
   it("nhóm 15 (hiệu ứng chiêu): một tờ MỖI HỆ, tổng đúng số chiêu học được, mỗi hệ có chiêu đều có tờ", () => {
     const out = String(run.stdout);
+    const slash = new Set(["cone", "line", "bolt", "dash"]);
     const byEl = new Map<string, number>();
-    for (const k of LEARNABLE_SKILLS) byEl.set(k.element, (byEl.get(k.element) ?? 0) + 1);
+    const privByEl = new Map<string, number>(); // ô C (vệt chém Wuxia, gói riêng) chỉ có ở chiêu chém / tia / lao
+    for (const k of LEARNABLE_SKILLS) {
+      byEl.set(k.element, (byEl.get(k.element) ?? 0) + 1);
+      if (slash.has(k.shape)) privByEl.set(k.element, (privByEl.get(k.element) ?? 0) + 1);
+    }
     let total = 0;
     for (const [el, n] of byEl) {
-      expect(out, el).toContain(`15-hieu-ung-chieu-${el} ${n} mã`);
+      expect(out, el).toContain(
+        `15-hieu-ung-chieu-${el} ${n} mã (ô gói riêng: ${privByEl.get(el) ?? 0})`,
+      );
       total += n;
       expect(fs.statSync(path.join(pub, `15-hieu-ung-chieu-${el}.png`)).size, el).toBeGreaterThan(
         5_000,

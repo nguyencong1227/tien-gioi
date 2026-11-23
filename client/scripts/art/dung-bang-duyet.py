@@ -459,7 +459,8 @@ def main():
         for code_group, title, rows in sheets:
             render_sheet(title, rows, os.path.join(a.public, f"{code_group}.png"), public=True)
             render_sheet(title, rows, os.path.join(a.private, f"{code_group}-day-du.png"), public=False)
-            print("ĐÃ DỰNG", code_group, len(rows), "mã")
+            priv_cells = sum(1 for r in rows for c in r["opts"] if c.frames and SRC[c.src][2])
+            print(f"ĐÃ DỰNG {code_group} {len(rows)} mã (ô gói riêng: {priv_cells})")
         built[g] = "\n".join(md_for(cg, t, r) for cg, t, r in sheets)
     if a.md:
         upsert_md(a.md, built)
