@@ -17,7 +17,9 @@
     "perf:mobile": "node scripts/measure-mobile-perf.mjs",
     "perf:4g": "node scripts/measure-4g.mjs",
     "preview": "vite preview --host",
-    "assets": "node scripts/gen-assets.mjs"
+    "assets": "node scripts/gen-assets.mjs",
+    "assets:sync": "node scripts/sync-asset-docs.mjs",
+    "assets:merge-fix": "node scripts/merge-fix.mjs"
   },
   "dependencies": {
     "@capacitor/app": "8.1.2",
