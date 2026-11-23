@@ -80,6 +80,8 @@ def first(pattern):
 def fit(im, game_h, view=VIEW):
     """Thu / phóng `im` về cao xấp xỉ `game_h` điểm ảnh GAME rồi phóng `view` lần nguyên số. Phóng to nguyên số = giữ điểm ảnh; thu nhỏ dùng LANCZOS (chỉ để XEM, bản thật sẽ thu theo đường khác)."""
     im = trim(im)
+    if game_h is None:  # giao diện: giữ CỠ THẬT (không thu / phóng), chỉ phóng nguyên số `view` lần nếu là điểm ảnh nhỏ
+        return (im.resize((im.width * view, im.height * view), Image.NEAREST) if view > 1 else im), None
     k = game_h / im.height
     if k >= 1:
         n = max(1, round(k))
@@ -88,6 +90,64 @@ def fit(im, game_h, view=VIEW):
     else:
         im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
     return im.resize((im.width * view, im.height * view), Image.NEAREST), k
+
+
+SHOT = os.path.join(ROOT, "docs/screenshots")
+UI_DIR = {"xian": f"{XIAN}/ui", "ninja": f"{NINJA}/theme", "sunny": f"{SUNNY}/UI"}
+
+
+def tres_margins(path):
+    """Biên 9-slice (trái, trên, phải, dưới) trong tệp `.tres` của gói Godot."""
+    import re
+
+    t = open(path, encoding="utf8").read()
+    return tuple(int(float(re.search(rf"texture_margin_{k} = ([\d.]+)", t).group(1))) for k in ("left", "top", "right", "bottom"))
+
+
+def nine(im, m, size, scale=1, smooth=False):
+    """Dựng khung 9-slice cỡ `size` từ `im` với biên `m` (trái, trên, phải, dưới). `scale` phóng / thu cả ảnh nguồn trước (điểm ảnh nhỏ: phóng nguyên số, NEAREST)."""
+    if scale != 1:
+        im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.NEAREST if scale > 1 else Image.LANCZOS)
+        m = tuple(max(1, round(v * scale)) for v in m)
+    l, t, r, b = m
+    W, H = size
+    sw, sh = im.size
+    xs = [(0, l, 0, l), (l, sw - r, l, W - r), (sw - r, sw, W - r, W)]
+    ys = [(0, t, 0, t), (t, sh - b, t, H - b), (sh - b, sh, H - b, H)]
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    for sy0, sy1, dy0, dy1 in ys:
+        for sx0, sx1, dx0, dx1 in xs:
+            if sx1 <= sx0 or sy1 <= sy0 or dx1 <= dx0 or dy1 <= dy0:
+                continue
+            piece = im.crop((sx0, sy0, sx1, sy1))
+            if piece.size != (dx1 - dx0, dy1 - dy0):
+                piece = piece.resize((dx1 - dx0, dy1 - dy0), Image.BICUBIC if smooth else Image.NEAREST)
+            out.alpha_composite(piece, (dx0, dy0))
+    return out
+
+
+def stack(ims, gap=4):
+    """Xếp các ảnh theo chiều dọc (căn trái) thành MỘT ảnh: một ô phương án có thể chứa nhiều thanh."""
+    W = max(i.width for i in ims)
+    H = sum(i.height for i in ims) + gap * (len(ims) - 1)
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    y = 0
+    for i in ims:
+        out.alpha_composite(i, (0, y))
+        y += i.height + gap
+    return out
+
+
+def side(ims, gap=6):
+    """Xếp các ảnh theo chiều ngang (căn giữa dọc) thành MỘT ảnh."""
+    W = sum(i.width for i in ims) + gap * (len(ims) - 1)
+    H = max(i.height for i in ims)
+    out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    x = 0
+    for i in ims:
+        out.alpha_composite(i, (x, (H - i.height) // 2))
+        x += i.width + gap
+    return out
 
 
 # ---------------------------------------------------------------- bộ nạp theo nguồn
@@ -140,6 +200,13 @@ class Loaders:
             out.append(im)
         return out
 
+    # giao diện: HIỆN TẠI cắt từ ảnh chụp trong docs/screenshots (điểm ảnh thật, 1 ảnh = 1 điểm CSS); phương án lấy từ thư mục UI của từng gói
+    def shot(self, name, box):
+        return load(os.path.join(SHOT, name)).crop(box)
+
+    def ui(self, src, rel):
+        return load(os.path.join(UI_DIR[src], rel))
+
     def wuxia_slash(self, n=3):
         fs = sorted(glob.glob(f"{WUXIA}/05_VFX/Blade_Slash/Frames/*.png"))
         return [load(fs[round(i * (len(fs) - 1) / max(1, n - 1))]) for i in range(n)]
@@ -164,29 +231,30 @@ class Loaders:
 
 # ---------------------------------------------------------------- tờ ảnh
 class Cell:
-    def __init__(self, letter, src, frames, cap, game_h):
-        self.letter, self.src, self.cap = letter, src, cap
-        self.frames, self.game_h = frames, game_h  # frames: list[Image] (hoặc [] = không có)
+    def __init__(self, letter, src, frames, cap, game_h, view=None, note=None):
+        self.letter, self.src, self.cap, self.note = letter, src, cap, note  # note: chữ trong ô trống thay câu mặc định
+        self.frames, self.game_h = frames, game_h  # frames: list[Image] (hoặc [] = không có); game_h None = giữ cỡ thật
+        self.view = view or VIEW  # hệ số phóng thêm (giao diện dùng 1, biểu tượng điểm ảnh nhỏ dùng 3)
 
 
 def cell_image(c, public):
     """Ảnh của một ô (dải khung nằm ngang) hoặc khung trống nếu không có / là gói riêng trên tờ công khai."""
     private = SRC[c.src][2]
     if not c.frames or (public and private):
-        w, h = 200, 110
+        w, h = 200, (56 if c.game_h is None else 110)  # giao diện (game_h None) dùng ô trống thấp hơn để hàng gọn
         im = Image.new("RGBA", (w, h), PANEL)
         d = ImageDraw.Draw(im)
         if c.frames:
             msg = "gói riêng: xem tờ riêng\n(không đưa lên GitHub)"
         elif c.src == "cur":
-            msg = "chưa có hình riêng trong atlas\n(dùng hình dự phòng)"
+            msg = c.note or "chưa có hình riêng trong atlas\n(dùng hình dự phòng)"
         else:
             msg = "KHÔNG CÓ trong các gói"
         d.multiline_text((w // 2, h // 2), msg, font=font(12), fill=DIM, anchor="mm", align="center")
         return im, 0
     parts, k = [], 1
     for f in c.frames:
-        p, k = fit(f, c.game_h)
+        p, k = fit(f, c.game_h, c.view)
         parts.append(p)
     gap = 6
     W = sum(p.width for p in parts) + gap * (len(parts) - 1)
@@ -210,19 +278,25 @@ def render_sheet(title, rows, path, public):
         rendered.append([cell_image(c, public) for c in cells])
     # độ rộng cột = ô rộng nhất của cột đó (kẹp 200..420) để dải khung không bị cắt
     ncols = 4
-    colw = [max(200, min(520, max(imgs[i][0].width for imgs in rendered) + 12)) for i in range(ncols)]
+    colw = [max(200, min(700, max(imgs[i][0].width for imgs in rendered) + 12)) for i in range(ncols)]
     xs = [LAB_W + PAD + sum(colw[:i]) + 8 * i for i in range(ncols)]
     W = xs[-1] + colw[-1] + PAD
     heights = []
     for r, imgs in zip(rows, rendered):
         img_h = max(im.height for im, _ in imgs)
         cap_lines = max(len(textwrap.wrap(c.cap + "  x9.99", width=max(18, int(colw[i] / 6.2)))) for i, c in enumerate([r["cur"]] + r["opts"]))
-        heights.append(max(img_h + 34 + 14 * cap_lines + 12, 96))
+        # cột nhãn bên trái (tên + khuyến nghị) cũng phải vừa trong hàng, nếu không chữ tràn sang hàng dưới
+        left_h = 30 + 19 * len(textwrap.wrap(r["name"], width=30)) + ((4 + 14 * len(textwrap.wrap("khuyến nghị: " + r["rec"], width=38))) if r.get("rec") else 0) + 14
+        if r.get("top"):  # căn đỉnh: chú thích nằm ngay dưới hình CỦA TỪNG ô, hàng cao theo ô cao nhất (kể cả chú thích)
+            body = max(im.height + 4 + 14 * len(textwrap.wrap(c.cap + "  x9.99", width=max(18, int(colw[i] / 6.2)))) for i, ((im, _), c) in enumerate(zip(imgs, [r["cur"]] + r["opts"])))
+            heights.append(max(34 + body + 12, 96, left_h))
+        else:
+            heights.append(max(img_h + 34 + 14 * cap_lines + 12, 96, left_h))
     H = 70 + sum(heights) + PAD
     sheet = Image.new("RGBA", (W, H), BG)
     d = ImageDraw.Draw(sheet)
     d.text((PAD, 14), title, font=f_tit, fill=GOLD)
-    d.text((PAD, 40), "mỗi hình ĐÃ thu / phóng về cỡ trong game rồi ×%d; 'x' nhỏ = hệ số thu phóng" % VIEW, font=f_cap, fill=DIM)
+    d.text((PAD, 40), rows[0].get("sub") or "mỗi hình ĐÃ thu / phóng về cỡ trong game rồi ×%d; 'x' nhỏ = hệ số thu phóng" % VIEW, font=f_cap, fill=DIM)
     y = 62
     for r, imgs, h in zip(rows, rendered, heights):
         d.rounded_rectangle((PAD // 2, y, W - PAD // 2, y + h - 6), radius=6, fill=(33, 30, 42))
@@ -243,9 +317,9 @@ def render_sheet(title, rows, path, public):
             tag = "HIỆN TẠI" if i == 0 else c.letter
             d.rounded_rectangle((x, y + 8, x + 20 + (60 if i == 0 else 0), y + 28), radius=4, fill=GOLD if i else (90, 84, 110))
             d.text((x + 6, y + 10), tag, font=f_cap, fill=(26, 24, 33) if i else INK)
-            sheet.alpha_composite(im, (x, y + 34 + (img_h - im.height)))
+            sheet.alpha_composite(im, (x, y + 34 + (0 if r.get("top") else img_h - im.height)))  # nhân vật / quái đứng trên đất (căn đáy); giao diện căn đỉnh (top=True)
             cap = c.cap + (f"  x{k:.2g}" if k else "")
-            cy = y + 34 + img_h + 4
+            cy = y + 34 + (im.height if r.get("top") else img_h) + 4
             for line in textwrap.wrap(cap, width=max(18, int(colw[i] / 6.2))):
                 d.text((x, cy), line, font=f_cap, fill=DIM)
                 cy += 14
@@ -255,13 +329,13 @@ def render_sheet(title, rows, path, public):
 
 
 # ---------------------------------------------------------------- dữ liệu các nhóm
-def cell(L, letter, src, getter, cap, game_h):
+def cell(L, letter, src, getter, cap, game_h, view=None):
     """Ô phương án: `getter` trả Image hoặc list[Image]; trả về ô trống nếu lỗi tìm tệp (ghi rõ trong tờ)."""
     try:
         v = getter()
     except (FileNotFoundError, KeyError, IndexError):
         v = []
-    return Cell(letter, src, v if isinstance(v, list) else [v], cap, game_h)
+    return Cell(letter, src, v if isinstance(v, list) else [v], cap, game_h, view)
 
 
 def group_nv(L):
@@ -383,6 +457,150 @@ def group_hu(L, names):
     return sheets
 
 
+def group_ui(L, names):
+    """Giao diện (UI): 9 mã. HIỆN TẠI = điểm ảnh THẬT cắt từ ảnh chụp trong docs/screenshots (giao diện là DOM / CSS, không có tệp ảnh); phương án dựng ở CÙNG KÍCH CỠ
+    (khung 9-slice theo biên của gói, thanh phủ ~70 %), giữ cỡ thật (×1); biểu tượng điểm ảnh nhỏ của gói riêng ghi ×3."""
+    N = lambda rel: L.ui("ninja", rel)
+    X = lambda rel: L.ui("xian", rel)
+    U = lambda rel: L.ui("sunny", rel)
+    shot = L.shot
+    HUD, CHAR, SET, TT = "hud-1280x720.png", "char-1280x720.png", "sheet-settings-390x844.png", "trang-thai-1280x720.png"
+    sub = "HIỆN TẠI = ảnh chụp thật (docs/screenshots, 1 ảnh = 1 điểm CSS); phương án dựng ở CÙNG KÍCH CỠ, giữ cỡ thật (×1); biểu tượng điểm ảnh nhỏ ghi ×3 / ×4"
+
+    def cur(frames, cap):
+        return cell(L, "", "cur", frames, cap, None, 1)
+
+    def opt(letter, src, getter, cap, view=1):
+        return cell(L, letter, src, getter, cap, None, view)
+
+    def empty(letter, src):
+        return Cell(letter, src, [], "", None, 1)
+
+    def xnine(name, size, scale=1):
+        base = f"ui_xianxia_{name}"
+        return nine(X(base + ".png"), tres_margins(f"{UI_DIR['xian']}/{base}.tres"), size, scale=scale, smooth=True)
+
+    def sbox(t, size):
+        src = Image.new("RGBA", (9, 9))
+        for r, row in enumerate((("tl", "tc", "tr"), ("lc", "c", "rc"), ("bl", "bc", "br"))):
+            for c, n in enumerate(row):
+                src.alpha_composite(U(f"9slice_box_white/{t}_box_9slice_{n}.png"), (c * 3, r * 3))
+        return nine(src, (3, 3, 3, 3), size, scale=3)
+
+    rows = []
+    # UI-01 khung bảng (góc trên trái của hộp "Đạo Thể · Trang Bị", 150x84)
+    P = (150, 84)
+    rows.append(dict(code="UI-01", name="Khung bảng (hộp thoại, túi, nhân vật...)", top=True, rec="giữ hiện tại (đọc tốt); A nếu muốn khung mực / ngọc kiểu tiên hiệp", sub=sub,
+        cur=cur(lambda: shot(CHAR, (410, 98, 560, 182)), "hộp 'Đạo Thể' hiện tại (CSS), góc trên trái 150x84"),
+        opts=[opt("A", "xian", lambda: [xnine(f"panel_01_{n}", P) for n in ("ink", "jade", "rosewood", "silk")], "panel_01 mực / ngọc / gỗ hồng / lụa (9-slice, biên của gói)"),
+              opt("B", "ninja", lambda: [nine(N("theme_1/nine_path_panel.png"), (6, 6, 6, 6), P, scale=3), nine(N("theme_1/nine_path_bg.png"), (5, 5, 4, 4), P, scale=3)], "theme_1 nine_path_panel / nine_path_bg ×3"),
+              opt("C", "sunny", lambda: [sbox("dt", P), sbox("lt", P)], "9slice_box dt / lt ×3")]))
+    # UI-02 nút bấm
+    B = (80, 36)
+    rows.append(dict(code="UI-02", name="Nút bấm (thường / chạm / nhấn)", top=True, rec="giữ hiện tại; A (ngọc) nếu muốn nút kiểu tiên hiệp",
+        cur=cur(lambda: [shot(HUD, (101, 139, 181, 175)), shot(CHAR, (136, 99, 212, 135))], "HUD 'Nhiệm vụ' (thường) + 'Nhân vật' (đang mở)"),
+        opts=[opt("A", "xian", lambda: [xnine(f"button_01_{c}_{st}", B) for c in ("jade", "silk") for st in ("normal", "hover", "pressed")], "button_01 ngọc / lụa x thường / chạm / nhấn"),
+              opt("B", "ninja", lambda: [nine(N(f"theme_1/button_{st}.png"), (5, 4 if st == "pressed" else 3, 5, 3), B, scale=3) for st in ("normal", "hover", "pressed")], "theme_1 button thường / chạm / nhấn ×3"),
+              opt("C", "sunny", lambda: _slabel(U, B[0]), "label_left + middle + right ×3 (nhãn, không có trạng thái)")]))
+    # UI-03 thanh
+    BW = 244
+    rows.append(dict(code="UI-03", name="Thanh khí huyết / linh lực / tu vi", top=True, rec="giữ hiện tại (chữ số nằm ngay trên thanh); chỉ đổi nếu chữ vẫn đọc được",
+        cur=cur(lambda: shot(HUD, (21, 42, 265, 94)), "HUD hiện tại: ba thanh 244 px (đỏ / xanh / vàng) có chữ"),
+        opts=[opt("A", "xian", lambda: _xbars(X, BW), "bar_01 frame + hp / mp / spirit (phủ 72 %), thu về 244 px"),
+              opt("B", "ninja", lambda: _nbars(N, L, BW), "system/ui/life_bar + bg ×3 (chỉ có thanh ĐỎ; phủ 100 / 60 / 25 %)"),
+              opt("C", "sunny", lambda: _sbars(U), "redbar / bluebar / greenbar mức 0 / 3 / cuối ×3", 1)]))
+    # UI-04 ô vật phẩm
+    S54 = (54, 54)
+    rows.append(dict(code="UI-04", name="Ô vật phẩm (túi, thanh dùng nhanh)", top=True, rec="giữ hiện tại; C nếu muốn ô tròn kiểu hộp đạo cụ",
+        cur=cur(lambda: shot(HUD, (982, 652, 1098, 706)), "HUD: ô 'Hồi Huyết' (sáng) + 'Hồi Linh' (mờ), 54x54"),
+        opts=[opt("A", "xian", lambda: [xnine(f"panel_01_{n}", S54, scale=0.5) for n in ("ink", "jade")], "panel_01 mực / ngọc thu 50 % làm ô 54x54"),
+              opt("B", "ninja", lambda: [nine(N(f"theme_1/nine_path_{n}.png"), m, S54, scale=2) for n, m in (("panel", (6, 6, 6, 6)), ("bg", (5, 5, 4, 4)), ("bg_2", (5, 5, 4, 4)))], "theme_1 panel / bg / bg_2 ×2"),
+              opt("C", "sunny", lambda: [U("itemdisc_01.png"), U("itemdisc_02.png")], "itemdisc_01 / 02 (đĩa tròn) ×3", 3)]))
+    # UI-05 con trỏ chuột
+    rows.append(dict(code="UI-05", name="Con trỏ chuột (máy tính)", top=True, rec="A (kiếm) cho điểm nhấn; chỉ máy tính, không ảnh hưởng điện thoại",
+        cur=Cell("", "cur", [], "con trỏ hệ thống của trình duyệt (không vẽ riêng)", None, 1, note="con trỏ hệ thống\n(không vẽ riêng)"),
+        opts=[opt("A", "xian", lambda: [_fit_h(X("ui_xianxia_01_cursor_sword.png"), 32), _fit_h(X("ui_xianxia_01_cursor_whisk.png"), 32)], "cursor_sword / cursor_whisk (phất trần), thu về 32 px"),
+              empty("B", "ninja"),
+              opt("C", "sunny", lambda: [U(f"cursor_0{i}.png") for i in range(1, 6)] + [U("hand_open_01.png"), U("hand_closed_01.png")], "cursor_01..05 + tay mở / nắm ×3", 3)]))
+    # UI-06 đường kẻ / góc trang trí
+    rows.append(dict(code="UI-06", name="Đường kẻ phân cách + góc trang trí khung", top=True, rec="A (mây / ngọc) nếu duyệt khung bảng A ở UI-01; không thì giữ hiện tại",
+        cur=cur(lambda: shot(CHAR, (425, 140, 640, 172)), "đường kẻ dưới tiêu đề hộp 'Đạo Thể' (CSS, 1 px)"),
+        opts=[opt("A", "xian", lambda: [X("ui_xianxia_01_divider_cloud.png"), X("ui_xianxia_01_divider_jade.png"), _fit_h(X("ui_xianxia_01_corner_tl.png"), 40)], "divider_cloud / divider_jade / corner_tl (thu về 40 px)"),
+              empty("B", "ninja"), empty("C", "sunny")]))
+    # UI-07 ô tích chọn + thanh trượt
+    rows.append(dict(code="UI-07", name="Ô tích chọn + thanh trượt (Cài đặt)", top=True, rec="giữ hiện tại (ô kiểm HTML gốc: bàn phím và trình đọc màn hình dùng được)",
+        cur=cur(lambda: [shot(SET, (25, 120, 312, 142)), shot(SET, (338, 270, 368, 300))], "Cài đặt: thanh trượt vàng + ô kiểm trắng"),
+        opts=[opt("A", "xian", lambda: _xslider(X), "slider_track + knob (70 %) + check_off / check_on, thu về cỡ hiện tại"),
+              opt("B", "ninja", lambda: [N("theme_1/unchecked.png"), N("theme_1/checked.png"), N("theme_1/h_slidder_grabber.png"), N("theme_1/slider_progress.png")], "theme_1 unchecked / checked / grabber / slider_progress ×2", 2),
+              opt("C", "sunny", lambda: [U("confirm.png"), U("cancel.png")], "confirm (✓) / cancel (✗) ×3 (dấu, không phải ô kiểm)", 3)]))
+    # UI-08 nút hành động tròn
+    rows.append(dict(code="UI-08", name="Nút hành động tròn (Chém, Đột phá, Đả tọa, Kiếm khí)", top=True, rec="giữ hiện tại (chữ Hán + nhãn Việt đã rõ trên mọi cỡ màn hình)",
+        cur=cur(lambda: shot(HUD, (1110, 550, 1266, 706)), "HUD: bốn nút tròn 156x156"),
+        opts=[empty("A", "xian"),
+              opt("B", "ninja", lambda: [N(f"nine_path_{n}.png") for n in (8, 9, 4)], "theme/nine_path_8 / 9 / 4 (tròn) ×4", 4),
+              opt("C", "sunny", lambda: [U("itemdisc_01.png"), U("itemdisc_02.png")], "itemdisc_01 / 02 ×4", 4)]))
+    # UI-09 huy hiệu trạng thái
+    rows.append(dict(code="UI-09", name="Huy hiệu trạng thái (Bỏng, Choáng, Tăng tốc...)", top=True, rec="A (biểu tượng) đứng cạnh số giây; giữ chữ cho trình đọc màn hình",
+        cur=cur(lambda: shot(TT, (38, 230, 490, 272)), "HUD: ô 'tên + số giây' (đỏ có hại, xanh có lợi)"),
+        opts=[opt("A", "xian", lambda: [X(f"ui_xianxia_status_{n}.png") for n in ("bleed", "burn", "freeze", "golden_shield", "paralyze", "poison", "seal", "swift")], "status_ bleed / burn / freeze / golden_shield / paralyze / poison / seal / swift (32 px)"),
+              empty("B", "ninja"), empty("C", "sunny")]))
+    return [("16-giao-dien", "Nhóm 16 — Giao diện (UI): khung, nút, thanh, ô, con trỏ, đường kẻ, ô kiểm, nút tròn, huy hiệu", rows)]
+
+
+def _fit_h(im, h):
+    im = trim(im)
+    return im.resize((max(1, round(im.width * h / im.height)), h), Image.LANCZOS)
+
+
+def _slabel(U, w):
+    """Nhãn Sunnyside: trái + giữa (kéo giãn) + phải, phóng ×3, rộng xấp xỉ `w`."""
+    l, m, r = U("label_left.png"), U("label_middle.png"), U("label_right.png")
+    n = max(l.width + r.width + 1, w // 3)
+    im = Image.new("RGBA", (n, l.height))
+    im.alpha_composite(l, (0, 0))
+    im.alpha_composite(m.resize((n - l.width - r.width, m.height), Image.NEAREST), (l.width, 0))
+    im.alpha_composite(r, (n - r.width, 0))
+    return im.resize((im.width * 3, im.height * 3), Image.NEAREST)
+
+
+def _xbars(X, w):
+    frame = X("ui_xianxia_bar_01_frame.png")
+    out = []
+    for n in ("hp", "mp", "spirit"):
+        prog = X(f"ui_xianxia_bar_01_{n}.png")
+        comp = frame.copy()
+        comp.alpha_composite(prog.crop((0, 0, int(prog.width * 0.72), prog.height)))
+        out.append(comp.resize((w, round(w * frame.height / frame.width)), Image.LANCZOS))
+    return stack(out)
+
+
+def _nbars(N, L, w):
+    bg = load(f"{NINJA}/system/ui/life_bar/life_bar_bg.png")
+    bar = load(f"{NINJA}/system/ui/life_bar/life_bar.png")
+    out = []
+    for frac in (1.0, 0.6, 0.25):
+        b = nine(bg, (2, 1, 2, 1), (w, 12), scale=3)
+        b.alpha_composite(nine(bar, (2, 1, 2, 1), (max(12, int(w * frac)), 12), scale=3))
+        out.append(b)
+    return stack(out)
+
+
+def _sbars(U):
+    rows = []
+    for col, lv in (("red", ("00", "03", "06")), ("blue", ("00", "03", "05")), ("green", ("00", "03", "06"))):
+        rows.append(side([U(f"{col}bar_{l}.png").resize((45, 21), Image.NEAREST) for l in lv]))
+    return stack(rows)
+
+
+def _xslider(X):
+    track = X("ui_xianxia_01_slider_track.png").resize((287, 9), Image.LANCZOS)
+    knob = _fit_h(X("ui_xianxia_01_slider_knob.png"), 22)
+    sl = Image.new("RGBA", (287, 24))
+    sl.alpha_composite(track, (0, 8))
+    sl.alpha_composite(knob, (int(287 * 0.7) - knob.width // 2, 1))
+    return [sl, _fit_h(X("ui_xianxia_01_check_off.png"), 30), _fit_h(X("ui_xianxia_01_check_on.png"), 30)]
+
+
 def md_for(code_group, title, rows):
     out = [f"## {title}", "", f"Tờ ảnh: `{code_group}.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/{code_group}-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).", "",
            "| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |", "|---|---|---|---|---|---|---|"]
@@ -391,7 +609,7 @@ def md_for(code_group, title, rows):
         if not c.frames:
             return "—"
         n, lic, priv, view = SRC[c.src]
-        return f"{n} ({'**gói riêng**, ' if priv else ''}{lic}); {view}; {c.cap}".replace("|", "/")
+        return f"{n} ({'**gói riêng**, ' if priv else ''}{lic}); {'' if c.game_h is None else view + '; '}{c.cap}".replace("|", "/")  # giao diện (game_h None) không có "góc nhìn"
 
     for r in rows:
         out.append(f"| {r['code']} | {r['name']} | {r['cur'].cap or '—'} | " + " | ".join(desc(c) for c in r["opts"]) + f" | {r.get('rec', '')} |")
@@ -451,7 +669,7 @@ def main():
     one = lambda t: [t]
     builders = {
         "10": lambda: one(group_nv(L)), "11": lambda: one(group_npc(L, names)), "12": lambda: one(group_quai(L, names)),
-        "13": lambda: one(group_trum(L, names)), "15": lambda: group_hu(L, names),
+        "13": lambda: one(group_trum(L, names)), "15": lambda: group_hu(L, names), "16": lambda: group_ui(L, names),
     }
     built = {}
     for g in a.groups.split(","):

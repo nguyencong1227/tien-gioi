@@ -233,7 +233,25 @@ Tờ ảnh: `15-hieu-ung-chieu-none.png` (công khai: hiện tại + CC0) và `/
 
 <!-- /NHOM 15 -->
 
+<!-- NHOM 16 -->
+## Nhóm 16 — Giao diện (UI): khung, nút, thanh, ô, con trỏ, đường kẻ, ô kiểm, nút tròn, huy hiệu
+
+Tờ ảnh: `16-giao-dien.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/16-giao-dien-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| UI-01 | Khung bảng (hộp thoại, túi, nhân vật...) | hộp 'Đạo Thể' hiện tại (CSS), góc trên trái 150x84 | Xianxia Pixel Pack (willYEE) (CC0); panel_01 mực / ngọc / gỗ hồng / lụa (9-slice, biên của gói) | Ninja Adventure (CC0); theme_1 nine_path_panel / nine_path_bg ×3 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); 9slice_box dt / lt ×3 | giữ hiện tại (đọc tốt); A nếu muốn khung mực / ngọc kiểu tiên hiệp |
+| UI-02 | Nút bấm (thường / chạm / nhấn) | HUD 'Nhiệm vụ' (thường) + 'Nhân vật' (đang mở) | Xianxia Pixel Pack (willYEE) (CC0); button_01 ngọc / lụa x thường / chạm / nhấn | Ninja Adventure (CC0); theme_1 button thường / chạm / nhấn ×3 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); label_left + middle + right ×3 (nhãn, không có trạng thái) | giữ hiện tại; A (ngọc) nếu muốn nút kiểu tiên hiệp |
+| UI-03 | Thanh khí huyết / linh lực / tu vi | HUD hiện tại: ba thanh 244 px (đỏ / xanh / vàng) có chữ | Xianxia Pixel Pack (willYEE) (CC0); bar_01 frame + hp / mp / spirit (phủ 72 %), thu về 244 px | Ninja Adventure (CC0); system/ui/life_bar + bg ×3 (chỉ có thanh ĐỎ; phủ 100 / 60 / 25 %) | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); redbar / bluebar / greenbar mức 0 / 3 / cuối ×3 | giữ hiện tại (chữ số nằm ngay trên thanh); chỉ đổi nếu chữ vẫn đọc được |
+| UI-04 | Ô vật phẩm (túi, thanh dùng nhanh) | HUD: ô 'Hồi Huyết' (sáng) + 'Hồi Linh' (mờ), 54x54 | Xianxia Pixel Pack (willYEE) (CC0); panel_01 mực / ngọc thu 50 % làm ô 54x54 | Ninja Adventure (CC0); theme_1 panel / bg / bg_2 ×2 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); itemdisc_01 / 02 (đĩa tròn) ×3 | giữ hiện tại; C nếu muốn ô tròn kiểu hộp đạo cụ |
+| UI-05 | Con trỏ chuột (máy tính) | con trỏ hệ thống của trình duyệt (không vẽ riêng) | Xianxia Pixel Pack (willYEE) (CC0); cursor_sword / cursor_whisk (phất trần), thu về 32 px | — | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); cursor_01..05 + tay mở / nắm ×3 | A (kiếm) cho điểm nhấn; chỉ máy tính, không ảnh hưởng điện thoại |
+| UI-06 | Đường kẻ phân cách + góc trang trí khung | đường kẻ dưới tiêu đề hộp 'Đạo Thể' (CSS, 1 px) | Xianxia Pixel Pack (willYEE) (CC0); divider_cloud / divider_jade / corner_tl (thu về 40 px) | — | — | A (mây / ngọc) nếu duyệt khung bảng A ở UI-01; không thì giữ hiện tại |
+| UI-07 | Ô tích chọn + thanh trượt (Cài đặt) | Cài đặt: thanh trượt vàng + ô kiểm trắng | Xianxia Pixel Pack (willYEE) (CC0); slider_track + knob (70 %) + check_off / check_on, thu về cỡ hiện tại | Ninja Adventure (CC0); theme_1 unchecked / checked / grabber / slider_progress ×2 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); confirm (✓) / cancel (✗) ×3 (dấu, không phải ô kiểm) | giữ hiện tại (ô kiểm HTML gốc: bàn phím và trình đọc màn hình dùng được) |
+| UI-08 | Nút hành động tròn (Chém, Đột phá, Đả tọa, Kiếm khí) | HUD: bốn nút tròn 156x156 | — | Ninja Adventure (CC0); theme/nine_path_8 / 9 / 4 (tròn) ×4 | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); itemdisc_01 / 02 ×4 | giữ hiện tại (chữ Hán + nhãn Việt đã rõ trên mọi cỡ màn hình) |
+| UI-09 | Huy hiệu trạng thái (Bỏng, Choáng, Tăng tốc...) | HUD: ô 'tên + số giây' (đỏ có hại, xanh có lợi) | Xianxia Pixel Pack (willYEE) (CC0); status_ bleed / burn / freeze / golden_shield / paralyze / poison / seal / swift (32 px) | — | — | A (biểu tượng) đứng cạnh số giây; giữ chữ cho trình đọc màn hình |
+
+<!-- /NHOM 16 -->
+
 ## Nhóm còn đang làm
 
 - Nhóm 14: vật phẩm (VP, 126 món)
-- Nhóm 16: giao diện (UI)

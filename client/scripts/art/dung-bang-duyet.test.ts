@@ -52,7 +52,77 @@ describe("dung-bang-duyet.py: ranh giới giấy phép (đọc mã, chạy mọi
   });
 });
 
-describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13 và 15)", () => {
+describe("dung-bang-duyet.py: nhóm 16 (giao diện), phần đọc mã / tài liệu (chạy mọi máy)", () => {
+  const repo = path.join(here, "..", "..", "..");
+
+  it("mọi ảnh chụp dùng làm hình HIỆN TẠI của giao diện có thật trong docs/screenshots (đổi tên / xoá ảnh chụp thì bảng duyệt vỡ)", () => {
+    const m = /HUD, CHAR, SET, TT = ([^\n]+)\n/.exec(code);
+    expect(m, "thiếu khai báo ảnh chụp giao diện").toBeTruthy();
+    const names = [...m![1].matchAll(/"([^"]+\.png)"/g)].map((x) => x[1]);
+    expect(names.length).toBe(4);
+    for (const n of names)
+      expect(fs.existsSync(path.join(repo, "docs/screenshots", n)), n).toBe(true);
+  });
+
+  it("DUYET_TUNG_PHAN.md có khối nhóm 16 với đủ UI-01..UI-09 và tờ ảnh công khai có thật", () => {
+    const doc = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+    const blk = /<!-- NHOM 16 -->([\s\S]*?)<!-- \/NHOM 16 -->/.exec(doc);
+    expect(blk, "thiếu khối NHOM 16").toBeTruthy();
+    for (let i = 1; i <= 9; i++) expect(blk![1], `UI-0${i}`).toContain(`| UI-0${i} |`);
+    expect(blk![1]).not.toMatch(/UI-10/);
+    expect(
+      fs.statSync(path.join(repo, "docs/art/huong-moi/16-giao-dien.png")).size,
+    ).toBeGreaterThan(10_000);
+  });
+
+  it('ô giao diện của gói riêng (Sunnyside) KHÔNG bị gắn nhầm sang nguồn công khai: mọi lời gọi `opt("C", ...)` dùng nguồn sunny', () => {
+    const calls = [...code.matchAll(/opt\("C", "(\w+)"/g)].map((x) => x[1]);
+    expect(calls.length).toBeGreaterThanOrEqual(6);
+    for (const src of calls) expect(src).toBe("sunny");
+  });
+});
+
+describe.skipIf(!hasPillow)("dung-bang-duyet.py: hàm nine() (9-slice) dựng đúng hình học", () => {
+  it("góc giữ nguyên điểm ảnh, giữa kéo giãn, đúng kích thước đích; phóng nguyên số khi scale > 1", () => {
+    const prog = [
+      "import sys; sys.dont_write_bytecode = True  # không để lại __pycache__ cạnh tập lệnh",
+      "import importlib.util",
+      `spec = importlib.util.spec_from_file_location("m", ${JSON.stringify(SCRIPT)})`,
+      "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
+      "from PIL import Image",
+      "src = Image.new('RGBA', (9, 9), (0, 0, 255, 255))",
+      "src.putpixel((0, 0), (255, 0, 0, 255)); src.putpixel((8, 8), (0, 255, 0, 255)); src.putpixel((4, 0), (255, 255, 0, 255))",
+      "o = m.nine(src, (3, 3, 3, 3), (40, 30))",
+      "assert o.size == (40, 30), o.size",
+      "assert o.getpixel((0, 0)) == (255, 0, 0, 255), 'góc trên trái'",
+      "assert o.getpixel((39, 29)) == (0, 255, 0, 255), 'góc dưới phải'",
+      "assert o.getpixel((20, 15)) == (0, 0, 255, 255), 'giữa'",
+      "assert o.getpixel((20, 0)) == (255, 255, 0, 255), 'cạnh trên: phần giữa của cạnh nguồn được kéo giãn'",
+      "src2 = Image.new('RGBA', (12, 12), (0, 0, 255, 255))",
+      "src2.putpixel((7, 0), (255, 128, 0, 255)); src2.putpixel((11, 11), (0, 255, 0, 255)); src2.putpixel((1, 0), (255, 0, 255, 255))",
+      "o3 = m.nine(src2, (2, 3, 5, 1), (40, 30))  # biên bất đối xứng: trái 2, trên 3, phải 5, dưới 1",
+      "assert o3.getpixel((35, 0)) == (255, 128, 0, 255), 'biên PHẢI = 5: cột đầu của dải phải nằm ở x = 40 - 5'",
+      "assert o3.getpixel((34, 0)) == (0, 0, 255, 255), 'trước dải phải là phần giữa (xanh)'",
+      "assert o3.getpixel((1, 0)) == (255, 0, 255, 255), 'biên TRÁI = 2: cột 1 của nguồn giữ nguyên'",
+      "assert o3.getpixel((39, 29)) == (0, 255, 0, 255) and o3.getpixel((39, 28)) == (0, 0, 255, 255), 'biên DƯỚI = 1: chỉ một hàng cuối là dải dưới'",
+      "o2 = m.nine(src, (3, 3, 3, 3), (60, 60), scale=2)",
+      "assert o2.getpixel((0, 0)) == o2.getpixel((1, 1)) == (255, 0, 0, 255), 'phóng nguyên số: 1 điểm ảnh gốc = 2x2'",
+      "src3 = Image.new('RGBA', (6, 6), (0, 0, 255, 255)); src3.putpixel((0, 0), (255, 0, 0, 255)); src3.putpixel((2, 0), (255, 255, 0, 255))",
+      "o4 = m.nine(src3, (1, 1, 1, 1), (60, 60), scale=3)  # biên 1 nhân 3 = 3 điểm ảnh; điểm ảnh gốc (2, 0) nằm ngoài biên",
+      "assert o4.getpixel((2, 0)) == (255, 0, 0, 255), 'biên nhân theo scale: 3 điểm đầu vẫn là góc đỏ'",
+      "assert o4.getpixel((3, 0)) != (255, 0, 0, 255), 'điểm thứ 4 đã là phần giữa'",
+      "assert o2.getpixel((59, 59)) == (0, 255, 0, 255)",
+      "s = m.stack([Image.new('RGBA', (10, 4)), Image.new('RGBA', (6, 5))], gap=3)",
+      "assert s.size == (10, 12), s.size",
+      "print('OK')",
+    ].join("\n");
+    const r = spawnSync("python3", ["-I", "-c", prog], { encoding: "utf8" });
+    expect(r.status, String(r.stderr)).toBe(0);
+    expect(String(r.stdout).trim()).toBe("OK");
+  });
+});
+
+describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13, 15 và 16)", () => {
   let dir = "";
   let pub = "";
   let priv = "";
@@ -82,7 +152,7 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13 và 15)", 
         "-I",
         SCRIPT,
         "--groups",
-        "10,11,12,13,15",
+        "10,11,12,13,15,16",
         "--public",
         pub,
         "--private",
@@ -158,5 +228,14 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13 và 15)", 
         !yes,
       );
     }
+  });
+
+  it("nhóm 16 (giao diện): 9 mã, đúng 7 ô gói riêng (UI-01..05, 07, 08 ô C Sunnyside), tờ công khai KHÁC tờ đầy đủ", () => {
+    const out = String(run.stdout);
+    expect(out).toContain("16-giao-dien 9 mã (ô gói riêng: 7)");
+    const a = fs.readFileSync(path.join(pub, "16-giao-dien.png"));
+    const b = fs.readFileSync(path.join(priv, "16-giao-dien-day-du.png"));
+    expect(a.length).toBeGreaterThan(10_000);
+    expect(a.equals(b), "gói riêng lọt ra tờ công khai").toBe(false);
   });
 });
