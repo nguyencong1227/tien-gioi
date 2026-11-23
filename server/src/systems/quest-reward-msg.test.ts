@@ -156,7 +156,7 @@ describe("tin questReward khi trả nhiệm vụ", () => {
     expect(questRewards.map((x) => x.sid)).toEqual(["a"]);
   });
 
-  it("nhiệm vụ nộp đồ chỉ có tu vi: tin báo 50 tu vi, không có vật phẩm; nanh nộp đã trừ khỏi túi", () => {
+  it("nhiệm vụ nộp đồ: tin báo 50 tu vi + vật phẩm (M66.4 #1333); nanh nộp đã trừ khỏi túi", () => {
     const { w, questRewards } = makeWorld();
     const { p, c } = addPlayer(w, "a", 1, 0);
     standAt(p, "cao_thi");
@@ -166,8 +166,14 @@ describe("tin questReward khi trả nhiệm vụ", () => {
     expect(c.quests.daily.nop_nanh).toBeTruthy(); // đã trả thật
     expect(countItem(c.inv, "nanh_soi")).toBe(0);
     expect(questRewards).toHaveLength(1);
-    expect(questRewards[0].msg).toEqual({ questId: "nop_nanh", exp: 50, coin: 0, items: [] });
+    expect(questRewards[0].msg).toEqual({
+      questId: "nop_nanh",
+      exp: 50,
+      coin: 0,
+      items: [{ itemId: "hoi_linh_dan", qty: 2 }],
+    });
     expect(p.exp).toBe(50);
+    expect(countItem(c.inv, "hoi_linh_dan")).toBe(2); // đan dược vừa vào túi
   });
 });
 
