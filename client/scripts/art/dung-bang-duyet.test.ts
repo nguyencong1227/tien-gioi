@@ -238,4 +238,17 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-13, 15 và 16
     expect(a.length).toBeGreaterThan(10_000);
     expect(a.equals(b), "gói riêng lọt ra tờ công khai").toBe(false);
   });
+
+  it("MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ)", () => {
+    const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
+    const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
+    expect(sheets.length).toBeGreaterThanOrEqual(15); // 4 (nhóm 10-13) + 10 (nhóm 15) + 1 (nhóm 16)
+    for (const f of sheets) {
+      const inRepo = fs.readFileSync(path.join(repoDir, f));
+      expect(
+        inRepo.equals(fs.readFileSync(path.join(pub, f))),
+        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,15,16 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
+      ).toBe(true);
+    }
+  });
 });
