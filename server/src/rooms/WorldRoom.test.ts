@@ -54,6 +54,8 @@ import {
   JOIN_WRONG_MAP,
   MAPS,
   getMap,
+  keepSlotsOf,
+  engraveSlotsOf,
   parseWrongMap,
   roomNameOf,
   TRAVEL_COOLDOWN_MS,
@@ -2955,6 +2957,33 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     expect(sk.slots).toEqual(["", "", "", ""]);
     expect(playerOf(name).limbo).toBeUndefined();
     expect(playerOf(name).skills.learned).toEqual({ me_tung_bo: 1, hoa_van_kiem: 1 });
+  });
+
+  it("REGEN mục 58 (hanh/hanh1): chân linh MỚI TINH 0 ô giữ / 0 ô khắc + client gửi keep/engrave vượt ô KHÔNG làm kẹt ở Hoàng Tuyền — đầu thai vẫn xong (mã sai: validateRebirth trả null, tin bị từ chối)", async () => {
+    // Tái hiện chính xác `hanh`/`hanh1` (QUYET_DINH_M3 mục 58): kiếp 1, chân linh mới tinh
+    // (unlocks rỗng => keepSlotsOf = engraveSlotsOf = 0), Duyên đã cộng, màn Hoàng Tuyền đã hiện,
+    // nhưng client gửi keep/engrave KHÔNG rỗng (vượt 0 ô) => validateRebirth trả null => "Lựa chọn đầu thai không hợp lệ" + dừng => kẹt.
+    const name = "Luan Hoi Hanh";
+    const a = await join(name);
+    await playAndDie(a);
+    const limbo = await waitFor(() => a.limbos[0]);
+    const sr = serverRoom(a.room) as any;
+    const sid = a.room.sessionId;
+    const c = sr.world.ctrl.get(sid);
+    // chân linh mới tinh: KHÔNG mở ô Ký vật, KHÔNG mở ô khắc => 0 / 0 ô (đúng như `hanh`)
+    expect(keepSlotsOf(c.soul.unlocks)).toBe(0);
+    expect(engraveSlotsOf(c.soul.unlocks)).toBe(0);
+    // dù có trang bị chụp được (keepable KHÔNG rỗng) thì 0 ô giữ vẫn khiến giữ lại bị vượt ô
+    expect(limbo.keepable).toContain("hac_ho_kiem");
+    // client (màn Hoàng Tuyền / Tam Sinh Thạch) gửi keep/engrave vượt ô => CŨNG là ca thường sau mục 51
+    a.room.send("rebirth", { keep: ["hac_ho_kiem"], engrave: ["me_tung_bo"] });
+    const reborn = await waitFor(() => a.reborns[0]);
+    expect(reborn.kiep).toBe(2); // KHÔNG kẹt: đầu thai xong, kiếp 2
+    expect(sr.world.ctrl.get(sid).limbo).toBeUndefined();
+    expect(soulOf(name).engraved).toEqual([]); // 0 ô khắc => không khắc gì (không xoá, cũng không thêm)
+    expect(soulOf(name).kiep).toBe(2);
+    // báo người chơi phần đã bỏ bằng toast info ("Đầu thai: ..."), KHÔNG phải toast từ chối khiến màn Hoàng Tuyền đóng sai
+    expect(a.toasts.some((t) => /Đầu thai:/.test(t.text) && t.tone === "info")).toBe(true);
   });
 
   it("đầu thai khoan dung (mục 58): tin xấu (chiêu lạ, quá ô, xuất thân chưa mở) KHÔNG làm kẹt ở Hoàng Tuyền: phần sai bị bỏ, chân linh đã khắc giữ nguyên, có toast báo", async () => {
