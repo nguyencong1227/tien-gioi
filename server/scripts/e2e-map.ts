@@ -172,15 +172,21 @@ async function main() {
       return { best, zoom: cam.zoom, w: cam.width, h: cam.height }; })()`);
     must(view.best >= 15, `vùng đo có đủ trang trí (${view.best} ô trong 20x12)`);
     await sleep(300);
+    // Quái / NPC / người chơi đi lại trong khung (máy chủ thật có quái) làm hai ảnh chụp "cùng trạng thái" lệch vài chục điểm ảnh (một hộp ~33x20 px, vị trí đổi mỗi lần; đo
+    // trên main: đối chứng 0 ... 506, ca thời tiết đỏ 1 / 4 lần vì ngưỡng 300). `update()` của cảnh bật lại `root.setVisible(true)` MỖI khung nên ẩn rời không giữ được:
+    // gắn vào `prerender` (sau update, ngay trước khi vẽ) của đúng khung sắp chụp; khung kế tiếp cảnh tự hiện lại.
+    await ev(
+      `window.__e2eHide = () => { const s = window.__scene; for (const m of [s.monsters, s.players, s.npcs, s.loots]) m?.forEach((e) => e.root.setVisible(false)); }; 1`,
+    );
     // Đếm điểm ảnh KHÁC nhau giữa hai ảnh chụp liên tiếp ngay trong trang (không chuyển dữ liệu ảnh lớn qua CDP)
     const diffBetween = async (visA: boolean, visB: boolean) =>
       Number(
         await ev(`new Promise((resolve) => { const s = window.__scene;
         const grab = (visible) => new Promise((res) => { s.decorLayer.setVisible(visible);
           const r = s.game.canvas.getBoundingClientRect(), w = Math.round(r.width), h = Math.round(r.height);
-          setTimeout(() => s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
+          setTimeout(() => { s.game.events.once('prerender', window.__e2eHide); s.game.renderer.snapshotArea(0, 0, w, h, (img) => {
             const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-            const x = c.getContext('2d'); x.drawImage(img, 0, 0); res(x.getImageData(0, 0, c.width, c.height).data); }), 120); });
+            const x = c.getContext('2d'); x.drawImage(img, 0, 0); res(x.getImageData(0, 0, c.width, c.height).data); }); }, 120); });
         grab(${visA}).then((a) => grab(${visB}).then((b) => { let n = 0;
           for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 24) n++;
           resolve(n); })); })`),
@@ -390,9 +396,9 @@ async function main() {
       for (let i = 0; i < A.length; i += 4) if (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]) > 60) n++; return n; })()`;
     const stash = (name: string) =>
       ev(`new Promise((resolve) => { const g = window.__scene.game, w = g.canvas.width, h = g.canvas.height;
-        setTimeout(() => g.renderer.snapshotArea(0, 0, w, h, (img) => {
+        setTimeout(() => { g.events.once('prerender', window.__e2eHide); g.renderer.snapshotArea(0, 0, w, h, (img) => {
           const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-          const x = c.getContext('2d'); x.drawImage(img, 0, 0); window.${name} = x.getImageData(0, 0, c.width, c.height).data; resolve(1); }), 150); })`);
+          const x = c.getContext('2d'); x.drawImage(img, 0, 0); window.${name} = x.getImageData(0, 0, c.width, c.height).data; resolve(1); }); }, 150); })`);
     await T.shot("map-weather-bat");
     await stash("__wOn");
     await ev(`window.__scene.weatherPaused = true; 1`);
