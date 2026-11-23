@@ -191,6 +191,16 @@ describe("gainExp trả số tu vi thật đã cộng", () => {
     expect(p.tier).toBeGreaterThanOrEqual(2);
   });
 
+  it("đỉnh tiên đồ (cảnh giới cuối, bậc cuối): trả phần thật sự cộng, đầy rồi thì 0", () => {
+    const { w } = makeWorld();
+    const last = REALMS.length - 1;
+    const { p } = addPlayer(w, "a", last, REALMS[last].tiers.length - 1);
+    p.exp = p.expMax - 4;
+    expect(gainExp(w, "a", p, 100)).toBeCloseTo(4, 6);
+    expect(p.exp).toBe(p.expMax);
+    expect(gainExp(w, "a", p, 100)).toBe(0);
+  });
+
   it("bậc cuối chờ Đột phá: trả phần thật sự cộng, phần dư cắt đi không tính", () => {
     const { w } = makeWorld();
     const { p } = addPlayer(w, "a", 0, 0);
