@@ -273,6 +273,26 @@ Mô phỏng ở `server/src/balance/pk.ts`; test `pk.test.ts` giữ mục tiêu.
 Không có hiệu chỉnh chênh lệch: bên mạnh hơn hầu như luôn thắng và nhanh hơn (trận này không có né / đan / kỹ năng nên ít bất ngờ); người yếu hơn có quyền từ chối lời thách. Hai người cùng bậc: bên **đánh trước** trong cùng một tick thắng thường hơn (đòn hạ khí huyết về 0 kết thúc trận ngay), nên tỉ lệ thắng của người thứ nhất ở dòng "cùng bậc" trên 50% là hiệu ứng thứ tự xử lý, không phải lợi thế bậc. Nếu muốn trận công bằng giữa người chênh bậc thì cần chuẩn hoá chỉ số về bậc thấp hơn: việc riêng, chờ người dùng quyết (câu hỏi 4 ở `questions.md`).
 
 
+## Thưởng tu vi nhiệm vụ một lần (M66.4, #1333)
+
+Nhiệm vụ **chính** (chuỗi `next`) và **việc phụ** (không bắt buộc) thưởng tu vi MỘT LẦN. Bảng dưới so **trước / sau** bước 2 (#1362): mỗi nhiệm vụ chính
+nâng lên sàn 5 % thanh bậc nhận, việc phụ 2 %; trần nới 10 % (chuỗi chính) / 4 % (việc phụ) mỗi cảnh giới (ngưỡng ở `shared/src/kim-dan-world.test.ts`).
+"Tổng thanh" = tổng `expToNext` qua 3 bậc của cảnh giới. Nhiệm vụ lặp hằng ngày (`daily`, Bảng cáo thị — dòng thu nhập lặp mỗi ngày) KHÔNG tính ở đây.
+
+| Cảnh giới | Tổng thanh | Chuỗi chính TRƯỚC | Chuỗi chính SAU | Việc phụ TRƯỚC | Việc phụ SAU | Tổng 1-lần SAU |
+|---|---:|---:|---:|---:|---:|---:|
+| Trúc Cơ | 15,279 | 1.31% (200) | 2.23% (340) | 1.96% (300) | 1.96% (300) | **4.19%** |
+| Kim Đan | 166,680 | 3.48% (5,800) | 8.40% (14,000) | 2.40% (4,000) | 3.60% (6,000) | **12.00%** |
+| Nguyên Anh | 1,000,080 | 4.92% (49,200) | 9.47% (94,700) | 1.95% (19,500) | 2.07% (20,700) | **11.54%** |
+
+**Hoàn thành MỌI nhiệm vụ một lần** (chuỗi chính + việc phụ) thưởng thêm **Trúc Cơ 4.19% / Kim Đan 12.00% / Nguyên Anh 11.54%** tổng thanh — tức phần tu vi bonus rút ngắn cảnh giới đó chừng ấy %
+(nghĩa đen về phía tu vi; thời gian thật rút ngắn ÍT HƠN vì còn thời gian đi lại, nói chuyện và chính việc săn quái trong nhiệm vụ — A đo Kim Đan ~4,2 → 3,9 giờ,
+~7 %). Trước #1362 các cảnh giới chỉ thưởng 1-lần 3.27 / 5.88 / 6.87% (Trúc Cơ / Kim Đan / Nguyên Anh).
+
+> Lưu ý cân bằng: thưởng 1-lần sau #1362 đạt **12.00%** tổng thanh ở Kim Đan — sát ngưỡng ~12 % A đặt (comment #1333: trên ~12 %
+> thì báo trước khi chốt). Đây là hệ quả của dữ liệu #1362 đã merge, KHÔNG đổi ở đây; `daily` giữ nguyên nên không thành đường tắt cày tu vi lặp.
+
+
 ## Kim Đan trước M6 (#402)
 
 Số đo bằng đúng mô hình và mã server ở trên, với **nội dung hiện có** (Linh Thố, Hôi Lang, Hắc Hổ, Xích Mãng; chưa có quái / đồ / nhiệm vụ cho Kim Đan).
