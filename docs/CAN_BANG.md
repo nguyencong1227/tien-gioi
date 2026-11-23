@@ -1003,7 +1003,7 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 | am_suong_yeu_vuong | am_suong | 13 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 18 s | 5.070 + 2.630 | 1.521 + 789 | 9,7 ph |
 | han_van_lang_le | han_van | 16 | thường | Hàn Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 2.208 + 1.156 | 1.656 + 867 | 3,9 ph |
 | han_van_lang_doi | han_van | 18 | thường | Hàn Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 14 s | 1.584 + 1.184 | 1.188 + 888 | 3,8 ph |
-| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 1.168 | 1.425 + 876 | 3,5 ph |
+| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 1.172 | 1.425 + 879 | 3,5 ph |
 | han_van_nha_gio | han_van | 16 | thường | Phong Nha x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.208 + 1.156 | 1.656 + 867 | 3,8 ph |
 | han_van_soi_tuyet | han_van | 16 | tinh anh | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 3.312 + 1.734 | 1.656 + 867 | 5,9 ph |
 | han_van_yeu_vuong | han_van | 16 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 5.520 + 2.890 | 1.656 + 867 | 9,8 ph |

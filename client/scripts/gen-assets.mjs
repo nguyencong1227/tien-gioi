@@ -1018,6 +1018,9 @@ const BOOKS = {
   kinh_thuc_giap_phi_tan: [0xc8ccd4, 0x8a93a0],
   kinh_thiet_sa_chuong: [0xa8803a, 0xe6c98a],
   kinh_chuong_vu_phong_lam: [0xa8803a, 0xd8cc9a],
+  // Lôi (CT15 đợt 2, #1185, D): bìa theo hệ Lôi (vàng); dấu ấn sinh tự động từ id (#1303)
+  kinh_loi_hoa_pha_ta_chuong: [0xe0b040, 0xfff0b0],
+  kinh_chan_hon_loi_phap: [0xc8b83c, 0xe6dcff],
 };
 
 /**
