@@ -285,8 +285,8 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
     const before = { ...ASSUME.searchSec };
     const s = searchSensitivity(getRows());
     expect({ ...ASSUME.searchSec }).toEqual(before);
-    // số liệu mô hình khớp bảng Kim Đan sau nội dung (mục 30: 4,2 giờ tối ưu; trước đó 5,2 giờ, 5,7 giờ bãi mới): chặn trôi mà không ai hay
-    expect(s.model.kimDan / 60).toBeGreaterThan(4);
+    // số liệu mô hình khớp bảng Kim Đan sau nội dung (mục 30: 4,2 giờ tối ưu; #1333 sàn thưởng nhiệm vụ: 3,9 giờ; trước đó 5,2 giờ, 5,7 giờ bãi mới): chặn trôi mà không ai hay
+    expect(s.model.kimDan / 60).toBeGreaterThan(3.8);
     expect(s.model.kimDan / 60).toBeLessThan(6);
     expect(s.model.kimDanNoMang).toBeGreaterThanOrEqual(s.model.kimDan);
     expect(s.measured.luyenKhi).toBeLessThan(s.model.luyenKhi);
