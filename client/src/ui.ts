@@ -344,6 +344,7 @@ import {
   setQualityMode,
   type QualityMode,
 } from "./gfx/quality";
+import { mapVisualEnabled, setMapVisualPref } from "./gfx/map-visual";
 import {
   modalStack,
   focusModal,
@@ -5515,6 +5516,22 @@ export const ui = {
     });
     // Bộ điều tốc có thể tự đổi bậc: cập nhật dòng "Đang dùng"
     onQualityChange(syncSettingsDom);
+
+    // Cảnh bản đồ kiểu mới (lớp hình Tiled, S3b #1206): ô chọn ở Cài đặt, đổi là cảnh dựng lại ngay (WorldScene nghe `onMapVisualPref`)
+    const mapVisualChk = document.getElementById("set-map-visual") as HTMLInputElement | null;
+    if (mapVisualChk) {
+      const store = (): Storage | null => {
+        try {
+          return localStorage;
+        } catch {
+          return null;
+        }
+      };
+      mapVisualChk.checked = mapVisualEnabled(location.search, store());
+      mapVisualChk.addEventListener("change", () =>
+        setMapVisualPref(store(), mapVisualChk.checked),
+      );
+    }
 
     // Giảm chuyển động (#269, #280)
     syncReducedMotionDom();

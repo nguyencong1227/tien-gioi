@@ -57,6 +57,7 @@ import {
   fetchVisualJson,
   loadVisualTexture,
   mapVisualEnabled,
+  onMapVisualPref,
   sanitizeVisualMap,
   visualImageFits,
   visualPackPaths,
@@ -684,6 +685,9 @@ export class WorldScene extends Phaser.Scene {
     this.refreshPrivateTileset();
     // Lớp hình Tiled (S3b): gói `map:<id>` có `visual.json` + ảnh tileset thì vẽ thay lớp ô cũ; về muộn thì dựng lại MỘT lần
     this.refreshMapVisual();
+    // Người chơi bật / tắt "Cảnh bản đồ kiểu mới" ở Cài đặt: dựng lại nền ngay
+    const offVisualPref = onMapVisualPref(() => this.applyMapVisualPref());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offVisualPref);
     const offPrivateReady = packs().onReady((id) => {
       if (isPrivatePackDefId(id)) this.refreshPrivateTileset();
       if (id === mapPackId(this.map.def.id)) this.refreshMapVisual();
@@ -1044,6 +1048,24 @@ export class WorldScene extends Phaser.Scene {
       this.privateTilesetBusy = false;
       if (ok && this.sys.isActive()) this.buildMapVisuals();
     });
+  }
+
+  /**
+   * Áp lựa chọn "Cảnh bản đồ kiểu mới" của người chơi NGAY (không cần tải lại): tắt -> quên lớp hình, dựng lại nền cũ; bật -> dùng lớp hình đã nạp (làm mờ chuyển) hoặc xin gói nếu chưa có.
+   */
+  private applyMapVisualPref() {
+    const on = mapVisualEnabled(window.location.search, safeLocalStorage());
+    if (!on) {
+      this.visualSeq++; // vô hiệu mọi lần xin đang chạy
+      if (this.visualMap) {
+        this.visualMap = undefined;
+        this.visualMapId = "";
+        this.buildMapVisuals();
+      }
+      return;
+    }
+    if (this.visualMap && this.visualMapId === this.map.def.id) this.buildMapVisuals(true);
+    else this.refreshMapVisual();
   }
 
   /** Huỷ ba lớp hình Tiled (nếu có). */

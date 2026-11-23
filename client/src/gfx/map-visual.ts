@@ -230,9 +230,9 @@ export async function fetchVisualJson(
 export const VISUAL_STORAGE_KEY = "tg.mapVisual";
 
 /**
- * Lớp hình Tiled có bật không: `?visual=0` tắt, `?visual=1` bật (thắng mọi thứ khác); không có thì **`?debug` mặc định TẮT** (như thời tiết / sương / nước đứng yên ở `?debug`: các
- * script đo / E2E dùng `?debug` có cảnh cũ ổn định, bật bằng `?visual=1`); không `?debug` thì khoá `localStorage` `"0"` tắt; mặc định BẬT (nhưng chỉ vẽ khi gói `map:<id>` THẬT SỰ có
- * ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
+ * Lớp hình Tiled có bật không, theo thứ tự: `?visual=0` tắt / `?visual=1` bật (thắng mọi thứ khác); khoá `localStorage` `tg.mapVisual` = `"0"` tắt / `"1"` bật (lựa chọn RÕ RÀNG của người
+ * chơi ở Cài đặt); không có thì **`?debug` mặc định TẮT** (như thời tiết / sương / nước đứng yên ở `?debug`: các script đo / E2E dùng `?debug` có cảnh cũ ổn định, bật bằng `?visual=1`);
+ * còn lại mặc định BẬT (nhưng chỉ vẽ khi gói `map:<id>` THẬT SỰ có ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
  */
 export function mapVisualEnabled(
   search: string,
@@ -243,10 +243,44 @@ export function mapVisualEnabled(
     const q = params.get("visual");
     if (q === "0") return false;
     if (q === "1") return true;
-    if (params.has("debug")) return false;
-    return storage?.getItem(VISUAL_STORAGE_KEY) !== "0";
+    // lựa chọn RÕ RÀNG của người chơi (ô "Cảnh bản đồ kiểu mới" trong Cài đặt ghi "0" / "1") thắng mặc định của ?debug
+    const pref = storage?.getItem(VISUAL_STORAGE_KEY);
+    if (pref === "0") return false;
+    if (pref === "1") return true;
+    return !params.has("debug");
   } catch {
     return true;
+  }
+}
+
+type PrefListener = () => void;
+const prefListeners = new Set<PrefListener>();
+
+/** Đăng ký nghe người chơi đổi ô "Cảnh bản đồ kiểu mới" (cảnh dựng lại ngay, không cần tải lại trang). Trả hàm huỷ đăng ký. */
+export function onMapVisualPref(cb: PrefListener): () => void {
+  prefListeners.add(cb);
+  return () => void prefListeners.delete(cb);
+}
+
+/**
+ * Lưu lựa chọn của người chơi ("1" bật / "0" tắt) rồi báo mọi nơi đang nghe. Trình duyệt chặn `localStorage` thì vẫn báo (đổi được trong phiên, không lưu). Một người nghe ném lỗi
+ * không làm hỏng những người còn lại. Không bao giờ ném lỗi.
+ */
+export function setMapVisualPref(
+  storage: { setItem(k: string, v: string): void } | null,
+  on: boolean,
+): void {
+  try {
+    storage?.setItem(VISUAL_STORAGE_KEY, on ? "1" : "0");
+  } catch {
+    // trình duyệt chặn lưu: bỏ qua
+  }
+  for (const cb of [...prefListeners]) {
+    try {
+      cb();
+    } catch {
+      // một người nghe lỗi không chặn người khác
+    }
   }
 }
 
