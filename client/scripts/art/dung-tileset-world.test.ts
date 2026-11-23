@@ -124,13 +124,13 @@ describe.skipIf(!can)("dung-tileset-world.py: dựng thật + tự kiểm", () =
     }
   });
 
-  it("báo cáo lệch map-builder CHỈ gồm hai việc đã biết của C (`GID_GRASS`, `TILES_WORLD_COUNT`): bốn GID vật thể + khối đá lát khớp ảnh", () => {
+  it("map-builder KHÔNG CÒN LỆCH ảnh dựng: GID_GRASS, TILES_WORLD_COUNT, bốn GID vật thể và khối đá lát đều khớp 100%", () => {
     const r = run(dir);
     expect(r.status, r.stderr).toBe(0);
     const lines = String(r.stdout)
       .split("\n")
       .filter((l) => l.startsWith("CẦN SỬA ở server/src/systems/map-builder.ts:"));
-    for (const l of lines) expect(l, l).toMatch(/GID_GRASS|TILES_WORLD_COUNT/);
+    expect(lines).toEqual([]);
   });
 
   it("ảnh xem trước trong repo (05 tileset 4 vùng, 06 bốn bản đồ thật) == bản dựng lại từ mã (đổi mã mà quên dựng lại ảnh thì đỏ)", () => {
