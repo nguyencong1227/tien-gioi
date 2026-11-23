@@ -41,6 +41,7 @@ export interface AnalyzedRun {
   totalDuration: number | null;
   lintDuration: number | null;
   buildJobDuration: number | null;
+  testJobs?: Record<string, number | null>;
   test1Duration: number | null;
   test2Duration: number | null;
   test3Duration: number | null;
