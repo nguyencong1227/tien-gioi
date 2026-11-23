@@ -1,9 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CURRENCY_NAME, ITEM_BY_ID, QUEST_BY_ID, questRewardMsg } from "@tien-gioi/shared";
+import { questReadyToast } from "./quest-log";
 import {
   QUEST_REWARD_MAX_ITEMS,
   QUEST_REWARD_MAX_NUM,
+  isQuestRewardEchoToast,
   questRewardView,
   sanitizeQuestRewardMsg,
 } from "./quest-reward-view";
@@ -147,5 +149,31 @@ describe("dây nối bảng thưởng (canh mã nguồn)", () => {
     expect(html).toMatch(
       /<div id="quest-reward"[^>]*role="status"[^>]*aria-live="polite"[^>]*hidden/,
     );
+  });
+});
+
+describe("isQuestRewardEchoToast: toast lặp lại điều bảng thưởng đã nói (ảnh chơi thử AI v0.5.4: toast che bảng)", () => {
+  const q = QUEST_BY_ID["nhap_the"] ?? Object.values(QUEST_BY_ID).find((x) => !x.daily)!;
+  const other = Object.values(QUEST_BY_ID).find((x) => x.id !== q.id)!;
+
+  it("nhận ra dòng 'Hoàn thành: <tên>' của máy chủ (trùng tiêu đề bảng) và dòng 'ĐÃ ĐỦ' của chính nhiệm vụ", () => {
+    expect(isQuestRewardEchoToast(`Hoàn thành: ${q.title}`, q.id)).toBe(true);
+    expect(isQuestRewardEchoToast(questReadyToast(q), q.id)).toBe(true);
+    // tiêu đề bảng và dòng toast máy chủ là MỘT chuỗi: nếu ai đổi một bên, toast lại đè lên bảng
+    expect(isQuestRewardEchoToast(questRewardView(questRewardMsg(q, 1, 0)).title, q.id)).toBe(true);
+  });
+
+  it("giữ toast của nhiệm vụ KHÁC và toast việc khác (nhận nhiệm vụ kế, túi đầy...)", () => {
+    expect(isQuestRewardEchoToast(`Hoàn thành: ${other.title}`, q.id)).toBe(false);
+    expect(isQuestRewardEchoToast(questReadyToast(other), q.id)).toBe(false);
+    expect(isQuestRewardEchoToast(`Nhận nhiệm vụ: ${q.title}`, q.id)).toBe(false);
+    expect(isQuestRewardEchoToast("Túi đồ đã đầy, không nhận được phần thưởng.", q.id)).toBe(false);
+    expect(isQuestRewardEchoToast("", q.id)).toBe(false);
+  });
+
+  it("id nhiệm vụ lạ / độc: không sập, không gỡ gì", () => {
+    for (const id of ["", "khong_co", "constructor", "__proto__", "toString"]) {
+      expect(isQuestRewardEchoToast("Hoàn thành: x", id), id).toBe(false);
+    }
   });
 });

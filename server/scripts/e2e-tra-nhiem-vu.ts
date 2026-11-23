@@ -407,6 +407,31 @@ async function main() {
     );
     const c3 = await counters();
     must(c3.qr === 1, `đúng MỘT bảng sau lần trả thành công (đếm được ${c3.qr})`);
+    // Không toast nào CHỒNG lên bảng thưởng (ca người chơi phát hiện bằng ảnh chơi thử AI, v0.5.4): máy chủ gửi toast "Hoàn thành: <tên>" ngay trước
+    // `questReward`, toast nằm ở 16 % chiều cao còn bảng ở 64 px nên che dòng vật phẩm; chữ trùng tiêu đề bảng nên bảng đã đủ, không cần toast.
+    // Chờ hai khung hình cho DOM yên (toast vừa thêm / vừa bị gỡ), rồi đo hình chữ nhật của từng dòng toast với bảng.
+    await ev(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`);
+    const overlap = JSON.parse(
+      String(
+        await ev(`JSON.stringify((() => {
+          const panel = document.getElementById('quest-reward').getBoundingClientRect();
+          return [...document.querySelectorAll('#toast p')].map((p) => {
+            const r = p.getBoundingClientRect();
+            const w = Math.min(r.right, panel.right) - Math.max(r.left, panel.left);
+            const h = Math.min(r.bottom, panel.bottom) - Math.max(r.top, panel.top);
+            return { text: p.textContent, hit: r.width > 0 && r.height > 0 && w > 0 && h > 0 };
+          });
+        })())`),
+      ),
+    ) as { text: string; hit: boolean }[];
+    must(
+      !overlap.some((t) => t.text === panel.title || t.text?.startsWith(`ĐÃ ĐỦ: ${def.title}`)),
+      `toast lặp lại điều bảng đã nói ("${panel.title}" / "ĐÃ ĐỦ: ...") phải bị gỡ: ${JSON.stringify(overlap.map((t) => t.text))}`,
+    );
+    must(
+      overlap.every((t) => !t.hit),
+      `không toast nào chồng lên bảng thưởng: ${JSON.stringify(overlap.filter((t) => t.hit))}`,
+    );
     ok(
       `bảng "${panel.title}": +${realExp} tu vi (= tăng thật ${gotExp}, HUD "${panel.hud}"), Hồi Huyết Đan ×${potion.qty} (= túi thật)`,
     );
