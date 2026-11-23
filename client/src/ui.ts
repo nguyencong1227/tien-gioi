@@ -208,6 +208,7 @@ import {
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { perfRttText } from "./net-latency";
+import { questRewardView, sanitizeQuestRewardMsg, type QuestRewardView } from "./quest-reward-view";
 import {
   questCardSubtitle,
   dialogRewardOf,
@@ -2335,6 +2336,48 @@ function fillRewardLine(el: HTMLElement, prefix: string, rewards: QuestReward) {
   });
 }
 
+/** Thời gian bảng thưởng trả nhiệm vụ ở lại trên màn hình (không chặn thao tác). */
+const QUEST_REWARD_SHOW_MS = 6000;
+let questRewardTimer: number | undefined;
+
+/** Vẽ bảng thưởng khi TRẢ nhiệm vụ (mục 66): tiêu đề + từng dòng (tu vi, vật phẩm có biểu tượng tô độ hiếm, Linh thạch). Tin mới tới thì thay bảng cũ. */
+function showQuestReward(view: QuestRewardView) {
+  const box = $("quest-reward");
+  box.replaceChildren();
+  const title = document.createElement("div");
+  title.className = "qr-title";
+  title.textContent = view.title;
+  const list = document.createElement("div");
+  list.className = "qr-lines";
+  for (const line of view.lines) {
+    const row = document.createElement("div");
+    row.className = `qr-line qr-${line.kind}`;
+    const ico = document.createElement("i");
+    const text = document.createElement("span");
+    text.textContent = line.text;
+    if (line.kind === "item" && line.itemId !== undefined) {
+      applyItemVisual(ico, ITEM_BY_ID[line.itemId]);
+      applyRarityText(text, line.rarity);
+    } else if (line.kind === "exp") {
+      ico.textContent = "✦";
+    } else if (line.kind === "coin") {
+      ico.textContent = "💎";
+    }
+    row.append(ico, text);
+    list.append(row);
+  }
+  box.append(title, list);
+  box.hidden = false;
+  // chạy lại hoạt ảnh khi thay bảng đang hiện
+  box.style.animation = "none";
+  void box.offsetWidth;
+  box.style.animation = "";
+  window.clearTimeout(questRewardTimer);
+  questRewardTimer = window.setTimeout(() => {
+    box.hidden = true;
+  }, QUEST_REWARD_SHOW_MS);
+}
+
 // ---------- Sổ nhiệm vụ (Quest Log Modal - Phím Q) ----------
 
 function renderQuestModal() {
@@ -3274,7 +3317,6 @@ function renderDialogOptions() {
       const action = opt.action;
       const npcId = currentDialog?.npcId ?? "duoc_su";
       ui.closeDialog();
-      if (action.kind === "turnIn") sound.questDone();
       if (action.kind === "forge") {
         ui.openForgeModal(npcId);
         return;
@@ -6383,6 +6425,14 @@ export const ui = {
     notifyQuestsReady();
     renderQuestTracker();
     if (questModalOpen) renderQuestModal();
+  },
+
+  /** Tin `questReward` của máy chủ (mục 66): bảng thưởng THẬT khi trả nhiệm vụ + tiếng hoàn thành (chỉ khi trả THÀNH CÔNG: máy chủ không gửi khi túi đầy / trả lần hai). */
+  onQuestReward(raw: unknown) {
+    const msg = sanitizeQuestRewardMsg(raw);
+    if (!msg) return;
+    showQuestReward(questRewardView(msg));
+    sound.questDone();
   },
 
   getQuestLog(): QuestsMsg {
