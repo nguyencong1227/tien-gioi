@@ -923,6 +923,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Vô sắc Trúc Cơ, Huyền phẩm (CT8 lát 3, A): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ vì bí cảnh đòi thưởng >= 15 phút săn quái tốt nhất cùng bậc (`balance/dungeon.test.ts` đỏ ở 14,86 khi thêm 0,3 % x 2 vào Hắc Hổ)
     { itemId: bookIdOf("su_tu_hong"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("cam_long_khau"), chance: 0.006, min: 1, max: 1 },
+    // Mộc Trúc Cơ, Huyền phẩm (CT17 lát 2, G): rơi hiếm từ Xích Mãng (trùm Trúc Cơ), KHÔNG từ Hắc Hổ (giữ `balance/dungeon.test.ts`)
+    { itemId: bookIdOf("me_hon_huong_quyet"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -987,6 +989,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thien_la_loi_cam"), chance: 0.006, min: 1, max: 1 }, // Lôi gắn dấu, Địa phẩm (CT8 lát 2)
     { itemId: bookIdOf("chuong_tam_loi_bao"), chance: 0.006, min: 1, max: 1 }, // Lôi kích dấu (CT8 lát 2)
     { itemId: bookIdOf("bach_thu_khieu_phong"), chance: 0.006, min: 1, max: 1 }, // Phong tăng tốc đồng đội (CT8 lát 2)
+    // Mộc Nguyên Anh, Địa phẩm (CT17 lát 2, G): rơi hiếm từ Phong Nha (giữ thu nhập Nguyên Anh như CT17 lát 1)
+    { itemId: bookIdOf("man_da_hoa_kinh"), chance: 0.008, min: 1, max: 1 },
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
