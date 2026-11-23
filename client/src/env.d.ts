@@ -199,8 +199,13 @@ declare module "*sync-asset-docs.mjs" {
   export function generateRaSoatItemRows(
     orderedItems: string[],
     currentRaSoatContent: string,
+    extraRaSoatContent?: string,
   ): string;
-  export function syncAssetDocs(options?: { checkOnly?: boolean }): {
+  export function syncAssetDocs(options?: {
+    checkOnly?: boolean;
+    extraCreditsContent?: string;
+    extraRaSoatContent?: string;
+  }): {
     changed: boolean;
     errors: string[];
     stats: AssetStats;

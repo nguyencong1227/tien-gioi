@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { syncAssetDocs } from "../scripts/sync-asset-docs.mjs";
+import { generateRaSoatItemRows, syncAssetDocs } from "../scripts/sync-asset-docs.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "../..");
@@ -20,6 +20,20 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu 
     expect(stats.itemCount).toBeGreaterThanOrEqual(130);
     expect(stats.totalScanned).toBeGreaterThanOrEqual(149);
     expect(stats.totalAtlasFrames).toBeGreaterThanOrEqual(492);
+  });
+
+  it("generateRaSoatItemRows: giữ mô tả từ cả bản ours và bản theirs khi ghép, ours thắng khi trùng (#1371)", () => {
+    const ours = `| 28 | \`client/public/assets/items/kinh_a.png\` | Mô tả A từ ours | Tác giả A ours | **CC0 1.0** | ✓ Hợp lệ |`;
+    const theirs = `| 28 | \`client/public/assets/items/kinh_a.png\` | Mô tả A từ theirs | Tác giả A theirs | **CC0 1.0** | ✓ Hợp lệ |
+| 29 | \`client/public/assets/items/kinh_b.png\` | Mô tả B từ theirs | Tác giả B theirs | **CC0 1.0** | ✓ Hợp lệ |`;
+    const rows = generateRaSoatItemRows(["kinh_a.png", "kinh_b.png"], ours, theirs);
+    // 1. Khi trùng id kinh_a.png: bản ours thắng
+    expect(rows).toContain("Mô tả A từ ours");
+    expect(rows).toContain("Tác giả A ours");
+    expect(rows).not.toContain("Mô tả A từ theirs");
+    // 2. Icon kinh_b.png mới từ nhánh theirs: giữ nguyên mô tả và tác giả chi tiết của theirs
+    expect(rows).toContain("Mô tả B từ theirs");
+    expect(rows).toContain("Tác giả B theirs");
   });
 
   it("đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi", () => {

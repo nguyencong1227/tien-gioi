@@ -87,18 +87,24 @@ export function extractMarker(content, markerName) {
 
 /**
  * Thu thập số liệu tài sản hiện tại từ đĩa
+ * @param {{ extraCreditsContent?: string }} options
  */
-export function collectAssetStats() {
+export function collectAssetStats(options = {}) {
   const itemFilesOnDisk = fs
     .readdirSync(ITEMS_DIR)
     .filter((f) => f.endsWith(".png"))
     .sort();
 
-  // Đọc thứ tự xuất hiện hiện tại trong CREDITS.md nếu có để giữ thứ tự ổn định
+  // Đọc thứ tự xuất hiện hiện tại trong CREDITS.md (kèm bản theirs nếu có) để giữ thứ tự ổn định
   let orderedItems = [...itemFilesOnDisk];
+  const extraCredits = options.extraCreditsContent || process.env.THEIRS_CREDITS || "";
+  let creditsContent = "";
   if (fs.existsSync(CREDITS_FILE)) {
-    const creditsContent = fs.readFileSync(CREDITS_FILE, "utf8");
-    const m = creditsContent.match(/`([a-z0-9_]+\.png)`/g);
+    creditsContent = fs.readFileSync(CREDITS_FILE, "utf8");
+  }
+  const combinedCredits = creditsContent + "\n" + extraCredits;
+  if (combinedCredits.trim()) {
+    const m = combinedCredits.match(/`([a-z0-9_]+\.png)`/g);
     if (m) {
       const existing = m.map((s) => s.replace(/`/g, "")).filter((s) => s.endsWith(".png"));
       const seen = new Set();
@@ -150,8 +156,15 @@ export function collectAssetStats() {
 /**
  * Tạo danh sách các hàng markdown cho bảng mục 2 trong docs/RA_SOAT_TAI_SAN.md
  * từ STT 28 trở đi (sau phông chữ ở STT 27).
+ * @param {string[]} orderedItems
+ * @param {string} currentRaSoatContent
+ * @param {string} [extraRaSoatContent]
  */
-export function generateRaSoatItemRows(orderedItems, currentRaSoatContent) {
+export function generateRaSoatItemRows(
+  orderedItems,
+  currentRaSoatContent,
+  extraRaSoatContent = "",
+) {
   // 16 item đầu tiên thuộc M4 (STT 4-19 trong bảng tĩnh)
   const initial16 = new Set([
     "hoi_huyet_dan.png",
@@ -172,21 +185,27 @@ export function generateRaSoatItemRows(orderedItems, currentRaSoatContent) {
     "mang_dam_phu.png",
   ]);
 
-  // Đọc mô tả hiện có từ RA_SOAT_TAI_SAN.md
+  // Đọc mô tả hiện có từ currentRaSoatContent + extraRaSoatContent
+  // Bản của mình (currentRaSoatContent) đứng trước nên thắng khi trùng id
+  const extra = extraRaSoatContent || process.env.THEIRS_RA_SOAT || "";
+  const combinedRaSoat = currentRaSoatContent + "\n" + extra;
   const descMap = new Map();
-  const lines = currentRaSoatContent.split("\n");
+  const lines = combinedRaSoat.split("\n");
   for (const line of lines) {
     if (!line.includes("client/public/assets/items/")) continue;
     const match = line.match(
       /^\|\s*\d+\s*\|\s*`client\/public\/assets\/items\/([^`]+)`\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|/,
     );
     if (match) {
-      descMap.set(match[1], {
-        desc: match[2].trim(),
-        author: match[3].trim(),
-        license: match[4].trim(),
-        status: match[5].trim(),
-      });
+      const file = match[1];
+      if (!descMap.has(file)) {
+        descMap.set(file, {
+          desc: match[2].trim(),
+          author: match[3].trim(),
+          license: match[4].trim(),
+          status: match[5].trim(),
+        });
+      }
     }
   }
 
@@ -221,11 +240,13 @@ export function generateRaSoatItemRows(orderedItems, currentRaSoatContent) {
 
 /**
  * Đồng bộ nội dung vào CREDITS.md và docs/RA_SOAT_TAI_SAN.md
- * @param {{ checkOnly?: boolean }} options
+ * @param {{ checkOnly?: boolean, extraCreditsContent?: string, extraRaSoatContent?: string }} options
  * @returns {{ changed: boolean, errors: string[], stats: object }}
  */
 export function syncAssetDocs(options = {}) {
-  const stats = collectAssetStats();
+  const extraCredits = options.extraCreditsContent || process.env.THEIRS_CREDITS || "";
+  const extraRaSoat = options.extraRaSoatContent || process.env.THEIRS_RA_SOAT || "";
+  const stats = collectAssetStats({ extraCreditsContent: extraCredits });
   const errors = [];
   let anyChanged = false;
 
@@ -266,7 +287,7 @@ export function syncAssetDocs(options = {}) {
     );
 
     // 3. Cập nhật docs/RA_SOAT_TAI_SAN.md
-    const itemRows = generateRaSoatItemRows(stats.itemFiles, raSoat);
+    const itemRows = generateRaSoatItemRows(stats.itemFiles, raSoat, extraRaSoat);
 
     raSoat = replaceMarker(raSoat, "AUTO-RA-SOAT-ITEM-ROWS", "\n" + itemRows + "\n");
     raSoat = replaceMarker(
