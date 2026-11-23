@@ -228,9 +228,9 @@ Linh thạch ròng = thưởng hoàn thành + giá bán đồ thưởng kỳ v�
 
 | Đội | Linh thạch ròng / người | = phút săn | Tu vi / người | = phút săn |
 |---|---:|---:|---:|---:|
-| 2 người | 1261 | 17.6 | 2816 | 23.4 |
-| 3 người | 1084 | 15.1 | 2122 | 17.7 |
-| 4 người | 996 | 13.9 | 1776 | 14.8 |
+| 2 người | 1235 | 19.8 | 2816 | 23.4 |
+| 3 người | 1067 | 17.1 | 2122 | 17.7 |
+| 4 người | 983 | 15.8 | 1776 | 14.8 |
 
 Tối đa 3 lượt thưởng mỗi ngày (`DUNGEON_DAILY_REWARDS`) nên bí cảnh là một lựa chọn thêm chứ không thay được việc săn quái.
 
