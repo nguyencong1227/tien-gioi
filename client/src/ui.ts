@@ -37,6 +37,7 @@ import {
   type ItemDef,
   type Equipment,
   type EquipSlot,
+  type QuestReward,
   type QuestsMsg,
   type QuestCtx,
   type DialogMsg,
@@ -207,7 +208,16 @@ import {
 import { renderHall, updateHallCountdown, type HallUiState } from "./sect-hall-ui";
 import { canAffordFee, feeChipText, recipeFee } from "./forge-fee";
 import { perfRttText } from "./net-latency";
-import { questCardSubtitle, doneRows, doneSummary, questKind, rewardParts } from "./quest-log";
+import {
+  questCardSubtitle,
+  dialogRewardOf,
+  doneRows,
+  doneSummary,
+  QuestReadyWatcher,
+  questKind,
+  questReadyToast,
+  rewardParts,
+} from "./quest-log";
 import { pickupBtnText, portalBtnText, talkBtnText } from "./ctx-btn";
 import { sound } from "./audio";
 import {
@@ -482,6 +492,10 @@ let currentRealm = 0;
 let currentTier = 0;
 let currentEquip: FullEquip = equipmentOf(null);
 let questLog: QuestsMsg = { active: [], done: [], dailyDone: [] };
+/** Theo dõi nhiệm vụ VỪA đủ mục tiêu để báo MỘT lần (mục 66; mốc chỉ lập sau khi đã nhận cả túi lẫn sổ lần đầu: `QuestReadyWatcher`). */
+const questReadyWatcher = new QuestReadyWatcher();
+/** Thời gian dòng "ĐÃ ĐỦ" ở lại trên màn hình (toast thường 3 s): người chơi phải kịp đọc rằng còn việc phải về trả. */
+const QUEST_READY_TOAST_MS = 6000;
 
 // ---------- Tổ đội (M3, #75) ----------
 let partyData: PartyMsg = NO_PARTY;
@@ -2148,6 +2162,24 @@ function renderQuestTracker() {
   });
 }
 
+/** Vẽ một dòng toast và gỡ sau `ms` mili giây. KHÔNG đụng trạng thái chờ máy chủ (`ui.toast` mới là chỗ coi toast là lời đáp của thao tác kho / Nội vụ / đầu thai). */
+function showToastLine(m: ToastMsg, ms: number) {
+  const p = document.createElement("p");
+  p.className = m.tone ?? "info";
+  p.textContent = m.text;
+  $("toast").append(p);
+  setTimeout(() => p.remove(), ms);
+}
+
+/** Báo MỘT lần (toast) mỗi nhiệm vụ vừa đủ mục tiêu: chạy khi túi hoặc sổ nhiệm vụ đổi (QUYET_DINH_M3 mục 66). Chưa nhận đủ cả hai tin đầu thì chưa làm gì (mốc lập sau). */
+function notifyQuestsReady() {
+  for (const id of questReadyWatcher.update(questLog.active, getCtx())) {
+    const def = questDefAny(id);
+    // Không qua `ui.toast`: đây là tin của client, không phải lời đáp của máy chủ (không được mở khoá nút đang chờ kho / Nội vụ). Dòng này quan trọng nên ở lâu hơn toast thường.
+    if (def) showToastLine({ text: questReadyToast(def), tone: "good" }, QUEST_READY_TOAST_MS);
+  }
+}
+
 // ---------- Màn Phím tắt trong Cài đặt (QUYET_DINH_M3 mục 13, #463) ----------
 
 let keysModalOpen = false;
@@ -2283,6 +2315,26 @@ function onKeyCaptureKeydown(e: KeyboardEvent) {
   }
 }
 
+/**
+ * Điền dòng "Thưởng: ..." vào `el`. Mỗi món thưởng là một <span> tô màu + dấu theo độ hiếm (như túi / cửa hàng); tu vi và dấu phẩy giữ màu vàng của dòng.
+ * Dùng chung cho thẻ nhiệm vụ trong sổ và dòng xem trước ở hộp thoại NPC (mục 66).
+ */
+function fillRewardLine(el: HTMLElement, prefix: string, rewards: QuestReward) {
+  el.append(prefix);
+  rewardParts(rewards).forEach((part, k) => {
+    if (k > 0) el.append(", ");
+    if (part.itemId === undefined) {
+      el.append(part.text);
+      return;
+    }
+    const span = document.createElement("span");
+    span.className = "q-reward-item";
+    span.textContent = part.text;
+    applyRarityText(span, part.rarity);
+    el.append(span);
+  });
+}
+
 // ---------- Sổ nhiệm vụ (Quest Log Modal - Phím Q) ----------
 
 function renderQuestModal() {
@@ -2336,20 +2388,7 @@ function renderQuestModalImpl() {
 
       const rew = document.createElement("div");
       rew.className = "q-card-rewards";
-      // Mỗi món thưởng là một <span> tô màu + dấu theo độ hiếm (như túi / cửa hàng); tu vi và dấu phẩy giữ màu vàng của dòng
-      rew.append("Thưởng: ");
-      rewardParts(def.rewards).forEach((part, k) => {
-        if (k > 0) rew.append(", ");
-        if (part.itemId === undefined) {
-          rew.append(part.text);
-          return;
-        }
-        const span = document.createElement("span");
-        span.className = "q-reward-item";
-        span.textContent = part.text;
-        applyRarityText(span, part.rarity);
-        rew.append(span);
-      });
+      fillRewardLine(rew, "Thưởng: ", def.rewards);
 
       card.append(head, desc, progEl, rew);
       container.append(card);
@@ -3248,6 +3287,15 @@ function renderDialogOptions() {
     });
 
     optBox.append(btn);
+
+    // Xem trước thưởng ngay dưới lựa chọn nhận / trả nhiệm vụ (mục 66): biết sẽ được gì TRƯỚC khi bấm. Là thưởng GỐC; tu vi thật có thể nhân hệ số
+    const reward = dialogRewardOf(opt.action);
+    if (reward) {
+      const line = document.createElement("div");
+      line.className = "dlg-opt-reward";
+      fillRewardLine(line, "Thưởng (gốc): ", reward);
+      optBox.append(line);
+    }
   }
 }
 
@@ -6267,6 +6315,8 @@ export const ui = {
 
   onInv(m: InvMsg) {
     invSlots = m.slots;
+    questReadyWatcher.noteInv();
+    notifyQuestsReady();
     // túi đổi trong lúc hộp xác nhận vứt đang mở và món định vứt không còn đúng (đổi món / không đủ số lượng): đóng hộp, lời trong hộp không còn đúng
     if (dropPlanPending && !dropStillValid(invSlots, dropPlanPending)) closeDropConfirm(false);
     const now = performance.now();
@@ -6329,6 +6379,8 @@ export const ui = {
 
   onQuests(m: QuestsMsg) {
     questLog = m;
+    questReadyWatcher.noteQuests();
+    notifyQuestsReady();
     renderQuestTracker();
     if (questModalOpen) renderQuestModal();
   },
@@ -6842,11 +6894,7 @@ export const ui = {
     if (hallBusy.size) endHallBusy(); // thao tác Nội vụ có toast trả lời (kết quả / từ chối): mở khoá nút
     // đang chờ máy chủ trả lời "đầu thai" mà có toast TỪ CHỐI tới (`isRebirthRefusal`): là lời từ chối (lựa chọn không hợp lệ, chưa ghi sổ...): giữ lý do trên màn Hoàng Tuyền
     if (rebirthBusy && activeLimboMsg && isRebirthRefusal(m)) limboRebirthFailed(m.text);
-    const p = document.createElement("p");
-    p.className = m.tone ?? "info";
-    p.textContent = m.text;
-    $("toast").append(p);
-    setTimeout(() => p.remove(), 3000);
+    showToastLine(m, 3000);
   },
 
   death(secondsLeft: number | null, text?: string, subText?: string) {

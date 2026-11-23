@@ -2,24 +2,34 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_MAP_ID,
   ITEM_BY_ID,
   MAIN_QUEST_START,
+  MAP_BY_ID,
   NPC_BY_ID,
   QUESTS,
   QUEST_BY_ID,
   SECT_QUEST_BY_ID,
   SECT_QUEST_GIVER,
+  emptyInventory,
   isSectQuest,
+  type QuestCtx,
+  type QuestProgress,
 } from "@tien-gioi/shared";
 import {
   MAIN_QUEST_TOTAL,
   QUEST_KIND_BADGE,
   QUEST_KIND_LABEL,
+  dialogRewardOf,
   doneRows,
   doneSummary,
+  QuestReadyWatcher,
+  newlyReadyQuests,
   questCardSubtitle,
   questKind,
   questReadyText,
+  questReadyToast,
+  readyQuestIds,
   rewardParts,
 } from "./quest-log";
 
@@ -152,12 +162,33 @@ describe("nhiệm vụ TÔNG MÔN (M8.6): không có NPC giao", () => {
     expect(questCardSubtitle({ id: "x", giver: "constructor" })).toBe("constructor (Việc phụ)");
   });
 
-  it("questReadyText: tông môn -> mở bảng Tông môn > Nội vụ để trả; NPC thường -> gặp NPC trả; NPC lạ -> 'NPC'", () => {
-    expect(questReadyText(sectDef)).toBe("Hoàn thành · Mở bảng Tông môn > Nội vụ để trả nhiệm vụ");
+  it("questReadyText (mục 66): 'ĐÃ ĐỦ — về gặp <NPC> ở <bản đồ> để trả nhiệm vụ'; tông môn -> bảng Tông môn > Nội vụ; NPC lạ -> 'NPC', không bản đồ", () => {
+    expect(questReadyText(sectDef)).toBe("ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ");
     const q = QUEST_BY_ID[MAIN[0]!]!;
-    expect(questReadyText(q)).toBe(`Hoàn thành · Gặp ${NPC_BY_ID[q.giver]!.name} trả nhiệm vụ`);
-    expect(questReadyText({ giver: "khong_co" })).toBe("Hoàn thành · Gặp NPC trả nhiệm vụ");
-    expect(questReadyText({ giver: "constructor" })).toBe("Hoàn thành · Gặp NPC trả nhiệm vụ");
+    const npc = NPC_BY_ID[q.giver]!;
+    const mapName = MAP_BY_ID[npc.mapId ?? DEFAULT_MAP_ID]!.name;
+    expect(questReadyText(q)).toBe(`ĐÃ ĐỦ — về gặp ${npc.name} ở ${mapName} để trả nhiệm vụ`);
+    expect(questReadyText({ giver: "khong_co" })).toBe("ĐÃ ĐỦ — về gặp NPC để trả nhiệm vụ");
+    expect(questReadyText({ giver: "constructor" })).toBe("ĐÃ ĐỦ — về gặp NPC để trả nhiệm vụ");
+  });
+
+  it("questReadyText nói ĐÚNG bản đồ của NPC giao, kể cả NPC ở bản đồ KHÁC bản đồ mặc định", () => {
+    const other = QUESTS.find((q) => {
+      const m = NPC_BY_ID[q.giver]?.mapId;
+      return m !== undefined && m !== DEFAULT_MAP_ID;
+    });
+    expect(other, "phải có nhiệm vụ của NPC ở bản đồ ngoài Lạc Hà").toBeTruthy();
+    const mapId = NPC_BY_ID[other!.giver]!.mapId!;
+    expect(questReadyText(other!)).toContain(` ở ${MAP_BY_ID[mapId]!.name} `);
+    expect(questReadyText(other!)).not.toContain(MAP_BY_ID[DEFAULT_MAP_ID]!.name);
+  });
+
+  it("questReadyToast: 'ĐÃ ĐỦ: <tên nhiệm vụ> — về gặp <NPC> ở <bản đồ> để trả nhiệm vụ'", () => {
+    const q = QUEST_BY_ID[MAIN[0]!]!;
+    expect(questReadyToast(q)).toBe(
+      `ĐÃ ĐỦ: ${q.title} — ${questReadyText(q).replace("ĐÃ ĐỦ — ", "")}`,
+    );
+    expect(questReadyToast(sectDef)).toContain(`ĐÃ ĐỦ: ${sectDef.title} — mở bảng Tông môn`);
   });
 
   it("doneRows nhận id nhiệm vụ tông môn (xếp trong nhóm lặp, cuối nhóm); id độc vẫn bị bỏ", () => {
@@ -232,5 +263,125 @@ describe("rewardParts: các phần của dòng 'Thưởng:' ở thẻ nhiệm v�
     expect(rewardParts({ items: [{ itemId: "constructor", qty: 3 }] })).toEqual([
       { text: "constructor ×3", itemId: "constructor" },
     ]);
+  });
+});
+
+describe("báo MỘT lần khi nhiệm vụ vừa đủ (mục 66)", () => {
+  const talkQ = QUESTS.find((q) => q.steps.length === 1 && q.steps[0]!.kind === "talk")!;
+  const killQ = QUESTS.find((q) => q.steps.every((s) => s.kind === "kill"))!;
+  const ctx: QuestCtx = { realm: 0, tier: 0, inv: emptyInventory() };
+  const done = (id: string, n: number): QuestProgress => ({ id, step: n, count: 0 });
+  const doing = (id: string): QuestProgress => ({ id, step: 0, count: 0 });
+
+  it("readyQuestIds: chỉ nhiệm vụ đã qua hết bước; id lạ / độc bị bỏ", () => {
+    const ids = readyQuestIds(
+      [done(talkQ.id, talkQ.steps.length), doing(killQ.id), done("constructor", 1), done("x", 1)],
+      ctx,
+    );
+    expect([...ids]).toEqual([talkQ.id]);
+  });
+
+  it("prev = null (vừa vào phòng): KHÔNG báo gì dù có nhiệm vụ đã đủ từ trước; trả mốc để lần sau so", () => {
+    const r = newlyReadyQuests(null, [done(talkQ.id, talkQ.steps.length)], ctx);
+    expect(r.notify).toEqual([]);
+    expect([...r.next]).toEqual([talkQ.id]);
+  });
+
+  it("chuyển từ chưa đủ -> đủ: báo ĐÚNG MỘT lần, lần xem sau (vẫn đủ) không báo lại", () => {
+    const before = newlyReadyQuests(null, [doing(talkQ.id)], ctx);
+    const flip = newlyReadyQuests(before.next, [done(talkQ.id, talkQ.steps.length)], ctx);
+    expect(flip.notify).toEqual([talkQ.id]);
+    const again = newlyReadyQuests(flip.next, [done(talkQ.id, talkQ.steps.length)], ctx);
+    expect(again.notify).toEqual([]);
+  });
+
+  it("nhận nhiệm vụ đã đủ sẵn (bước đầu đạt ngay): báo; trả xong (biến khỏi sổ) rồi nhận lại cái khác thì báo cái mới", () => {
+    const base = newlyReadyQuests(new Set(), [], ctx);
+    expect(newlyReadyQuests(base.next, [done(talkQ.id, 1)], ctx).notify).toEqual([talkQ.id]);
+    const turned = newlyReadyQuests(new Set([talkQ.id]), [], ctx);
+    expect([...turned.next]).toEqual([]);
+    expect(newlyReadyQuests(turned.next, [done(talkQ.id, 1)], ctx).notify).toEqual([talkQ.id]);
+  });
+
+  it("đủ -> thiếu (lỡ vứt đồ) -> đủ lại: báo lại lần nữa", () => {
+    const collectQ = QUESTS.find((q) => q.steps.some((s) => s.kind === "collect"))!;
+    const need = collectQ.steps.filter((s) => s.kind === "collect") as {
+      kind: "collect";
+      itemId: string;
+      count: number;
+    }[];
+    const full = emptyInventory();
+    need.forEach((s, i) => (full[i] = { itemId: s.itemId, qty: s.count }));
+    const prog = done(collectQ.id, collectQ.steps.length);
+    const ready = newlyReadyQuests(new Set(), [prog], { ...ctx, inv: full });
+    expect(ready.notify).toEqual([collectQ.id]);
+    const lost = newlyReadyQuests(ready.next, [prog], ctx); // túi trống: không còn đủ
+    expect(lost.notify).toEqual([]);
+    expect([...lost.next]).toEqual([]);
+    expect(newlyReadyQuests(lost.next, [prog], { ...ctx, inv: full }).notify).toEqual([
+      collectQ.id,
+    ]);
+  });
+});
+
+describe("xem trước thưởng ở hộp thoại NPC (mục 66)", () => {
+  const withReward = QUESTS.find((q) => rewardParts(q.rewards).length > 0)!;
+
+  it("lựa chọn nhận / trả mang questId: trả đúng thưởng gốc trong dữ liệu", () => {
+    expect(dialogRewardOf({ kind: "accept", questId: withReward.id })).toBe(withReward.rewards);
+    expect(dialogRewardOf({ kind: "turnIn", questId: withReward.id })).toBe(withReward.rewards);
+  });
+
+  it("lựa chọn khác, id lạ / độc: không có xem trước (không ném lỗi)", () => {
+    expect(dialogRewardOf({ kind: "close" })).toBeUndefined();
+    expect(dialogRewardOf({ kind: "shop" })).toBeUndefined();
+    expect(dialogRewardOf({ kind: "accept", questId: "khong_co" })).toBeUndefined();
+    expect(dialogRewardOf({ kind: "accept", questId: "constructor" })).toBeUndefined();
+    expect(dialogRewardOf({ kind: "turnIn", questId: "__proto__" })).toBeUndefined();
+  });
+});
+
+describe("QuestReadyWatcher: không báo nhầm lúc vào phòng (mục 66)", () => {
+  const talkQ = QUESTS.find((q) => q.steps.length === 1 && q.steps[0]!.kind === "talk")!;
+  const ctx: QuestCtx = { realm: 0, tier: 0, inv: emptyInventory() };
+  const ready: QuestProgress[] = [{ id: talkQ.id, step: talkQ.steps.length, count: 0 }];
+  const notReady: QuestProgress[] = [{ id: talkQ.id, step: 0, count: 0 }];
+
+  it("chưa nhận đủ cả túi lẫn sổ: không báo, và KHÔNG lập mốc (tin thứ hai tới vẫn chỉ lập mốc, không báo nhiệm vụ đã đủ từ trước)", () => {
+    const w = new QuestReadyWatcher();
+    w.noteInv();
+    expect(w.update(ready, ctx)).toEqual([]); // chưa có sổ
+    w.noteQuests();
+    expect(w.update(ready, ctx)).toEqual([]); // đủ cả hai: lập mốc, nhiệm vụ đã đủ từ trước không báo
+    expect(w.update(ready, ctx)).toEqual([]);
+  });
+
+  it("thứ tự ngược (sổ trước, túi sau) cũng vậy", () => {
+    const w = new QuestReadyWatcher();
+    w.noteQuests();
+    expect(w.update(ready, ctx)).toEqual([]);
+    w.noteInv();
+    expect(w.update(ready, ctx)).toEqual([]);
+  });
+
+  it("sau khi lập mốc: nhiệm vụ vừa đủ báo đúng MỘT lần", () => {
+    const w = new QuestReadyWatcher();
+    w.noteInv();
+    w.noteQuests();
+    expect(w.update(notReady, ctx)).toEqual([]); // mốc: chưa đủ
+    expect(w.update(ready, ctx)).toEqual([talkQ.id]);
+    expect(w.update(ready, ctx)).toEqual([]);
+  });
+
+  it("mỗi phiên một người theo dõi: phiên mới (đăng nhập lại) không nhớ mốc cũ", () => {
+    const a = new QuestReadyWatcher();
+    a.noteInv();
+    a.noteQuests();
+    a.update(notReady, ctx);
+    expect(a.update(ready, ctx)).toEqual([talkQ.id]);
+    const b = new QuestReadyWatcher();
+    b.noteInv();
+    b.noteQuests();
+    expect(b.update(ready, ctx)).toEqual([]);
   });
 });
