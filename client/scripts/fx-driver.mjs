@@ -108,6 +108,12 @@ export const FX_CAST_SKILLS = [
   "huyet_trao_pha_mach",
   "bach_cot_hong_nhan",
   "niep_hon_doat_phat",
+  // Thủy (CT15 đợt 2 lát 2, #1185, D): hình mới aura_water / pull / bolt
+  "thai_hoa_bo_nguyen",
+  "huyet_co_bi_kinh",
+  "toa_long_cam_na",
+  "huyet_ti_phuoc_than",
+  "no_dao_bai_khong",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */

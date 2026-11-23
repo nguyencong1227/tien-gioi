@@ -7,6 +7,7 @@ import process from "node:process";
 import { fileURLToPath, URL } from "node:url";
 import zlib from "node:zlib";
 import { sigilRows } from "./book-marks.mjs";
+import { syncAssetDocs } from "./sync-asset-docs.mjs";
 
 const OUT_DIR = fileURLToPath(new URL("../public/assets", import.meta.url));
 const ITEMS_DIR = path.join(OUT_DIR, "items");
@@ -1028,6 +1029,20 @@ const BOOKS = {
   kinh_huyet_trao_pha_mach: [0x9a7070, 0xf0d0d0],
   kinh_bach_cot_hong_nhan: [0x888888, 0xf0e8e8],
   kinh_niep_hon_doat_phat: [0x706878, 0xe0d8e8],
+  // Âm (CT16 đợt 2, #1186, E; lô 1 vẽ TRƯỚC dữ liệu): bìa tím đen theo hệ Âm, mỗi quyển một sắc riêng (mực, đêm, kinh mạch độc, vuốt cào); dấu ấn sinh tự động từ id (#1303),
+  // riêng "Tịch Dạ Kiếm Quyết" (kiếm đêm tách bóng) có dấu kiếm
+  kinh_thuc_hon_nhat_chi: [0x2e2440, 0xb8a0d8],
+  kinh_tich_da_phan_anh: [0x3a3456, 0xa8b0e0, "kiem"],
+  kinh_kho_mach_dan_luu: [0x322a3a, 0x7fbf9a],
+  // "Thực Phách Âm Trảo" (cg2, thay hai quyển cg4 / cg5 đã bỏ theo quy tắc mục 8 `docs/PHAN_CONG_CHIEU_THUC.md`): ba vệt vuốt cào, bìa tím rượu, vệt trảo hồng tro
+  kinh_thuc_phat_am_trao: [0x40283a, 0xd49ab8, "trao"],
+  // Thủy (CT15 đợt 2 lát 2, #1185, D; icon vẽ SAU dữ liệu của D, B): bìa theo hệ Thủy nhưng mỗi quyển một sắc riêng để không trùng Bích Thủy / Hư Thủy (0x3b7bd9); dấu ấn sinh tự động từ id (#1303),
+  // riêng "Tỏa Long Thủ" (cầm nã, siết như xích) có dấu vuốt
+  kinh_thai_hoa_bo_nguyen: [0x2f8f9a, 0xf2d8e8], // sương trên cánh hoa: lam ngọc, viền hồng phấn
+  kinh_huyet_co_bi_kinh: [0x4a3a8a, 0xc880d8], // cổ trùng nuôi bằng máu, máu rỉ màu tím
+  kinh_toa_long_cam_na: [0x2c6a8a, 0xb0d8e8, "trao"],
+  kinh_huyet_ti_phuoc_than: [0x2a2f6a, 0xe06070], // tơ máu: chàm đậm, sợi đỏ
+  kinh_no_dao_bai_khong: [0x1f4a8a, 0xe0f4ff], // sóng lớp lớp: biển sâu, bọt trắng
 };
 
 /**
@@ -2057,3 +2072,11 @@ function buildAtlas() {
 buildTileset();
 buildAtlas();
 process.stdout.write("Generated tileset.png, atlas.png, atlas.json, and item icons.\n");
+try {
+  const { stats } = syncAssetDocs();
+  process.stdout.write(
+    `Synced asset docs: ${stats.itemCount} items, ${stats.totalScanned} static files, ${stats.totalAtlasFrames} atlas frames.\n`,
+  );
+} catch (err) {
+  process.stderr.write(`Warning: syncAssetDocs failed: ${err.message}\n`);
+}

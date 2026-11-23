@@ -95,22 +95,22 @@ describe("nhịp tu luyện (mô hình simulate, có nội dung mới)", () => {
   const minutes = (rows: ReturnType<typeof simulate>, realm: number) =>
     rows.filter((r) => r.realm === realm).reduce((a, r) => a + r.minutes, 0);
 
-  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 50 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ)", () => {
+  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 49 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ; #1333: `thanh_lo_tram` lên sàn 240 rút 1 phút)", () => {
     const before = simulate(2);
     const after = withKimDan(() => simulate(2));
     expect(after.map((r) => r.minutes)).toEqual(before.map((r) => r.minutes));
-    expect(Math.round(after.at(-1)!.total)).toBe(170);
+    expect(Math.round(after.at(-1)!.total)).toBe(169);
     // Luyện Khí: 51 phút cộng dồn (bao gồm 3 việc phụ Lạc Hà #754 thưởng exp 25/30/35 = 90, trong trần 2,5 %)
     expect(Math.round(after.filter((r) => r.realm <= 1).at(-1)!.total)).toBe(51);
   });
 
-  it("Kim Đan ~4-7 giờ (mục tiêu M6 5-7 giờ, mục 30: tu vi x2 + máu x1,5 rút còn ~4,2 giờ, người dùng chủ ý thưởng nhiều tu vi hơn): người tối ưu (cả Xích Mãng) và người chỉ săn bãi mới", () => {
+  it("Kim Đan ~3,8-7 giờ (mục tiêu M6 5-7 giờ, mục 30: tu vi x2 + máu x1,5 rút còn ~4,2 giờ, người dùng chủ ý thưởng nhiều tu vi hơn; mục 66.4 / #1333: sàn thưởng nhiệm vụ rút thêm ~7 % còn ~3,9 giờ): người tối ưu (cả Xích Mãng) và người chỉ săn bãi mới", () => {
     const optimal =
       minutes(
         withKimDan(() => simulate(3)),
         KD,
       ) / 60;
-    expect(optimal).toBeGreaterThan(4);
+    expect(optimal).toBeGreaterThan(3.8);
     expect(optimal).toBeLessThan(7);
     // chỉ bãi mới + Hắc Hổ / Sói / Thỏ (không đụng Xích Mãng)
     const noMang = withKimDan(() => simulate(3), true);
@@ -181,11 +181,15 @@ describe("luân hồi khi cày tới Kim Đan (#406 mục 4): mọi cách chơi 
     expect(base.some((m) => m.realm === 3)).toBe(false);
   });
 
-  it("từ Luyện Khí tầng 5 tới hết Kim Đan, Duyên / giờ (0 trùm) chênh <= 1,3x và đỉnh vẫn ở Trúc Cơ (Kim Đan không trả quá tay)", () => {
+  it("từ Luyện Khí tầng 5 tới hết Kim Đan, Duyên / giờ (0 trùm) chênh <= 1,3x và đỉnh Kim Đan không vượt đỉnh Trúc Cơ quá 5 % (Kim Đan không trả quá tay)", () => {
     expect(r.ratio).toBeLessThanOrEqual(1.3);
-    expect(r.hi.realm).toBeLessThanOrEqual(2);
+    // Trước #1333 đỉnh nằm ở Trúc Cơ (`r.hi.realm <= 2`). Sàn thưởng nhiệm vụ một lần (mục 66.4) rút nhịp Kim Đan ~7 %, nên Duyên / giờ Kim Đan hậu kỳ (28,64)
+    // nhỉnh hơn Trúc Cơ trung kỳ (28,28) ~1,3 %: giữ ý "không trả quá tay" bằng cận số 5 % thay vì cận theo cảnh giới.
+    const tcPeak = Math.max(
+      ...r.milestones.filter((x) => x.realm === 2).map((x) => x.duyenPerHourZeroBoss),
+    );
     for (const m of r.milestones.filter((x) => x.realm === 3))
-      expect(m.duyenPerHourZeroBoss, m.label).toBeLessThanOrEqual(r.hi.duyenPerHourZeroBoss);
+      expect(m.duyenPerHourZeroBoss, m.label).toBeLessThanOrEqual(tcPeak * 1.05);
   });
 
   it("không điểm dừng Kim Đan nào đáng cố ý chết sớm: mọi mốc Kim Đan >= mốc thấp nhất, và hết Kim Đan không kém hết Trúc Cơ quá 10%", () => {

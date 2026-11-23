@@ -219,10 +219,71 @@ async function main() {
       return JSON.stringify(d);
     };
 
+    // QUỸ ĐẠO khi đi bộ (E2E đêm 23/11, run 45134303573: `walkDiag` cho thấy nhân vật đứng yên ở (2020, 2830), cách cổng am_suong_nam ~640 px và cách điểm xuất hiện (1984, 3344)
+    // ~510 px về phía bắc, FPS 4, Chrome ăn ~360% CPU, hai lần thử cùng một chỗ: một dòng cuối không nói được nó ĐI ĐẾN đó thế nào). Mỗi giây ghi vị trí đoán trước (client),
+    // vị trí thật (World), khí huyết / chết, joystick, FPS; kèm sự kiện kiểm toán của phòng (tha chết, dời chỗ, ...). Chỉ in khi hết giờ; không đổi hành vi.
+    const startTrace = async () => {
+      const rows: string[] = [];
+      const t0 = Date.now();
+      const rel = () => `+${((Date.now() - t0) / 1000).toFixed(1)}s`;
+      let world: any = null;
+      let origAudit: any = null;
+      let busy = false;
+      const tick = async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          const page = JSON.parse(
+            String(
+              await ev(`(() => { const s = window.__scene, J = window.__joystick;
+                return JSON.stringify({ sid: s.room.sessionId, roomId: s.room.roomId, p: [Math.round(s.predX), Math.round(s.predY)],
+                  j: J ? [Math.round(J.x * 100) / 100, Math.round(J.y * 100) / 100, J.active] : null, fps: Math.round(s.game?.loop?.actualFps ?? -1) }); })()`),
+            ),
+          );
+          const room = matchMaker.getLocalRoomById(String(page.roomId)) as any;
+          if (room?.world && room.world !== world) {
+            world = room.world;
+            origAudit = world.audit;
+            world.audit = (evName: string, fields: unknown) => {
+              rows.push(`${rel()} [kiểm toán] ${evName} ${JSON.stringify(fields).slice(0, 160)}`);
+              origAudit?.(evName, fields);
+            };
+          }
+          const me = room?.world?.state?.players?.get(String(page.sid));
+          rows.push(
+            `${rel()} khách=${page.p} máy chủ=${me ? `${Math.round(me.x)},${Math.round(me.y)}` : "?"} hp=${me ? Math.round(me.hp) : "?"}${me?.dead ? " CHẾT" : ""} joy=${JSON.stringify(page.j)} fps=${page.fps}`,
+          );
+          if (rows.length > 200) rows.splice(30, 1); // giữ 30 mẫu ĐẦU (nhân vật rời điểm xuất hiện thế nào) + mẫu mới nhất
+        } catch {
+          /* trang đang chuyển cảnh: bỏ mẫu này */
+        } finally {
+          busy = false;
+        }
+      };
+      const timer = setInterval(() => void tick(), 1000);
+      return {
+        dump: () =>
+          (rows.length > 45
+            ? [
+                ...rows.slice(0, 30),
+                `... (${rows.length - 40} mẫu giữa bị lược)`,
+                ...rows.slice(-10),
+              ]
+            : rows
+          ).join("\n    "),
+        stop: () => {
+          clearInterval(timer);
+          // trả `audit` của phòng về nguyên bản (chỉ khi chưa ai đổi sau ta)
+          if (world) world.audit = origAudit;
+        },
+      };
+    };
+
     // Đi bộ tới cổng `id` của bản đồ hiện tại bằng joystick ảo (BFS trên ô) rồi đứng sát tâm cổng
     const walkToPortal = async (id: string) => {
       const P = `window.__scene.map.portals.find((q) => q.id === ${JSON.stringify(id)})`;
       await ev(`(() => { const s = window.__scene, m = s.map, W = m.def.w, H = m.def.h, tiles = m.tiles, p = ${P}, J = window.__joystick;
+        if (window.__walkTimer) { clearInterval(window.__walkTimer); window.__walkTimer = 0; }
         window.__walkErr = ''; if (!p) { window.__walkErr = 'bản đồ này không có cổng ' + ${JSON.stringify(id)}; return 0; }
         const bad = (i) => { const t = tiles[i]; return t === 3 || t === 4 || t === 5; };
         const sx = Math.floor(s.predX / 32), sy = Math.floor(s.predY / 32), gx = Math.floor(p.x / 32), gy = Math.floor(p.y / 32);
@@ -234,7 +295,7 @@ async function main() {
         const goal = gy * W + gx; if (prev[goal] === -2) { window.__walkErr = 'không có đường tới cổng'; return 0; }
         const path = []; for (let c = goal; c !== -1; c = prev[c]) path.push([(c % W) * 32 + 16, Math.floor(c / W) * 32 + 16]); path.reverse();
         let i = 1; window.__walkLen = path.length;
-        window.__walkTimer = setInterval(() => { if (Math.hypot(s.predX - p.x, s.predY - p.y) < 30 || i >= path.length) { J.x = 0; J.y = 0; J.active = false; clearInterval(window.__walkTimer); return; }
+        const timerId = window.__walkTimer = setInterval(() => { if (Math.hypot(s.predX - p.x, s.predY - p.y) < 30 || i >= path.length) { J.x = 0; J.y = 0; J.active = false; clearInterval(timerId); if (window.__walkTimer === timerId) window.__walkTimer = 0; return; }
           const [tx, ty] = path[i], dx = tx - s.predX, dy = ty - s.predY, d = Math.hypot(dx, dy);
           // Waypoint ĐÃ QUA khi hình chiếu của nhân vật dọc đoạn đường tới nó vượt 1 (hoặc tới sát 8 px): khung chậm (~4-6 FPS, runner CI) nhảy
           // 27-45 px mỗi khung nên bán kính 8 px không bao giờ trúng, nhân vật quay quanh waypoint tới hết hạn chờ (đo: 90 s ở am_suong_nam khi ghim một nhân)
@@ -244,6 +305,7 @@ async function main() {
         !(await ev(`window.__walkErr`)),
         `có đường đi bộ tới cổng ${id} (${await ev(`window.__walkErr`)})`,
       );
+      const trace = await startTrace();
       try {
         await T.waitFor(
           `!!window.__scene.nearPortal && Math.hypot(window.__scene.predX - ${P}.x, window.__scene.predY - ${P}.y) < ${WALK_NEAR_PX}`,
@@ -253,11 +315,16 @@ async function main() {
       } catch (err) {
         // Chỉ chẩn đoán rồi ném lại đúng lỗi gốc: lần đỏ trên CI (22/11, 90 s ở am_suong_nam, 2/2 lần, không tái hiện được ở máy dev) chỉ để lại một dòng timeout
         out(`  (chẩn đoán đi bộ tới cổng ${id}: ${await walkDiag(id)})`);
+        out(`  (quỹ đạo đi bộ, mỗi giây một mẫu:\n    ${trace.dump()})`);
         throw err;
+      } finally {
+        trace.stop();
       }
       ok(`đã tới gần cổng ${id} sau ${await ev(`window.__walkLen`)} ô`);
+      // Dừng HẲN bộ hẹn giờ đi bộ (nó chỉ tự dừng khi cách tâm cổng < 30 px, còn đây đã đợi tới < WALK_NEAR_PX): để sống tiếp thì sau khi qua cổng nó vẫn bẻ joystick về waypoint của bản đồ CŨ,
+      // chọi nhau với bộ hẹn giờ của lần đi bộ kế (E2E đêm 23/11, run 45134303573, 2 / 2 lần đỏ ở am_suong_nam: joystick đảo lên / xuống mỗi 40 ms, nhân vật trôi ~510 px về phía bắc rồi đứng yên hoặc chết)
       await ev(
-        `(() => { const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; return 1; })()`,
+        `(() => { if (window.__walkTimer) { clearInterval(window.__walkTimer); window.__walkTimer = 0; } const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; return 1; })()`,
       );
       await sleep(700); // đợi vị trí THẬT của server đuổi kịp vị trí đoán trước (server kiểm khoảng cách tới cổng)
     };

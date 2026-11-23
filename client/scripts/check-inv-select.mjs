@@ -1,4 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 /* global console, setTimeout, fetch, Buffer */
 /**
  * Kiểm LỖI TÚI ĐỒ (QUYET_DINH_M3 mục 24) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), ở năm khung nhìn:
@@ -13,6 +14,8 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   BÀN PHÍM (mọi khung): mũi tên chọn ô; Tab / Enter tới Vứt 1 -> hộp mở, focus ở "Giữ lại"; Esc đóng HỘP trước (túi còn mở); Enter xác nhận thì vứt đúng món.
  *   Bảng nhân vật (so sánh trang bị): rê chuột KHÔNG đổi món xem trước; bấm mới đổi.
  * `--shots`: lưu ảnh hộp xác nhận (và trạng thái rê chuột) mỗi khung nhìn.
+ * `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập KHUNG CHẬM của runner GitHub (luồng chính bận `ms` mỗi khung hình, `slow-frame.mjs`); 170 gần với runner. Ca "click ma" dừng đồng hồ trang
+ *   (`freezeClock`) để "bấm ngay sau khi mở hộp" đúng nghĩa bất kể tốc độ máy (#1389: đỏ 2 / 2 lượt chạy tay vì cửa sổ 450 ms đã trôi qua giữa hai lệnh CDP).
  */
 import http from "node:http";
 import fs from "node:fs";
@@ -25,6 +28,12 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Chờ tối đa chừng này ms cho Chrome mở cổng CDP và cho cảnh sẵn sàng. Trước đây 15 s / 16 s: một lượt Chrome khởi động chậm trên runner làm CẢ HAI script đỏ cùng lúc
+ * với "Không tìm thấy Chrome page target" sau 15,3 s (run 45243928886, A ở #1389); các `e2e-*.ts` khác chờ 30 s.
+ */
+const START_WAIT_MS = 60000;
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -96,7 +105,7 @@ async function main() {
   };
   try {
     let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
+    for (const tStart = Date.now(); !page && Date.now() - tStart < START_WAIT_MS;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
         page = (await res.json()).find((t) => t.type === "page") ?? null;
@@ -135,10 +144,15 @@ async function main() {
       if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails));
       return r.result?.result?.value;
     };
+    /** Chờ `n` khung hình THẬT của trang: `sleep` cố định không đủ để trang xử lý / vẽ lại khi khung chậm (runner WebGL phần mềm), còn khung nhanh chỉ tốn vài chục ms. */
+    const nextFrames = (n = 2) =>
+      evalJs(
+        `new Promise((res) => { let k = ${n}; const f = () => (--k <= 0 ? res(1) : requestAnimationFrame(f)); requestAnimationFrame(f); })`,
+      );
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     // ---- đầu vào THẬT của Chrome ----
@@ -157,10 +171,12 @@ async function main() {
       await moveTo(x, y);
       await mouse("mousePressed", x, y);
       await mouse("mouseReleased", x, y);
+      await nextFrames(2); // để trang xử lý xong lần bấm trước khi đọc trạng thái (khung chậm)
     };
     const tapAt = async (x, y) => {
       await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
       await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await nextFrames(2);
     };
     const keyDef = {
       Enter: [13, "\r"],
@@ -203,7 +219,7 @@ async function main() {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
       let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
+      for (const tReady = Date.now(); !ready && Date.now() - tReady < START_WAIT_MS;) {
         await sleep(200);
         ready = Boolean(
           await evalJs(
@@ -231,6 +247,20 @@ async function main() {
       };
       /** Hộp xác nhận bỏ qua mọi lần bấm trong ~450 ms đầu (chống "click ma" sau khi chạm Vứt): chờ qua cửa sổ đó trước khi bấm "Vứt" / "Giữ lại" */
       const pastGuard = () => sleep(560);
+      /**
+       * Dừng đồng hồ `performance.now()` của TRANG cho tới `thawClock()`. Cửa sổ chống click ma là 450 ms ĐỒNG HỒ THẬT, nhưng ở khung chậm (runner GitHub: WebGL phần mềm)
+       * mỗi lệnh CDP chờ cả một khung hình nên "bấm ngay sau khi mở" thực ra trễ > 450 ms và click được nhận (đúng hành vi, ca đo sai: đỏ 2 / 2 lượt chạy tay ở #1389).
+       * Dừng đồng hồ TỪ TRƯỚC khi mở hộp thì "ngay sau khi mở" đúng nghĩa bất kể tốc độ máy; mở lại đồng hồ rồi `pastGuard()` thì đã qua cửa sổ.
+       */
+      const freezeClock = () =>
+        evalJs(`(() => {
+          if (!window.__pnReal) window.__pnReal = performance.now.bind(performance);
+          const t = window.__pnReal();
+          performance.now = () => t;
+          return t;
+        })()`);
+      const thawClock = () =>
+        evalJs(`(() => { if (window.__pnReal) performance.now = window.__pnReal; return 1; })()`);
       /** Tâm của phần tử (đã cuộn vào tầm nhìn); `null` nếu không có. Trả thêm phần tử TẠI điểm đó để biết có bị che (nút Đóng nổi...) không. */
       const center = (sel, idx = 0) =>
         evalJs(`(() => {
@@ -313,6 +343,7 @@ async function main() {
         await moveTo(drop1.x, drop1.y);
         st = await state();
         check(st.selected === 2, "rê tới nút Vứt 1: ô chọn vẫn là ô 2");
+        await freezeClock(); // trước khi mở hộp: ca click ma bên dưới phải "ngay sau khi mở" thật, không phụ thuộc tốc độ máy
         await mouse("mousePressed", drop1.x, drop1.y);
         await mouse("mouseReleased", drop1.x, drop1.y);
         await sleep(200);
@@ -333,6 +364,7 @@ async function main() {
           "bấm Vứt ngay khi hộp vừa mở (click ma): bị bỏ qua, hộp vẫn mở, chưa gửi gì",
         );
         await shot("xac-nhan-vut");
+        await thawClock();
         await pastGuard();
         check(yes.hit, `nút Vứt trong hộp bấm được (không bị che bởi "${yes.topId}")`);
         await clickAt(yes.x, yes.y);
@@ -451,6 +483,8 @@ async function main() {
         await sleep(200);
         st = await state();
         check(!st.confirmOpen && st.drops.length === 0, "chạm Giữ lại: hộp đóng, không gửi gì");
+        await pastGuard(); // qua cửa sổ sau khi đóng rồi mới dừng đồng hồ
+        await freezeClock();
         await tapAt(all.x, all.y);
         await sleep(100);
         const yes = await center("#inv-drop-yes");
@@ -461,6 +495,7 @@ async function main() {
           st.confirmOpen && st.drops.length === 0,
           "chạm Vứt ngay khi hộp vừa mở (click ma): bị bỏ qua, chưa gửi gì",
         );
+        await thawClock();
         await pastGuard();
         await tapAt(yes.x, yes.y);
         await sleep(250);
@@ -546,6 +581,7 @@ async function main() {
           return 1;
         })()`);
         await sleep(300);
+        await nextFrames(3);
       };
       const qty = () =>
         evalJs(`(() => {
@@ -565,6 +601,7 @@ async function main() {
         );
         await send("Input.insertText", { text });
         await sleep(80);
+        await nextFrames(2);
       };
       const selectSlot = async (i) => {
         const c = await center("#inv-grid .inv-slot", i);

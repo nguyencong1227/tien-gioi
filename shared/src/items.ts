@@ -927,8 +927,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_hon_huong_quyet"), chance: 0.006, min: 1, max: 1 },
     // Lôi Trúc Cơ, Huyền phẩm (CT15 đợt 2, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ — Hắc Hổ là con săn Linh thạch/phút cao nhất cùng bậc, thêm sách vào nó đẩy denominator của `balance/dungeon.test.ts` lên làm bí cảnh Linh Hư < 15 phút (đỏ ở 14,90)
     { itemId: bookIdOf("loi_hoa_pha_ta_chuong"), chance: 0.006, min: 1, max: 1 },
-    // Vô sắc Trúc Cơ, Huyền phẩm (CT17 lát 3, G): rơi hiếm từ Xích Mãng (trùm Trúc Cơ), KHÔNG từ Hắc Hổ (giữ `balance/dungeon.test.ts`); pattern giống `su_tu_hong` / `loi_hoa_pha_ta_chuong`
-    { itemId: bookIdOf("huyet_trao_pha_mach"), chance: 0.006, min: 1, max: 1 },
+    // Thủy Trúc Cơ, Huyền phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ (lý do tương tự Lôi ở trên)
+    { itemId: bookIdOf("thai_hoa_bo_nguyen"), chance: 0.006, min: 1, max: 1 },
+    // Độc Mộc Trúc Cơ, Huyền phẩm (A, #1187 / book-drop-realm): hai sách trước đây CHỈ rơi từ Độc Tước (Nguyên Anh, cao hơn cấp chiêu hai bậc); Xích Mãng là trùm Trúc Cơ, hợp chủ đề rắn / độc, và KHÔNG phải Hắc Hổ (giữ `balance/dungeon.test.ts`)
+    { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("thiem_to_cong"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -939,6 +942,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("thu_thuy_kiem_anh"), chance: 0.012, min: 1, max: 1 }, // Kim + Thủy (CT6 lát 1)
     { itemId: bookIdOf("phi_kiem_tam_lien"), chance: 0.008, min: 1, max: 1 }, // đạn bay Kim (CT9 lát 1)
     { itemId: bookIdOf("hoi_phong_lien_chuong"), chance: 0.005, min: 1, max: 1 }, // Phong Kim Đan (CT8 lát 1)
+    // Thủy Kim Đan, Huyền phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi hiếm từ Sương Hồ (quái Kim Đan hệ băng, hợp thủy)
+    { itemId: bookIdOf("huyet_co_bi_kinh"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("toa_long_cam_na"), chance: 0.006, min: 1, max: 1 },
   ],
   thach_quy: [
     { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
@@ -959,6 +965,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("liet_diem_tran"), chance: 0.008, min: 1, max: 1 }, // vùng cháy Hỏa (CT9 lát 1)
     { itemId: bookIdOf("xich_tuoc_phu"), chance: 0.005, min: 1, max: 1 }, // phù Hỏa Kim Đan (CT8 lát 1)
     { itemId: bookIdOf("hoa_huyet_phe_nguyen"), chance: 0.005, min: 1, max: 1 }, // vô sắc Kim Đan (CT8 lát 3)
+    // Vô sắc Kim Đan (`reqRealm` 3), Huyền phẩm (CT17 lát 3, G; nguồn rơi chuyển từ Xích Mãng sang Độc Thiềm vì Xích Mãng là trùm TRÚC CƠ, `book-drop-realm.test.ts`): rơi hiếm
+    { itemId: bookIdOf("huyet_trao_pha_mach"), chance: 0.006, min: 1, max: 1 },
   ],
   // Trùm Kim Đan: bãi của đội 3-4 người; Giao Lân là nguyên liệu bộ III
   hac_giao: [
@@ -978,6 +986,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("bach_kim_trao"), chance: 0.015, min: 1, max: 1 },
     { itemId: bookIdOf("hon_phien_tuong"), chance: 0.006, min: 1, max: 1 }, // tượng Âm (CT9 lát 1)
     { itemId: bookIdOf("minh_vu_lac_hon"), chance: 0.006, min: 1, max: 1 }, // quạt Âm Nguyên Anh (CT8 lát 2)
+    // Thủy Nguyên Anh, Địa phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi hiếm từ Hàn Lang (quái Nguyên Anh hệ thủy, hợp thủy)
+    { itemId: bookIdOf("huyet_ti_phuoc_than"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("no_dao_bai_khong"), chance: 0.006, min: 1, max: 1 },
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },

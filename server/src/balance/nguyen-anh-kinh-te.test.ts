@@ -157,9 +157,9 @@ describe("kinh tế bộ IV", () => {
     expect(sellPrice("han_lang_mao")).toBeGreaterThan(0);
   });
 
-  it("nguyên liệu không chiếm gần hết thời gian bậc đầu: cày đủ mất dưới ~80% (mục 30: 78%, nguyên liệu rơi theo con mà con chết chậm 1,5 lần; trước đó < 50%)", () => {
+  it("nguyên liệu không chiếm gần hết thời gian bậc đầu: cày đủ mất dưới ~85% (mục 30: 78%, nguyên liệu rơi theo con mà con chết chậm 1,5 lần; trước đó < 50%; #1333: bốn việc chính nhận ở bậc đầu mỗi việc >= 5 % thanh bậc đầu (~20 % cộng lại) rút thời gian bậc nên phần cày nguyên liệu nhích lên 82,6 %)", () => {
     expect(materialShare(eco, 0)).toBeGreaterThan(0);
-    expect(materialShare(eco, 0)).toBeLessThan(0.8);
+    expect(materialShare(eco, 0)).toBeLessThan(0.85);
   });
 
   it("phí rèn luôn cao hơn giá bán thành phẩm và trả đủ trước hết Trung kỳ (không chặn người chơi quá một bậc)", () => {

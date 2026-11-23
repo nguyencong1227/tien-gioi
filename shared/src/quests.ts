@@ -308,7 +308,7 @@ export const QUESTS: QuestDef[] = [
     giver: "truong_tran",
     desc: "Qua Bắc Môn Quan, tới Thanh Lộ Trạm (Hắc Phong Cốc) và nói chuyện với lái buôn Mạc Thông.",
     steps: [{ kind: "talk", npcId: "lai_buon" }],
-    rewards: { exp: 100, items: [{ itemId: "hoi_huyet_dan", qty: 5 }] },
+    rewards: { exp: 240, items: [{ itemId: "hoi_huyet_dan", qty: 5 }] },
     minRealm: { realm: 2, tier: 0 },
     next: "vong_suong",
     talk: {
@@ -356,7 +356,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "suong_mao", count: 12 },
     ],
     rewards: {
-      exp: 1200,
+      exp: 2400,
       items: [
         { itemId: "hoi_huyet_dan", qty: 5 },
         { itemId: "dai_hoi_huyet_dan", qty: 2 },
@@ -387,7 +387,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "thach_quy", count: 15 },
       { kind: "collect", itemId: "quy_giap", count: 10 },
     ],
-    rewards: { exp: 1200, items: [{ itemId: "dai_hoi_linh_dan", qty: 3 }] },
+    rewards: { exp: 2400, items: [{ itemId: "dai_hoi_linh_dan", qty: 3 }] },
     minRealm: { realm: 3, tier: 0 },
     next: "doc_thiem_nang",
     talk: {
@@ -412,7 +412,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "doc_nang", count: 8 },
     ],
     rewards: {
-      exp: 1500,
+      exp: 2600,
       items: [
         { itemId: "dai_hoi_huyet_dan", qty: 4 },
         { itemId: "tu_khi_dan", qty: 1 },
@@ -440,7 +440,7 @@ export const QUESTS: QuestDef[] = [
     giver: "tram_truong",
     desc: "Đạt Kim Đan hậu kỳ.",
     steps: [{ kind: "reachRealm", realm: 3, tier: 2 }],
-    rewards: { exp: 800, items: [{ itemId: "dai_hoi_linh_dan", qty: 4 }] },
+    rewards: { exp: 2800, items: [{ itemId: "dai_hoi_linh_dan", qty: 4 }] },
     minRealm: { realm: 3, tier: 1 },
     next: "lang_han_quan",
     talk: {
@@ -483,7 +483,7 @@ export const QUESTS: QuestDef[] = [
   },
 
   // ---------- Việc phụ Âm Sương Trạch (Kim Đan, D8 #756): mỗi NPC một việc, một tầng (0/1/2), KHÔNG thuộc chuỗi chính ----------
-  // Việc phụ KHÔNG bắt buộc: thưởng cho công sức săn quái thêm. exp nhỏ (cả ba <= ~1% tổng thanh Kim Đan, tổng việc phụ Kim Đan <= 2,5%,
+  // Việc phụ KHÔNG bắt buộc: thưởng cho công sức săn quái thêm. exp vừa phải (đã nâng lên sàn 2% bậc nhận ở #1333 bước 2: cả ba <= 2,5% tổng thanh Kim Đan, tổng việc phụ Kim Đan <= 4%,
   // xem kim-dan-world.test.ts), mỗi việc tối đa một kinh quyển rarity <= 2. doc_thiem chỉ an toàn từ trung kỳ -> việc độc nang đòi tier 1.
   {
     id: "am_suong_mao_hang",
@@ -494,7 +494,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "suong_ho", count: 12 },
       { kind: "collect", itemId: "suong_mao", count: 8 },
     ],
-    rewards: { exp: 400, items: [{ itemId: "dai_hoi_huyet_dan", qty: 2 }] },
+    rewards: { exp: 1000, items: [{ itemId: "dai_hoi_huyet_dan", qty: 2 }] },
     minRealm: { realm: 3, tier: 0 },
     talk: {
       offer: [
@@ -513,7 +513,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "thach_quy", count: 10 },
       { kind: "collect", itemId: "quy_giap", count: 6 },
     ],
-    rewards: { exp: 600, items: [{ itemId: "dai_hoi_linh_dan", qty: 2 }] },
+    rewards: { exp: 1300, items: [{ itemId: "dai_hoi_linh_dan", qty: 2 }] },
     minRealm: { realm: 3, tier: 2 },
     talk: {
       offer: [
@@ -535,7 +535,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "doc_nang", count: 6 },
     ],
     rewards: {
-      exp: 500,
+      exp: 1200,
       items: [
         { itemId: "hoi_huyet_dan", qty: 3 },
         { itemId: "kinh_thi_doc_am_chuong", qty: 1 },
@@ -560,7 +560,7 @@ export const QUESTS: QuestDef[] = [
     giver: "tram_truong",
     desc: "Qua Lăng Hàn Quan ở rìa bắc đầm, tới Hàn Vân Trạm và nói chuyện với trạm trưởng Thôi Tuyết Phong.",
     steps: [{ kind: "talk", npcId: "tram_truong_han" }],
-    rewards: { exp: 500, items: [{ itemId: "dai_hoi_huyet_dan", qty: 3 }] },
+    rewards: { exp: 3200, items: [{ itemId: "dai_hoi_huyet_dan", qty: 3 }] },
     minRealm: { realm: 3, tier: 2 },
     next: "han_van_len",
     talk: {
@@ -606,7 +606,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "han_lang_mao", count: 12 },
     ],
     rewards: {
-      exp: 6600,
+      exp: 14400,
       items: [
         { itemId: "dai_hoi_huyet_dan", qty: 5 },
         { itemId: "thuong_hoi_huyet_dan", qty: 2 },
@@ -635,7 +635,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "phong_nha", count: 20 },
       { kind: "collect", itemId: "phong_nha_vu", count: 10 },
     ],
-    rewards: { exp: 6600, items: [{ itemId: "thuong_hoi_linh_dan", qty: 3 }] },
+    rewards: { exp: 14400, items: [{ itemId: "thuong_hoi_linh_dan", qty: 3 }] },
     minRealm: { realm: 4, tier: 0 },
     next: "cot_tuong_cot",
     talk: {
@@ -656,7 +656,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "kill", monster: "cot_tuong", count: 12 },
       { kind: "collect", itemId: "tuong_cot", count: 10 },
     ],
-    rewards: { exp: 6600, items: [{ itemId: "thuong_hoi_linh_dan", qty: 3 }] },
+    rewards: { exp: 14400, items: [{ itemId: "thuong_hoi_linh_dan", qty: 3 }] },
     minRealm: { realm: 4, tier: 0 },
     next: "doc_tuoc_nang_cb",
     talk: {
@@ -681,7 +681,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "doc_tuoc_nang", count: 8 },
     ],
     rewards: {
-      exp: 8200,
+      exp: 15000,
       items: [
         { itemId: "thuong_hoi_huyet_dan", qty: 4 },
         { itemId: "tu_khi_dan", qty: 1 },
@@ -709,7 +709,7 @@ export const QUESTS: QuestDef[] = [
     giver: "tram_truong_han",
     desc: "Đạt Nguyên Anh hậu kỳ.",
     steps: [{ kind: "reachRealm", realm: 4, tier: 2 }],
-    rewards: { exp: 4400, items: [{ itemId: "thuong_hoi_linh_dan", qty: 4 }] },
+    rewards: { exp: 16600, items: [{ itemId: "thuong_hoi_linh_dan", qty: 4 }] },
     minRealm: { realm: 4, tier: 1 },
     next: "thien_han_hoan",
     talk: {
@@ -731,7 +731,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "thien_han_chau", count: 3 },
     ],
     rewards: {
-      exp: 13500,
+      exp: 16600,
       items: [
         { itemId: "tu_khi_dan", qty: 1 },
         { itemId: "thuong_hoi_huyet_dan", qty: 5 },
@@ -765,7 +765,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "han_lang_mao", count: 8 },
     ],
     rewards: {
-      exp: 5000,
+      exp: 5800,
       items: [
         { itemId: "thuong_hoi_huyet_dan", qty: 3 },
         { itemId: "kinh_han_quang_tien", qty: 1 },
@@ -796,7 +796,7 @@ export const QUESTS: QuestDef[] = [
       { kind: "collect", itemId: "tuong_cot", count: 8 },
     ],
     rewards: {
-      exp: 6500,
+      exp: 6900,
       items: [
         { itemId: "thuong_hoi_linh_dan", qty: 3 },
         { itemId: "kinh_bach_kim_trao", qty: 1 },
@@ -848,7 +848,7 @@ export const QUESTS: QuestDef[] = [
   },
 
   // ---------- Việc phụ Lạc Hà (Luyện Khí, D6 #754): mỗi NPC một việc, một tầng, KHÔNG thuộc chuỗi chính ----------
-  // Việc phụ KHÔNG bắt buộc: thưởng cho công sức săn quái thêm. exp nhỏ (trần 2,5 % tổng thanh Luyện Khí, xem kim-dan-world.test.ts),
+  // Việc phụ KHÔNG bắt buộc: thưởng cho công sức săn quái thêm. exp nhỏ (đã trên sàn 2 %; trần việc phụ 4 % tổng thanh Luyện Khí, xem kim-dan-world.test.ts),
   // mỗi việc tối đa một kinh quyển rarity <= 2. Steps tránh trùng đúng việc hằng ngày của cao_thi (lang_hai/nop_nanh/ho_hoan).
   {
     id: "lac_ha_bong_bang",

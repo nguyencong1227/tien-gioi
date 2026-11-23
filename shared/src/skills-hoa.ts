@@ -75,7 +75,7 @@ export const SKILLS_HOA: readonly SkillDef[] = [
     grade: 2,
   },
   // CT17 lát 3 (G, #1187): vô sắc (element "none") +3 — 3 ứng viên CÒN THỂ hợp cảnh giới (canh 0-3) KHÔNG trùng 5 chiêu vô sắc A đã làm ở skills-khac.ts (CT8 #1053).
-  // Huyết Trảo Phá Mạch: trảo công máu (Trúc Cơ thành). Bạch Cốt Hồng Nhan: ảo ảnh khống chế (Nguyên Anh). Nhiếp Hồn Đoạt Phách: ánh nhìn rút hồn (Nguyên Anh).
+  // Huyết Trảo Phá Mạch: trảo công máu (Kim Đan). Bạch Cốt Hồng Nhan: ảo ảnh khống chế (Nguyên Anh). Nhiếp Hồn Đoạt Phách: ánh nhìn rút hồn (Nguyên Anh).
   {
     id: "huyet_trao_pha_mach",
     name: "Huyết Trảo Phá Mạch",

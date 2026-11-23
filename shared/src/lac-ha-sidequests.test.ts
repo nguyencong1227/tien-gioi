@@ -1,6 +1,6 @@
 // Ba việc phụ ở Lạc Hà Trấn (Luyện Khí, D6 #754): mỗi việc một NPC (truong_tran / duoc_su / tho_ren), một tầng cảnh giới (0/3/6),
 // steps chỉ kill/collect/talk trỏ tới quái/vật phẩm CÓ THẬT và THẬT SỰ THU ĐƯỢC ở Lạc Hà (quái sinh ở Lạc Hà rơi / mua ở cửa hàng trấn),
-// thưởng exp trong khung (tối đa 2,5 % tổng thanh Luyện Khí, xem kim-dan-world.test.ts) và KHÔNG QUÁ MỘT kinh quyển rarity <= 2
+// thưởng exp trong khung (tối đa 4 % tổng thanh Luyện Khí, xem kim-dan-world.test.ts) và KHÔNG QUÁ MỘT kinh quyển rarity <= 2
 // (rarity 3 chỉ rơi từ quái). Test này là chốt chặn: đột biến dữ liệu phải làm đỏ ít nhất một nó.
 import { describe, expect, it } from "vitest";
 import {
@@ -115,18 +115,16 @@ describe("việc phụ Lạc Hà (Luyện Khí, D6 #754)", () => {
     }
   });
 
-  it("thưởng exp NHỎ: tổng CẢ BA việc <= 2,5 % tổng thanh Luyện Khí (không biến việc phụ thành đường tắt)", () => {
+  it("thưởng exp NHỎ: tổng CẢ BA việc <= 4 % tổng thanh Luyện Khí (không biến việc phụ thành đường tắt)", () => {
     const total = LA_HA_SIDE.reduce((a, q) => a + (q.rewards.exp ?? 0), 0);
     expect(total, "tổng exp việc phụ Lạc Hà").toBeGreaterThan(0);
     expect(
       LA_HA_SIDE.every((q) => (q.rewards.exp ?? 0) > 0),
       "mọi việc phải có exp",
     ).toBe(true);
-    // So sánh với trần 2,5 % tổng thanh Luyện Khí (các tầng 0-8) — cùng ngưỡng với cap test chính.
+    // So sánh với trần 4 % tổng thanh Luyện Khí (các tầng 0-8) — cùng ngưỡng với cap test chính (#1333 bước 2 nới 2,5 % -> 4 %; số thật 2,37 %).
     const bars = [0, 1, 2, 3, 4, 5, 6, 7, 8].reduce((a, t) => a + expToNext(1, t), 0);
-    expect(total / bars, `tổng exp việc phụ ${total}/${bars} vượt 2,5 %`).toBeLessThanOrEqual(
-      0.025,
-    );
+    expect(total / bars, `tổng exp việc phụ ${total}/${bars} vượt 4 %`).toBeLessThanOrEqual(0.04);
   });
 
   it("thưởng KHÔNG QUÁ MỘT kinh quyển rarity <= 2 mỗi nhiệm vụ; CHỈ rarity <= 2 (rarity 3 chỉ rơi từ quái); quyển dạy chiêu CÓ THẬT và học được ở tầng nhận", () => {

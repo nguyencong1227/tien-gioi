@@ -1,4 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 /* global console, setTimeout, fetch */
 /**
  * Kiểm DI CHUYỂN BẰNG BÀN PHÍM (QUYET_DINH_M3 mục 25: "giật / không ăn / liệt nút") trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite):
@@ -13,6 +14,11 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   [5] PHÍM KẸT: keyup không tới (mất focus / ẩn tab / menu chuột phải / vào ô chat) thì QUÊN phím, nhân vật dừng; không kẹt sau đó;
  *   [6] FOCUS: ô đánh dấu (checkbox) còn focus KHÔNG chặn đi bộ; ô chat chặn (gõ chữ), nhả ra thì đi lại;
  *   [7] MỤC SÓT: bảng đã ẩn mà còn trong ngăn xếp (đường đóng quên `remove`) không còn chặn WASD.
+ *
+ * KHUNG CHẬM (runner GitHub: WebGL phần mềm, vài khung hình / giây): mỗi khung hình chỉ tiến MỘT bước 8 px nên tốc độ tỉ lệ với FPS và đo px / giây cố định là sai (#1389: đỏ 2 / 2 lượt chạy tay).
+ * Script đo thời gian khung hình + tốc độ; nếu chậm thì các ca "đi đủ nhanh" chỉ đòi CÓ ĐI (chờ theo điều kiện, không theo đồng hồ), ca khựng chỉ đòi giây nào cũng nhích,
+ * ca không-giật-tăng-tốc dùng trần theo tốc độ danh nghĩa; máy nhanh giữ ngưỡng tỉ lệ chặt như cũ. `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`) giả lập khung chậm
+ * (`slow-frame.mjs`; 150 tái hiện đúng các ✗ của runner với bản cũ). Mã thoát 0 = đạt, 1 = có ✗.
  */
 import http from "node:http";
 import fs from "node:fs";
@@ -25,6 +31,12 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Chờ tối đa chừng này ms cho Chrome mở cổng CDP và cho cảnh sẵn sàng. Trước đây 15 s / 16 s: một lượt Chrome khởi động chậm trên runner làm CẢ HAI script đỏ cùng lúc
+ * với "Không tìm thấy Chrome page target" sau 15,3 s (run 45243928886, A ở #1389); các `e2e-*.ts` khác chờ 30 s.
+ */
+const START_WAIT_MS = 60000;
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -39,6 +51,41 @@ export const VIEWPORTS = [
 ];
 
 export const MIN_TAP_PX = 44;
+
+/** Dưới mức này (px trong 1 giây giữ phím) coi là khung chậm; máy nhanh đo được 150-158 px. */
+const SLOW_PX = 110;
+/** Tốc độ đi bộ danh nghĩa (px / giây) của máy nhanh. */
+const NOMINAL_PX_S = 150;
+/** Khung chậm: ngưỡng tối thiểu để coi là "có đi" (hai bước, mỗi bước ≈ 7,9 px = tốc độ × 50 ms; đặt 15 để làm tròn không làm hụt). */
+const SLOW_MIN_PX = 15;
+/** Thời gian một khung hình (ms) vượt mức này (dưới ~25 FPS) coi là khung chậm, dù tốc độ đo được còn cao. */
+const SLOW_FRAME_MS = 40;
+
+/**
+ * Chuẩn tốc độ (px / giây) từ các giây giữ phím D đã đo: BỎ giây đầu (khởi động) rồi lấy TRUNG VỊ của các giây còn lại.
+ * Không lấy giây nhanh nhất: máy tải nặng đo 87 / 95 / 95 / 150 thì một giây bốc 150 px làm chuẩn cao hơn mức thật, mọi ngưỡng tỉ lệ đòi quá cao (A, nit ở #1391).
+ */
+export function speedBase(windows) {
+  const rest = windows.slice(1).sort((a, b) => a - b);
+  return rest[Math.floor(rest.length / 2)];
+}
+
+/**
+ * Giới hạn độ trễ nhấn phím -> nhân vật nhích (ms). Độ trễ thật ≈ 4 khung hình + nhiễu (đo: khung 25 ms -> 101 ms; khung 36 ms -> 146-161 ms), nên `4 x khung` làm giới hạn
+ * tụt về đúng sàn 150 ms ở khung ~36 ms (run 45244896458 của A ở #1389: trung vị 161 > 150). 6 khung chừa ~50% nhiễu; khung <= 25 ms giữ sàn 150 ms như cũ.
+ */
+export function latencyLimit(frameMs) {
+  return Math.max(150, 6 * frameMs);
+}
+
+/** Máy có chậm không: đã chậm ở khung nhìn trước (`sticky`), hoặc chuẩn thấp, hoặc khung hình dài. Chậm chỉ NỚI các ca đo tốc độ, không bỏ ca nào. */
+export function isSlowMachine({ base, frameMs, sticky = false }) {
+  return sticky || base < SLOW_PX || frameMs > SLOW_FRAME_MS;
+}
+/** Khung chậm: chờ tối đa chừng này ms cho một ca "đi đủ" (thay vì đồng hồ cố định). */
+const SLOW_WAIT_MS = 5000;
+/** Khung chậm: một giây giữ phím mà nhích được ít nhất MỘT bước (≈ 7,9 px) là không khựng; lỗi khựng thật là đứng im cả giây. */
+const SLOW_STALL_PX = 6;
 
 async function main() {
   const shotsArg = process.argv.indexOf("--shots");
@@ -93,13 +140,16 @@ async function main() {
     { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
   );
   let failures = 0;
+  // Máy đã bị đo là chậm ở MỘT khung nhìn thì coi là chậm ở mọi khung nhìn sau (A, nit ở #1391: máy tải nặng, khung nhìn 2 đo 87 / 95 / 95 / 150 px
+  // nên không bị coi là chậm, ngưỡng tỉ lệ 0,4 x 150 = 60 đòi hơn mức thật 55 px ở ca thanh trượt).
+  let machineSlow = false;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
     let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
+    for (const tStart = Date.now(); !page && Date.now() - tStart < START_WAIT_MS;) {
       try {
         const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
         page = (await res.json()).find((t) => t.type === "page") ?? null;
@@ -141,7 +191,7 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
@@ -160,7 +210,7 @@ async function main() {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
       let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
+      for (const tReady = Date.now(); !ready && Date.now() - tReady < START_WAIT_MS;) {
         await sleep(200);
         ready = Boolean(
           await evalJs(
@@ -220,16 +270,36 @@ async function main() {
         });
       /** Giữ `code` trong `ms` ms (phím lặp 30 Hz sau 500 ms như hệ điều hành), trả quãng đường đã đi. */
       const hold = async (code, ms, opts = {}) => {
+        const { need = 0, ...keyOpts } = opts;
         await reset();
-        await down(code, opts);
+        await down(code, keyOpts);
         const t0 = Date.now();
-        while (Date.now() - t0 < ms) {
+        // Khung chậm: giữ tới khi đi đủ `need` px (tối đa SLOW_WAIT_MS) thay vì chỉ đúng `ms`: đồng hồ thật không đo được thứ phụ thuộc FPS.
+        const waitMove = slow && need > 0;
+        for (;;) {
+          const el = Date.now() - t0;
+          if (el >= ms) {
+            if (!waitMove || el >= SLOW_WAIT_MS) break;
+            const q = await pos();
+            if (Math.hypot(q.x, q.y) >= need) break;
+          }
           await sleep(33);
-          if (Date.now() - t0 > 500) await down(code, { ...opts, repeat: true });
+          if (Date.now() - t0 > 500) await down(code, { ...keyOpts, repeat: true });
         }
         const p = await pos();
-        await up(code, opts);
+        await up(code, keyOpts);
         await sleep(60);
+        return p;
+      };
+      /** Khung chậm: chờ (tối đa SLOW_WAIT_MS) tới khi `pred(vị trí)` đúng; khung nhanh trả luôn vị trí hiện tại. */
+      const settle = async (pred) => {
+        let p = await pos();
+        if (!slow) return p;
+        const t0 = Date.now();
+        while (!pred(p) && Date.now() - t0 < SLOW_WAIT_MS) {
+          await sleep(50);
+          p = await pos();
+        }
         return p;
       };
       const stopped = async () => {
@@ -239,13 +309,44 @@ async function main() {
         return Math.hypot(b.x - a.x, b.y - a.y) < 1;
       };
       await sleep(300);
-      await reset();
-      await down("KeyD");
-      await sleep(1000);
-      const base = (await pos()).x;
-      await up("KeyD");
-      await sleep(60);
-      check(base > 60, `chuẩn: giữ D 1 giây đi được ${base.toFixed(0)} px`);
+      // Chuẩn tốc độ = TRUNG VỊ của 3 giây sau một giây khởi động bỏ đi: ở khung chậm (runner WebGL phần mềm, vừa tải trang / đổi bảng phím)
+      // giây đầu đi ít hơn hẳn các giây sau (đo thật: 32-47 px so với 158 px), nên lấy giây đầu làm chuẩn thì mọi ngưỡng tỉ lệ đều sai.
+      /** Thời gian trung bình một khung hình (ms), đo bằng `requestAnimationFrame` trong 600 ms. */
+      const measureFrameMs = async () =>
+        Number(
+          await evalJs(
+            `new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 >= 600) res((performance.now() - t0) / n); else requestAnimationFrame(f); }; requestAnimationFrame(f); })`,
+          ),
+        );
+      const frameMs0 = await measureFrameMs();
+      const windows = [];
+      for (let w = 0; w < 4; w++) {
+        await reset();
+        await down("KeyD");
+        await sleep(1000);
+        windows.push((await pos()).x);
+        await up("KeyD");
+        await sleep(60);
+      }
+      // Chuẩn = TRUNG VỊ của 3 giây sau giây khởi động (không phải giây nhanh nhất: một giây bốc lên 150 px giữa 87 / 95 / 95 làm mọi ngưỡng tỉ lệ đòi quá cao)
+      const base = speedBase(windows);
+      // Khung chậm: mỗi khung hình chỉ tiến MỘT bước 8 px (server xử lý một bước cho mỗi input), nên tốc độ tỉ lệ với FPS và dao động theo tải máy;
+      // không thể đòi px / giây cố định. Khi đó mọi ca "đi đủ nhanh" chỉ đòi CÓ ĐI (chờ theo điều kiện), ca "không giật tăng tốc" bỏ qua.
+      const slow = isSlowMachine({ base, frameMs: frameMs0, sticky: machineSlow });
+      if (slow) {
+        machineSlow = true;
+        console.log(
+          `  ⚠ khung chậm: khung hình ${frameMs0.toFixed(0)} ms, giữ D 1 giây đi ${base.toFixed(0)} px (chậm nếu khung > ${SLOW_FRAME_MS} ms hoặc chuẩn < ${SLOW_PX} px, hoặc đã chậm ở khung nhìn trước): các ca đo tốc độ chỉ đòi có đi >= ${SLOW_MIN_PX} px, ca không-giật-tăng-tốc dùng trần danh nghĩa`,
+        );
+      }
+      /** Ngưỡng "đi đủ": khung nhanh = `frac` × chuẩn; khung chậm = vài bước (chỉ cần chứng minh có đi). */
+      const atLeast = (frac) => (slow ? SLOW_MIN_PX : base * frac);
+      /** Ngưỡng "không đi quá xa" (đổi hướng ngay): tính theo tốc độ danh nghĩa, khung chậm đi ít hơn nên luôn nằm trong. */
+      const atMost = (frac) => Math.max(base, NOMINAL_PX_S) * frac;
+      check(
+        base >= (slow ? SLOW_MIN_PX : 60),
+        `chuẩn: giữ D 1 giây đi được ${base.toFixed(0)} px (các giây: ${windows.map((w) => w.toFixed(0)).join(", ")})`,
+      );
 
       console.log(`  [1] giữ phím D ${SECS} giây (phím lặp 30 Hz): mỗi giây đi đều, không khựng`);
       await reset();
@@ -264,12 +365,14 @@ async function main() {
       const minStep = Math.min(...steps);
       const maxStep = Math.max(...steps);
       check(
-        minStep >= base * 0.75,
-        `${SECS} giây liên tục: giây chậm nhất ${minStep.toFixed(0)} px >= 75% chuẩn ${base.toFixed(0)} px`,
+        minStep >= (slow ? SLOW_STALL_PX : base * 0.75),
+        `${SECS} giây liên tục: giây chậm nhất ${minStep.toFixed(0)} px >= ${slow ? `${SLOW_STALL_PX} px (khung chậm: giây nào cũng nhích, không đứng im)` : `75% chuẩn ${base.toFixed(0)} px`}`,
       );
+      // trần = max(130% chuẩn, 140% tốc độ danh nghĩa): khung chậm đo vị trí lệch một khung nên có giây "bù" tới ~180 px (đo thật), còn lỗi tăng tốc thật gấp đôi trở lên
+      const maxAllowed = Math.max(base * 1.3, NOMINAL_PX_S * 1.4);
       check(
-        maxStep <= base * 1.3,
-        `giây nhanh nhất ${maxStep.toFixed(0)} px <= 130% chuẩn (không giật tăng tốc)`,
+        maxStep <= maxAllowed,
+        `giây nhanh nhất ${maxStep.toFixed(0)} px <= ${maxAllowed.toFixed(0)} px (không giật tăng tốc)`,
       );
       check(await stopped(), "nhả phím: nhân vật dừng");
       const toastTexts = () =>
@@ -281,11 +384,13 @@ async function main() {
 
       console.log("  [2] bộ gõ kiểu Windows: key = 'Process', keyCode 229");
       for (const code of ["KeyD", "KeyA", "KeyW", "KeyS", "ArrowRight"]) {
-        const p = await hold(code, 700, { ime: true });
+        // khung chậm: đòi đi >= 30 px (4 bước, chờ tối đa 5 s): bộ gõ nuốt phím thì đứng im hoặc chỉ nhích một bước
+        const need = slow ? 30 : atLeast(0.5);
+        const p = await hold(code, 700, { ime: true, need });
         const dist = Math.hypot(p.x, p.y);
         check(
-          dist > base * 0.5,
-          `giữ ${code} qua bộ gõ: đi được ${dist.toFixed(0)} px (> 50% chuẩn)`,
+          dist >= need,
+          `giữ ${code} qua bộ gõ: đi được ${dist.toFixed(0)} px (${slow ? ">= 30 px, khung chậm" : "> 50% chuẩn"})`,
         );
       }
 
@@ -308,11 +413,11 @@ async function main() {
         windowsVirtualKeyCode: 231,
       });
       await sleep(500);
-      const pu = await pos();
+      const pu = await settle((p) => -p.y >= atLeast(0.4));
       await up("KeyW");
       await sleep(60);
       check(
-        -pu.y > base * 0.4,
+        -pu.y >= atLeast(0.4),
         `giữ W, bộ gõ chèn Backspace + chữ: vẫn đi lên ${(-pu.y).toFixed(0)} px`,
       );
 
@@ -325,14 +430,17 @@ async function main() {
       const mid = await pos();
       await up("KeyA");
       await sleep(400);
-      const fin = await pos();
+      const fin = await settle((p) => p.x - mid.x >= atLeast(0.25));
       await up("KeyD");
       await sleep(60);
       check(
-        fin.x - mid.x > base * 0.25,
+        fin.x - mid.x >= atLeast(0.25),
         `nhả A, giữ D: vẫn đi sang phải (+${(fin.x - mid.x).toFixed(0)} px), không đứng im`,
       );
-      check(mid.x > -base * 0.45, `bấm D khi A chưa nhả: đổi hướng ngay (x = ${mid.x.toFixed(0)})`);
+      check(
+        mid.x > -atMost(0.45),
+        `bấm D khi A chưa nhả: đổi hướng ngay (x = ${mid.x.toFixed(0)})`,
+      );
 
       console.log("  [5] phím KẸT: mất focus / ẩn tab / menu chuột phải / vào ô chat");
       const stuckCase = async (name, trigger) => {
@@ -371,9 +479,9 @@ async function main() {
         );
       else console.log("  - ô chat ẩn ở khung nhìn này: bỏ qua ca vào ô chat");
       await evalJs(`document.getElementById("chat-input").blur()`);
-      const afterKept = await hold("KeyD", 600);
+      const afterKept = await hold("KeyD", 600, { need: SLOW_MIN_PX });
       check(
-        afterKept.x > base * 0.4,
+        afterKept.x >= atLeast(0.4),
         `sau các ca kẹt, bấm lại vẫn đi (${afterKept.x.toFixed(0)} px)`,
       );
 
@@ -381,9 +489,9 @@ async function main() {
       await evalJs(
         `(() => { const c = document.createElement("input"); c.type = "checkbox"; c.id = "mk-test-cb"; c.style.position = "fixed"; c.style.left = "-100px"; document.body.append(c); c.focus(); return document.activeElement === c; })()`,
       );
-      const withCb = await hold("KeyD", 600);
+      const withCb = await hold("KeyD", 600, { need: SLOW_MIN_PX });
       check(
-        withCb.x > base * 0.4,
+        withCb.x >= atLeast(0.4),
         `ô đánh dấu (checkbox) đang giữ focus: vẫn đi (${withCb.x.toFixed(0)} px)`,
       );
       await evalJs(`document.getElementById("mk-test-cb").remove()`);
@@ -391,9 +499,9 @@ async function main() {
       await evalJs(
         `(() => { const c = document.createElement("input"); c.type = "range"; c.id = "mk-test-range"; c.style.position = "fixed"; c.style.left = "-100px"; document.body.append(c); c.focus(); return document.activeElement === c; })()`,
       );
-      const withRange = await hold("KeyD", 600);
+      const withRange = await hold("KeyD", 600, { need: SLOW_MIN_PX });
       check(
-        withRange.x > base * 0.4,
+        withRange.x >= atLeast(0.4),
         `thanh trượt (range) đang giữ focus: vẫn đi (${withRange.x.toFixed(0)} px)`,
       );
       await evalJs(`document.getElementById("mk-test-range").remove()`);
@@ -404,9 +512,9 @@ async function main() {
       }
       await evalJs(`document.getElementById("chat-input").blur()`);
       await sleep(100);
-      const backWalk = await hold("KeyD", 600);
+      const backWalk = await hold("KeyD", 600, { need: SLOW_MIN_PX });
       check(
-        backWalk.x > base * 0.4,
+        backWalk.x >= atLeast(0.4),
         `nhả ô chat: đi lại bình thường (${backWalk.x.toFixed(0)} px)`,
       );
 
@@ -420,9 +528,9 @@ async function main() {
       );
       await evalJs(`document.getElementById("inv-modal").hidden = true`); // đường đóng quên `remove`: ẩn thẳng phần tử
       await sleep(100);
-      const healed = await hold("KeyD", 600);
+      const healed = await hold("KeyD", 600, { need: SLOW_MIN_PX });
       check(
-        healed.x > base * 0.4,
+        healed.x >= atLeast(0.4),
         `bảng đã ẩn nhưng còn trong ngăn xếp: tự chữa, đi lại được (${healed.x.toFixed(0)} px)`,
       );
       await evalJs(`window.__ui.toggleInventory(false)`);
@@ -454,6 +562,9 @@ async function main() {
       await sleep(200);
 
       console.log("  [9] độ trễ từ lúc nhấn phím đến lúc thấy nhân vật nhích");
+      // Độ trễ không thể nhỏ hơn vài khung hình: ở khung chậm (runner WebGL phần mềm) đo khung hình rồi nới ngưỡng theo đó.
+      const frameMs = await measureFrameMs();
+      const latLimit = latencyLimit(frameMs);
       const lat = [];
       for (let i = 0; i < 10; i++) {
         await reset();
@@ -462,7 +573,7 @@ async function main() {
         const t1 = Date.now();
         await down("KeyD");
         let dt = -1;
-        while (Date.now() - t1 < 1000) {
+        while (Date.now() - t1 < Math.max(1000, 8 * frameMs)) {
           if ((await pos()).x - x0 > 0.5) {
             dt = Date.now() - t1;
             break;
@@ -476,8 +587,8 @@ async function main() {
       lat.sort((a, b) => a - b);
       const med = lat[Math.floor(lat.length / 2)];
       check(
-        lat[0] >= 0 && med <= 150,
-        `độ trễ nhấn phím -> nhích: trung vị ${med} ms (<= 150), lớn nhất ${lat[lat.length - 1]} ms`,
+        lat[0] >= 0 && med <= latLimit,
+        `độ trễ nhấn phím -> nhích: trung vị ${med} ms (<= ${latLimit.toFixed(0)}; khung hình ${frameMs.toFixed(0)} ms), lớn nhất ${lat[lat.length - 1]} ms`,
       );
     }
 
@@ -507,7 +618,7 @@ async function main() {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
       let ready2 = false;
-      for (let i = 0; i < 80 && !ready2; i++) {
+      for (const tReady2 = Date.now(); !ready2 && Date.now() - tReady2 < START_WAIT_MS;) {
         await sleep(200);
         ready2 = Boolean(
           await evalJs(
@@ -549,7 +660,7 @@ async function main() {
           KeyD: "d",
           ArrowRight: "ArrowRight",
         };
-        const holdKey = async (code, ms) => {
+        const holdKey = async (code, ms, needPx = 0) => {
           await evalJs(
             `(() => { const sc = window.__scene; sc.predX = window.__start.x; sc.predY = window.__start.y; sc.cameras.main.centerOn(sc.predX, sc.predY); return 1; })()`,
           );
@@ -560,9 +671,19 @@ async function main() {
             windowsVirtualKeyCode: VK2[code],
           });
           await sleep(ms);
-          const p = await evalJs(
-            `({ x: window.__scene.predX - window.__start.x, y: window.__scene.predY - window.__start.y })`,
-          );
+          const readPos = () =>
+            evalJs(
+              `({ x: window.__scene.predX - window.__start.x, y: window.__scene.predY - window.__start.y })`,
+            );
+          let p = await readPos();
+          // ca "đi": chờ theo ĐIỀU KIỆN (đi đủ `needPx`, tối đa SLOW_WAIT_MS) thay vì chỉ đồng hồ cố định, vì khung chậm đi ít hơn hẳn trong 600 ms
+          for (
+            const t0 = Date.now();
+            needPx > 0 && Math.hypot(p.x, p.y) < needPx && Date.now() - t0 < SLOW_WAIT_MS;
+          ) {
+            await sleep(50);
+            p = await readPos();
+          }
           await send("Input.dispatchKeyEvent", {
             type: "keyUp",
             key: KEY2[code],
@@ -574,22 +695,22 @@ async function main() {
         };
         console.log("  [10] bảng phím đã đổi: phím mới đi, phím cũ không đi");
         const MIN = 30;
-        const r = await holdKey("KeyL", 600);
+        const r = await holdKey("KeyL", 600, MIN + 1);
         check(
           r.x > MIN && Math.abs(r.y) < 1,
           `L = đi phải (${r.x.toFixed(0)}, ${r.y.toFixed(0)} px)`,
         );
-        const l = await holdKey("KeyJ", 600);
+        const l = await holdKey("KeyJ", 600, MIN + 1);
         check(
           l.x < -MIN && Math.abs(l.y) < 1,
           `J = đi trái (${l.x.toFixed(0)}, ${l.y.toFixed(0)} px)`,
         );
-        const u = await holdKey("KeyI", 600);
+        const u = await holdKey("KeyI", 600, MIN + 1);
         check(
           u.y < -MIN && Math.abs(u.x) < 1,
           `I = đi lên (${u.x.toFixed(0)}, ${u.y.toFixed(0)} px)`,
         );
-        const d = await holdKey("KeyK", 600);
+        const d = await holdKey("KeyK", 600, MIN + 1);
         check(
           d.y > MIN && Math.abs(d.x) < 1,
           `K = đi xuống (${d.x.toFixed(0)}, ${d.y.toFixed(0)} px)`,

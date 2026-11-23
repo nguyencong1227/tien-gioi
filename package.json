@@ -2,7 +2,7 @@
   "name": "tien-gioi",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "workspaces": [
     "shared",
     "server",
@@ -42,6 +42,9 @@
     "capture:viewports": "node client/scripts/capture-viewports.mjs",
     "chup-viewport": "node client/scripts/capture-viewports.mjs",
     "check:budget": "node client/scripts/check-perf-budget.mjs",
+    "assets": "npm run assets -w client",
+    "assets:sync": "npm run assets:sync -w client",
+    "assets:merge-fix": "npm run assets:merge-fix -w client",
     "build:packs": "npm run build:packs -w client",
     "check:packs": "npm run check:packs -w client",
     "leak:test": "node client/scripts/leak-test.mjs"

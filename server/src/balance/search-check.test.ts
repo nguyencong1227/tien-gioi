@@ -161,8 +161,10 @@ describe("searchRun: thợ săn bất tử trong World thật", () => {
 
   it("biết hết bản đồ không bao giờ chậm hơn nhìn hẹp ở loài thưa (cùng hạt giống)", () => {
     const mean = (x: number[]) => x.reduce((s, v) => s + v, 0) / x.length;
+    // Trung bình trên 4 hạt giống (không phải một): một hạt giống duy nhất đổi quỹ đạo mỗi khi bảng rơi của Xích Mãng thêm / bớt một dòng (mỗi dòng gọi thêm `Math.random`),
+    // nên thêm sách chiêu vào Xích Mãng từng làm hạt giống 1 đỏ (15,1 > 14,3) dù hạt 2-8 đều chênh 1,5-4 lần. Cách đo 4 hạt: ~11 (biết hết) so với ~16-24 (nhìn hẹp).
     const of = (v: (typeof SEARCH_VIEWS)[keyof typeof SEARCH_VIEWS]) =>
-      mean(searchRun("lac_ha", "mang", 3, 0, 6, 1, v).searches);
+      mean([1, 2, 3, 4].flatMap((seed) => searchRun("lac_ha", "mang", 3, 0, 6, seed, v).searches));
     const all = of(SEARCH_VIEWS.all);
     expect(all).toBeLessThan(of(SEARCH_VIEWS.pc));
     expect(all).toBeLessThan(of(SEARCH_VIEWS.phone));
@@ -285,8 +287,8 @@ describe("bảng đối chiếu thời gian tìm quái", () => {
     const before = { ...ASSUME.searchSec };
     const s = searchSensitivity(getRows());
     expect({ ...ASSUME.searchSec }).toEqual(before);
-    // số liệu mô hình khớp bảng Kim Đan sau nội dung (mục 30: 4,2 giờ tối ưu; trước đó 5,2 giờ, 5,7 giờ bãi mới): chặn trôi mà không ai hay
-    expect(s.model.kimDan / 60).toBeGreaterThan(4);
+    // số liệu mô hình khớp bảng Kim Đan sau nội dung (mục 30: 4,2 giờ tối ưu; #1333 sàn thưởng nhiệm vụ: 3,9 giờ; trước đó 5,2 giờ, 5,7 giờ bãi mới): chặn trôi mà không ai hay
+    expect(s.model.kimDan / 60).toBeGreaterThan(3.8);
     expect(s.model.kimDan / 60).toBeLessThan(6);
     expect(s.model.kimDanNoMang).toBeGreaterThanOrEqual(s.model.kimDan);
     expect(s.measured.luyenKhi).toBeLessThan(s.model.luyenKhi);

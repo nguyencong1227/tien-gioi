@@ -208,6 +208,7 @@ async function main() {
     const walkToPortal = async (id: string) => {
       const P = `window.__scene.map.portals.find((q) => q.id === ${JSON.stringify(id)})`;
       await ev(`(() => { const s = window.__scene, m = s.map, W = m.def.w, H = m.def.h, tiles = m.tiles, p = ${P}, J = window.__joystick;
+        if (window.__walkTimer) { clearInterval(window.__walkTimer); window.__walkTimer = 0; }
         window.__walkErr = ''; if (!p) { window.__walkErr = 'bản đồ này không có cổng ' + ${JSON.stringify(id)}; return 0; }
         const bad = (i) => { const t = tiles[i]; return t === 3 || t === 4 || t === 5; };
         const sx = Math.floor(s.predX / 32), sy = Math.floor(s.predY / 32), gx = Math.floor(p.x / 32), gy = Math.floor(p.y / 32);
@@ -219,7 +220,7 @@ async function main() {
         const goal = gy * W + gx; if (prev[goal] === -2) { window.__walkErr = 'không có đường tới cổng'; return 0; }
         const path = []; for (let c = goal; c !== -1; c = prev[c]) path.push([(c % W) * 32 + 16, Math.floor(c / W) * 32 + 16]); path.reverse();
         let i = 1; window.__walkLen = path.length;
-        window.__walkTimer = setInterval(() => { if (Math.hypot(s.predX - p.x, s.predY - p.y) < 30 || i >= path.length) { J.x = 0; J.y = 0; J.active = false; clearInterval(window.__walkTimer); return; }
+        const timerId = window.__walkTimer = setInterval(() => { if (Math.hypot(s.predX - p.x, s.predY - p.y) < 30 || i >= path.length) { J.x = 0; J.y = 0; J.active = false; clearInterval(timerId); if (window.__walkTimer === timerId) window.__walkTimer = 0; return; }
           const [tx, ty] = path[i], dx = tx - s.predX, dy = ty - s.predY, d = Math.hypot(dx, dy);
           if (d < 8) { i++; return; } J.x = dx / d; J.y = dy / d; J.active = true; }, 40); return 1; })()`);
       must(!(await ev(`window.__walkErr`)), `có đường đi bộ tới cổng ${id}`);
@@ -236,8 +237,9 @@ async function main() {
         );
         throw err;
       }
+      // Dừng HẲN bộ hẹn giờ đi bộ (nó chỉ tự dừng khi cách tâm cổng < 30 px; để sống tiếp thì sau khi qua cổng nó bẻ joystick về waypoint của bản đồ CŨ, chọi nhau với lần đi bộ kế: xem e2e-chuyen-canh)
       await ev(
-        `(() => { const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; return 1; })()`,
+        `(() => { if (window.__walkTimer) { clearInterval(window.__walkTimer); window.__walkTimer = 0; } const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; return 1; })()`,
       );
       await sleep(700); // đợi vị trí THẬT của server đuổi kịp vị trí đoán trước (server kiểm khoảng cách tới cổng)
     };

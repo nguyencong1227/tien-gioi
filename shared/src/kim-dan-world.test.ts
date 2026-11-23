@@ -206,12 +206,34 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
     expect(minStep("thien_han_hoan")).toBeGreaterThanOrEqual(stepOf(4, 1));
   });
 
-  it("thưởng tu vi chuỗi chính mỗi cảnh giới Trúc Cơ / Kim Đan / Nguyên Anh <= 5% tổng thanh (không biến nhiệm vụ thành đường tắt)", () => {
+  // SÀN / TRẦN thưởng tu vi nhiệm vụ MỘT LẦN (QUYET_DINH_M3 mục 66.4, #1333 bước 2; A chốt ở comment #1333): người dùng muốn trả nhiệm vụ "cảm thấy được",
+  // nên mỗi nhiệm vụ chính >= 5 % thanh bậc nhận, mỗi việc phụ >= 2 %. Sàn và trần cũ (5 % / 2,5 %) KHÔNG thể cùng đúng ở Kim Đan / Nguyên Anh (mọi việc chính
+  // đạt sàn = 8-9 % tổng thanh), nên trần nới lên 10 % (chuỗi chính mỗi cảnh giới) và 4 % (việc phụ mỗi cảnh giới). Vẫn là thưởng MỘT lần (không `daily`):
+  // cả chuỗi chỉ rút ngắn cảnh giới đó dưới ~10 %. Đổi một con số ở ĐÂY thì đổi cả hai chiều (sàn + trần) có chủ ý, kèm số đo ở docs/CAN_BANG.md.
+  const QUEST_EXP_FLOOR_MAIN = 0.05;
+  const QUEST_EXP_FLOOR_SIDE = 0.02;
+  const QUEST_EXP_CAP_MAIN = 0.1;
+  const QUEST_EXP_CAP_SIDE = 0.04;
+
+  it("SÀN thưởng tu vi: mỗi nhiệm vụ chính không daily >= 5 % thanh bậc nhận (minRealm), mỗi việc phụ >= 2 % (mục 66.4, #1333)", () => {
+    for (const q of QUESTS) {
+      if (q.daily) continue; // `daily` là dòng thu nhập lặp lại mỗi ngày: giữ nguyên, không áp sàn
+      const side = q.desc.startsWith("Việc phụ");
+      const bar = expToNext(q.minRealm?.realm ?? 1, q.minRealm?.tier ?? 0);
+      const floor = Math.ceil((side ? QUEST_EXP_FLOOR_SIDE : QUEST_EXP_FLOOR_MAIN) * bar);
+      expect(
+        q.rewards.exp ?? 0,
+        `${q.id} (${side ? "việc phụ" : "chính"}): thưởng tu vi dưới sàn ${floor} (thanh bậc nhận ${bar})`,
+      ).toBeGreaterThanOrEqual(floor);
+    }
+  });
+
+  it("thưởng tu vi chuỗi chính mỗi cảnh giới Trúc Cơ / Kim Đan / Nguyên Anh <= 10 % tổng thanh (không biến nhiệm vụ thành đường tắt)", () => {
     const sums = new Map<number, number>();
     for (const q of QUESTS) {
       if (q.daily || !q.rewards.exp) continue;
-      // Chỉ tính chuỗi chính: việc phụ (không bắt buộc) là thưởng cho công sức săn quái thêm, KHÔNG bị chặn cùng ngưỡng
-      // (M7.9, #725: ba việc phụ Hàn Vân thưởng kinh quyển + exp theo khung của A; nếu tính vào sẽ vượt 5% ở Nguyên Anh).
+      // Chỉ tính chuỗi chính: việc phụ (không bắt buộc) là thưởng cho công sức săn quái thêm, có trần RIÊNG ở test dưới
+      // (M7.9, #725: ba việc phụ Hàn Vân thưởng kinh quyển + exp theo khung của A; tính chung thì chuỗi chính Nguyên Anh dư trần).
       if (q.desc.startsWith("Việc phụ")) continue;
       const reach = [...q.steps].reverse().find((s) => s.kind === "reachRealm");
       const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
@@ -220,13 +242,13 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
     for (const realm of [2, 3, 4]) {
       const bars = [0, 1, 2].reduce((a, t) => a + expToNext(realm, t), 0);
       expect(sums.get(realm)!, `cảnh giới ${realm}`).toBeGreaterThan(0);
-      expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(0.05);
+      expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(QUEST_EXP_CAP_MAIN);
     }
   });
 
-  it("thưởng tu vi VIỆC PHỤ mỗi cảnh giới (Luyện Khí / Trúc Cơ / Kim Đan / Nguyên Anh) <= 2,5% tổng thanh (việc phụ được loại khỏi cap chuỗi chính ở trên nên cần cap RIÊNG)", () => {
-    // Số thật lúc đặt (#725): Trúc Cơ 1,96 %, Kim Đan 1,50 %, Nguyên Anh 1,95 % (gộp với chuỗi chính Nguyên Anh = 6,87 %, chủ ý của A: việc phụ trả công 10-15 quái
-    // + nguyên liệu mỗi việc). Thêm việc phụ mới vượt 2,5 % thì phải cân lại có chủ ý (đổi ngưỡng này cùng PR), không để lọt vì "việc phụ không bị chặn".
+  it("thưởng tu vi VIỆC PHỤ mỗi cảnh giới (Luyện Khí / Trúc Cơ / Kim Đan / Nguyên Anh) <= 4 % tổng thanh (việc phụ được loại khỏi cap chuỗi chính ở trên nên cần cap RIÊNG)", () => {
+    // Số thật (#1333 bước 2, sau khi nâng lên sàn 2 %): Luyện Khí 2,37 % (đã trên sàn), Trúc Cơ 1,96 %, Kim Đan 3,60 % (gồm Giao Hoàn 2500), Nguyên Anh 2,05 %.
+    // Trước #1333 trần là 2,5 % (#725); thêm việc phụ mới vượt 4 % thì phải cân lại có chủ ý (đổi ngưỡng này cùng PR), không để lọt vì "việc phụ không bị chặn".
     // Realm 1 (Luyện Khí, D6 #754): ba việc phụ Lạc Hà exp 25/30/35 = 90, tổng thanh 9 tầng = 3803 → 2,37 %.
     const sums = new Map<number, number>();
     for (const q of QUESTS) {
@@ -240,7 +262,7 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       const tiers = realm === 1 ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2];
       const bars = tiers.reduce((a, t) => a + expToNext(realm, t), 0);
       expect(sums.get(realm)!, `cảnh giới ${realm}`).toBeGreaterThan(0);
-      expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(0.025);
+      expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(QUEST_EXP_CAP_SIDE);
     }
   });
 });
