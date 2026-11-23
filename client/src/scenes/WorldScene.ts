@@ -1070,7 +1070,13 @@ export class WorldScene extends Phaser.Scene {
     if (!mapVisualEnabled(window.location.search, safeLocalStorage())) return;
     const p = packs();
     const pid = mapPackId(id);
-    if (p.state(pid) !== "ready") return;
+    const st = p.state(pid);
+    if (st === "idle" || st === "failed") {
+      // Bản đồ đầu tiên sau đăng nhập chưa ai xin gói (`takeMapWait` chỉ chạy khi qua cổng): xin ở đây; về xong thì `onReady` gọi lại hàm này
+      void p.ensure(pid);
+      return;
+    }
+    if (st !== "ready") return;
     const jsonPath = visualPackPaths(id, "tileset_world.png");
     const jsonUrl = jsonPath ? p.fileUrl(pid, jsonPath.json) : null;
     if (!jsonPath || !jsonUrl || !p.fileUrl(pid, jsonPath.image)) return; // gói chưa có ảnh tileset: vẽ cách cũ
