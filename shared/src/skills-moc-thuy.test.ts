@@ -6,7 +6,7 @@ import { skillViolations } from "./skill-violations";
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 // Tên riêng (tông phái / quốc gia) của Vạn Kiếp Tu Tiên KHÔNG được làm của Tiên Giới (AGENTS.md, Asset nguồn 3): chữ mô tả dùng nguyên văn nhưng đổi tên riêng sang cách nói trung tính
 const VKTT_PROPER =
-  /Thanh Vân (Môn|Kiếm Tông)|Bắc Minh|Huyền Vũ Môn|Kim Đạo Tự|Đan Hà Cốc|đất Thịnh/;
+  /Thanh Vân (Môn|Kiếm Tông)|Bắc Minh|Huyền Vũ Môn|Kim Đạo Tự|Đan Hà Cốc|đất Thịnh|biển Vĩnh Triều|Vĩnh Triều Hải/;
 
 describe("chiêu nhóm Mộc + Thủy (CT7 #1052)", () => {
   it("đủ các chiêu đã thêm, id duy nhất", () => {
@@ -20,6 +20,12 @@ describe("chiêu nhóm Mộc + Thủy (CT7 #1052)", () => {
       "kho_moc_phung_xuan_quyet",
       "man_da_hoa_kinh",
       "me_hon_huong_quyet",
+      // CT15 đợt 2 slice THỦY (D, #1185): 5 chiêu hệ Thủy từ nguồn Vạn Kiếp
+      "thai_hoa_bo_nguyen",
+      "huyet_co_bi_kinh",
+      "toa_long_cam_na",
+      "huyet_ti_phuoc_than",
+      "no_dao_bai_khong",
     ];
     expect(SKILLS_MOC_THUY.map((s) => s.id).sort()).toEqual([...expectIds].sort());
     expect(new Set(SKILLS_MOC_THUY.map((s) => s.id)).size).toBe(SKILLS_MOC_THUY.length);
