@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -38,6 +38,15 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(scripts).not.toContain("e2e:all");
       expect(scripts).not.toContain("e2e-all");
       expect(scripts).not.toContain("shot:layout");
+    });
+
+    it("server/package.json thật chứa đúng e2e:inv-select và e2e:move-keys (#1386)", () => {
+      const realPkgPath = path.resolve(__dirname, "../package.json");
+      const realPkg = JSON.parse(readFileSync(realPkgPath, "utf-8"));
+      const scripts = getE2eScripts(realPkg);
+      expect(scripts).toContain("e2e:inv-select");
+      expect(scripts).toContain("e2e:move-keys");
+      expect(scripts.length).toBeGreaterThanOrEqual(32);
     });
   });
 
@@ -128,6 +137,14 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       });
       expect(selected).toEqual(["e2e:bi-canh", "e2e:chat-luong"]);
       expect(skipped).toEqual(["e2e:noi-lai"]);
+    });
+
+    it("lọc chính xác inv-select và move-keys với --only (#1386)", () => {
+      const list = [...all, "e2e:inv-select", "e2e:move-keys"];
+      const { selected } = filterScripts(list, {
+        only: ["inv-select", "move-keys"],
+      });
+      expect(selected).toEqual(["e2e:inv-select", "e2e:move-keys"]);
     });
   });
 
