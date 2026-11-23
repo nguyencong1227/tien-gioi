@@ -165,21 +165,8 @@ export function parseShard(val: string): ShardConfig {
  * Sử dụng phân bổ vòng tròn (round-robin: idx % N === M - 1) để phân tán đều tải,
  * bảo toàn thứ tự kịch bản ban đầu và đảm bảo mỗi kịch bản chỉ xuất hiện đúng 1 lần qua các shard.
  */
-export function shardScripts(
-  scripts: string[],
-  shardOrIndex: ShardConfig | number,
-  totalCount?: number,
-): string[] {
-  let index: number;
-  let total: number;
-  if (typeof shardOrIndex === "object") {
-    index = shardOrIndex.index;
-    total = shardOrIndex.total;
-  } else {
-    index = shardOrIndex;
-    total = totalCount ?? 1;
-  }
-
+export function shardScripts(scripts: string[], shard: ShardConfig): string[] {
+  const { index, total } = shard;
   if (total < 1 || index < 1 || index > total) {
     throw new Error(`Phạm vi shard không hợp lệ: ${index}/${total}. Yêu cầu 1 <= M <= N.`);
   }

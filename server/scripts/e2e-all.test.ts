@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   executeScriptOnce,
   extractLastLines,
@@ -450,7 +450,7 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
     const mockScripts = Array.from({ length: 32 }, (_, i) => `e2e:test-${i + 1}`);
 
     it("chia 32 kịch bản thành 2 shard đồng đều (mỗi shard 16 kịch bản)", () => {
-      const shard1 = shardScripts(mockScripts, 1, 2);
+      const shard1 = shardScripts(mockScripts, { index: 1, total: 2 });
       const shard2 = shardScripts(mockScripts, { index: 2, total: 2 });
 
       expect(shard1).toHaveLength(16);
@@ -460,9 +460,9 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
     });
 
     it("chia 32 kịch bản thành 3 shard cân bằng (11, 11, 10)", () => {
-      const s1 = shardScripts(mockScripts, 1, 3);
-      const s2 = shardScripts(mockScripts, 2, 3);
-      const s3 = shardScripts(mockScripts, 3, 3);
+      const s1 = shardScripts(mockScripts, { index: 1, total: 3 });
+      const s2 = shardScripts(mockScripts, { index: 2, total: 3 });
+      const s3 = shardScripts(mockScripts, { index: 3, total: 3 });
 
       expect(s1).toHaveLength(11);
       expect(s2).toHaveLength(11);
@@ -472,8 +472,8 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
 
     it("hoạt động mượt mà với số kịch bản lẻ (ví dụ 33 kịch bản khi thêm kịch bản mới ở PR #1394)", () => {
       const oddScripts = Array.from({ length: 33 }, (_, i) => `e2e:test-${i + 1}`);
-      const s1 = shardScripts(oddScripts, 1, 2);
-      const s2 = shardScripts(oddScripts, 2, 2);
+      const s1 = shardScripts(oddScripts, { index: 1, total: 2 });
+      const s2 = shardScripts(oddScripts, { index: 2, total: 2 });
 
       expect(s1).toHaveLength(17);
       expect(s2).toHaveLength(16);
@@ -482,7 +482,9 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
 
     it("bảo toàn bất biến: mọi kịch bản xuất hiện đúng MỘT lần duy nhất qua các shard M = 1..N", () => {
       const N = 4;
-      const shards = Array.from({ length: N }, (_, i) => shardScripts(mockScripts, i + 1, N));
+      const shards = Array.from({ length: N }, (_, i) =>
+        shardScripts(mockScripts, { index: i + 1, total: N }),
+      );
 
       // Tập hợp tất cả các kịch bản chạy trên các shard
       const allSharded: string[] = [];
@@ -504,8 +506,8 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
     });
 
     it("bảo toàn thứ tự kịch bản ban đầu theo package.json trong mỗi shard", () => {
-      const s1 = shardScripts(mockScripts, 1, 2);
-      const s2 = shardScripts(mockScripts, 2, 2);
+      const s1 = shardScripts(mockScripts, { index: 1, total: 2 });
+      const s2 = shardScripts(mockScripts, { index: 2, total: 2 });
 
       // Chỉ số của từng phần tử trong shard phải tăng dần theo danh sách ban đầu
       let lastIndexS1 = -1;
@@ -530,57 +532,13 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(selected).toEqual(["e2e:a", "e2e:b", "e2e:d", "e2e:e", "e2e:f", "e2e:h"]);
 
       // Chia 2 shard trên 6 script còn lại
-      const s1 = shardScripts(selected, 1, 2);
-      const s2 = shardScripts(selected, 2, 2);
+      const s1 = shardScripts(selected, { index: 1, total: 2 });
+      const s2 = shardScripts(selected, { index: 2, total: 2 });
 
       expect(s1).toEqual(["e2e:a", "e2e:d", "e2e:f"]);
       expect(s2).toEqual(["e2e:b", "e2e:e", "e2e:h"]);
       expect(s1).not.toContain("e2e:c");
       expect(s2).not.toContain("e2e:g");
-    });
-  });
-
-  describe("Kiểm tra đột biến (Mutation Testing cho Sharding, #1404)", () => {
-    const mockScripts = Array.from({ length: 32 }, (_, i) => `e2e:test-${i + 1}`);
-
-    it("đột biến idx % (N + 1) sẽ làm rớt kịch bản và bị kiểm tra bất biến phát hiện (ĐỎ)", () => {
-      // Hàm đột biến: dùng idx % (N + 1) thay vì idx % N
-      const mutantShard = (scripts: string[], index: number, total: number) => {
-        return scripts.filter((_, idx) => idx % (total + 1) === index - 1);
-      };
-
-      const N = 2;
-      const s1 = mutantShard(mockScripts, 1, N);
-      const s2 = mutantShard(mockScripts, 2, N);
-
-      // Do idx % 3 === 2 bị bỏ rơi (những script ở idx 2, 5, 8, ... không thuộc shard 1 hay 2)
-      const combined = [...s1, ...s2];
-      expect(combined.length).toBeLessThan(mockScripts.length);
-      // Kiểm tra bất biến xác nhận đột biến này làm hỏng tính toàn vẹn
-      expect(combined.length).not.toBe(mockScripts.length);
-    });
-
-    it("đột biến bỏ lọc (trả về toàn bộ script) sẽ làm trùng lặp và bị kiểm tra tính duy nhất phát hiện (ĐỎ)", () => {
-      // Hàm đột biến: không lọc theo shard mà trả về toàn bộ
-      const mutantShard = (scripts: string[], _index: number, _total: number) => {
-        return [...scripts];
-      };
-
-      const N = 2;
-      const s1 = mutantShard(mockScripts, 1, N);
-      const s2 = mutantShard(mockScripts, 2, N);
-
-      // Kiểm tra trùng lặp
-      const seen = new Set<string>();
-      let duplicateFound = false;
-      for (const item of [...s1, ...s2]) {
-        if (seen.has(item)) {
-          duplicateFound = true;
-          break;
-        }
-        seen.add(item);
-      }
-      expect(duplicateFound).toBe(true);
     });
   });
 
@@ -610,6 +568,59 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
     it("runE2eAll với --dry-run và --shard 1/2 chạy thành công với mã thoát 0", async () => {
       const code = await runE2eAll(["--dry-run", "--shard", "1/2"]);
       expect(code).toBe(0);
+    });
+
+    it("runE2eAll với --dry-run nối đúng toRun: hai shard 1/2 và 2/2 rời nhau và hợp lại bằng toàn bộ kịch bản", async () => {
+      const logs: string[] = [];
+      const logSpy = vi.spyOn(console, "log").mockImplementation((msg: string) => {
+        logs.push(msg);
+      });
+
+      try {
+        // Shard 1/2
+        const code1 = await runE2eAll(["--dry-run", "--shard", "1/2"]);
+        expect(code1).toBe(0);
+
+        const dryRun1Lines = [...logs];
+        logs.length = 0;
+
+        // Shard 2/2
+        const code2 = await runE2eAll(["--dry-run", "--shard", "2/2"]);
+        expect(code2).toBe(0);
+
+        const dryRun2Lines = [...logs];
+
+        const parseDryRunScripts = (lines: string[]): string[] => {
+          return lines
+            .filter((line) => /^\s+\d+\.\s+e2e/.test(line))
+            .map((line) => line.trim().replace(/^\d+\.\s+/, ""));
+        };
+
+        const shard1Scripts = parseDryRunScripts(dryRun1Lines);
+        const shard2Scripts = parseDryRunScripts(dryRun2Lines);
+
+        const realPkgPath = path.resolve(__dirname, "../package.json");
+        const realPkg = JSON.parse(readFileSync(realPkgPath, "utf-8"));
+        const allPkgScripts = getE2eScripts(realPkg);
+
+        // (a) Hai danh sách rời nhau hoàn toàn (không có kịch bản nào xuất hiện ở cả 2 shard)
+        const set1 = new Set(shard1Scripts);
+        for (const s of shard2Scripts) {
+          expect(set1.has(s)).toBe(false);
+        }
+
+        // (b) Hợp của chúng = allPkgScripts (cùng độ dài, đủ phần tử)
+        expect(shard1Scripts.length + shard2Scripts.length).toBe(allPkgScripts.length);
+        const union = [...shard1Scripts, ...shard2Scripts].sort();
+        expect(union).toEqual([...allPkgScripts].sort());
+
+        // (c) Shard 1 có phần tử đầu = kịch bản đầu tiên của package.json
+        expect(shard1Scripts[0]).toBe(allPkgScripts[0]);
+        // (d) Shard 2 có phần tử đầu = kịch bản thứ hai của package.json
+        expect(shard2Scripts[0]).toBe(allPkgScripts[1]);
+      } finally {
+        logSpy.mockRestore();
+      }
     });
 
     it("runE2eAll khi shard rỗng (--only chan-duong --shard 2/2) thoát mã 0 và ghi REPORT.md thành công", async () => {
