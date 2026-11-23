@@ -1,4 +1,4 @@
-// Bộ chạy toàn bộ 22 script E2E của Tiên Giới một lệnh (M7.16, Issue #694).
+// Bộ chạy toàn bộ 32 script E2E của Tiên Giới một lệnh (M7.16, Issue #694, #1386).
 // Chạy TUẦN TỰ từng script e2e:* (đọc từ server/package.json), timeout mỗi script,
 // tự động dọn sạch toàn bộ cây tiến trình con cháu (tránh mồ côi Chrome detached),
 // tự động thử lại 1 lần nếu đỏ (xanh ở lần 2 -> FLAKY), in bảng kết quả Markdown,

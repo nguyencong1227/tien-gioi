@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   e2e:
-    name: Chạy toàn diện 22 kịch bản E2E
+    name: Chạy toàn diện 32 kịch bản E2E
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -53,10 +53,10 @@ jobs:
       - name: Build client (harness phục vụ client/dist)
         run: npm run build
 
-      - name: Chạy toàn bộ 22 kịch bản E2E tuần tự (e2e:all)
+      - name: Chạy toàn bộ 32 kịch bản E2E tuần tự (e2e:all)
         id: e2e
         # Ghi chú về GPU:
-        # Cả 22 kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
+        # Cả 32 kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
         # Khi phát hiện biến môi trường CI=true (có sẵn trên GitHub Actions), hệ thống tự động
         # thêm cờ --disable-gpu và lùi về phần mềm rasterization SwiftShader của Chrome.
         # Do đó tất cả kịch bản đều chạy ổn định trên ubuntu-latest mà không cần GPU vật lý.
