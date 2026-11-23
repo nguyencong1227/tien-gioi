@@ -26,6 +26,7 @@ import { renderTinhAnh } from "./tinh-anh";
 import { renderBotHuntSection } from "./bot-hunt";
 import { renderSectEconomy } from "./tong-mon";
 import { renderAmbushBalance } from "./chan-duong";
+import { renderQuestReward } from "./quest-reward";
 import { renderBossBalance } from "./trum";
 import { renderWorldBossBalance } from "./trum-the-gioi";
 import { renderSkillBalanceMarkdown } from "./skills-model";
@@ -461,6 +462,8 @@ ${reincarnationSection}
 ${dungeonSection}
 
 ${pkSection}
+
+${renderQuestReward()}
 
 ${kimDanTruocSection}
 
