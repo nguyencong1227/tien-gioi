@@ -1024,6 +1024,10 @@ const BOOKS = {
   // Lôi (CT15 đợt 2, #1185, D): bìa theo hệ Lôi (vàng); dấu ấn sinh tự động từ id (#1303)
   kinh_loi_hoa_pha_ta_chuong: [0xe0b040, 0xfff0b0],
   kinh_chan_hon_loi_phap: [0xc8b83c, 0xe6dcff],
+  // Vô sắc (CT17 lát 3, G): bìa xám theo hệ none, không dấu (ba tone riêng để không trùng pixel)
+  kinh_huyet_trao_pha_mach: [0x9a7070, 0xf0d0d0],
+  kinh_bach_cot_hong_nhan: [0x888888, 0xf0e8e8],
+  kinh_niep_hon_doat_phat: [0x706878, 0xe0d8e8],
 };
 
 /**

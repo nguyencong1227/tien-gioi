@@ -927,6 +927,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("me_hon_huong_quyet"), chance: 0.006, min: 1, max: 1 },
     // Lôi Trúc Cơ, Huyền phẩm (CT15 đợt 2, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ — Hắc Hổ là con săn Linh thạch/phút cao nhất cùng bậc, thêm sách vào nó đẩy denominator của `balance/dungeon.test.ts` lên làm bí cảnh Linh Hư < 15 phút (đỏ ở 14,90)
     { itemId: bookIdOf("loi_hoa_pha_ta_chuong"), chance: 0.006, min: 1, max: 1 },
+    // Vô sắc Trúc Cơ, Huyền phẩm (CT17 lát 3, G): rơi hiếm từ Xích Mãng (trùm Trúc Cơ), KHÔNG từ Hắc Hổ (giữ `balance/dungeon.test.ts`); pattern giống `su_tu_hong` / `loi_hoa_pha_ta_chuong`
+    { itemId: bookIdOf("huyet_trao_pha_mach"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -995,6 +997,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("man_da_hoa_kinh"), chance: 0.008, min: 1, max: 1 },
     // Lôi Nguyên Anh gắn dấu (CT15 đợt 2, D #1185): rơi hiếm từ Phong Nha (quái Nguyên Anh), giữ số Linh thạch / giờ mục 30
     { itemId: bookIdOf("chan_hon_loi_phap"), chance: 0.006, min: 1, max: 1 },
+    // Vô sắc Nguyên Anh, Địa phẩm (CT17 lát 3, G): rơi hiếm từ Phong Nha (quái Nguyên Anh), giữ thu nhập Nguyên Anh như các lát trước
+    { itemId: bookIdOf("bach_cot_hong_nhan"), chance: 0.006, min: 1, max: 1 },
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },
@@ -1019,6 +1023,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("doan_truong_chi_phap"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("kho_moc_phung_xuan_quyet"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("phuong_minh_cau_hoang"), chance: 0.006, min: 1, max: 1 }, // Hỏa khống chế Nguyên Anh (CT8 lát 2)
+    // Vô sắc Nguyên Anh, Địa phẩm (CT17 lát 3, G): rơi hiếm từ Độc Tước (quái Nguyên Anh), giữ thu nhập Nguyên Anh như các lát trước
+    { itemId: bookIdOf("niep_hon_doat_phat"), chance: 0.006, min: 1, max: 1 },
   ],
   // Trùm Nguyên Anh: bãi của đội 3-4 người; Thiên Hàn châu là nguyên liệu vũ khí bộ IV
   thien_han_vuong: [
