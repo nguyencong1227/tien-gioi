@@ -393,7 +393,15 @@ describe("mapVisualEnabled (cờ bật / tắt lớp hình mới)", () => {
   });
   it("mặc định BẬT (không tham số, không khoá lưu, hoặc không có localStorage)", () => {
     expect(mapVisualEnabled("", store(null))).toBe(true);
-    expect(mapVisualEnabled("?debug=1", null)).toBe(true);
+    expect(mapVisualEnabled("", null)).toBe(true);
+    expect(mapVisualEnabled("?crowd=12", null)).toBe(true);
+  });
+  it("?debug mặc định TẮT (cảnh cũ ổn định cho script đo / E2E); ?visual=1 bật lại, ?visual=0 vẫn tắt", () => {
+    expect(mapVisualEnabled("?debug=1", null)).toBe(false);
+    expect(mapVisualEnabled("?dungeon=mock&debug=1", store(null))).toBe(false);
+    expect(mapVisualEnabled("?debug=1&visual=1", null)).toBe(true);
+    expect(mapVisualEnabled("?debug=1&visual=1", store("0"))).toBe(true);
+    expect(mapVisualEnabled("?debug=1&visual=0", null)).toBe(false);
   });
   it("?visual=0 tắt, ?visual=1 bật và THẮNG khoá lưu", () => {
     expect(mapVisualEnabled("?visual=0", store(null))).toBe(false);

@@ -230,17 +230,20 @@ export async function fetchVisualJson(
 export const VISUAL_STORAGE_KEY = "tg.mapVisual";
 
 /**
- * Lớp hình Tiled có bật không: `?visual=0` tắt, `?visual=1` bật (thắng khoá lưu); không có thì khoá `localStorage` `"0"` tắt; mặc định BẬT (nhưng chỉ vẽ khi gói
- * `map:<id>` THẬT SỰ có ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
+ * Lớp hình Tiled có bật không: `?visual=0` tắt, `?visual=1` bật (thắng mọi thứ khác); không có thì **`?debug` mặc định TẮT** (như thời tiết / sương / nước đứng yên ở `?debug`: các
+ * script đo / E2E dùng `?debug` có cảnh cũ ổn định, bật bằng `?visual=1`); không `?debug` thì khoá `localStorage` `"0"` tắt; mặc định BẬT (nhưng chỉ vẽ khi gói `map:<id>` THẬT SỰ có
+ * ảnh tileset: gói chưa có ảnh thì client vẽ cách cũ). Không bao giờ ném lỗi (trình duyệt chặn `localStorage`).
  */
 export function mapVisualEnabled(
   search: string,
   storage: { getItem(k: string): string | null } | null,
 ): boolean {
   try {
-    const q = new URLSearchParams(search).get("visual");
+    const params = new URLSearchParams(search);
+    const q = params.get("visual");
     if (q === "0") return false;
     if (q === "1") return true;
+    if (params.has("debug")) return false;
     return storage?.getItem(VISUAL_STORAGE_KEY) !== "0";
   } catch {
     return true;

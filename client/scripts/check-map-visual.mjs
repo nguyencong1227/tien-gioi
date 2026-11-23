@@ -7,6 +7,7 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *
  * Dựng một BẢN SAO của client/dist trong thư mục tạm (không đụng dist / public), rồi thử bốn tình huống bằng cách đổi gói `map:lac_ha` trong bản sao:
  *   (1) gói CÓ ảnh tileset + `visual.json` hợp lệ -> ba lớp hình (ground -10 / decor -9 / over worldH - 0.01, phóng 2 lần), lớp ô cũ + trang trí + nước KHÔNG còn;
+ *   (1b) `?debug` KHÔNG kèm `?visual` -> vẽ cách cũ (mặc định tắt ở `?debug` để các script đo / E2E có cảnh ổn định);
  *   (2) `?visual=0` -> vẽ cách cũ (cờ tắt thắng gói);
  *   (3) gói CHƯA có ảnh trong manifest -> vẽ cách cũ, không lỗi;
  *   (4) `visual.json` hỏng (hợp lệ về băm nhưng sai nội dung) -> vẽ cách cũ, không lỗi.
@@ -208,7 +209,7 @@ async function main() {
       });
       await evalJs("window.__isOldPage = true");
       await send("Page.navigate", {
-        url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`,
+        url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`, // ?debug mặc định TẮT lớp hình: ca cần lớp hình truyền &visual=1
       });
       let ready = false;
       for (let i = 0; i < 80 && !ready; i++) {
@@ -261,7 +262,7 @@ async function main() {
       // (1) gói có ảnh + visual.json hợp lệ -> ba lớp hình
       if (haveImage) {
         setPack({ image: true, visualBuf: visual0 });
-        if (!(await loadPage(vp, "", true))) {
+        if (!(await loadPage(vp, "&visual=1", true))) {
           console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
           failures++;
           continue;
@@ -299,6 +300,14 @@ async function main() {
         );
         await shot(`ban-do-hinh-moi-${vp.name}.webp`);
 
+        // (1b) ?debug KHÔNG kèm ?visual: mặc định TẮT (cảnh cũ ổn định cho các script đo / E2E dùng ?debug) dù gói có ảnh
+        if (!(await loadPage(vp, "", false))) {
+          failures++;
+          continue;
+        }
+        const dbg = await state();
+        check(dbg.layers === 0 && dbg.legacy, "?debug không kèm ?visual: vẽ cách cũ dù gói có ảnh");
+
         // (2) cờ tắt thắng gói
         if (!(await loadPage(vp, "&visual=0", false))) {
           failures++;
@@ -315,7 +324,7 @@ async function main() {
 
       // (3) gói chưa có ảnh trong manifest
       setPack({ image: false, visualBuf: visual0 });
-      if (!(await loadPage(vp, "", false))) {
+      if (!(await loadPage(vp, "&visual=1", false))) {
         failures++;
         continue;
       }
@@ -326,7 +335,7 @@ async function main() {
       // (4) visual.json hỏng (băm khớp nội dung, nhưng nội dung sai)
       if (haveImage) {
         setPack({ image: true, visualBuf: Buffer.from('{"width":96,"height":96,"layers":"x"}') });
-        if (!(await loadPage(vp, "", false))) {
+        if (!(await loadPage(vp, "&visual=1", false))) {
           failures++;
           continue;
         }

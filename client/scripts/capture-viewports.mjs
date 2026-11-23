@@ -451,7 +451,7 @@ const mapScenario = (id, name, mapId) => ({
   id,
   name,
   mode: "map",
-  query: `map=${mapId}&crowd=12&debug=1&weather=1&fog=1&water=1`,
+  query: `map=${mapId}&crowd=12&debug=1&weather=1&fog=1&water=1&visual=1`, // visual=1: ?debug mặc định tắt lớp hình Tiled; gói có ảnh thì ảnh chụp là cảnh MỚI
   targetSelector: "#hud",
   action: async (send) => {
     await send("Runtime.evaluate", { expression: `if (window.__ui) window.__ui.closeAllModals()` });

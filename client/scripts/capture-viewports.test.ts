@@ -91,6 +91,8 @@ describe("capture-viewports", () => {
         expect(mockStartMapId(`?${sc.query}`, false)).toBe(want[sc.id]);
         // ?debug tắt ba hiệu ứng môi trường: phải bật lại, nếu không ảnh chụp là bản đồ trơ
         for (const k of ["weather", "fog", "water"]) expect(q.get(k)).toBe("1");
+        // ?debug mặc định TẮT lớp hình Tiled (mapVisualEnabled): ảnh bản đồ phải bật lại, nếu không chụp ra cảnh cũ dù gói có ảnh
+        expect(q.get("visual")).toBe("1");
         expect(q.get("crowd")).not.toBeNull();
       }
     });
