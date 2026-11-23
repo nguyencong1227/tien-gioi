@@ -460,6 +460,8 @@ const mapScenario = (id, name, mapId) => ({
   },
 });
 export const MAP_SCENARIOS = [
+  // Bản đồ mặc định (mục 67.1: ảnh TRƯỚC / SAU của lớp hình Tiled phải có cả Lạc Hà)
+  mapScenario("07-map-lac-ha", "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)", "lac_ha"),
   mapScenario(
     "08-map-hac-phong",
     "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",

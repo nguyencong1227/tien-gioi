@@ -62,8 +62,9 @@ describe("capture-viewports", () => {
   });
 
   describe("kịch bản bản đồ ngoài (--maps, #408 bước 4)", () => {
-    it("chụp Hắc Phong (mốc), Âm Sương và Hàn Vân, KHÔNG lẫn vào bộ ảnh mốc M5", () => {
+    it("chụp Lạc Hà, Hắc Phong (mốc), Âm Sương và Hàn Vân, KHÔNG lẫn vào bộ ảnh mốc M5", () => {
       expect(MAP_SCENARIOS.map((s) => s.id)).toEqual([
+        "07-map-lac-ha",
         "08-map-hac-phong",
         "09-map-am-suong",
         "10-map-han-van",
@@ -74,6 +75,7 @@ describe("capture-viewports", () => {
 
     it("địa chỉ trỏ đúng bản đồ có thật (client mock nhận đúng id), bật sương + thời tiết + nước", () => {
       const want: Record<string, string> = {
+        "07-map-lac-ha": "lac_ha",
         "08-map-hac-phong": "hac_phong",
         "09-map-am-suong": "am_suong",
         "10-map-han-van": "han_van",

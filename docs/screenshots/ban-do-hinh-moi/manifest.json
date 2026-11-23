@@ -1,0 +1,308 @@
+{
+  "capturedAt": "2026-11-23T05:27:57.397Z",
+  "format": "webp",
+  "quality": 75,
+  "maps": true,
+  "viewports": [
+    {
+      "id": "desktop-hd",
+      "name": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "mobile": false
+    },
+    {
+      "id": "tablet-p",
+      "name": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-l",
+      "name": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-p",
+      "name": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "mobile": true
+    },
+    {
+      "id": "mobile-sm",
+      "name": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "mobile": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "07-map-lac-ha",
+      "name": "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)"
+    },
+    {
+      "id": "08-map-hac-phong",
+      "name": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)"
+    },
+    {
+      "id": "09-map-am-suong",
+      "name": "Âm Sương Trạch (sương + thời tiết + nước)"
+    },
+    {
+      "id": "10-map-han-van",
+      "name": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)"
+    }
+  ],
+  "images": [
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "07-map-lac-ha",
+      "scenarioName": "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)",
+      "fileName": "desktop-hd__07-map-lac-ha.webp",
+      "sizeKb": 81.9,
+      "sha256": "dea2b7a0952e7ad9aa1e0cf40be6b9148bf7a44d78280e0227f0ec1f51831fc8"
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "desktop-hd__08-map-hac-phong.webp",
+      "sizeKb": 63.3,
+      "sha256": "ae3bda40c4d2210634b90bcbf96d4922388feb68073ad0465dceb4906f7b4c60"
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "desktop-hd__09-map-am-suong.webp",
+      "sizeKb": 68.7,
+      "sha256": "7c7c4dea74f20b59bd56624f5f3f67e015670ab7174354ae05cf7928cc864afe"
+    },
+    {
+      "viewportId": "desktop-hd",
+      "viewportName": "Máy tính Laptop / HD (1280x720)",
+      "width": 1280,
+      "height": 720,
+      "dpr": 1,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "desktop-hd__10-map-han-van.webp",
+      "sizeKb": 69.2,
+      "sha256": "a0371f2b91c7f3232beddb530d0d205e9887549a0ecde3cdf59ea426ab8473d4"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "07-map-lac-ha",
+      "scenarioName": "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)",
+      "fileName": "tablet-p__07-map-lac-ha.webp",
+      "sizeKb": 225,
+      "sha256": "30fa31f9d65548c17a7fb102f8671a000666a6ffcac3d97afe9a361c09edf6a6"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "tablet-p__08-map-hac-phong.webp",
+      "sizeKb": 205.2,
+      "sha256": "e7a41db930ee35bba16301ccfe856421f5de2daf253c110f7147b3a2e06eccf1"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "tablet-p__09-map-am-suong.webp",
+      "sizeKb": 193.9,
+      "sha256": "c12c32443c770e4acb7200f06b45331c9cbe3e6957b307fabd2f4cba76c6267c"
+    },
+    {
+      "viewportId": "tablet-p",
+      "viewportName": "Máy tính bảng dọc (iPad Portrait)",
+      "width": 768,
+      "height": 1024,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "tablet-p__10-map-han-van.webp",
+      "sizeKb": 221.4,
+      "sha256": "17bb6747ae094a589741911e0b55495c8479059db166a970439625bda10eceff"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "07-map-lac-ha",
+      "scenarioName": "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)",
+      "fileName": "mobile-l__07-map-lac-ha.webp",
+      "sizeKb": 129.6,
+      "sha256": "d85a000a9e991c513fcf22b85d41b8864e1420dfb7fdc31e7f3a16b1358157a3"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "mobile-l__08-map-hac-phong.webp",
+      "sizeKb": 104,
+      "sha256": "8731f942386e0e777eb53e44153e7300118c03dfecb6feeb5b506b69e25af772"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "mobile-l__09-map-am-suong.webp",
+      "sizeKb": 106.1,
+      "sha256": "cd9a15055faa8cb3e838b5a95ad9fa9a15dc5eab510e8bd6131e5da0c3097726"
+    },
+    {
+      "viewportId": "mobile-l",
+      "viewportName": "Điện thoại ngang (Gaming landscape)",
+      "width": 844,
+      "height": 390,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "mobile-l__10-map-han-van.webp",
+      "sizeKb": 108,
+      "sha256": "9efcaf40e3c215e0a392da549503e972a0b84d190ea84d45786a2673a98f1675"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "07-map-lac-ha",
+      "scenarioName": "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)",
+      "fileName": "mobile-p__07-map-lac-ha.webp",
+      "sizeKb": 142.1,
+      "sha256": "0c3d64dad87be1e83f5cc7ffbdec4ecacd7aadfd113d5bfe96ea771a0b2b3f77"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "mobile-p__08-map-hac-phong.webp",
+      "sizeKb": 133.4,
+      "sha256": "1bda65443079a668492aaf063792a1b09dbe094fbf0c1fe20ac8c22615237121"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "mobile-p__09-map-am-suong.webp",
+      "sizeKb": 122.6,
+      "sha256": "b6ca94b6d9848daa37e1ed74ae3fdb1d7ad0cb9a70b035a37670c0b339f1da01"
+    },
+    {
+      "viewportId": "mobile-p",
+      "viewportName": "Điện thoại dọc (iPhone / Android chuẩn)",
+      "width": 390,
+      "height": 844,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "mobile-p__10-map-han-van.webp",
+      "sizeKb": 141.3,
+      "sha256": "2955805fa7b145b0cacb1b504efe8d38ebd5c9878d489ca1d97044d88deafa6e"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "07-map-lac-ha",
+      "scenarioName": "Lạc Hà Trấn (bản đồ mặc định: sương + thời tiết + nước)",
+      "fileName": "mobile-sm__07-map-lac-ha.webp",
+      "sizeKb": 104.5,
+      "sha256": "e0aa9e959d1137f9fa660ba23834b9d505c0696347d7d0f09838574db71ea6cb"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "08-map-hac-phong",
+      "scenarioName": "Hắc Phong Cốc (mốc so sánh: sương + thời tiết + nước)",
+      "fileName": "mobile-sm__08-map-hac-phong.webp",
+      "sizeKb": 98.1,
+      "sha256": "dfd7fbc0a27dfa2eff0e0c97f05a1c8fbd64d7eefc5b40483448e74e2e73c59a"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "09-map-am-suong",
+      "scenarioName": "Âm Sương Trạch (sương + thời tiết + nước)",
+      "fileName": "mobile-sm__09-map-am-suong.webp",
+      "sizeKb": 94.7,
+      "sha256": "1c189a7bcbcbbf3ad00ba978bf088cd3b43ea1ae33c934aa3eb3acbbddc74fe6"
+    },
+    {
+      "viewportId": "mobile-sm",
+      "viewportName": "Điện thoại nhỏ (Compact 360x640)",
+      "width": 360,
+      "height": 640,
+      "dpr": 2,
+      "scenarioId": "10-map-han-van",
+      "scenarioName": "Hàn Vân Lĩnh (băng nguyên: sương + hạt tuyết + nước)",
+      "fileName": "mobile-sm__10-map-han-van.webp",
+      "sizeKb": 104.3,
+      "sha256": "241bb695f87af4443a4a7a3b531fce6908154fb82f095448034065bde4e2f382"
+    }
+  ]
+}
