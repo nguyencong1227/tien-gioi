@@ -19,7 +19,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { Tab, sleep, removeTmpDirs, getChromeGpuFlags, killChrome } from "./e2e-kit";
+import { Tab, sleep, removeTmpDirs, killChrome } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -119,38 +120,13 @@ async function main() {
       "máy chủ in danh sách nguồn có CORS_ORIGINS",
     );
 
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore" },
-    );
-    let spawnError: Error | null = null;
-    chrome.once("error", (e) => (spawnError = e));
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    if (spawnError)
-      throw new Error(`Không chạy được google-chrome: ${(spawnError as Error).message}`);
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("T", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("T", launched.webSocketDebuggerUrl);
     const T = tab;
     const ev = (e: string) => T.ev(e);
     await T.send("Page.addScriptToEvaluateOnNewDocument", {
