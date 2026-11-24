@@ -486,6 +486,72 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     expect(hu).toBe(LEARNABLE_SKILLS.length);
   }, 120_000);
 
+  it("--ghi-ma ghi ĐÚNG số đã in trên tờ: 2 trang bị MỚI cùng phẩm ngược thứ tự (phẩm, tên) và 2 chiêu MỚI ngược thứ tự hệ (A review #1423)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const tmp = fs.mkdtempSync(path.join(dir, "ghi-ma-"));
+    const names = JSON.parse(fs.readFileSync(namesFile, "utf8")) as {
+      items: unknown[];
+      skills: unknown[];
+    };
+    // `zz_a` đứng TRƯỚC `aa_b` trong danh sách, nhưng tờ sắp trang bị theo (phẩm, tên): "A Kiếm" trước "Z Kiếm"
+    names.items.push(
+      { id: "zz_a", name: "Z Kiếm", type: "equip", rarity: 2, rarityName: "Trúc Cơ" },
+      { id: "aa_b", name: "A Kiếm", type: "equip", rarity: 2, rarityName: "Trúc Cơ" },
+    );
+    // chiêu: `zz_moc` (hệ Mộc) đứng TRƯỚC `aa_kim` (hệ Kim) trong danh sách, nhưng tờ đi theo thứ tự hệ (Kim trước Mộc)
+    names.skills.push(
+      { id: "zz_moc", name: "Z Mộc", element: "moc", shape: "cone", style: null },
+      { id: "aa_kim", name: "A Kim", element: "kim", shape: "cone", style: null },
+    );
+    const fake = path.join(tmp, "names.json");
+    const maFile = path.join(tmp, "ma.json");
+    const md = path.join(tmp, "doc.md");
+    fs.writeFileSync(fake, JSON.stringify(names));
+    fs.copyFileSync(MA_JSON, maFile);
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "14,15",
+        "--public",
+        path.join(tmp, "pub"),
+        "--private",
+        path.join(tmp, "priv"),
+        "--names",
+        fake,
+        "--ma",
+        maFile,
+        "--md",
+        md,
+        "--ghi-ma",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const shown = new Map<string, number>(); // tên hiển thị trên tờ -> số mã in ra
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| VP-(\d+) \| ([^|]*?) \|/gm))
+      shown.set(m[2].replace(/ · MỚI \(sau 23\/11\)$/, ""), Number(m[1]));
+    const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).vp;
+    expect(written.aa_b, "A Kiếm").toBe(shown.get("A Kiếm"));
+    expect(written.zz_a, "Z Kiếm").toBe(shown.get("Z Kiếm"));
+    expect(written.aa_b).toBeLessThan(written.zz_a); // sắp theo (phẩm, tên): A trước Z
+    const nums = Object.values(written).sort((a, b) => a - b);
+    expect(nums).toEqual(nums.map((_, i) => i + 1)); // vẫn liên tục, không số nào bị cấp hai lần
+    // nhóm 15 cùng luật: số ghi == số in, và theo thứ tự hệ (Kim trước Mộc) dù danh sách đưa Mộc trước
+    const huShown = new Map<string, number>();
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| HU-(\d+) \| ([^|(]*?) \(/gm))
+      huShown.set(m[2], Number(m[1]));
+    const huWritten = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).hu;
+    expect(huWritten.aa_kim, "A Kim").toBe(huShown.get("A Kim"));
+    expect(huWritten.zz_moc, "Z Mộc").toBe(huShown.get("Z Mộc"));
+    expect(huWritten.aa_kim).toBeLessThan(huWritten.zz_moc);
+    const huNums = Object.values(huWritten).sort((a, b) => a - b);
+    expect(huNums).toEqual(huNums.map((_, i) => i + 1));
+  }, 120_000);
+
   it("dựng đủ 4 nhóm: mỗi nhóm một tờ công khai + một tờ đầy đủ, đúng số mã", () => {
     expect(run.status, String(run.stderr)).toBe(0);
     const out = String(run.stdout);

@@ -497,14 +497,19 @@ HU_BY_ELEMENT = {  # hệ -> hiệu ứng đặc trưng của hệ
 }
 
 
+def hu_order(names):
+    """THỨ TỰ chiêu của nhóm 15 (dùng chung cho `group_hu` và `--ghi-ma`): theo `ELEMENT_ORDER`, trong hệ giữ thứ tự `skills`. Trả (chiêu theo hệ, danh sách phẳng)."""
+    by_el = {}
+    for sk in names["skills"]:
+        by_el.setdefault(sk["element"], []).append(sk)
+    return by_el, [sk for el in ELEMENT_ORDER for sk in by_el.get(el, [])]
+
+
 def group_hu(L, names):
     """Hiệu ứng chiêu: một tờ MỖI HỆ (10 tờ). A = theo HÌNH chiêu, B = theo HỆ (cùng tô màu hệ), C = vệt chém Wuxia (chỉ chiêu chém / tia).
     Mã HU lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (mã 23/11 giữ nguyên, chiêu mới nhận số ở CUỐI): trong tờ mỗi hệ, hàng cũ theo thứ tự mã trước, hàng MỚI (đánh dấu `NEW_TAG`) sau."""
     t = codes()
-    by_el = {}
-    for sk in names["skills"]:
-        by_el.setdefault(sk["element"], []).append(sk)
-    order = [sk for el in ELEMENT_ORDER for sk in by_el.get(el, [])]
+    by_el, order = hu_order(names)
     num = MA.assign_codes(t["hu"], [sk["id"] for sk in order])
     sheets = []
     for el in ELEMENT_ORDER:
@@ -761,14 +766,19 @@ def vp_row(L, code, it, nth=0):
     return dict(code=code, name=it["name"], rec=rec, cur=cur, opts=[a, b, c])
 
 
+def vp_order(names):
+    """THỨ TỰ vật phẩm của nhóm 14 (một nguồn DUY NHẤT: `group_vp` in tờ và `--ghi-ma` ghi bảng đều dùng): theo `VP_GROUPS`, trang bị sắp (phẩm, tên). Mã MỚI cấp theo đúng thứ tự này,
+    nên hai nơi lệch thứ tự là tờ in số này mà bảng ghi số khác (A review #1423). Trả (vật phẩm theo nhóm, danh sách phẳng)."""
+    by = {g: [it for it in names["items"] if vp_group_of(it) == g] for g, _ in VP_GROUPS}
+    by["trang-bi"].sort(key=lambda it: (it["rarity"], it["name"]))  # phẩm thấp -> cao
+    return by, [it for g, _ in VP_GROUPS for it in by[g]]
+
+
 def group_vp(L, names):
     """Vật phẩm: các tờ `14-vat-pham-<nhóm>[-<n>]` (<= `VP_SHEET_ROWS` hàng mỗi tờ). Mã VP lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (mã đã giao người dùng 23/11 giữ nguyên;
     vật phẩm mới nhận số ở CUỐI): tờ CŨ dựng y như 23/11 (cùng hàng, cùng cách chia tờ), vật phẩm mới nằm ở tờ `-moi` riêng, hàng đánh dấu `NEW_TAG`."""
     t = codes()
-    items = names["items"]
-    by = {g: [it for it in items if vp_group_of(it) == g] for g, _ in VP_GROUPS}
-    by["trang-bi"].sort(key=lambda it: (it["rarity"], it["name"]))  # phẩm thấp -> cao
-    order = [it for g, _ in VP_GROUPS for it in by[g]]
+    by, order = vp_order(names)
     num = MA.assign_codes(t["vp"], [it["id"] for it in order])
     # `nth` xoay vòng giữa các họ icon của gói C: tính theo THỨ TỰ MÃ (mã cũ như 23/11 trước, mã mới sau) để hàng cũ không đổi hình khi có hàng mới chèn vào nhóm
     seen = {}  # (loại, phẩm) -> số vật phẩm đã gặp
@@ -947,9 +957,9 @@ def main():
     if a.ghi_ma:
         t = CODES
         if "14" in built:
-            t = MA.extended(t, "vp", MA.assign_codes(t["vp"], [it["id"] for g, _ in VP_GROUPS for it in names["items"] if vp_group_of(it) == g]))
+            t = MA.extended(t, "vp", MA.assign_codes(t["vp"], [it["id"] for it in vp_order(names)[1]]))
         if "15" in built:
-            t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for el in ELEMENT_ORDER for sk in names["skills"] if sk["element"] == el]))
+            t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for sk in hu_order(names)[1]]))
         MA.save(a.ma, t)
         print(f"ĐÃ GHI bảng mã: VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
 
