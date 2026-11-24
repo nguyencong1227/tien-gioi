@@ -463,6 +463,10 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
     const vpId = new Map(Object.entries(t.vp).map(([id, n]) => [n, id] as const));
     const huId = new Map(Object.entries(t.hu).map(([id, n]) => [n, id] as const));
+    const maxVp = Math.max(...Object.values(t.vp));
+    const maxHu = Math.max(...Object.values(t.hu));
+    const unregItems = new Set(ITEMS.filter((i) => !(i.id in t.vp)).map((i) => i.name));
+    const unregSkills = new Set(LEARNABLE_SKILLS.filter((k) => !(k.id in t.hu)).map((k) => k.name));
     const text = fs.readFileSync(md, "utf8");
     let vp = 0;
     let hu = 0;
@@ -472,13 +476,27 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
       const shown = m[3].replace(/ · MỚI \(sau 23\/11\)$/, "");
       if (m[1] === "VP") {
         vp++;
-        expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
+        if (vpId.has(n)) expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
+        else {
+          // vật phẩm PR nội dung thêm mà CHƯA --ghi-ma: mã tạm ở CUỐI (> số lớn nhất trong bảng), tên là một vật phẩm chưa có trong bảng
+          expect(n, `VP-${m[2]} chưa có trong bảng: phải ở CUỐI`).toBeGreaterThan(maxVp);
+          expect(unregItems.has(shown), `VP-${m[2]}: ${shown}`).toBe(true);
+        }
         expect(mới, `VP-${m[2]} MỚI`).toBe(n > DONG_BANG.vp);
       } else {
         hu++;
-        expect(shown.startsWith(`${skills.get(huId.get(n) ?? "")} (`), `HU-${m[2]}: ${shown}`).toBe(
-          true,
-        );
+        if (huId.has(n))
+          expect(
+            shown.startsWith(`${skills.get(huId.get(n) ?? "")} (`),
+            `HU-${m[2]}: ${shown}`,
+          ).toBe(true);
+        else {
+          expect(n, `HU-${m[2]} chưa có trong bảng: phải ở CUỐI`).toBeGreaterThan(maxHu);
+          expect(
+            [...unregSkills].some((k) => shown.startsWith(`${k} (`)),
+            `HU-${m[2]}: ${shown}`,
+          ).toBe(true);
+        }
         expect(mới, `HU-${m[2]} MỚI`).toBe(n > DONG_BANG.hu);
       }
     }
