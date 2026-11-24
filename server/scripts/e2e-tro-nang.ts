@@ -7,7 +7,7 @@
 //  4. Tab bị giữ trong bảng đang mở (focus trap), Shift+Tab cũng vậy.
 //  5. Bảng có `role="dialog"` + `aria-modal`; nút mở có `aria-expanded` đúng; mở bảng thì focus vào trong bảng.
 // Mọi kiểm "thấy" dùng hiển thị THẬT (`checkVisibility`), không chỉ `!hidden`. Chạy: `npm run build && npm run e2e:tro-nang -w server`.
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, sleep, shown, listenWithRetry, removeTmpDirs, killChrome } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -101,34 +102,13 @@ async function main() {
   };
   let fatal: string | null = null;
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore" },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     await tab.send("Page.addScriptToEvaluateOnNewDocument", {
       source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
     });
@@ -444,7 +424,7 @@ async function main() {
     fatal = (e as Error).message;
   } finally {
     tab?.close();
-    chrome?.kill();
+    killChrome(chrome);
     await gameServer.gracefullyShutdown(false).catch(() => {});
     httpServer.close();
     rmSync(dataDir, { recursive: true, force: true });
