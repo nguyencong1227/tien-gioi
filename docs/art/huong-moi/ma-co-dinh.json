@@ -154,7 +154,16 @@
     "kinh_han_suong_toa": 144,
     "kinh_bang_phach_than_cham": 145,
     "kinh_loi_am_an": 146,
-    "kinh_tu_dien_thoa": 147
+    "kinh_tu_dien_thoa": 147,
+    "kinh_xich_viem": 148,
+    "kinh_chu_canh_dao_hong": 149,
+    "kinh_hoa_duoc_no": 150,
+    "kinh_quy_hoa_phe_hon": 151,
+    "kinh_ma_trao_phe_huyet": 152,
+    "kinh_phat_hoa_hang_ma": 153,
+    "kinh_huyet_mang_pha_giap": 154,
+    "kinh_quy_anh_me_tung": 155,
+    "kinh_am_phong_quyen_hon": 156
   },
   "hu": {
     "ung_trao": 1,
@@ -234,6 +243,15 @@
     "kho_mach_dan_luu": 75,
     "huyet_trao_pha_mach": 76,
     "bach_cot_hong_nhan": 77,
-    "niep_hon_doat_phat": 78
+    "niep_hon_doat_phat": 78,
+    "xich_viem": 79,
+    "chu_canh_dao_hong": 80,
+    "hoa_duoc_no": 81,
+    "quy_hoa_phe_hon": 82,
+    "ma_trao_phe_huyet": 83,
+    "phat_hoa_hang_ma": 84,
+    "huyet_mang_pha_giap": 85,
+    "quy_anh_me_tung": 86,
+    "am_phong_quyen_hon": 87
   }
 }
