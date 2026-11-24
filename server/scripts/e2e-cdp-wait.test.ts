@@ -17,6 +17,24 @@ export const LOOP = /Date\.now\(\) - (start|waitChromeStart) < (\d+)/g;
 export const IMPORT_HELPER =
   /import\s*\{[^}]*\blaunchChrome\b[^}]*\}\s*from\s*["']\.\/e2e-chrome["']/;
 
+/**
+ * Kiểm tra mã nguồn của một script E2E:
+ * - Nếu đã import launchChrome: không được còn vòng chờ chép tay (LOOP).
+ * - Nếu chưa chuyển đổi: phải có vòng chờ CDP >= MIN_WAIT_MS (15 s).
+ */
+export function checkScriptSource(name: string, src: string): void {
+  if (IMPORT_HELPER.test(src)) {
+    // Script đã chuyển sang helper: không được còn vòng chờ chép tay sót lại
+    const waits = [...src.matchAll(LOOP)].map((m) => Number(m[2]));
+    expect(waits.length, `${name} đã import launchChrome nhưng vẫn còn vòng chờ chép tay`).toBe(0);
+    return;
+  }
+  const waits = [...src.matchAll(LOOP)].map((m) => Number(m[2]));
+  for (const w of waits) {
+    expect(w, `${name}: hạn chờ ${w} < ${MIN_WAIT_MS}`).toBeGreaterThanOrEqual(MIN_WAIT_MS);
+  }
+}
+
 describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694, #1432)", () => {
   const files = readdirSync(here).filter(
     (f) => /^e2e.*\.ts$/.test(f) && !f.endsWith(".test.ts") && f !== "e2e-chrome.ts",
@@ -36,14 +54,7 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
   for (const f of files) {
     it(`${f}: dùng launchChrome (>= ${HELPER_MIN_WAIT_MS} ms, không còn vòng chép tay) hoặc có vòng chờ CDP >= ${MIN_WAIT_MS} ms`, () => {
       const src = readFileSync(path.join(here, f), "utf8");
-      if (IMPORT_HELPER.test(src)) {
-        // Script đã chuyển sang helper: không được còn vòng chờ chép tay sót lại
-        const waits = [...src.matchAll(LOOP)].map((m) => Number(m[2]));
-        expect(waits.length, `${f} đã import launchChrome nhưng vẫn còn vòng chờ chép tay`).toBe(0);
-        return;
-      }
-      const waits = [...src.matchAll(LOOP)].map((m) => Number(m[2]));
-      for (const w of waits) expect(w).toBeGreaterThanOrEqual(MIN_WAIT_MS);
+      checkScriptSource(f, src);
     });
   }
 
@@ -61,10 +72,7 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
       for (const start = Date.now(); Date.now() - start < 5000;) {}
     `;
     expect(IMPORT_HELPER.test(fakeBadSrc)).toBe(false);
-    const waits = [...fakeBadSrc.matchAll(LOOP)].map((m) => Number(m[2]));
-    expect(() => {
-      for (const w of waits) expect(w).toBeGreaterThanOrEqual(MIN_WAIT_MS);
-    }).toThrow();
+    expect(() => checkScriptSource("fakeBad", fakeBadSrc)).toThrow();
   });
 
   it("bắt được trường hợp vừa import launchChrome vừa giữ vòng chờ chép tay (#1434 review)", () => {
@@ -73,9 +81,6 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
       for (const start = Date.now(); Date.now() - start < 15000;) {}
     `;
     expect(IMPORT_HELPER.test(fakeMixedSrc)).toBe(true);
-    const waits = [...fakeMixedSrc.matchAll(LOOP)].map((m) => Number(m[2]));
-    expect(() => {
-      expect(waits.length, "vẫn còn vòng chờ chép tay").toBe(0);
-    }).toThrow();
+    expect(() => checkScriptSource("fakeMixed", fakeMixedSrc)).toThrow();
   });
 });

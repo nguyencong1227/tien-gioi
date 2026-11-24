@@ -51,6 +51,8 @@ export interface LaunchChromeOptions {
   timeoutMs?: number;
   /** Khoảng thời gian thăm dò /json (ms), mặc định 150 ms. */
   pollIntervalMs?: number;
+  /** Hạn chờ cho mỗi lượt gọi fetch /json (ms), mặc định 2000 ms. */
+  fetchTimeoutMs?: number;
   /** Hàm in log (mặc định console.log). */
   log?: (msg: string) => void;
   /** Lệnh thực thi Chrome (mặc định "google-chrome", dùng để thay thế trong test giả lập). */
@@ -70,11 +72,13 @@ export interface LaunchChromeOptions {
 export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedChrome> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_CDP_TIMEOUT_MS;
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const fetchTimeoutMs = opts.fetchTimeoutMs ?? 2000;
   const executable = opts.executable ?? "google-chrome";
   const log = opts.log ?? ((msg: string) => console.log(msg));
 
   let currentPort = opts.cdpPort;
   let lastDiag: ChromeDiag | null = null;
+  const allDiags: ChromeDiag[] = [];
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     if (attempt === 2) {
@@ -105,15 +109,25 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
           "about:blank",
         ];
 
-    const chrome = spawn(executable, args, {
-      stdio: ["ignore", "ignore", "pipe"],
-      detached: true,
-    });
+    let chrome: ChildProcess;
+    try {
+      chrome = spawn(executable, args, {
+        stdio: ["ignore", "ignore", "pipe"],
+        detached: true,
+      });
+    } catch (err) {
+      throw new Error(`Không chạy được ${executable}: ${(err as Error).message}`, { cause: err });
+    }
 
     let exitCode: number | null = null;
     let exitSignal: NodeJS.Signals | null = null;
+    let spawnError: Error | null = null;
     const stderrTail: string[] = [];
     let partialLine = "";
+
+    chrome.on("error", (err) => {
+      spawnError = err;
+    });
 
     chrome.on("exit", (code, signal) => {
       exitCode = code;
@@ -141,12 +155,18 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
+      if (spawnError !== null) {
+        // Lỗi khởi chạy tiến trình (vd ENOENT do thiếu executable) -> thoát vòng lặp ngay
+        break;
+      }
       if (exitCode !== null) {
         // Chrome đã thoát sớm, không chờ vô ích
         break;
       }
       try {
-        const res = await fetch(`http://127.0.0.1:${currentPort}/json`);
+        const res = await fetch(`http://127.0.0.1:${currentPort}/json`, {
+          signal: AbortSignal.timeout(fetchTimeoutMs),
+        });
         if (res.ok) {
           const data = (await res.json()) as any[];
           if (Array.isArray(data)) {
@@ -155,9 +175,26 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
           }
         }
       } catch {
-        // Cổng chưa mở
+        // Cổng chưa mở hoặc fetch bị timeout / từ chối kết nối
+      }
+      if (spawnError !== null) {
+        break;
       }
       await sleep(pollIntervalMs);
+    }
+
+    // Nếu gặp lỗi khởi chạy (vd ENOENT thiếu Chrome), không thử lại lần 2 mà ném lỗi ngay
+    if (spawnError !== null) {
+      killChrome(chrome);
+      throw new Error(`Không chạy được ${executable}: ${(spawnError as Error).message}`, {
+        cause: spawnError,
+      });
+    }
+
+    // Đợi 50 ms để pipe stderr flush hết dữ liệu đệm nếu tiến trình vừa thoát.
+    // 50 ms là khoảng thời gian heuristic đủ cho I/O pipe cục bộ trên Linux/macOS trước khi đọc đuôi stderr.
+    if (exitCode !== null) {
+      await sleep(50);
     }
 
     const elapsedMs = Date.now() - start;
@@ -175,6 +212,7 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
       signal: exitSignal,
       stderrTail: [...stderrTail],
     };
+    allDiags.push(lastDiag);
 
     const first = targets.find((t) => t.type === "page");
     if (first?.webSocketDebuggerUrl) {
@@ -192,19 +230,38 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
     killChrome(chrome);
   }
 
-  // Cả hai lần thử đều thất bại: ném lỗi kèm chẩn đoán chi tiết
+  // Cả hai lần thử đều thất bại: ném lỗi kèm chẩn đoán chi tiết cả hai lần
   const diag = lastDiag!;
   const diagLines = [
     `Không kết nối được Chrome DevTools sau ${diag.elapsedMs} ms (đã thử ${diag.attempts} lần).`,
     `exitCode: ${diag.exitCode !== null ? diag.exitCode : "null"}, signal: ${diag.signal ?? "null"}, port: ${currentPort}`,
   ];
-  if (diag.stderrTail.length > 0) {
-    diagLines.push(`Stderr (~${diag.stderrTail.length} dòng cuối):`);
-    for (const l of diag.stderrTail) {
-      diagLines.push(`  ${l}`);
+
+  if (allDiags.length > 1) {
+    diagLines.push("Chi tiết các lần thử:");
+    for (let i = 0; i < allDiags.length; i++) {
+      const d = allDiags[i];
+      diagLines.push(
+        `--- Lần ${i + 1} (${d.elapsedMs} ms, exitCode: ${d.exitCode !== null ? d.exitCode : "null"}, signal: ${d.signal ?? "null"}) ---`,
+      );
+      if (d.stderrTail.length > 0) {
+        diagLines.push(`Stderr (~${d.stderrTail.length} dòng cuối):`);
+        for (const l of d.stderrTail) {
+          diagLines.push(`  ${l}`);
+        }
+      } else {
+        diagLines.push("Stderr: (trống)");
+      }
     }
   } else {
-    diagLines.push("Stderr: (trống)");
+    if (diag.stderrTail.length > 0) {
+      diagLines.push(`Stderr (~${diag.stderrTail.length} dòng cuối):`);
+      for (const l of diag.stderrTail) {
+        diagLines.push(`  ${l}`);
+      }
+    } else {
+      diagLines.push("Stderr: (trống)");
+    }
   }
 
   throw new Error(diagLines.join("\n"));
