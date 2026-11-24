@@ -166,11 +166,11 @@ export const SKILLS_HOA: readonly SkillDef[] = [
     grade: 0,
   },
   {
-    // Huyết Diễm Ma Trảo -> chiêu "Ma Trảo Phệ Huyết": trảo nhuộm lửa máu, chém đơn Trúc Cơ, chảy máu. Nguồn cg1 pham3, uy0,69 phi2 hoi0, ma_hoa (mô tả), bleed 2 lượt.
+    // Huyết Diễm Ma Trảo -> chiêu "Ma Trảo Phệ Huyết": trảo nhuộm lửa máu, chém đơn Trúc Cơ, chảy máu. Nguồn cg1 pham3, uy0,69 phi2 hoi0, bleed 2 lượt (mô tả viết lại cho khớp hiệu ứng — A #1424: nguồn mô tả "ma_hoa / máu chảy ngược gấp đôi" nhưng game chỉ chảy máu).
     id: "ma_trao_phe_huyet",
     name: "Ma Trảo Phệ Huyết",
     bookName: "Huyết Diễm Ma Trảo",
-    desc: "Năm ngón nhuộm lửa máu xé thịt, vết thương không khép. Ma niệm sắp tràn thì máu kẻ trúng trảo chảy ngược về gấp đôi, lấy tương khắc trong kinh mạch làm lò mà sinh tâm ma.",
+    desc: "Năm ngón nhuộm lửa máu xé thịt, vết thương không khép lại. Lửa máu len vào kinh mạch, khiến máu đối phương không ngừng rỉ ra, đau nhói nhiều lượt cho tới khi thương thế được cầm.",
     element: "hoa",
     shape: "cone",
     cooldown: 3000,
