@@ -36,9 +36,15 @@ export class NetSlowDetector {
     if (this.waitingSince === null) this.waitingSince = now;
   }
 
-  /** Vừa nhận bất kỳ phản hồi nào (patch state, pong): mạng đang thông. */
-  noteInbound(): void {
-    this.waitingSince = null;
+  /**
+   * Vừa nhận bất kỳ phản hồi nào (patch state, pong): mạng đang thông, xoá mốc chờ.
+   * `stillExpectingAt`: còn một tin đã gửi mà CHƯA được đáp (ping chờ pong) thì truyền đồng hồ lúc này: patch chỉ chứng minh mạng sống TẠI LÚC NÀY, ping vẫn chưa có pong, nên đếm lại
+   * thời gian chờ từ đây thay vì xoá hẳn. Nhịp tim chỉ giữ MỘT ping chờ (không gửi ping mới khi chưa có pong) nên nếu xoá hẳn thì sẽ không còn `noteSend` nào đặt lại mốc: mạng đứng ngay
+   * sau patch đó (pong bị nuốt) thì chip không bao giờ hiện, chỉ còn banner nối lại ở giây 8 (e2e:nhip-tim Ca 6 khi chạy 1 lõi: ping đi ~150 ms trước lúc đứng, patch về giữa chừng).
+   */
+  noteInbound(stillExpectingAt?: number): void {
+    this.waitingSince =
+      stillExpectingAt !== undefined && Number.isFinite(stillExpectingAt) ? stillExpectingAt : null;
   }
 
   /** Quên mọi mốc (đổi phòng, nối lại, tab hiện lại). */
@@ -96,6 +102,8 @@ export class NetSlowMonitor {
   private stopped = false;
   /** Đã nhận ít nhất một `pong`: máy chủ hiểu `ping`. */
   private pongSeen = false;
+  /** Đã gửi `ping` mà chưa nhận `pong` nào kể từ đó (chỉ tính khi máy chủ hiểu `ping`). */
+  private pingOutstanding = false;
   private origSend: NetSlowRoom["send"] | null = null;
   private wrapper: NetSlowRoom["send"] | null = null;
 
@@ -122,12 +130,17 @@ export class NetSlowMonitor {
       // `ping` chỉ chắc chắn được đáp lại khi máy chủ từng trả `pong` (máy chủ cũ không hiểu `ping`, như `supported` của nhịp tim); `input` thì luôn được đáp bằng patch
       if (type === "input" || (type === "ping" && this.pongSeen))
         this.detector.noteSend(this.now());
+      if (type === "ping" && this.pongSeen) this.pingOutstanding = true;
       orig(type, message);
     };
     this.wrapper = room.send;
-    room.onStateChange(() => this.detector.noteInbound());
+    // patch về mà ping vẫn chưa được đáp: đếm lại thời gian chờ từ bây giờ (xem `noteInbound`)
+    room.onStateChange(() =>
+      this.detector.noteInbound(this.pingOutstanding ? this.now() : undefined),
+    );
     room.onMessage("pong", () => {
       this.pongSeen = true;
+      this.pingOutstanding = false;
       this.detector.noteInbound();
     });
     this.detector.poll(this.now()); // đặt mốc `poll` đầu tiên: lần gửi ngay sau `start()` (ping đầu của nhịp tim) không bị coi là "cũ"
