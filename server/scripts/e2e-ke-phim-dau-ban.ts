@@ -1,24 +1,27 @@
 // E2E THẬT: GIỮ PHÍM DI CHUYỂN LIÊN TỤC LÂU → vị trí TĂNG ĐỀU (QUYET_DINH_M3 mục 25, #1383 Part 2).
-// Server Colyseus thật + Chrome headless + phím THẬT qua CDP (isTrusted). Khác bước 8 của e2e-ban-phim (chỉ giữ 0,7s,
-// chỉ khẳng định "đứng yên khi túi mở / đi khi túi đóng"): ca người dùng báo là GIỮ PHÍM LIÊN TỤC LÂU (tới ~30 giây) rồi
-// nhân vật "giật / liệt nút" — vị trí KHÔNG tăng đều. Script này giữ mũi tên phải một nhịp dài, LẤY MẪU vị trí server (me.x,
-// đọc thẳng state phòng, không qua mạng) nhiều mốc, rồi khẳng định: (1) đơn điệu không giảm (không giật lùi), (2) không interval
-// nào đứng yên (KHÔNG "liệt nút" giữa đường), (3) tăng đều (không burst), (4) thả phím thì dừng.
+// Server Colyseus thật + Chrome headless (dựng qua helper launchChrome #1434) + phím THẬT qua CDP (isTrusted). Khác bước 8 của
+// e2e-ban-phim (chỉ giữ 0,7s, chỉ khẳng định "đứng yên khi túi mở / đi khi túi đóng"): ca người dùng báo là GIỮ PHÍM LIÊN TỤC LÂU
+// (tới ~30 giây) rồi nhân vật "giật / liệt nút" — vị trí KHÔNG tăng đều. Script giữ mũi tên phải một nhịp dài, LẤY MẪU vị trí server
+// (me.x, đọc thẳng state phòng, không qua mạng) nhiều mốc, rồi khẳng định: (1) đơn điệu không giảm (không giật lùi), (2) KHÔNG có
+// plateau đứng DÀI (KHÔNG "liệt nút" giữa đường — kiểm theo độ dài plateau, tốc độ-độc lập), (3) tốc độ TB toàn cửa sổ ≈ mong đợi
+// (khung nhanh) HOẶC không burst vượt tốc độ danh nghĩa (khung chậm), (4) thả phím thì dừng.
 // Cơ chế token-bucket + cắt backlog của applyInputs (mục 41) là bất biến theo thời gian nên 6 giây đủ đại diện cho 30 giây;
 // độ dài giữ lấy từ env E2E_KE_PHIM_MS (mặc định 6000) để chạy nhanh, có thể nâng lên 30000 khi muốn lặp ca thật.
 //
 // FPS-AWARE (#1394, theo B + A): runner GitHub chạy WebGL phần mềm / bị bóp CPU (`CI=true taskset -c 0`) nên khung hình CHẬM
 // (vài khung / giây); khi đó client chỉ tiến MỘT bước ~8 px mỗi khung → vị trí tăng theo FPS chứ KHÔNG theo đồng hồ thật, đo
 // px/giây cố định sẽ ĐỎ giả (đỏ 2/2 trên runner ở đầu 4ad40ad6). Script ĐO thời gian khung hình bằng rAF TRƯỚC khi giữ phím:
-//   - KHUNG CHẬM (frameMs > SLOW_FRAME_MS, hoặc tốc độ mẫu < SLOW_FRAC×mong đợi): chỉ đòi bất biến theo FPS — đơn điệu, MỖI
-//     interval nhích >= một bước (KHÔNG liệt nút), trần không burst theo tốc độ danh nghĩa, thả phím dừng; BỎ kiểm tốc độ tuyệt
-//     đối (trung vị ≈ mong đợi / min >= 0,85×) và in `⚠ khung chậm ... bỏ qua`. Đột biến "liệt nút" (ngừng gửi input) vẫn ĐỎ vì
-//     các interval sau ngừng tăng.
-//   - KHUNG NHANH: nới biên per-interval (0,6×/1,4× mong đợi, hấp thụ ±1 tick lấy mẫu) + khẳng định tốc độ TB TOÀN cửa sổ trong
-//     ±10% mong đợi (không theo từng interval 350 ms — biên tuyệt đối theo đồng hồ thật chập chờn ở dải khung 25-50 ms, A #1394).
-// `--slow-frame <ms>` / `TG_SLOW_FRAME_MS` giả lập khung chậm (client/scripts/slow-frame.mjs) để kiểm cả hai nhánh không cần runner.
-// Chạy: `npm run e2e:ke-phim-dau-ban -w server` [--slow-frame 150].
-import { spawn, execSync } from "node:child_process";
+//   - KHUNG CHẬM (frameMs > SLOW_FRAME_MS, hoặc tốc độ TB < SLOW_FRAC×mong đợi): KHÔNG đòi tốc độ tuyệt đối — chỉ đòi đơn điệu,
+//     KHÔNG plateau đứng dài, trần không burst vượt tốc độ danh nghĩa (maxR <= 1,4×), thả phím dừng; in `⚠ khung chậm ... bỏ qua`.
+//   - KHUNG NHANH: tốc độ TB TOÀN cửa sổ trong ±15% mong đợi (răng cho đột biến làm chậm/nhanh movement) + đơn điệu + plateau +
+//     thả phím. KHÔNG kiểm từng interval: biên tuyệt đối theo đồng hồ thật chập chờn ở dải khung 28-40 ms (A/C tái hiện đỏ ở
+//     --slow-frame 14: min 85,5 < sàn 90; và --slow-frame 36: TB ~130 < ±10%) — jitter lấy mẫu ±1 tick KHÔNG phải lỗi movement thật.
+// ĐỘT BIẾN TEST-ONLY (env `E2E_KE_PHIM_MUTATE=stall:<N>`): ngừng gửi input sau N bước giữ phím → giả "liệt nút"; cờ giữ-phím
+// (`window.__kphHoldStarted`) do KỊCH BẢN đặt qua CDP ngay trước khi gửi phím (KHÔNG đặt trong mã game — F không sửa mã trò chơi),
+// để đột biến đếm stall chỉ tính các bước SAU khi giữ phím. `--slow-frame <ms>` / `TG_SLOW_FRAME_MS` giả lập khung chậm
+// (client/scripts/slow-frame.mjs) để kiểm cả hai nhánh không cần runner.
+// Chạy: `npm run e2e:ke-phim-dau-ban -w server` [--slow-frame 150] [E2E_KE_PHIM_MUTATE=stall:20].
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -28,7 +31,8 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { DEFAULT_MAP_ID, roomNameOf, statsFor } from "@tien-gioi/shared";
-import { Tab, sleep, listenWithRetry, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 
 // Giả lập KHUNG CHẬM (copy từ client/scripts/slow-frame.mjs — module JS thuần không kèm .d.ts nên KHÔNG import được trong TS;
 // giữ nguyên bản chất: mỗi requestAnimationFrame bận luồng chính `ms` ms). `--slow-frame <ms>` / `TG_SLOW_FRAME_MS` bật, 0 = tắt.
@@ -68,9 +72,9 @@ const EPS = 0.5; // sai số float khi khẳng định đơn điệu (px)
 // ---- FPS-aware (#1394) ----
 const SLOW_FRAME_MS = 40; // khung hình > 40 ms (~25 FPS) coi là khung chậm (dưới đây là runner WebGL phần mềm / taskset -c 0)
 const SLOW_FRAC = 0.85; // hoặc tốc độ mẫu < SLOW_FRAC×mong đợi → coi là khung chậm (chậm theo hiệu quả, dù frameMs biên)
-const FAST_LO = 0.6; // khung nhanh: sàn per-interval (nới so 0,85× để hấp thụ ±1 tick = ±23 px/s lấy mẫu)
-const FAST_HI = 1.4; // khung nhanh: trần per-interval (nới so 1,15× vì lý do trên)
-const WINDOW_FRAC = 0.1; // khung nhanh: tốc độ TB toàn cửa sổ phải trong ±10% mong đợi
+const FAST_HI = 1.4; // khung CHẬM: trần tốc độ danh nghĩa — interval nhanh nhất KHÔNG được vượt (máy chậm KHÔNG thể nhanh hơn tốc độ thật)
+const WINDOW_FRAC = 0.15; // khung NHANH: tốc độ TB toàn cửa sổ phải trong ±15% mong đợi (±10% quá chặt ở khung 28-40 ms: jitter lấy mẫu ±1 tick
+// ≈ ±8 px/350 ms ≈ ±23 px/s, và TB hiệu quả bị giới hạn FPS tụt xuống ~130 px/s ở --slow-frame 36 → đỏ giả; C chốt ±10-15%, A muốn thông qua --slow-frame 25/36/50/80/150)
 // "Liệt nút" = plateau DỪNG đứng KÉO DÀI (đột biến ngừng gửi input → dx≈0 mọi interval tới cuối). Máy chậm KHỎE chỉ có blip lẻ
 // (jitter gửi input không đều ở khung rất chậm) nên KHÔNG có plateau dài. Kiểm theo độ dài plateau (tốc độ-độc lập) chứ KHÔNG
 // theo "mỗi interval phải nhích" (quá chặt ở khung cực chậm: lấy mẫu 350 ms có interval bắt đúng 0 bước → false red).
@@ -175,7 +179,7 @@ async function main() {
   }
   out(`- Server E2E: http://127.0.0.1:${PORT}`);
 
-  let chrome: ReturnType<typeof spawn> | null = null;
+  let chrome: ChildProcess | null = null;
   let tab: Tab | null = null;
   let fatal: string | null = null;
   const failures: string[] = [];
@@ -184,34 +188,10 @@ async function main() {
     if (!ok) failures.push(`${name}: ${detail}`);
   };
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore" },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    // Dựng Chrome qua helper launchChrome (#1434): hạn chờ >= 30 s + tự thử lại kèm chẩn đoán, thay vòng chờ CDP chép tay.
+    const launched = await launchChrome({ cdpPort: CDP, userDataDir: chromeDir, log: out });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     // Khởi tạo trang (chạy TRƯỚC mọi script của game): localStorage đạo hiệu/mã + giả lập khung chậm (slow-frame.mjs) + đột biến TEST-ONLY.
     const initSource = `
       localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)});
@@ -284,6 +264,9 @@ async function main() {
 
     // ---- Giữ phím mũi tên phải LIÊN TỤC, lấy mẫu vị trí server nhiều mốc ----
     const x0 = me.x;
+    // Đánh cờ "đã bắt đầu giữ phím" qua CDP NGAY TRƯỚC khi gửi phím — đột biến stall chỉ đếm các bước SAU cờ này (KHÔNG đếm
+    // warmup đứng yên). F KHÔNG đặt cờ trong mã game (WorldScene); kịch bản tự đặt qua CDP cho cùng kết quả đo (A + B, #1394).
+    await t.ev(`window.__kphHoldStarted = true; 1`);
     const holdStart = Date.now();
     await dispatchKey(t, K_RIGHT, "rawKeyDown"); // nhấn và GIỮ (không nhả)
     // Lấy mẫu song song với vòng tick: mỗi mốc ghi lại thời điểm + me.x thật (đọc thẳng state phòng)
@@ -294,19 +277,6 @@ async function main() {
     }
     const xEndHold = me.x;
     await dispatchKey(t, K_RIGHT, "keyUp"); // thả phím
-
-    if (process.env.E2E_KE_PHIM_DEBUG) {
-      const flagAt = await t.ev(`window.__kphHoldStarted ? "set" : "unset"`).catch(() => "?");
-      out(`  [DBG] __kphHoldStarted sau hold: ${flagAt}`);
-      let prevx = raw[0]?.x ?? x0;
-      out(`  [DBG] t(ms từ holdStart), x, dx`);
-      for (const s of raw) {
-        out(
-          `  [DBG] ${(s.t - holdStart).toFixed(0)}, ${s.x.toFixed(1)}, ${(s.x - prevx).toFixed(1)}`,
-        );
-        prevx = s.x;
-      }
-    }
 
     check(
       "Giữ phím phải: nhân vật đi sang phải (server)",
@@ -379,20 +349,17 @@ async function main() {
           `max ${maxR.toFixed(1)} vs trần ${(FAST_HI * expected).toFixed(0)} px/s`,
         );
       } else {
-        // KHUNG NHANH: khẳng định tốc độ TB TOÀN cửa sổ trong ±10% mong đợi (không theo từng interval — biên tuyệt đối theo đồng
-        // hồ thật chập chờn ở dải khung 25-50 ms, A #1394).
+        // KHUNG NHANH: khẳng định tốc độ TB TOÀN cửa sổ trong ±15% mong đợi (không theo từng interval — biên tuyệt đối theo đồng
+        // hồ thật chập chờn ở dải khung 25-50 ms, A/C #1394).
         const wLO = (1 - WINDOW_FRAC) * expected;
         const wHI = (1 + WINDOW_FRAC) * expected;
+        // Tốc độ TB TOÀN cửa sổ trong ±15% mong đợi — răng cho đột biến làm chậm/nhanh movement (kéo base ra khỏi ±15%). KHÔNG
+        // kiểm từng interval: biên tuyệt đối theo đồng hồ thật chập chờn ở dải khung 28-40 ms (A/C tái hiện đỏ ở --slow-frame 14,
+        // min 85,5 < sàn 90; --slow-frame 36: TB ~130 < ±10%) — jitter lấy mẫu ±1 tick không phải lỗi movement thật.
         check(
           "Tốc độ trung bình toàn cửa sổ ≈ mong đợi (đều, không chậm/lỡ)",
           base >= wLO && base <= wHI,
           `TB cửa sổ ${base.toFixed(1)} vs mong đợi ${expected} px/s (±${(WINDOW_FRAC * 100).toFixed(0)}%)`,
-        );
-        // Nới biên per-interval (0,6×/1,4×) để hấp thụ ±1 tick (~±23 px/s) jitter lấy mẫu; lỗi burst thật (gấp đôi) vẫn đỏ.
-        check(
-          "Mỗi interval tăng đều (không chậm/lỡ, không burst)",
-          rates.every((r) => r >= FAST_LO * expected && r <= FAST_HI * expected),
-          `min ${minR.toFixed(1)} / max ${maxR.toFixed(1)} vs biên ${(FAST_LO * expected).toFixed(0)}..${(FAST_HI * expected).toFixed(0)} px/s`,
         );
       }
     }

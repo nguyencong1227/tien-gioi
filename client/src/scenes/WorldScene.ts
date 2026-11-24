@@ -2821,11 +2821,6 @@ export class WorldScene extends Phaser.Scene {
       this.sendStops(this.stopBurst.tick(false));
       return;
     }
-    // E2E (e2e-ke-phim-dau-ban): đánh cờ "đã bắt đầu giữ phím di chuyển" NGAY TRƯỚC khi gửi input bước đầu tiên CÓ hướng đi, để
-    // đột biến đếm stall chỉ tính các bước SAU khi giữ phím — KHÔNG đếm các bước warmup khi nhân vật đứng yên (khiến đột biến hết
-    // hạn trước khi giữ phím → stall giả). Phải đặt SAU bước trả sớm "không có hướng đi" trên, nếu đặt trước sẽ bật cờ cả trong
-    // warmup (khiến bộ đếm đột biến tính cả các bước đứng yên → hết hạn sớm → stall giả). Biến toàn cục do script đột biến đọc.
-    if (!(window as any).__kphHoldStarted) (window as any).__kphHoldStarted = true;
     this.moving = true;
     const msg: InputMsg = { seq: ++this.seq, dx, dy };
     this.room.send("input", msg);
