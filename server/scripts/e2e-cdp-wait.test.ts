@@ -12,7 +12,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const MIN_WAIT_MS = 15000;
 const HELPER_MIN_WAIT_MS = 30000;
 /** Vòng `for (const start = Date.now(); Date.now() - start < N;)` hoặc `while (Date.now() - waitChromeStart < N)` chờ `/json` của CDP. */
-const LOOP = /Date\.now\(\) - (start|waitChromeStart) < (\d+)/g;
+export const LOOP = /Date\.now\(\) - (start|waitChromeStart) < (\d+)/g;
+/** Khớp dòng import helper `launchChrome` từ `./e2e-chrome`. */
+export const IMPORT_HELPER =
+  /import\s*\{[^}]*\blaunchChrome\b[^}]*\}\s*from\s*["']\.\/e2e-chrome["']/;
 
 describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694, #1432)", () => {
   const files = readdirSync(here).filter(
@@ -31,10 +34,12 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
   });
 
   for (const f of files) {
-    it(`${f}: mọi vòng chờ CDP >= ${MIN_WAIT_MS} ms (hoặc đã chuyển sang helper launchChrome)`, () => {
+    it(`${f}: dùng launchChrome (>= ${HELPER_MIN_WAIT_MS} ms, không còn vòng chép tay) hoặc có vòng chờ CDP >= ${MIN_WAIT_MS} ms`, () => {
       const src = readFileSync(path.join(here, f), "utf8");
-      if (src.includes("launchChrome(")) {
-        expect(src).toContain("launchChrome");
+      if (IMPORT_HELPER.test(src)) {
+        // Script đã chuyển sang helper: không được còn vòng chờ chép tay sót lại
+        const waits = [...src.matchAll(LOOP)].map((m) => Number(m[2]));
+        expect(waits.length, `${f} đã import launchChrome nhưng vẫn còn vòng chờ chép tay`).toBe(0);
         return;
       }
       const waits = [...src.matchAll(LOOP)].map((m) => Number(m[2]));
@@ -45,8 +50,32 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
   it("ít nhất phần lớn script có vòng chờ CDP hoặc dùng helper launchChrome (#1432)", () => {
     const withWait = files.filter((f) => {
       const src = readFileSync(path.join(here, f), "utf8");
-      return src.includes("launchChrome(") || new RegExp(LOOP.source).test(src);
+      return IMPORT_HELPER.test(src) || new RegExp(LOOP.source).test(src);
     });
     expect(withWait.length).toBeGreaterThanOrEqual(18);
+  });
+
+  it("bắt được trường hợp ngụy tạo: chỉ ghi chuỗi trong chú thích nhưng vẫn giữ vòng chờ ngắn < 15 s (#1434 review)", () => {
+    const fakeBadSrc = `
+      // kịch bản này thử dùng launchChrome( sau khi sửa
+      for (const start = Date.now(); Date.now() - start < 5000;) {}
+    `;
+    expect(IMPORT_HELPER.test(fakeBadSrc)).toBe(false);
+    const waits = [...fakeBadSrc.matchAll(LOOP)].map((m) => Number(m[2]));
+    expect(() => {
+      for (const w of waits) expect(w).toBeGreaterThanOrEqual(MIN_WAIT_MS);
+    }).toThrow();
+  });
+
+  it("bắt được trường hợp vừa import launchChrome vừa giữ vòng chờ chép tay (#1434 review)", () => {
+    const fakeMixedSrc = `
+      import { launchChrome } from "./e2e-chrome";
+      for (const start = Date.now(); Date.now() - start < 15000;) {}
+    `;
+    expect(IMPORT_HELPER.test(fakeMixedSrc)).toBe(true);
+    const waits = [...fakeMixedSrc.matchAll(LOOP)].map((m) => Number(m[2]));
+    expect(() => {
+      expect(waits.length, "vẫn còn vòng chờ chép tay").toBe(0);
+    }).toThrow();
   });
 });

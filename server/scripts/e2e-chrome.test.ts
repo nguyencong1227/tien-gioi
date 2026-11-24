@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
@@ -140,7 +140,7 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     const port = await freePort();
     const fakeScript = path.join(tmpDir, "fake-chrome-fail.js");
 
-    // Script Node giả lập: in nhiều dòng stderr rồi treo mà không bao giờ mở HTTP server
+    // Script Node giả lập: in nhiều dòng stderr rồi thoát mà không bao giờ mở HTTP server
     writeFileSync(
       fakeScript,
       `
@@ -232,6 +232,89 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     expect(allocCalled).toBe(true);
     expect(launched.cdpPort).toBe(port2);
     expect(launched.webSocketDebuggerUrl).toBe(`ws://127.0.0.1:${port2}/devtools/page/new`);
+
+    launched.kill();
+  });
+
+  it("Ca 5: Chrome giả còn sống nhưng mở cổng quá muộn (> timeoutMs) -> tiến trình 1 bị giết, tiến trình 2 thế chỗ thành công (#1434 review)", async () => {
+    const port = await freePort();
+    const fakeScript = path.join(tmpDir, "fake-chrome-hang.js");
+    const markerFile = path.join(tmpDir, "attempt-marker-hang.txt");
+    const pid1File = path.join(tmpDir, "pid1.txt");
+
+    // Lần 1: ghi pid1, giữ tiến trình sống nhưng mở cổng sau tận 3000ms (> timeoutMs 400ms).
+    // Lần 2: mở cổng ngay sau 50ms với URL khác biệt (/attempt-2).
+    writeFileSync(
+      fakeScript,
+      `
+      const fs = require("node:fs");
+      const http = require("node:http");
+      const port = Number(process.argv[2]);
+      const marker = ${JSON.stringify(markerFile)};
+      const pid1 = ${JSON.stringify(pid1File)};
+
+      if (!fs.existsSync(marker)) {
+        fs.writeFileSync(marker, "attempt-1-started");
+        fs.writeFileSync(pid1, String(process.pid));
+        setTimeout(() => {
+          const srv = http.createServer((req, res) => {
+            if (req.url === "/json") {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify([{ type: "page", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/page/attempt-1" }]));
+            }
+          });
+          srv.listen(port, "127.0.0.1");
+        }, 3000);
+        setInterval(() => {}, 1000);
+      } else {
+        setTimeout(() => {
+          const srv = http.createServer((req, res) => {
+            if (req.url === "/json") {
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify([{ type: "page", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/page/attempt-2" }]));
+            }
+          });
+          srv.listen(port, "127.0.0.1");
+        }, 50);
+        setInterval(() => {}, 1000);
+      }
+      `,
+    );
+
+    const logs: string[] = [];
+    const launched = await launchChrome({
+      cdpPort: port,
+      userDataDir: path.join(tmpDir, "user-data"),
+      executable: process.execPath,
+      customArgs: (p) => [fakeScript, String(p)],
+      timeoutMs: 400,
+      pollIntervalMs: 50,
+      log: (m) => logs.push(m),
+    });
+
+    expect(launched.diag.attempts).toBe(2);
+    // Khẳng định URL thuộc về lần 2, không phải của lần 1 trả lời chậm
+    expect(launched.webSocketDebuggerUrl).toBe(`ws://127.0.0.1:${port}/devtools/page/attempt-2`);
+    expect(logs).toContain("đã dựng lại Chrome lần 2");
+
+    // Đọc PID của lần 1 và kiểm chứng tiến trình 1 ĐÃ CHẾT sau khi bị killChrome
+    expect(existsSync(pid1File)).toBe(true);
+    const pid1 = Number(readFileSync(pid1File, "utf8").trim());
+    expect(Number.isInteger(pid1) && pid1 > 0).toBe(true);
+
+    let pid1Alive = true;
+    for (let k = 0; k < 20; k++) {
+      try {
+        process.kill(pid1, 0);
+        await new Promise((r) => setTimeout(r, 25));
+      } catch {
+        pid1Alive = false;
+        break;
+      }
+    }
+    expect(pid1Alive, `Tiến trình Chrome lần 1 (PID ${pid1}) phải bị killChrome tiêu diệt`).toBe(
+      false,
+    );
 
     launched.kill();
   });

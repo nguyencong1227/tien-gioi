@@ -117,6 +117,7 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
 
     chrome.on("exit", (code, signal) => {
       exitCode = code;
+      // exitSignal là null khi tiến trình tự thoát; khi bị kill từ ngoài qua killChrome, Node nhận tín hiệu nếu bắt được
       exitSignal = signal;
     });
 
