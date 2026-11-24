@@ -4,6 +4,9 @@
 
 ## [Chưa phát hành] — sau v0.5.5
 
+### Client
+- **Chip "Mất kết nối" không còn bị nuốt khi mạng đứng ngay sau một patch trong lúc ping chờ pong** (B; `Refs #1403`; lỗi THẬT của client, không phải test chập chờn: `e2e:nhip-tim` Ca 6 đỏ 2 / 2 lần khi chạy `CI=true taskset -c 0` trên `main`, đỏ cùng ca với E2E hằng đêm 23/11). Nhịp tim chỉ giữ MỘT ping chờ pong (không gửi ping mới khi chưa có pong); nếu ping đi, một patch state về, rồi đường mạng đứng ngay (pong bị nuốt) thì `NetSlowDetector.noteInbound()` đã xoá mốc chờ mà không còn `noteSend` nào đặt lại, nên chip không bao giờ hiện, chỉ còn banner nối lại ở giây 8. Nay `NetSlowMonitor` nhớ "còn ping chờ pong" và khi patch về trong lúc đó thì đếm lại thời gian chờ từ lúc patch (`noteInbound(stillExpectingAt)`): chip hiện sau `SLOW_AFTER_MS` kể từ patch cuối nếu pong vẫn không về; patch về đều thì không báo; pong về thì hết chờ, phòng lặng im vẫn không báo. 2 ca đơn vị mới ở `net-slow.test.ts` (ca 1 đỏ trên mã cũ), đột biến 3 loại đỏ; `e2e:nhip-tim` 7 / 7 đạt 3 / 3 lần ở 1 lõi sau khi sửa. Người chơi: mạng đứng đột ngột thấy dải báo sớm hơn ~6 giây trong ca hẹp này.
+
 ## [0.5.5] — 24/11/2026: +17 CHIÊU mới (61 -> 78: Thủy, Âm, Băng, Lôi, vô sắc), hai sách độc Trúc Cơ rơi từ Xích Mãng, hết toast đè bảng thưởng, tiêu đề bảng ở điện thoại không còn cụt, bỏ tên môn phái của nguồn khỏi mô tả chiêu / ví dụ (chặn đường, trùm thế giới và gói tài nguyên riêng vẫn TẮT)
 
 Bản vá theo QUYET_DINH_M3 mục 72 (người dùng 24/11 23:52: "phát hành v0.5.5"; quy trình mục 65 / mục 58; gom hai sửa client chờ từ 23/11 là #1370 và #1373). Không đổi giao thức (`PROTOCOL_VERSION` giữ 6: `git diff v0.5.4..main -- shared/src/protocol.ts` RỖNG), không đổi định dạng lưu (`store.ts` / `soul.ts` / `sect-store.ts` / `account-store.ts` / `pg` RỖNG, nên rollback về v0.5.4 an toàn), không quái / cảnh giới mới (`game.ts` / `realms.ts` RỖNG), bản thật giữ `WORLD_BOSS` và `AMBUSH` TẮT, không APK mới.
