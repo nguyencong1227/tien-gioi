@@ -29,14 +29,35 @@ export function checkScriptSource(name: string, src: string): void {
   expect(waits.length, `${name} đã import launchChrome nhưng vẫn còn vòng chờ chép tay`).toBe(0);
 }
 
+/**
+ * Ba tệp duy nhất trong họ kịch bản E2E không tự khởi chạy Chrome trực tiếp (#1432, #1440 review B):
+ * - `e2e-chrome.ts`: nơi định nghĩa helper `launchChrome`, không tự import chính nó.
+ * - `e2e-kit.ts`: thư viện hàm phụ trợ dùng chung (`listenWithRetry`, `killChrome`, `removeTmpDirs`...), không dựng Chrome.
+ * - `e2e-all.ts`: bộ điều phối chạy tuần tự các kịch bản qua spawn child process `tsx`, không mở Chrome trực tiếp.
+ */
+export const EXCLUDED_E2E_FILES = new Map<string, string>([
+  ["e2e-chrome.ts", "nơi định nghĩa helper launchChrome, không tự import chính nó"],
+  ["e2e-kit.ts", "thư viện hàm phụ trợ (killChrome, listenWithRetry...), không dựng Chrome"],
+  ["e2e-all.ts", "bộ điều phối chạy tuần tự các kịch bản qua child process, không dựng Chrome"],
+]);
+
 describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694, #1432)", () => {
-  const EXCLUDED = new Set(["e2e-chrome.ts", "e2e-kit.ts", "e2e-all.ts"]);
   const files = readdirSync(here).filter(
-    (f) => /^e2e.*\.ts$/.test(f) && !f.endsWith(".test.ts") && !EXCLUDED.has(f),
+    (f) =>
+      ((/^e2e.*\.ts$/.test(f) && !f.endsWith(".test.ts")) || f === "shot-layout.ts") &&
+      !EXCLUDED_E2E_FILES.has(f),
   );
 
-  it("có script E2E để kiểm (tất cả 30 kịch bản ngoài danh sách loại trừ)", () => {
-    expect(files.length).toBeGreaterThanOrEqual(30);
+  it("danh sách loại trừ EXCLUDED_E2E_FILES chỉ gồm đúng 3 tệp không dựng Chrome (#1440 review B)", () => {
+    expect([...EXCLUDED_E2E_FILES.keys()].sort()).toEqual([
+      "e2e-all.ts",
+      "e2e-chrome.ts",
+      "e2e-kit.ts",
+    ]);
+  });
+
+  it("có đủ 31 kịch bản E2E để kiểm (30 script e2e-*.ts + shot-layout.ts)", () => {
+    expect(files.length).toBeGreaterThanOrEqual(31);
   });
 
   it(`helper e2e-chrome.ts có hạn chờ mặc định >= ${HELPER_MIN_WAIT_MS} ms (#1432)`, () => {
@@ -60,6 +81,16 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
         true,
       );
     }
+  });
+
+  it("bắt được trường hợp kịch bản mới ngoài danh sách loại trừ nhưng không import launchChrome (#1434, #1440 review B)", () => {
+    const fakeNewScriptSrc = `
+      // kịch bản e2e mới mở PR nhưng chưa chuyển sang launchChrome
+      const chrome = spawn("google-chrome", ["--headless=new"]);
+    `;
+    expect(() => checkScriptSource("e2e-moi-chua-dung-helper.ts", fakeNewScriptSrc)).toThrow(
+      /bắt buộc phải import launchChrome/,
+    );
   });
 
   it("bắt được trường hợp chép tay: chưa import helper launchChrome dù có vòng chờ dài hay ngắn (#1434 review)", () => {
