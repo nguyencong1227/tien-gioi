@@ -182,13 +182,16 @@ async function walkWithoutDrops(stall?: { stallAt: number; stallMs: number }) {
 }
 
 /** Chờ máy chủ xử lý xong hàng đợi, trả { x đã đi, thời gian (ms) tới lúc đứng yên hẳn }. */
+/** Thời gian đứng yên chờ trong `settle` sau khi hàng đợi rỗng (để kiểm không đi thêm): KHÔNG tính vào thời gian chuyển động. */
+const SETTLE_QUIET_MS = 4 * TICK_MS;
+
 async function settle(room: Room, x0: number) {
   const t0 = Date.now();
   const ctrl = ctrlOf(room);
   await waitFor(() => ctrl.inputs.length === 0, 3000, "máy chủ xử lý hết hàng đợi");
   const done = Date.now() - t0;
   const x1 = serverPlayer(room).x;
-  await sleep(4 * TICK_MS); // không còn đi thêm sau khi hàng đợi rỗng
+  await sleep(SETTLE_QUIET_MS); // không còn đi thêm sau khi hàng đợi rỗng
   expect(serverPlayer(room).x).toBe(x1);
   return { moved: x1 - x0, ms: done };
 }
@@ -226,7 +229,9 @@ describe("mạng đứng rồi xả dồn, nhả phím (phòng thật)", () => {
     // chờ TIN CUỐI được áp (hàng đợi có thể rỗng tạm thời khi các tin còn đang tới qua WebSocket)
     await waitFor(() => p.lastSeq === last, 3000, "máy chủ áp tới input cuối (seq 60)");
     const { moved } = await settle(room, x0);
-    const ms = Date.now() - t0;
+    // Chỉ tính thời gian CHUYỂN ĐỘNG: bỏ phần đứng yên cố định `settle` chờ ở cuối. Trước đây đo cả 200 ms đó nên chỉ còn ~100 ms dư
+    // (đo thật 475-529 ms so với trần 550; CI chậm ra 553 => đỏ giả, 24/11). Giờ ~280 ms so với trần 550; vẫn bắt "trôi 3 giây".
+    const ms = Date.now() - t0 - SETTLE_QUIET_MS;
     expect(moved).toBeGreaterThan(0);
     expect(moved).toBeLessThanOrEqual((10 + MAX_INPUT_BACKLOG + 1) * 7.5 + 1e-6);
     expect(ms).toBeLessThanOrEqual((MAX_INPUT_BACKLOG + 2) * TICK_MS + 200);
