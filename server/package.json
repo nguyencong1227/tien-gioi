@@ -2,7 +2,7 @@
   "name": "@tien-gioi/server",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
