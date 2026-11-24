@@ -17,6 +17,19 @@ from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+_spec = importlib.util.spec_from_file_location("ma_co_dinh", os.path.join(HERE, "ma-co-dinh.py"))
+MA = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
+MA_PATH = os.path.join(ROOT, "docs/art/huong-moi/ma-co-dinh.json")
+CODES = None  # bảng mã đã nạp (main() đặt; mã gọi trực tiếp thì `codes()` nạp từ MA_PATH)
+NEW_TAG = " · MỚI (sau 23/11)"  # đánh dấu hàng có mã vượt mốc đóng băng
+
+
+def codes():
+    global CODES
+    if CODES is None:
+        CODES = MA.load(MA_PATH)
+    return CODES
 NINJA = "/mnt/data/assets-src/ninja-adventure"
 XIAN = "/mnt/data/assets-work/b-duyet/xianxia/Xianxia_Pixel_Pack"
 WUXIA = "/mnt/data/assets-private/work/wuxia-rts/Wuxia_RTS_Pixel_Lite_v1.0"
@@ -471,6 +484,8 @@ def group_trum(L, names):
     return "13-trum", "Nhóm 13 — Trùm (T): thẻ trùm bằng ảnh AI SDXL giữ nguyên, đây chỉ là THÂN trên bản đồ", rows
 
 
+ELEMENT_ORDER = ("kim", "moc", "thuy", "hoa", "tho", "bang", "phong", "loi", "am", "none")  # thứ tự các tờ nhóm 15
+
 HU_BY_SHAPE = {  # hình chiêu -> hiệu ứng Xianxia hợp hình (anchor: left = tia bắn từ tay, center, bottom = đặt dưới chân)
     "line": "xf_sword_qi", "bolt": "xf_sword_qi", "chain": "xf_sword_rain", "cone": "xf_moon_arc", "fan": "xf_sword_rain", "nova": "xf_bgan_halo",
     "dash": "xf_flying_sword", "self": "xf_bell_ward", "aura": "xf_pill_light", "totem": "xf_array_seal", "trap": "xf_talisman",
@@ -483,16 +498,19 @@ HU_BY_ELEMENT = {  # hệ -> hiệu ứng đặc trưng của hệ
 
 
 def group_hu(L, names):
-    """Hiệu ứng chiêu: một tờ MỖI HỆ (10 tờ). A = theo HÌNH chiêu, B = theo HỆ (cùng tô màu hệ), C = vệt chém Wuxia (chỉ chiêu chém / tia)."""
+    """Hiệu ứng chiêu: một tờ MỖI HỆ (10 tờ). A = theo HÌNH chiêu, B = theo HỆ (cùng tô màu hệ), C = vệt chém Wuxia (chỉ chiêu chém / tia).
+    Mã HU lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (mã 23/11 giữ nguyên, chiêu mới nhận số ở CUỐI): trong tờ mỗi hệ, hàng cũ theo thứ tự mã trước, hàng MỚI (đánh dấu `NEW_TAG`) sau."""
+    t = codes()
     by_el = {}
     for sk in names["skills"]:
         by_el.setdefault(sk["element"], []).append(sk)
+    order = [sk for el in ELEMENT_ORDER for sk in by_el.get(el, [])]
+    num = MA.assign_codes(t["hu"], [sk["id"] for sk in order])
     sheets = []
-    n = 0
-    for el in ("kim", "moc", "thuy", "hoa", "tho", "bang", "phong", "loi", "am", "none"):
+    for el in ELEMENT_ORDER:
         rows = []
-        for sk in by_el.get(el, []):
-            n += 1
+        for sk in sorted(by_el.get(el, []), key=lambda sk: num[sk["id"]]):
+            n = num[sk["id"]]
             fa, fb = HU_BY_SHAPE.get(sk["shape"], "xf_taiji"), HU_BY_ELEMENT[el]
             slash = sk["shape"] in ("cone", "line", "bolt", "dash")
             same = fa == fb
@@ -500,7 +518,8 @@ def group_hu(L, names):
             b = Cell("B", "xian", [], "", 56) if same else cell(L, "B", "xian", lambda f=fb, e=el: L.xian_fx(f, e), f"{fb[3:]} (theo hệ)", 56)
             c = cell(L, "C", "wuxia", lambda: L.wuxia_slash(), "vệt chém Blade_Slash (64 px)", 40) if slash else Cell("C", "wuxia", [], "", 56)
             cur = cell(L, "", "cur", lambda s=sk: L.cur(f"item-kinh_{s['id']}"), "icon kinh quyển; hiệu ứng vẽ bằng mã", 24)
-            rows.append(dict(code=f"HU-{n:02d}", name=f"{sk['name']} ({ELEMENT_NAME[el]}, {sk['shape']})", rec="A (hợp hình); B nếu muốn nét riêng của hệ", cur=cur, opts=[a, b, c]))
+            name = f"{sk['name']} ({ELEMENT_NAME[el]}, {sk['shape']})" + (NEW_TAG if MA.is_new(t, "hu", n) else "")
+            rows.append(dict(code=MA.label("hu", n), name=name, rec="A (hợp hình); B nếu muốn nét riêng của hệ", cur=cur, opts=[a, b, c]))
         if rows:
             sheets.append((f"15-hieu-ung-chieu-{el}", f"Nhóm 15 — Hiệu ứng chiêu, hệ {ELEMENT_NAME[el]} (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ", rows))
     return sheets
@@ -650,7 +669,7 @@ def _xslider(X):
     return [sl, _fit_h(X("ui_xianxia_01_check_off.png"), 30), _fit_h(X("ui_xianxia_01_check_on.png"), 30)]
 
 
-# Vật phẩm (nhóm 14, 126 món): mã VP-001..126 LIÊN TỤC theo thứ tự đan / phù, kinh quyển, trang bị, nguyên liệu; chia thành các tờ <= VP_SHEET_ROWS hàng (một tờ 126 hàng cao ~24k px khó duyệt).
+# Vật phẩm (nhóm 14): mã VP lấy từ bảng ỔN ĐỊNH ma-co-dinh.json (đan / phù, kinh quyển, trang bị, nguyên liệu; mã mới ở CUỐI, tờ `-moi`); chia thành các tờ <= VP_SHEET_ROWS hàng (một tờ 126 hàng cao ~24k px khó duyệt).
 # Phương án A / B CHỈ nguồn công khai (atlas + Xianxia CC0 + Ninja CC0); phương án C = icon HOANTDZ (gói RIÊNG, che trên tờ công khai). Chỉ đề xuất hình HỢP NGHĨA (kiếm -> kiếm, phù -> bùa, đan -> bình đan, sách -> ngọc giản);
 # loại gói không có (áo, giày, nguyên liệu quái) để TRỐNG, khuyến nghị giữ hiện tại, thay vì nhét hũ / hòm cho đủ ô.
 VP_SHEET_ROWS = 30
@@ -743,27 +762,42 @@ def vp_row(L, code, it, nth=0):
 
 
 def group_vp(L, names):
-    """Vật phẩm: các tờ `14-vat-pham-<nhóm>[-<n>]` (<= `VP_SHEET_ROWS` hàng mỗi tờ), mã VP-001..126 liên tục theo thứ tự nhóm."""
+    """Vật phẩm: các tờ `14-vat-pham-<nhóm>[-<n>]` (<= `VP_SHEET_ROWS` hàng mỗi tờ). Mã VP lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (mã đã giao người dùng 23/11 giữ nguyên;
+    vật phẩm mới nhận số ở CUỐI): tờ CŨ dựng y như 23/11 (cùng hàng, cùng cách chia tờ), vật phẩm mới nằm ở tờ `-moi` riêng, hàng đánh dấu `NEW_TAG`."""
+    t = codes()
     items = names["items"]
     by = {g: [it for it in items if vp_group_of(it) == g] for g, _ in VP_GROUPS}
     by["trang-bi"].sort(key=lambda it: (it["rarity"], it["name"]))  # phẩm thấp -> cao
-    sheets, n = [], 0
-    seen = {}  # (loại, phẩm) -> số vật phẩm đã gặp: `nth` xoay vòng giữa các họ icon của gói C (tất định, mỗi món một họ khác)
+    order = [it for g, _ in VP_GROUPS for it in by[g]]
+    num = MA.assign_codes(t["vp"], [it["id"] for it in order])
+    # `nth` xoay vòng giữa các họ icon của gói C: tính theo THỨ TỰ MÃ (mã cũ như 23/11 trước, mã mới sau) để hàng cũ không đổi hình khi có hàng mới chèn vào nhóm
+    seen = {}  # (loại, phẩm) -> số vật phẩm đã gặp
+    row_of = {}
+    for it in sorted(order, key=lambda it: num[it["id"]]):
+        key = (it["type"], vp_equip_kind(it["name"]) if it["type"] == "equip" else it["id"].startswith("phu_"), it["rarity"])
+        nth = seen.get(key, 0)
+        seen[key] = nth + 1
+        n = num[it["id"]]
+        r = vp_row(L, MA.label("vp", n), it, nth)
+        if MA.is_new(t, "vp", n):
+            r["name"] += NEW_TAG
+        row_of[it["id"]] = r
+    sheets = []
     for g, label in VP_GROUPS:
-        rows = []
-        for it in by[g]:
-            n += 1
-            key = (it["type"], vp_equip_kind(it["name"]) if it["type"] == "equip" else it["id"].startswith("phu_"), it["rarity"])
-            nth = seen.get(key, 0)
-            seen[key] = nth + 1
-            rows.append(vp_row(L, f"VP-{n:03d}", it, nth))
-        parts_n = max(1, -(-len(rows) // VP_SHEET_ROWS))  # số tờ = trần chia; chia ĐỀU để không có tờ chỉ vài hàng
-        size = -(-len(rows) // parts_n)
-        chunks = [rows[i : i + size] for i in range(0, len(rows), size)]
-        for k, ch in enumerate(chunks, 1):
-            suffix = f"-{k}" if len(chunks) > 1 else ""
-            part = f" (tờ {k}/{len(chunks)})" if len(chunks) > 1 else ""
-            sheets.append((f"14-vat-pham-{g}{suffix}", f"Nhóm 14 — Vật phẩm (VP), {label}{part}: {ch[0]['code']} .. {ch[-1]['code']}", ch))
+        mine = sorted(by[g], key=lambda it: num[it["id"]])
+        old_rows = [row_of[it["id"]] for it in mine if not MA.is_new(t, "vp", num[it["id"]])]
+        new_rows = [row_of[it["id"]] for it in mine if MA.is_new(t, "vp", num[it["id"]])]
+        for slug, rows, what in (("", old_rows, ""), ("-moi", new_rows, " — MỚI sau 23/11")):
+            if not rows:
+                continue
+            parts_n = max(1, -(-len(rows) // VP_SHEET_ROWS))  # số tờ = trần chia; chia ĐỀU để không có tờ chỉ vài hàng
+            size = -(-len(rows) // parts_n)
+            chunks = [rows[i : i + size] for i in range(0, len(rows), size)]
+            for k, ch in enumerate(chunks, 1):
+                suffix = f"-{k}" if len(chunks) > 1 else ""
+                part = f" (tờ {k}/{len(chunks)})" if len(chunks) > 1 else ""
+                span = f"{ch[0]['code']} .. {ch[-1]['code']}"
+                sheets.append((f"14-vat-pham-{g}{slug}{suffix}", f"Nhóm 14 — Vật phẩm (VP), {label}{what}{part}: {span}", ch))
     return sheets
 
 
@@ -878,8 +912,13 @@ def main():
     ap.add_argument("--private", default="/mnt/data/assets-private/preview")
     ap.add_argument("--names", default=None, help="JSON {npcs:[{id,name,title}], mons:[{id,name,boss}]}; bỏ trống = tự chạy `npx tsx client/scripts/art/xuat-doi-tuong.ts`")
     ap.add_argument("--md", default=None, help="ghi các bảng markdown của các nhóm đã dựng vào tệp này (nối vào cuối)")
+    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
+    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
     a = ap.parse_args()
     import json
+
+    global CODES
+    CODES = MA.load(a.ma)
 
     if a.names:
         names = json.load(open(a.names, encoding="utf8"))
@@ -905,6 +944,14 @@ def main():
         built[g] = "\n".join(md_for(cg, t, r) for cg, t, r in sheets)
     if a.md:
         upsert_md(a.md, built)
+    if a.ghi_ma:
+        t = CODES
+        if "14" in built:
+            t = MA.extended(t, "vp", MA.assign_codes(t["vp"], [it["id"] for g, _ in VP_GROUPS for it in names["items"] if vp_group_of(it) == g]))
+        if "15" in built:
+            t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for el in ELEMENT_ORDER for sk in names["skills"] if sk["element"] == el]))
+        MA.save(a.ma, t)
+        print(f"ĐÃ GHI bảng mã: VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
 
 
 if __name__ == "__main__":

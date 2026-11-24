@@ -1,6 +1,7 @@
 // Bảng duyệt đồ hoạ từng phần (`dung-bang-duyet.py`, QUYET_DINH_M3 mục 67.2 / 69, issue #1330). Điều QUAN TRỌNG nhất là ranh giới GIẤY PHÉP: tờ ảnh CÔNG KHAI (vào repo) KHÔNG được chứa
 // hình của gói cấm phân phối lại (Wuxia RTS, Sunnyside, Cainos). Phần đọc mã chạy ở mọi máy; phần dựng thật cần Pillow + các gói ở /mnt/data (máy chủ chung có, CI không): thiếu thì bỏ qua.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -61,8 +62,12 @@ describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu
     const blk = /<!-- NHOM 14 -->([\s\S]*?)<!-- \/NHOM 14 -->/.exec(doc);
     expect(blk, "thiếu khối NHOM 14").toBeTruthy();
     const codes = [...blk![1].matchAll(/^\| (VP-\d{3}) \|/gm)].map((m) => m[1]);
-    expect(codes).toHaveLength(ITEMS.length);
-    expect(codes).toEqual(ITEMS.map((_, i) => `VP-${String(i + 1).padStart(3, "0")}`));
+    // Mã VP lấy từ bảng ỔN ĐỊNH (ma-co-dinh.json) chứ KHÔNG còn là VP-001.. theo thứ tự ITEMS: tờ có thể THIẾU vật phẩm mới thêm sau lần dựng lại cuối (PR nội dung không dựng
+    // lại tờ), nhưng mỗi mã đúng MỘT hàng, các mã liên tục 001..K, và K không vượt số vật phẩm.
+    expect(new Set(codes).size, "mã VP lặp").toBe(codes.length);
+    expect(codes.length).toBeGreaterThanOrEqual(128);
+    expect(codes.length).toBeLessThanOrEqual(ITEMS.length);
+    expect([...codes].sort()).toEqual(codes.map((_, i) => `VP-${String(i + 1).padStart(3, "0")}`));
     const sheets = [...blk![1].matchAll(/`(14-vat-pham-[a-z-]+\d?)\.png`/g)].map((m) => m[1]);
     expect(new Set(sheets).size).toBeGreaterThanOrEqual(4);
     for (const f of new Set(sheets))
@@ -83,6 +88,190 @@ describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu
     const inC = body.match(/Cell\("C", "hicon"/g)?.length ?? 0;
     expect(all).toBeGreaterThan(2);
     expect(inC).toBe(all);
+  });
+});
+
+// Mã ỔN ĐỊNH (A chốt 25/11): mã VP / HU của tờ người dùng đã nhận ngày 23/11 13:00 +0700 (commit dd32ff1b: VP-001..128, HU-01..59) KHÔNG BAO GIỜ đổi; vật phẩm / chiêu thêm sau nhận số ở CUỐI.
+// Mô-đun `ma-co-dinh.py` thuần (không Pillow) nên chạy ở mọi máy có python3, kể cả CI.
+const hasPython = spawnSync("python3", ["-I", "-c", "pass"], { encoding: "utf8" }).status === 0;
+const MA_FILE = path.join(here, "ma-co-dinh.py");
+const MA_JSON = path.join(here, "..", "..", "..", "docs/art/huong-moi/ma-co-dinh.json");
+const DONG_BANG = { vp: 128, hu: 59 };
+/** sha256 của các dòng `vp:<id>=<số>` rồi `hu:<id>=<số>` (số tăng dần) của phần ĐÃ ĐÓNG BĂNG; sửa một mã đã giao người dùng là đỏ. */
+const DONG_BANG_SHA256 = "ac64cbf5272abeeb19a3e75e2a0fd9620a3a2d91a860047b518044b86421a83c";
+
+type MaTable = {
+  dong_bang: { commit: string; vp_toi_da: number; hu_toi_da: number };
+  mo_coi: Record<string, string>;
+  vp: Record<string, number>;
+  hu: Record<string, number>;
+};
+const maTable = (): MaTable => JSON.parse(fs.readFileSync(MA_JSON, "utf8")) as MaTable;
+/** Chạy một đoạn python với mô-đun mã nạp sẵn là `MA`; nhận / trả JSON. */
+function ma(code: string, input: unknown = null) {
+  const r = spawnSync(
+    "python3",
+    [
+      "-I",
+      "-c",
+      `import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("ma", ${JSON.stringify(MA_FILE)})
+MA = importlib.util.module_from_spec(spec); spec.loader.exec_module(MA)
+inp = json.load(sys.stdin)
+${code}`,
+    ],
+    { input: JSON.stringify(input), encoding: "utf8" },
+  );
+  return { status: r.status, out: String(r.stdout), err: String(r.stderr) };
+}
+
+describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.json)", () => {
+  const repo = path.join(here, "..", "..", "..");
+
+  it("phần ĐÃ ĐÓNG BĂNG (tờ 23/11 dd32ff1b: VP-001..128, HU-01..59) giữ nguyên từng id -> số", () => {
+    const t = maTable();
+    expect(t.dong_bang).toMatchObject({
+      commit: "dd32ff1b",
+      vp_toi_da: DONG_BANG.vp,
+      hu_toi_da: DONG_BANG.hu,
+    });
+    const frozen = (kind: "vp" | "hu", max: number) =>
+      Object.entries(t[kind])
+        .filter(([, n]) => n <= max)
+        .sort((a, b) => a[1] - b[1])
+        .map(([id, n]) => `${kind}:${id}=${n}`);
+    const lines = [...frozen("vp", DONG_BANG.vp), ...frozen("hu", DONG_BANG.hu)];
+    expect(lines).toHaveLength(DONG_BANG.vp + DONG_BANG.hu);
+    expect(createHash("sha256").update(lines.join("\n")).digest("hex")).toBe(DONG_BANG_SHA256);
+  });
+
+  it("bảng hợp lệ: số liên tục 1..K, không trùng số / id; mọi id còn khớp vật phẩm / chiêu (id không còn khớp phải khai trong mo_coi)", () => {
+    const t = maTable();
+    const itemIds = new Set(ITEMS.map((i) => i.id));
+    const skillIds = new Set(LEARNABLE_SKILLS.map((k) => k.id));
+    for (const [kind, known] of [
+      ["vp", itemIds],
+      ["hu", skillIds],
+    ] as const) {
+      const nums = Object.values(t[kind]).sort((a, b) => a - b);
+      expect(nums, `${kind}: số liên tục từ 1`).toEqual(nums.map((_, i) => i + 1));
+      const orphan = Object.keys(t[kind]).filter((id) => !known.has(id));
+      for (const id of orphan)
+        expect(
+          t.mo_coi[`${kind}:${id}`],
+          `${kind}:${id} không còn khớp: khai trong mo_coi (số không dùng lại)`,
+        ).toBeTruthy();
+    }
+  });
+
+  it("mã VP / HU trong DUYET_TUNG_PHAN.md khớp bảng (cùng số = cùng vật phẩm / chiêu), nên tờ không bao giờ đổi nghĩa mã", () => {
+    const t = maTable();
+    const doc = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+    const byNum = (kind: "vp" | "hu") =>
+      new Map(Object.entries(t[kind]).map(([id, n]) => [n, id] as const));
+    const vpId = byNum("vp");
+    const huId = byNum("hu");
+    const items = new Map(ITEMS.map((i) => [i.id, i.name] as const));
+    const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
+    let vpRows = 0;
+    let huRows = 0;
+    for (const m of doc.matchAll(/^\| (VP|HU)-(\d+) \| ([^|]*?) \|/gm)) {
+      const n = Number(m[2]);
+      const shown = m[3].replace(/ · MỚI \(sau 23\/11\)$/, "");
+      if (m[1] === "VP") {
+        vpRows++;
+        expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
+      } else {
+        huRows++;
+        expect(shown.startsWith(`${skills.get(huId.get(n) ?? "")} (`), `HU-${m[2]}: ${shown}`).toBe(
+          true,
+        );
+      }
+    }
+    expect(vpRows).toBeGreaterThanOrEqual(DONG_BANG.vp);
+    expect(huRows).toBeGreaterThanOrEqual(DONG_BANG.hu);
+  });
+
+  it.skipIf(!hasPython)(
+    "assign_codes: id cũ giữ số, id mới nhận số Ở CUỐI dù chèn GIỮA danh sách",
+    () => {
+      const r = ma(`print(json.dumps(MA.assign_codes(inp["t"], inp["ids"])))`, {
+        t: { a: 1, b: 2 },
+        ids: ["x", "a", "y", "b", "z"],
+      });
+      expect(r.status, r.err).toBe(0);
+      expect(JSON.parse(r.out)).toEqual({ x: 3, a: 1, y: 4, b: 2, z: 5 });
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "assign_codes: số của id MỒ CÔI (đã xoá / đổi id) không bao giờ cấp lại; id lặp là lỗi",
+    () => {
+      const orphan = ma(
+        `print(json.dumps(MA.assign_codes(inp["t"], inp["ids"])))`,
+        { t: { a: 1, b: 2, c: 3 }, ids: ["a", "b", "z"] }, // c bị xoá
+      );
+      expect(orphan.status, orphan.err).toBe(0);
+      expect(JSON.parse(orphan.out)).toEqual({ a: 1, b: 2, z: 4 });
+      const dup = ma(`MA.assign_codes(inp["t"], inp["ids"])`, { t: { a: 1 }, ids: ["a", "a"] });
+      expect(dup.status).not.toBe(0);
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "is_new / label / extended: mốc đóng băng, định dạng mã, không đổi bảng gốc",
+    () => {
+      const tbl = { dong_bang: { vp_toi_da: 128, hu_toi_da: 59 }, vp: { a: 1 }, hu: { b: 1 } };
+      const r = ma(
+        `t = inp
+e = MA.extended(t, "vp", {"n": 129})
+print(json.dumps([MA.is_new(t, "vp", 128), MA.is_new(t, "vp", 129), MA.is_new(t, "hu", 59), MA.is_new(t, "hu", 60), MA.label("vp", 7), MA.label("hu", 7), e["vp"], t["vp"]]))`,
+        tbl,
+      );
+      expect(r.status, r.err).toBe(0);
+      expect(JSON.parse(r.out)).toEqual([
+        false,
+        true,
+        false,
+        true,
+        "VP-007",
+        "HU-07",
+        { a: 1, n: 129 },
+        { a: 1 },
+      ]);
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "load: bảng trùng số, số không hợp lệ hay thiếu khoá là lỗi (không nuốt lặng)",
+    () => {
+      const base = { dong_bang: {}, vp: {}, hu: {} };
+      const bad: unknown[] = [
+        { ...base, vp: { a: 1, b: 1 } },
+        { ...base, hu: { a: 0 } },
+        { ...base, hu: { a: "1" } },
+        { dong_bang: {}, vp: {} },
+      ];
+      for (const b of bad) {
+        const r = ma(
+          `import tempfile, os
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf8"); json.dump(inp, f); f.close()
+try:
+    MA.load(f.name)
+finally:
+    os.unlink(f.name)`,
+          b,
+        );
+        expect(r.status, JSON.stringify(b)).not.toBe(0);
+      }
+    },
+  );
+
+  it("generator CHỈ đọc bảng: không còn bộ đếm n tuần tự gán mã VP / HU", () => {
+    expect(code).not.toMatch(/f"VP-\{n:03d\}"/);
+    expect(code).not.toMatch(/f"HU-\{n:02d\}"/);
+    expect(code).toMatch(/MA\.assign_codes\(t\["vp"\]/);
+    expect(code).toMatch(/MA\.assign_codes\(t\["hu"\]/);
   });
 });
 
@@ -311,18 +500,23 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     expect(a.equals(b), "gói riêng lọt ra tờ công khai").toBe(false);
   });
 
-  it("MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ)", () => {
-    const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
-    const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
-    expect(sheets.length).toBeGreaterThanOrEqual(22); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16) + 1 (nhóm 17)
-    for (const f of sheets) {
-      const inRepo = fs.readFileSync(path.join(repoDir, f));
-      expect(
-        inRepo.equals(fs.readFileSync(path.join(pub, f))),
-        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16,17 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
-      ).toBe(true);
-    }
-  });
+  // CHỈ chạy khi DUYET_KIEM=1 (A, 25/11): tờ trong repo CỐ Ý đóng băng trong lúc người dùng duyệt (PR nội dung KHÔNG dựng lại tờ; B dựng lại MỘT LẦN lúc duyệt), nên so khớp
+  // mặc định sẽ đỏ ở mọi PR thêm vật phẩm / chiêu. Chạy trước khi duyệt / sau khi đổi bố cục công cụ: `DUYET_KIEM=1 npx vitest run client/scripts/art/dung-bang-duyet.test.ts`.
+  it.skipIf(process.env.DUYET_KIEM !== "1")(
+    "MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ; chỉ chạy khi DUYET_KIEM=1)",
+    () => {
+      const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
+      const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
+      expect(sheets.length).toBeGreaterThanOrEqual(22); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16) + 1 (nhóm 17)
+      for (const f of sheets) {
+        const inRepo = fs.readFileSync(path.join(repoDir, f));
+        expect(
+          inRepo.equals(fs.readFileSync(path.join(pub, f))),
+          `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16,17 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
+        ).toBe(true);
+      }
+    },
+  );
 
   it("nhóm 14 (vật phẩm): từ sáu tờ trở lên, mỗi tờ <= 30 hàng, tổng đúng số vật phẩm; ô C (icon HOANTDZ, gói riêng) có ở mọi tờ có món hợp, tờ công khai KHÁC tờ đầy đủ đúng khi có ô riêng", () => {
     const out = String(run.stdout);
