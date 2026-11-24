@@ -132,6 +132,10 @@ export const EXCLUDED_VIOLATION_FUNCS: ReadonlyArray<{ func: string; why: string
     func: "glossaryViolations",
     why: "nhận MỘT chuỗi văn bản (text: string), KHÔNG có bảng dữ liệu cố định để gọi; quét chữ hiển thị toàn bộ nội dung là Phần 3 #1200 (cần hàm gom chữ từ mọi bảng display, thêm vào CHECKS khi có); hiện chỉ test shared/src/glossary.test.ts gọi với chữ thoại/hiển thị chọn lọc",
   },
+  {
+    func: "bannedViolations",
+    why: "nhận MỘT chuỗi văn bản (text: string — từ cấm: tên riêng truyện khác + từ hiện đại), KHÔNG có bảng dữ liệu cố định để gọi; Phạm vi áp DỤNG chỉ chữ hiển thị GAME (KHÔNG docs/test/credits — tránh dương tính giả), nên quét toàn bộ nội dung là Phần 3 #1200 do Dev F nối (cần hàm gom chữ hiển thị); hiện chỉ test shared/src/glossary-banned.test.ts gọi với chữ thoại/mô tả chọn lọc + chéo dữ liệu thật",
+  },
 ];
 
 export interface CheckResult {

@@ -65,7 +65,15 @@ describe("client không dùng tên nhân vật của truyện khác", () => {
 
   it("không tệp nào trong client/ (src, scripts, index.html, public), server/src, server/scripts, shared/src chứa tên bị cấm", () => {
     const self = join(CLIENT_ROOT, "src", "no-foreign-names.test.ts");
-    const files = SCAN_ROOTS.flatMap((r) => walk(r)).filter((f) => f !== self);
+    // Các tệp CHÍNH thức liệt kê tên cấm (glossary-banned.ts của #1199 + test của nó) PHẢI nhắc đến tên ngoại lai để cấm / kiểm
+    // chúng — giống lý do trừ chính test này. Mọi tệp KHÁC vẫn bị quét; tránh dương tính giả chứ KHÔNG nới lỏng kiểm.
+    const bannedNameLists = [
+      join(REPO_ROOT, "shared", "src", "glossary-banned.ts"),
+      join(REPO_ROOT, "shared", "src", "glossary-banned.test.ts"),
+    ];
+    const files = SCAN_ROOTS.flatMap((r) => walk(r)).filter(
+      (f) => f !== self && !bannedNameLists.includes(f),
+    );
     expect(files.length).toBeGreaterThan(300); // quét thật, không quét hụt thư mục (~700 tệp: client, server, shared)
     const hits: string[] = [];
     for (const f of files) {
