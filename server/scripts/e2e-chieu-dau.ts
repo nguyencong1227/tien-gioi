@@ -9,7 +9,7 @@
 // Ảnh: đặt `E2E_SHOTS=<thư mục>`. Thoát 0 khi đạt, 1 khi sai. Không ghi vào `server/data/players` thật.
 //
 // Chạy: `npm run build -w client && npm run e2e:chieu-dau -w server` (cần google-chrome; client/dist phải là bản build mới). Mất ~1 phút.
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -20,14 +20,8 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client } from "colyseus.js";
 import { DEFAULT_MAP_ID, PROTOCOL_VERSION, roomNameOf, skillOf } from "@tien-gioi/shared";
-import {
-  Tab,
-  sleep,
-  listenWithRetry,
-  removeTmpDirs,
-  getChromeGpuFlags,
-  killChrome,
-} from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs, killChrome } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -155,40 +149,17 @@ async function main() {
       updatedAt: now,
     });
 
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      extraFlags: [
         // máy tính có chuột: headless không có chuột nên `pointer` là `none` và thanh chiêu L U I O (chỉ hiện ở `(pointer: fine)`) bị ẩn
         "--blink-settings=primaryPointerType=4,availablePointerTypes=4,primaryHoverType=2,availableHoverTypes=2",
-        "about:blank",
       ],
-      { stdio: "ignore" },
-    );
-    let spawnError: Error | null = null;
-    chrome.once("error", (e) => (spawnError = e));
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    if (spawnError)
-      throw new Error(`Không chạy được google-chrome: ${(spawnError as Error).message}`);
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("T", first.webSocketDebuggerUrl);
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("T", launched.webSocketDebuggerUrl);
     const T = tab;
     const ev = (e: string) => T.ev(e);
 
