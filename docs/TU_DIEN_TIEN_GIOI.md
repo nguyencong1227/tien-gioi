@@ -247,7 +247,7 @@ Dev F nối `bannedViolations` vào `npm run check:content` (Phần 3 #1200) ch�
 ### Tên riêng của truyện / game khác (cấm)
 
 > Thế giới Tiên Giới giữ nguyên; KHÔNG mượn nhân vật, tông phái, môn phái, tự viện, quốc gia của game /
-> truyện khác làm của Tiên Giới (AGENTS.md "Asset nguồn 3"). Danh sách từ những chỗ đã xác nhận rò rỏ:
+> truyện khác làm của Tiên Giới (AGENTS.md "Asset nguồn 3"). Danh sách từ những chỗ đã xác nhận rò rỉ:
 > AGENTS.md, `skills-kim-tho.test.ts` (`VKTT_PROPER`), và ví dụ người dùng trong issue #1199.
 
 | Chữ cấm | Lý do |
@@ -259,7 +259,7 @@ Dev F nối `bannedViolations` vào `npm run check:content` (Phần 3 #1200) ch�
 | Đan Hà Cốc | cốc (địa danh tông phái) của Vạn Kiếp Tu Tiên |
 | Hàn Lập | nhân vật của tiên hiệp khác (Phàm Nhân Tu Tiên) |
 
-> CHƯA phủ hết — gặp rò rỏ mới (tên nhân vật / tông phái truyện khác) thì THÊM dòng vào `BANNED_TERMS`,
+> CHƯA phủ hết — gặp rò rỉ mới (tên nhân vật / tông phái truyện khác) thì THÊM dòng vào `BANNED_TERMS`,
 > đừng bịa danh sách rộng không có bằng chứng. Matcher KHÔNG phân biệt hoa / thường nên mọi cách viết đều bị bắt.
 
 > **Ngoại lệ ĐÃ CHỐT (Dev A, PR #1408):** `Thanh Vân Kiếm Khí` / `Thanh Vân Kiếm Quyết` / `Thanh Vân Vạn Kiếm Quyết`
