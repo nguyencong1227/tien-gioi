@@ -1043,6 +1043,14 @@ const BOOKS = {
   kinh_toa_long_cam_na: [0x2c6a8a, 0xb0d8e8, "trao"],
   kinh_huyet_ti_phuoc_than: [0x2a2f6a, 0xe06070], // tơ máu: chàm đậm, sợi đỏ
   kinh_no_dao_bai_khong: [0x1f4a8a, 0xe0f4ff], // sóng lớp lớp: biển sâu, bọt trắng
+  // Hỏa + Phong (CT16 đợt 2 lô 2, #1186, E; B vẽ TRƯỚC dữ liệu chiêu theo thư của Dev E, id quyển = kinh_<id chiêu>, KHÔNG theo tên công pháp): mỗi quyển một sắc riêng
+  // để không trùng Liệt Diễm / Xích Tước (Hỏa) và Phiêu Phong / Hồi Phong (Phong); quyển không chỉ định dấu tay thì có ấn sinh từ id (#1303)
+  kinh_quy_hoa_phe_hon: [0x8a3048, 0x7fe0d0], // lửa ma trơi xanh lạnh trên bìa đỏ rượu (Luyện Khí, ấn hồn)
+  kinh_ma_trao_phe_huyet: [0x9a2a2a, 0xff7a68, "trao"], // móng vuốt nhuộm lửa máu (Trúc Cơ, chảy máu): ba vệt vuốt cào
+  kinh_phat_hoa_hang_ma: [0xd08a2a, 0xfff0b0], // lửa vàng của lòng bàn tay trừ tà (Kim Đan, thiêu đốt)
+  kinh_huyet_mang_pha_giap: [0x7a1f2e, 0xff9a8a, "tien"], // sợi máu đỏ đâm xuyên giáp (Nguyên Anh, chảy máu): mũi tên xiên
+  kinh_quy_anh_me_tung: [0x3f6a66, 0xc8e8e0], // bóng ma mờ tỏ, âm khí lam lục (Luyện Khí, bộ pháp "Quỷ Ảnh Bộ")
+  kinh_am_phong_quyen_hon: [0x4a5a78, 0xd0c8f0], // gió âm cuốn hồn oan, xám chàm tím (Kim Đan, "Quỷ Phong Quyết")
 };
 
 /**
