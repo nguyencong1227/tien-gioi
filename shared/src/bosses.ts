@@ -496,6 +496,48 @@ export const BOSSES: readonly BossDef[] = [
     ],
     enrage: { afterMs: 300_000, atkMult: 1.5, speedMult: 1.2, cdMult: 0.7 },
   },
+  {
+    // THANH XÀ (Lạc Hà, trùm CẦM ĐƯỜNG Luyện Khí; CD5 #1065): rắn xanh, trùm NHỎ một giai đoạn, hai chiêu báo trước đầy đủ (né được), KHÔNG triệu hồi con.
+    // Số là ĐỀ XUẤT khởi đầu: đo bằng `server/src/balance/chan-duong.ts` (docs/CAN_BANG.md mục "Chặn đường") — người bậc 7 mặc đồ tốt nhất chỉ đánh thường, thắng >= 60%
+    // và chết <= 5% ở giả định thận trọng (2 đan + đồ đúng bậc). Nếu lệch thì chỉnh `atk` / `dmgMult` / `cooldownMs`, KHÔNG nới khung báo trước.
+    kind: "thanh_xa",
+    maxAdds: 0,
+    abilities: [
+      {
+        id: "quat_duoi",
+        name: "Quật đuôi",
+        shape: { t: "cone", r: 140, arc: (2 * Math.PI) / 3 },
+        telegraphMs: 1000,
+        recoverMs: 700,
+        cooldownMs: 7000,
+        weight: 3,
+        dmgMult: 1.7,
+        cond: { maxDist: 170 },
+      },
+      {
+        id: "xau_xa",
+        name: "Xà xung lao tới",
+        shape: { t: "charge", len: 300, w: 76 },
+        telegraphMs: 900,
+        recoverMs: 900,
+        cooldownMs: 9000,
+        weight: 2,
+        dmgMult: 2,
+        cond: { minDist: 120 },
+      },
+    ],
+    phases: [
+      {
+        id: "dau",
+        fromHp: 1,
+        speedMult: 1,
+        atkMult: 1,
+        cdMult: 1,
+        castGapMs: 1500,
+        abilities: ["quat_duoi", "xau_xa"],
+      },
+    ],
+  },
 ];
 
 export const BOSS_BY_KIND: Readonly<Record<string, BossDef>> = Object.fromEntries(

@@ -938,6 +938,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("thiem_to_cong"), chance: 0.006, min: 1, max: 1 },
   ],
+  // Thanh Xà: trùm CẦM ĐƯỜNG Lạc Hà bậc Luyện Khí (CD5 #1065). Ambush-only, thưởng chính là payRewards của cảnh chặn đường; rơi phụ đan thường khi hạ
+  thanh_xa: [
+    { itemId: "hoi_huyet_dan", chance: 1, min: 1, max: 2 },
+    { itemId: "tu_khi_dan", chance: 0.3, min: 1, max: 1 },
+  ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
     { itemId: "suong_mao", chance: 0.5, min: 1, max: 2 },

@@ -61,6 +61,7 @@ export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
   cot_tuong: 0xe8dfc8, // bụi xương ngà
   doc_tuoc: 0x9be05a, // độc lục sáng (khác vàng lục của Độc Thiềm)
   thien_han_vuong: 0xbff4ff, // băng sâu phát sáng (trùm)
+  thanh_xa: 0x4fd06a, // xanh rắn (trùm CẦM ĐƯỜNG Lạc Hà, CD5 #1065; khác xanh vàng của Độc Thiềm 0xc4f24a)
 };
 
 /** Quái `kind` trong sổ game; id lạ / độc ("constructor", "__proto__") là `undefined` (state do server gửi, không tin). */

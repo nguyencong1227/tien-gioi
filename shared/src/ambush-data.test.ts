@@ -45,22 +45,24 @@ describe("dữ liệu chặn đường: khung", () => {
 });
 
 describe("dữ liệu chặn đường THẬT: bầy kẻ chặn đường (CD5b #1065)", () => {
-  it("24 bầy; độ phủ chỉ còn thiếu cảnh + bầy CẦM ĐẦU của Lạc Hà (E / D bổ sung cả hai rồi sửa dòng này)", () => {
-    expect(AMBUSH_FOES.length).toBe(24);
-    expect(ambushCoverageViolations()).toEqual([
-      "lac_ha / leader: thiếu cảnh",
-      "lac_ha / leader: thiếu bầy",
-    ]);
+  it("25 bầy; đủ cảnh + bầy cho mọi (bản đồ, mức) kể cả CẦM ĐẦU của Lạc Hà (G bổ sung Thanh Xà, CD5 #1065)", () => {
+    expect(AMBUSH_FOES.length).toBe(25);
+    expect(ambushCoverageViolations()).toEqual([]);
   });
 
   it("khoảng bậc HẸP (<= 5 bậc): `payRewards` chưa giảm tu vi theo chênh bậc nên người bậc cao hơn nhiều vẫn nhận đủ", () => {
     for (const g of AMBUSH_FOES) expect(g.maxStep - g.minStep, g.id).toBeLessThanOrEqual(5);
   });
 
-  it("kẻ cầm đầu là Xích Mãng đúng 1 con (trùm duy nhất thắng >= 60% một mình ở bậc >= 11); mọi bầy tinh anh / thường KHÔNG có trùm", () => {
+  it("kẻ cầm đầu đúng 1 con trùm, KHÔNG có lính: Xích Mãng (mang, các bản đồ khác) từ bậc >= 11; Thanh Xà (thanh_xa, Lạc Hà) từ bậc >= 7; mọi bầy tinh anh / thường KHÔNG có trùm", () => {
     for (const g of AMBUSH_FOES.filter((x) => x.tier === "leader")) {
-      expect(g.foes, g.id).toEqual([{ kind: "mang", count: 1 }]);
-      expect(g.minStep, g.id).toBeGreaterThanOrEqual(11);
+      expect(g.foes.length, g.id).toBe(1);
+      const f = g.foes[0]!;
+      expect(f.count, g.id).toBe(1);
+      expect(MONSTER_BY_ID[f.kind]!.boss ?? false, g.id).toBe(true);
+      // mang: trùm duy nhất đạt >= 60% một mình, từ bậc 11 (thực đơn A). thanh_xa: trùm CẦM ĐƯỜNG nhỏ bậc Luyện Khí, từ bậc 7 (đo CD5 #1065).
+      if (f.kind === "thanh_xa") expect(g.minStep, g.id).toBeGreaterThanOrEqual(7);
+      else expect(g.minStep, g.id).toBeGreaterThanOrEqual(11);
     }
     for (const g of AMBUSH_FOES.filter((x) => x.tier !== "leader"))
       for (const f of g.foes) expect(MONSTER_BY_ID[f.kind]!.boss ?? false, g.id).toBe(false);

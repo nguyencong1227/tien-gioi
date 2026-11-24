@@ -157,6 +157,8 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   lang: { chance: 0.7, min: 2, max: 6 },
   ho: { chance: 0.8, min: 8, max: 20 },
   mang: { chance: 1, min: 150, max: 300 },
+  // Thanh Xà: trùm CẦM ĐƯỜNG Lạc Hà bậc Luyện Khí (CD5 #1065), exp 650 < Xích Mãng 900 -> rơi trung bình ít hơn. Ambush-only (cap 0) nên xếp nhóm bí cảnh, giữ avg < yeu_vuong (currency.test)
+  thanh_xa: { chance: 1, min: 100, max: 200 },
   // Trùm bí cảnh (đã tính vào cân bằng 4c-2: `server/src/balance/dungeon.ts`); thưởng hoàn thành là `DUNGEONS[].reward.coin`, riêng với tiền rơi này
   yeu_vuong: { chance: 1, min: 300, max: 500 },
   // Quái Kim Đan (M6, #403): thu nhập 8-17k Linh thạch / giờ solo, gần Xích Mãng (~15k) nhưng không vượt 2x (docs/CAN_BANG.md)

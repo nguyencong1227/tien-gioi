@@ -1937,6 +1937,13 @@ function buildAtlas() {
     for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
 
+  // Thanh Xà (Lạc Hà trùm CẦM ĐƯỜNG, CD5 #1065): CHƯA có ảnh riêng — tái dùng ảnh Xích Mãng (cùng họ Rắn/mãng, kích thước trùm) làm ảnh tạm.
+  // B / C vẽ ảnh rắn xanh riêng thì thêm block `if (id === "thanh_xa")` trong drawMonsterFrame + XÓA khối tái dùng này.
+  push(`mon-thanh_xa`, drawMonsterFrame("mang", 0));
+  push(`mon-thanh_xa-0`, drawMonsterFrame("mang", 0));
+  push(`mon-thanh_xa-1`, drawMonsterFrame("mang", 1));
+  for (const pose of MONSTER_POSES) push(`mon-thanh_xa-${pose}`, drawMonsterPose("mang", pose));
+
   for (const npcId of [
     "truong_tran",
     "duoc_su",
