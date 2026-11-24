@@ -9360,9 +9360,69 @@
         "h": 24
       }
     },
-    "item-kinh_thuc_hon_nhat_chi": {
+    "item-kinh_huyet_trao_pha_mach": {
       "frame": {
         "x": 184,
+        "y": 1454,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_bach_cot_hong_nhan": {
+      "frame": {
+        "x": 210,
+        "y": 1454,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_niep_hon_doat_phat": {
+      "frame": {
+        "x": 236,
+        "y": 1454,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_thuc_hon_nhat_chi": {
+      "frame": {
+        "x": 262,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9382,7 +9442,7 @@
     },
     "item-kinh_tich_da_phan_anh": {
       "frame": {
-        "x": 210,
+        "x": 288,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9402,7 +9462,7 @@
     },
     "item-kinh_kho_mach_dan_luu": {
       "frame": {
-        "x": 236,
+        "x": 314,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9422,7 +9482,7 @@
     },
     "item-kinh_thuc_phat_am_trao": {
       "frame": {
-        "x": 262,
+        "x": 340,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9442,7 +9502,7 @@
     },
     "item-kinh_thai_hoa_bo_nguyen": {
       "frame": {
-        "x": 288,
+        "x": 366,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9462,7 +9522,7 @@
     },
     "item-kinh_huyet_co_bi_kinh": {
       "frame": {
-        "x": 314,
+        "x": 392,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9482,7 +9542,7 @@
     },
     "item-kinh_toa_long_cam_na": {
       "frame": {
-        "x": 340,
+        "x": 418,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9502,7 +9562,7 @@
     },
     "item-kinh_huyet_ti_phuoc_than": {
       "frame": {
-        "x": 366,
+        "x": 444,
         "y": 1454,
         "w": 24,
         "h": 24
@@ -9522,66 +9582,6 @@
     },
     "item-kinh_no_dao_bai_khong": {
       "frame": {
-        "x": 392,
-        "y": 1454,
-        "w": 24,
-        "h": 24
-      },
-      "rotated": false,
-      "trimmed": false,
-      "spriteSourceSize": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 24
-      },
-      "sourceSize": {
-        "w": 24,
-        "h": 24
-      }
-    },
-    "item-han_lang_mao": {
-      "frame": {
-        "x": 418,
-        "y": 1454,
-        "w": 24,
-        "h": 24
-      },
-      "rotated": false,
-      "trimmed": false,
-      "spriteSourceSize": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 24
-      },
-      "sourceSize": {
-        "w": 24,
-        "h": 24
-      }
-    },
-    "item-phong_nha_vu": {
-      "frame": {
-        "x": 444,
-        "y": 1454,
-        "w": 24,
-        "h": 24
-      },
-      "rotated": false,
-      "trimmed": false,
-      "spriteSourceSize": {
-        "x": 0,
-        "y": 0,
-        "w": 24,
-        "h": 24
-      },
-      "sourceSize": {
-        "w": 24,
-        "h": 24
-      }
-    },
-    "item-tuong_cot": {
-      "frame": {
         "x": 470,
         "y": 1454,
         "w": 24,
@@ -9600,7 +9600,7 @@
         "h": 24
       }
     },
-    "item-doc_tuoc_nang": {
+    "item-kinh_quy_hoa_phe_hon": {
       "frame": {
         "x": 496,
         "y": 1454,
@@ -9620,7 +9620,7 @@
         "h": 24
       }
     },
-    "item-thien_han_chau": {
+    "item-kinh_ma_trao_phe_huyet": {
       "frame": {
         "x": 522,
         "y": 1454,
@@ -9640,7 +9640,7 @@
         "h": 24
       }
     },
-    "item-han_vu_kiem": {
+    "item-kinh_phat_hoa_hang_ma": {
       "frame": {
         "x": 548,
         "y": 1454,
@@ -9660,7 +9660,7 @@
         "h": 24
       }
     },
-    "item-han_lang_bao": {
+    "item-kinh_huyet_mang_pha_giap": {
       "frame": {
         "x": 574,
         "y": 1454,
@@ -9680,7 +9680,7 @@
         "h": 24
       }
     },
-    "item-phong_nha_phu": {
+    "item-kinh_quy_anh_me_tung": {
       "frame": {
         "x": 600,
         "y": 1454,
@@ -9700,7 +9700,7 @@
         "h": 24
       }
     },
-    "item-thuong_hoi_huyet_dan": {
+    "item-kinh_am_phong_quyen_hon": {
       "frame": {
         "x": 2,
         "y": 1480,
@@ -9720,7 +9720,7 @@
         "h": 24
       }
     },
-    "item-thuong_hoi_linh_dan": {
+    "item-kinh_giao_can_cung": {
       "frame": {
         "x": 28,
         "y": 1480,
@@ -9740,7 +9740,7 @@
         "h": 24
       }
     },
-    "item-dot_pha_dan": {
+    "item-kinh_han_suong_toa": {
       "frame": {
         "x": 54,
         "y": 1480,
@@ -9760,7 +9760,7 @@
         "h": 24
       }
     },
-    "item-kinh_chi_dan": {
+    "item-kinh_bang_phach_than_cham": {
       "frame": {
         "x": 80,
         "y": 1480,
@@ -9780,7 +9780,7 @@
         "h": 24
       }
     },
-    "item-duong_anh_dan": {
+    "item-kinh_loi_am_an": {
       "frame": {
         "x": 106,
         "y": 1480,
@@ -9800,7 +9800,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_dan": {
+    "item-kinh_tu_dien_thoa": {
       "frame": {
         "x": 132,
         "y": 1480,
@@ -9820,7 +9820,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_cuonghuyet": {
+    "item-han_lang_mao": {
       "frame": {
         "x": 158,
         "y": 1480,
@@ -9840,7 +9840,7 @@
         "h": 24
       }
     },
-    "item-phu_kim_phicham": {
+    "item-phong_nha_vu": {
       "frame": {
         "x": 184,
         "y": 1480,
@@ -9860,7 +9860,7 @@
         "h": 24
       }
     },
-    "item-phu_kim_toagia": {
+    "item-tuong_cot": {
       "frame": {
         "x": 210,
         "y": 1480,
@@ -9880,7 +9880,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_lieutiem": {
+    "item-doc_tuoc_nang": {
       "frame": {
         "x": 236,
         "y": 1480,
@@ -9900,7 +9900,7 @@
         "h": 24
       }
     },
-    "item-phu_loi_loino": {
+    "item-thien_han_chau": {
       "frame": {
         "x": 262,
         "y": 1480,
@@ -9920,7 +9920,7 @@
         "h": 24
       }
     },
-    "item-phu_hoa_tammoi": {
+    "item-han_vu_kiem": {
       "frame": {
         "x": 288,
         "y": 1480,
@@ -9940,7 +9940,7 @@
         "h": 24
       }
     },
-    "item-phu_moc_kimlan": {
+    "item-han_lang_bao": {
       "frame": {
         "x": 314,
         "y": 1480,
@@ -9960,7 +9960,7 @@
         "h": 24
       }
     },
-    "item-phu_tho_tocphong": {
+    "item-phong_nha_phu": {
       "frame": {
         "x": 340,
         "y": 1480,
@@ -9980,10 +9980,290 @@
         "h": 24
       }
     },
-    "swordbeam": {
+    "item-thuong_hoi_huyet_dan": {
       "frame": {
         "x": 366,
         "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-thuong_hoi_linh_dan": {
+      "frame": {
+        "x": 392,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-dot_pha_dan": {
+      "frame": {
+        "x": 418,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-kinh_chi_dan": {
+      "frame": {
+        "x": 444,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-duong_anh_dan": {
+      "frame": {
+        "x": 470,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_hoa_dan": {
+      "frame": {
+        "x": 496,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_hoa_cuonghuyet": {
+      "frame": {
+        "x": 522,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_kim_phicham": {
+      "frame": {
+        "x": 548,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_kim_toagia": {
+      "frame": {
+        "x": 574,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_hoa_lieutiem": {
+      "frame": {
+        "x": 600,
+        "y": 1480,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_loi_loino": {
+      "frame": {
+        "x": 2,
+        "y": 1506,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_hoa_tammoi": {
+      "frame": {
+        "x": 28,
+        "y": 1506,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_moc_kimlan": {
+      "frame": {
+        "x": 54,
+        "y": 1506,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "item-phu_tho_tocphong": {
+      "frame": {
+        "x": 80,
+        "y": 1506,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "swordbeam": {
+      "frame": {
+        "x": 106,
+        "y": 1506,
         "w": 48,
         "h": 16
       },
@@ -10002,8 +10282,8 @@
     },
     "dot": {
       "frame": {
-        "x": 416,
-        "y": 1480,
+        "x": 156,
+        "y": 1506,
         "w": 16,
         "h": 16
       },
@@ -10028,7 +10308,7 @@
     "format": "RGBA8888",
     "size": {
       "w": 640,
-      "h": 1520
+      "h": 1536
     },
     "scale": "1"
   }

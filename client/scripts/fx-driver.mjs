@@ -104,12 +104,27 @@ export const FX_CAST_SKILLS = [
   // Lôi (CT15 đợt 2, #1185, D)
   "loi_hoa_pha_ta_chuong",
   "chan_hon_loi_phap",
+  // Lô 1 Âm (#1186, E): 4 chiêu hệ Âm (shared/src/skills-khac.ts), dữ liệu + id này cùng PR
+  "thuc_hon_nhat_chi",
+  "tich_da_phan_anh",
+  "thuc_phat_am_trao",
+  "kho_mach_dan_luu",
+  // Vô sắc (CT17 lát 3, G)
+  "huyet_trao_pha_mach",
+  "bach_cot_hong_nhan",
+  "niep_hon_doat_phat",
   // Thủy (CT15 đợt 2 lát 2, #1185, D): hình mới aura_water / pull / bolt
   "thai_hoa_bo_nguyen",
   "huyet_co_bi_kinh",
   "toa_long_cam_na",
   "huyet_ti_phuoc_than",
   "no_dao_bai_khong",
+  // Băng + Lôi (CT15 đợt 3, #1185, D): bolt / trap / ground (dấu + kích Lôi)
+  "giao_can_cung",
+  "han_suong_toa",
+  "bang_phach_than_cham",
+  "loi_am_an",
+  "tu_dien_thoa",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
