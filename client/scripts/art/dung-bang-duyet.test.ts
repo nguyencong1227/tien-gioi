@@ -267,11 +267,18 @@ finally:
     },
   );
 
-  it("generator CHỈ đọc bảng: không còn bộ đếm n tuần tự gán mã VP / HU", () => {
+  it("generator CHỈ đọc bảng: group_vp / group_hu cấp mã bằng MA.assign_codes, không còn bộ đếm tuần tự", () => {
+    const body = (from: string, to: string) => code.slice(code.indexOf(from), code.indexOf(to));
+    const vp = body("def group_vp(", "# Nền / màn tải / Hoàng Tuyền (nhóm 17");
+    const hu = body("def group_hu(", "def group_ui(");
+    expect(vp.length).toBeGreaterThan(500);
+    expect(hu.length).toBeGreaterThan(500);
+    expect(vp).toMatch(/MA\.assign_codes\(t\["vp"\]/);
+    expect(hu).toMatch(/MA\.assign_codes\(t\["hu"\]/);
+    for (const b of [vp, hu]) expect(b).not.toMatch(/\bn \+= 1\b/);
+    expect(hu).not.toMatch(/enumerate\(/); // group_hu không có lý do dùng chỉ số thứ tự (group_vp có: đánh số tờ chia nhỏ)
     expect(code).not.toMatch(/f"VP-\{n:03d\}"/);
     expect(code).not.toMatch(/f"HU-\{n:02d\}"/);
-    expect(code).toMatch(/MA\.assign_codes\(t\["vp"\]/);
-    expect(code).toMatch(/MA\.assign_codes\(t\["hu"\]/);
   });
 });
 
@@ -427,6 +434,57 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
   afterAll(() => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
+
+  it("mã VP / HU của tờ VỪA DỰNG khớp bảng ma-co-dinh.json (đổi ITEMS / chiêu không làm nhích mã; mã mới ở CUỐI, ghi MỚI)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const md = path.join(dir, "ma.md");
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "14,15",
+        "--public",
+        pub,
+        "--private",
+        priv,
+        "--names",
+        namesFile,
+        "--md",
+        md,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const t = maTable();
+    const items = new Map(ITEMS.map((i) => [i.id, i.name] as const));
+    const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
+    const vpId = new Map(Object.entries(t.vp).map(([id, n]) => [n, id] as const));
+    const huId = new Map(Object.entries(t.hu).map(([id, n]) => [n, id] as const));
+    const text = fs.readFileSync(md, "utf8");
+    let vp = 0;
+    let hu = 0;
+    for (const m of text.matchAll(/^\| (VP|HU)-(\d+) \| ([^|]*?) \|/gm)) {
+      const n = Number(m[2]);
+      const mới = / · MỚI \(sau 23\/11\)$/.test(m[3]);
+      const shown = m[3].replace(/ · MỚI \(sau 23\/11\)$/, "");
+      if (m[1] === "VP") {
+        vp++;
+        expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
+        expect(mới, `VP-${m[2]} MỚI`).toBe(n > DONG_BANG.vp);
+      } else {
+        hu++;
+        expect(shown.startsWith(`${skills.get(huId.get(n) ?? "")} (`), `HU-${m[2]}: ${shown}`).toBe(
+          true,
+        );
+        expect(mới, `HU-${m[2]} MỚI`).toBe(n > DONG_BANG.hu);
+      }
+    }
+    expect(vp).toBe(ITEMS.length);
+    expect(hu).toBe(LEARNABLE_SKILLS.length);
+  }, 120_000);
 
   it("dựng đủ 4 nhóm: mỗi nhóm một tờ công khai + một tờ đầy đủ, đúng số mã", () => {
     expect(run.status, String(run.stderr)).toBe(0);
