@@ -6,7 +6,7 @@
 // A không vào lại được run -> B cũng gục: run thua `all_dead`, B về Lạc Hà, run được dọn. Không lỗi console. Thoát 0 khi đạt, 1 khi sai.
 //
 // Chạy: `npm run build && npm run e2e:bi-canh-nga -w server` (cần google-chrome; client/dist phải là bản build mới).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -23,7 +23,8 @@ import {
   NPC_BY_ID,
   dayKey,
 } from "@tien-gioi/shared";
-import { Tab, shown, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, shown, sleep, listenWithRetry, removeTmpDirs } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -106,41 +107,16 @@ async function main() {
   let chrome: ChildProcess | null = null;
   const tabs: Tab[] = [];
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore" },
-    );
-    let spawnError: Error | null = null;
-    chrome.once("error", (e) => (spawnError = e));
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    if (spawnError)
-      throw new Error(`Không chạy được google-chrome: ${(spawnError as Error).message}`);
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
     const second = await (
       await fetch(`http://127.0.0.1:${CDP}/json/new?about:blank`, { method: "PUT" })
     ).json();
-    const ta = await Tab.open("A", first.webSocketDebuggerUrl);
+    const ta = await Tab.open("A", launched.webSocketDebuggerUrl);
     const tb = await Tab.open("B", (second as any).webSocketDebuggerUrl);
     tabs.push(ta, tb);
 

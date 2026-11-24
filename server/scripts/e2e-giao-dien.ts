@@ -8,7 +8,7 @@
 //  - điện thoại NGANG (7 khung từ 915x412 xuống 568x320, `LANDSCAPE_PHONES`, cả hai kiểu điều khiển cảm ứng float / dpad, #727): MỌI điều khiển cảm ứng đang hiện (liệt kê tự động) không chồng lên nhau,
 //    chạm giữa mỗi điều khiển trúng đúng nó, không điều khiển nào ra ngoài màn, nút Mục tiêu >= 44 px (`touch-controls-kit.ts`).
 // Chạy: `npm run build -w client && npm run e2e:giao-dien -w server` (cần google-chrome). Ảnh (tuỳ chọn): đặt E2E_SHOTS=<thư mục>.
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -17,7 +17,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs, killChrome } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 import { VIEWPORTS, applyViewport, crowdHud, viewportOf } from "./layout-kit";
 import {
   LANDSCAPE_PHONES,
@@ -153,34 +154,13 @@ async function main() {
   };
   let fatal: string | null = null;
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore" },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     const T = tab;
     const NAME = "Cu Ky Anh Anh";
     await T.send("Page.addScriptToEvaluateOnNewDocument", {
@@ -681,7 +661,7 @@ async function main() {
     fatal = (e as Error).message;
   } finally {
     tab?.close();
-    chrome?.kill();
+    killChrome(chrome);
     await gameServer.gracefullyShutdown(false).catch(() => {});
     httpServer.close();
     await sleep(600);

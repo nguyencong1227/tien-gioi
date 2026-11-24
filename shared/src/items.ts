@@ -937,6 +937,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Độc Mộc Trúc Cơ, Huyền phẩm (A, #1187 / book-drop-realm): hai sách trước đây CHỈ rơi từ Độc Tước (Nguyên Anh, cao hơn cấp chiêu hai bậc); Xích Mãng là trùm Trúc Cơ, hợp chủ đề rắn / độc, và KHÔNG phải Hắc Hổ (giữ `balance/dungeon.test.ts`)
     { itemId: bookIdOf("hac_sa_doc_chuong"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("thiem_to_cong"), chance: 0.006, min: 1, max: 1 },
+    // Hỏa Trúc Cơ, Huyền phẩm (lô 2 Hỏa #1186, E; A #1424: dời từ Yêu Vương — trùm bí cảnh 3-4 người, 0,5 % ≈ 200 lượt mới ra, thực tế không ai kiếm được — sang Xích Mãng trùm Trúc Cơ 0,6 % như các rr2 Trúc Cơ khác): rơi hiếm từ Xích Mãng (trùm Trúc Cơ, hợp chủ đề ma trảo máu), KHÔNG từ Hắc Hổ (giữ balance/dungeon.test.ts)
+    { itemId: bookIdOf("ma_trao_phe_huyet"), chance: 0.006, min: 1, max: 1 },
   ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
@@ -965,6 +967,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("phan_nhac_tram"), chance: 0.012, min: 1, max: 1 },
     { itemId: bookIdOf("loi_lien_chau"), chance: 0.008, min: 1, max: 1 }, // sét lan Lôi (CT9 lát 1)
     { itemId: bookIdOf("loi_dinh_nhat_miet"), chance: 0.005, min: 1, max: 1 }, // Lôi Kim Đan (CT8 lát 1)
+    // Hỏa + Phong Kim Đan, Huyền phẩm (lô 2 #1186, E): rơi hiếm từ Thạch Quy (quái Kim Đan); giữ số Linh thạch / giờ mục 30
+    { itemId: bookIdOf("phat_hoa_hang_ma"), chance: 0.005, min: 1, max: 1 },
+    { itemId: bookIdOf("am_phong_quyen_hon"), chance: 0.005, min: 1, max: 1 },
   ],
   doc_thiem: [
     { itemId: "doc_nang", chance: 0.45, min: 1, max: 2 },
@@ -1024,6 +1029,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("chan_hon_loi_phap"), chance: 0.006, min: 1, max: 1 },
     // Vô sắc Nguyên Anh, Địa phẩm (CT17 lát 3, G): rơi hiếm từ Phong Nha (quái Nguyên Anh), giữ thu nhập Nguyên Anh như các lát trước
     { itemId: bookIdOf("bach_cot_hong_nhan"), chance: 0.006, min: 1, max: 1 },
+    // Hỏa Nguyên Anh, Địa phẩm (lô 2 Hỏa #1186, E): rơi hiếm từ Phong Nha (quái Nguyên Anh); giữ số Linh thạch / giờ mục 30
+    { itemId: bookIdOf("huyet_mang_pha_giap"), chance: 0.005, min: 1, max: 1 },
   ],
   cot_tuong: [
     { itemId: "tuong_cot", chance: 0.5, min: 1, max: 2 },

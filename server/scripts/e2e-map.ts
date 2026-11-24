@@ -3,7 +3,7 @@
 // không chỉ đếm ô), chi phí draw call thêm <= 2 mỗi khung, texture <= 64 KB, dựng lại cảnh 20 lần không rò đối tượng / texture,
 // 0 lỗi console. BÀI HỌC #348: kiểm cái người chơi THẤY (điểm ảnh), không chỉ cái có trong cảnh.
 // Chạy: `npm run build && npm run e2e:map -w server` (cần google-chrome).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs, killChrome } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -57,34 +58,13 @@ async function main() {
   };
 
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        ...getChromeGpuFlags(),
-        "about:blank",
-      ],
-      { stdio: "ignore", detached: true },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     const T = tab;
 
     let NAME = "Trang Tri Ban Do"; // ca phiên mới dùng đạo hiệu khác: phiên cũ còn trong thời gian chờ nối lại
@@ -725,14 +705,7 @@ async function main() {
         /* bỏ qua */
       }
     }
-    // detached: Chrome là chủ một NHÓM tiến trình; giết cả nhóm (-pid) thì tiến trình con (gpu, renderer) không sống sót để ghi lại thư mục dữ liệu
-    if (chrome?.pid) {
-      try {
-        process.kill(-chrome.pid, "SIGKILL");
-      } catch {
-        chrome.kill("SIGKILL");
-      }
-    }
+    killChrome(chrome);
     await new Promise<void>((r) => httpServer.close(() => r()));
     // false: mặc định Colyseus GỌI process.exit ngay trong gracefullyShutdown nên các dòng dọn dẹp phía sau không bao giờ chạy (sót thư mục /tmp/tien-gioi-e2e-*)
     await gameServer.gracefullyShutdown(false);

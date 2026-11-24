@@ -12,7 +12,7 @@
 //  5. Rời phòng chủ động, đọc đĩa: chân linh kiếp 2 với `engraved = [hoa_van_kiem]`, hồ sơ nhân vật chiêu tầng 1 ở ô 2, không còn `limbo`.
 // Mỗi bước còn kiểm KHÔNG có lỗi / cảnh báo console.
 // Chạy: `npm run build -w client && npm run e2e:kiep-moi -w server` (cần google-chrome).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -23,15 +23,8 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { DEFAULT_MAP_ID, skillOf, type Soul } from "@tien-gioi/shared";
-import {
-  Tab,
-  sleep,
-  listenWithRetry,
-  removeTmpDirs,
-  getChromeGpuFlags,
-  killChrome,
-  shown,
-} from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs, killChrome, shown } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 import { freePort } from "../src/test-port.js";
 import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 
@@ -175,34 +168,13 @@ async function main() {
     };
     writeFileSync(soulFile, JSON.stringify(soul, null, 2));
 
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore", detached: true },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     const T = tab;
     const ev = (expr: string) => T.ev(expr) as Promise<any>;
     const noErrors = (when: string) =>
