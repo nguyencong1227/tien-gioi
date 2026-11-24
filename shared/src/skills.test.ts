@@ -6,6 +6,7 @@ import {
   ELEMENT_DISADVANTAGE_MULT,
   ENGRAVE_COSTS,
   ENGRAVE_MAX,
+  LEARNABLE_SKILLS,
   LEARNABLE_SLOTS,
   MAX_STATUSES,
   MOVE_SPEED_MUL_MAX,
@@ -805,5 +806,35 @@ describe("đủ cảnh giới để học / dùng chiêu (skillReqMet)", () => {
           const r = learnSkill(emptySkillBook(), k.id, realm, tier);
           expect(r.ok, `${k.id} ${realm}/${tier}`).toBe(skillReqMet(k, realm, tier));
         }
+  });
+});
+
+describe("tên riêng của Vạn Kiếp Tu Tiên không lọt vào chiêu học được", () => {
+  // Cùng danh sách với VKTT_PROPER trong skills-kim-tho / skills-moc-thuy / skills-dang-moi .test.ts nhưng quét MỌI
+  // chiêu trong LEARNABLE_SKILLS (các test kia chỉ quét nhóm của mình nên bỏ sót ba chiêu Băng cũ ở skills.ts: "Bắc Minh").
+  // Khoảng trắng giữa hai chữ khớp mọi dạng (cách kép, xuống dòng, NBSP) để không lách bằng định dạng.
+  const VKTT_PROPER =
+    /Thanh\s+Vân\s+(Môn|Kiếm\s+Tông)|Bắc\s+Minh|Huyền\s+Vũ\s+Môn|Kim\s+Đạo\s+Tự|Đan\s+Hà\s+Cốc/iu;
+
+  it("name / bookName / desc của mọi chiêu (đợt 1 và các nhóm sau) sạch tên môn phái / tự viện / cốc của nguồn", () => {
+    expect(LEARNABLE_SKILLS.length).toBeGreaterThan(60); // quét thật, không quét hụt
+    for (const s of LEARNABLE_SKILLS)
+      for (const t of [s.name, s.bookName, s.desc])
+        expect(VKTT_PROPER.test(t), `${s.id}: tên riêng Vạn Kiếp trong "${t}"`).toBe(false);
+  });
+
+  it("bộ lọc có răng: bắt đủ các dạng viết (hoa / thường, cách kép, xuống dòng, NBSP)", () => {
+    for (const s of [
+      "Bắc Minh",
+      "bắc minh",
+      "BẮC MINH",
+      "Bắc  Minh",
+      "Bắc\nMinh",
+      "Bắc Minh",
+      "Thanh Vân Môn",
+    ])
+      expect(VKTT_PROPER.test(s), JSON.stringify(s)).toBe(true);
+    for (const s of ["phương bắc", "Bắc trời quang, minh mẫn", "Thanh Vân Kiếm Khí"])
+      expect(VKTT_PROPER.test(s), JSON.stringify(s)).toBe(false);
   });
 });
