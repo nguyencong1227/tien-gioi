@@ -73,8 +73,9 @@ describe("bannedViolations — từ cấm (tên riêng khác truyện + từ hi�
   });
 
   it("bắt vi phạm đứng sau `İ` (U+0130): cũ toLowerCase()+indexOf lệch chỉ số bỏ lỡ (đột biến: quay lại cách đó -> đỏ)", () => {
-    // `İ` thường hoá thành 2 đơn vị byte với một số locale -> `hay.indexOf` lệch so với `src`, bỏ lỡ vi phạm đứng sau.
-    // Cách mới quét `matchAll` trên `src` nên KHÔNG lệch.
+    // `İ` (U+0130) thường hoá thành 2 đơn vị UTF-16 (i + dấu chấm trên combining, KHÔNG phải 1) — đúng với MỌI locale
+    // (toLowerCase của JS KHÔNG phụ thuộc locale ở đây) -> `hay` (bản thường) dài hơn `src` ở cùng vị trí, `hay.indexOf`
+    // trả chỉ số lệch so với `src` -> cắt sai / bỏ lỡ vi phạm đứng sau. Cách mới quét `matchAll` trên `src` nên KHÔNG lệch.
     expect(bannedViolations("İ Thanh Vân Môn").length).toBe(1);
     expect(bannedViolations("İ ok").length).toBe(1);
     expect(bannedViolations("thường İ Hàn Lập qua.").length).toBe(1);
@@ -97,7 +98,7 @@ describe("bannedViolations — từ cấm (tên riêng khác truyện + từ hi�
 
   it("hợp với khung: chữ cấm KHÔNG lọt vào mô tả MỌI chiêu học được (dữ liệu thật đang sạch)", () => {
     // Kiểm chéo chứng minh bộ cấm KHÔNG dương tính giả với nội dung game thật đang có — quét MỌI chiêu học được
-    // (không chỉ một nhóm hệ), nên bắt rò rỏ tên riêng ở bất kỳ chiêu nào. (Nếu thêm từ cấm rộng làm bùng nổ dữ
+    // (không chỉ một nhóm hệ), nên bắt rò rỉ tên riêng ở bất kỳ chiêu nào. (Nếu thêm từ cấm rộng làm bùng nổ dữ
     // liệu thật, ca này đỏ -> liệt kê chứ KHÔNG sửa dữ liệu.)
     for (const s of LEARNABLE_SKILLS) {
       for (const t of [s.name, s.bookName, s.desc]) {

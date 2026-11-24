@@ -23,6 +23,7 @@ import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import {
+  AMBUSH_CALM_MS,
   AMBUSH_EXP_PRICE_MIN,
   AMBUSH_STRIDE_PX,
   DEFAULT_MAP_ID,
@@ -326,6 +327,14 @@ async function main() {
     /** Dịch nhân vật tới chỗ ngoài trấn mà máy chủ KHÔNG chặn, đặt quãng đi sát một bước chân, chờ client theo kịp. */
     const placeInWild = async (sp: Prepared, from = 0) => {
       sp.a.cooldownUntil = 0; // TRƯỚC vòng chọn chỗ: `ambushBlocked` có nhánh "cooldown" (vừa vào game có hồi 3 phút)
+      // Chờ "combat" dịu (quái bỏ mục tiêu / hết cửa sổ bị đánh trong AMBUSH_CALM_MS) TRƯỚC khi chọn chỗ: vòng chọn bên dưới LÀ ĐỒNG BỘ
+      // (không `await` world tick), nên nếu đang combat thì mọi chỗ đều cùng lý do chặn => không thoát được, ném "Không có chỗ nào" (#1403).
+      // Chờ theo điều kiện (poll + sleepyield cho đồng hồ máy chủ + AI quái tiến), trần AMBUSH_CALM_MS + vài giây.
+      await until(
+        () => ambushBlocked(sp.world, sp.sid) !== "combat",
+        "trạng thái giao chiến dịu (cho đồng hồ máy chủ tiến trước khi chọn chỗ)",
+        AMBUSH_CALM_MS + 4000,
+      );
       let spot = { x: 0, y: 0 };
       for (let skip = from; ; skip++) {
         spot = wildSpot(sp.world, skip);
@@ -337,6 +346,9 @@ async function main() {
         if (why === null) break;
         out(`  - chỗ #${skip} bị chặn (${why}), thử chỗ khác`);
         if (skip >= from + 12) throw new Error(`Không có chỗ nào không bị chặn (${why})`);
+        // Cho world tick + AI quái tiến GIỮA các lần chọn chỗ: trùm lang thang có thể rời xa chỗ ứng viên ("boss"), combat dịu —
+        // vòng đồng bộ cũ không cho tick nào chạy nên trạng thái không bao giờ đổi (#1403).
+        await sleep(250);
       }
       await until(
         async () =>
@@ -373,29 +385,67 @@ async function main() {
     };
 
     /**
-     * Cho client thật đi vài bước tới khi hộp thoại hiện. Lần tung xúc xắc chỉ có MỘT lượt mỗi bước chân: quái / trùm ngẫu nhiên có thể đi tới gần giữa lúc
-     * kiểm và lúc tung (`ambushBlocked`), nên thử lại tối đa 4 lần với chỗ khác thay vì đỏ giả.
+     * Giữ phím D (đi bộ) THEO ĐIỀU KIỆN: cứ giữ cho tới khi máy chủ mở hộp thoại chặn đường (`sp.a.offer` được đặt — `openOffer` ghi vào
+     * `PlayerCtrl.ambush`, ĐÚNG đối tượng `sp.a` đang tham chiếu) HOẶC hết trần `capMs`. KHÔNG giữ một khoảng cố định: runner CI chậm, `hold(D, 700)`
+     * cố định chỉ cho client gửi đủ input đi ~38 px (chưa đủ quãng `AMBUSH_STRIDE_PX - 40` đã đặt sẵn) => KHÔNG tới lượt tung xúc xắc, hộp thoại không
+     * hiện (#1403). Chờ theo điều kiện để dù runner chậm tới đâu cũng đi đủ quãng cần thiết. Trả `true` nếu hộp thoại đã triggered.
+     */
+    const holdWalkUntilOffer = async (sp: Prepared, capMs = 10_000): Promise<boolean> => {
+      const base = {
+        key: KEY.D.key,
+        code: KEY.D.code,
+        windowsVirtualKeyCode: KEY.D.vk,
+        nativeVirtualKeyCode: KEY.D.vk,
+        modifiers: 0,
+      };
+      await T.send("Input.dispatchKeyEvent", { ...base, type: "rawKeyDown" });
+      await frames(4); // để phím được xử lý vào luồng nhập của client
+      // E2E_JANK_MS (mặc định 0): chặn luồng chính của trang chừng này ms ngay khi bắt giữ phím, mô phỏng runner CI chậm (#1403): khung hình
+      // chậm => client gửi ít input trong khoảng giữ cố định => đi không đủ quãng, hộp thoại không hiện. Dùng tái hiện cục bộ + chứng minh răng
+      // đột biến (giữ cố định 700 ms sẽ hết hạn trong lúc trang bị chặn => KHÔNG đi đủ => đỏ). Chờ theo điều kiện nên phiên bản sửa survive cú chặn.
+      const JANK_MS = Math.max(0, Number(process.env.E2E_JANK_MS ?? "0") || 0);
+      if (JANK_MS > 0) {
+        await sleep(50);
+        await T.ev(
+          `(() => { const e = Date.now() + ${JANK_MS}; while (Date.now() < e) {} return 1; })()`,
+        );
+      }
+      let triggered = false;
+      for (const end = Date.now() + capMs; Date.now() < end;) {
+        await frames(2);
+        await sleep(100);
+        if (sp.a.offer !== undefined) {
+          triggered = true;
+          break;
+        }
+      }
+      await T.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+      await frames(2);
+      return triggered;
+    };
+
+    /**
+     * Cho client thật đi bộ THEO ĐIỀU KIỆN tới khi hộp thoại hiện. Lần tung xúc xắc chỉ có MỘT lượt mỗi bước chân: quái / trùm ngẫu nhiên có thể đi tới gần giữa lúc
+     * kiểm và lúc tung (`ambushBlocked`), nên thử lại tối đa 4 lần với chỗ khác thay vì đỏ giả. Giữ phím chờ theo điều kiện (không khoảng cố định) để runner chậm cũng đi đủ quãng (#1403).
      */
     const walkIntoAmbush = async () => {
       const sp = cur;
       if (!sp) throw new Error("chưa prepare");
       for (let attempt = 0; ; attempt++) {
-        await hold([KEY.D], 700);
+        const triggered = await holdWalkUntilOffer(sp);
         const why = ambushBlocked(sp.world, sp.sid);
-        try {
-          await T.waitFor(
-            shown("ambush-modal"),
-            "hộp thoại chặn đường hiện",
-            attempt >= 3 ? 8000 : 2500,
-          );
+        if (triggered || sp.a.offer !== undefined) {
+          await T.waitFor(shown("ambush-modal"), "hộp thoại chặn đường hiện", 8000);
           return;
-        } catch (e) {
-          out(
-            `  [chẩn đoán lần ${attempt + 1}] ngay sau khi đi: blocked=${JSON.stringify(why)}; x=${Math.round(sp.p.x)}, walked=${Math.round(sp.a.walked)}, offer=${Boolean(sp.a.offer)}`,
-          );
-          if (attempt >= 3) throw e;
-          await placeInWild(sp, 3 * (attempt + 1)); // chỗ khác + đặt lại quãng đi
         }
+        out(
+          `  [chẩn đoán lần ${attempt + 1}] giữ phím hết trần mà KHÔNG mở hộp thoại: blocked=${JSON.stringify(why)}; x=${Math.round(sp.p.x)}, walked=${Math.round(sp.a.walked)}, offer=${Boolean(sp.a.offer)}`,
+        );
+        if (attempt >= 3)
+          throw new Error(
+            "Giữ phím đủ lâu (>=10s/lần) mà không gặp chặn đường sau 4 lần đặt lại chỗ",
+          );
+        await placeInWild(sp, 3 * (attempt + 1)); // chỗ khác + đặt lại quãng đi
       }
     };
 
