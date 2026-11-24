@@ -104,6 +104,11 @@ export const FX_CAST_SKILLS = [
   // Lôi (CT15 đợt 2, #1185, D)
   "loi_hoa_pha_ta_chuong",
   "chan_hon_loi_phap",
+  // Lô 1 Âm (#1186, E): 4 chiêu hệ Âm (shared/src/skills-khac.ts), dữ liệu + id này cùng PR
+  "thuc_hon_nhat_chi",
+  "tich_da_phan_anh",
+  "thuc_phat_am_trao",
+  "kho_mach_dan_luu",
   // Vô sắc (CT17 lát 3, G)
   "huyet_trao_pha_mach",
   "bach_cot_hong_nhan",

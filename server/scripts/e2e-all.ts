@@ -1,11 +1,13 @@
-// Bộ chạy toàn bộ 32 script E2E của Tiên Giới một lệnh (M7.16, Issue #694, #1386).
+// Bộ chạy toàn bộ các script E2E của Tiên Giới một lệnh (M7.16, Issue #694, #1386, #1404).
 // Chạy TUẦN TỰ từng script e2e:* (đọc từ server/package.json), timeout mỗi script,
+// hỗ trợ chia shard (--shard M/N) để chạy song song trên nhiều runner CI,
 // tự động dọn sạch toàn bộ cây tiến trình con cháu (tránh mồ côi Chrome detached),
 // tự động thử lại 1 lần nếu đỏ (xanh ở lần 2 -> FLAKY), in bảng kết quả Markdown,
 // trích dẫn 3-5 dòng log cuối của script đỏ, và ghi log đầy đủ từng script vào thư mục.
 //
 // Cách dùng:
 //   npm run e2e:all -w server
+//   npm run e2e:all -w server -- --shard 1/2
 //   npm run e2e:all -w server -- --only noi-lai,chat-luong
 //   npm run e2e:all -w server -- --skip map,dpr
 //   npm run e2e:all -w server -- --timeout 180 --logs /tmp/e2e-run
@@ -31,6 +33,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const serverPkgPath = path.resolve(here, "../package.json");
 
+export interface ShardConfig {
+  index: number;
+  total: number;
+}
+
 export interface E2eAllOptions {
   only?: string[];
   skip?: string[];
@@ -39,6 +46,7 @@ export interface E2eAllOptions {
   build: boolean;
   dryRun: boolean;
   retry: boolean;
+  shard?: ShardConfig;
 }
 
 export type ScriptStatus = "XANH" | "FLAKY" | "ĐỎ" | "BỎ QUA";
@@ -127,6 +135,45 @@ export function filterScripts(
   return { selected, skipped };
 }
 
+/** Phân tích và kiểm tra giá trị tham số --shard M/N (1 <= M <= N) */
+export function parseShard(val: string): ShardConfig {
+  const clean = val.trim();
+  const match = /^(\d+)\/(\d+)$/.exec(clean);
+  if (!match) {
+    throw new Error(
+      `Định dạng --shard không hợp lệ: "${val}". Cần có định dạng M/N (ví dụ: --shard 1/2)`,
+    );
+  }
+  const index = Number(match[1]);
+  const total = Number(match[2]);
+  if (
+    !Number.isInteger(index) ||
+    !Number.isInteger(total) ||
+    index < 1 ||
+    total < 1 ||
+    index > total
+  ) {
+    throw new Error(
+      `Phạm vi --shard không hợp lệ: "${val}". Yêu cầu 1 <= M <= N với M, N là số nguyên dương (ví dụ: --shard 1/2)`,
+    );
+  }
+  return { index, total };
+}
+
+/**
+ * Chia danh sách kịch bản theo shard M/N (hàm thuần pure function).
+ * Sử dụng phân bổ vòng tròn (round-robin: idx % N === M - 1) để phân tán đều tải,
+ * bảo toàn thứ tự kịch bản ban đầu và đảm bảo mỗi kịch bản chỉ xuất hiện đúng 1 lần qua các shard.
+ */
+export function shardScripts(scripts: string[], shard: ShardConfig): string[] {
+  const { index, total } = shard;
+  if (total < 1 || index < 1 || index > total) {
+    throw new Error(`Phạm vi shard không hợp lệ: ${index}/${total}. Yêu cầu 1 <= M <= N.`);
+  }
+
+  return scripts.filter((_, idx) => idx % total === index - 1);
+}
+
 /** Phân tích các tham số dòng lệnh CLI */
 export function parseCliArgs(args: string[]): E2eAllOptions {
   const options: E2eAllOptions = {
@@ -179,6 +226,12 @@ export function parseCliArgs(args: string[]): E2eAllOptions {
       options.dryRun = true;
     } else if (arg === "--no-retry") {
       options.retry = false;
+    } else if (arg === "--shard") {
+      const val = args[++i] ?? "";
+      options.shard = parseShard(val);
+    } else if (arg.startsWith("--shard=")) {
+      const val = arg.slice("--shard=".length);
+      options.shard = parseShard(val);
     }
   }
 
@@ -552,7 +605,14 @@ export function executeScriptOnce(
 
 /** Chạy toàn bộ quy trình e2e:all */
 export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise<number> {
-  const options = parseCliArgs(args);
+  let options: E2eAllOptions;
+  try {
+    options = parseCliArgs(args);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Lỗi tham số dòng lệnh: ${msg}`);
+    return 2;
+  }
   const out = (m: string) => console.log(m);
 
   out("======================================================================");
@@ -563,14 +623,26 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
   const pkgJson = JSON.parse(readFileSync(serverPkgPath, "utf-8"));
   const allScripts = getE2eScripts(pkgJson);
 
+  // Thứ tự xử lý: lọc --only và --skip TRƯỚC
   const { selected, skipped } = filterScripts(allScripts, {
     only: options.only,
     skip: options.skip,
   });
 
+  // Sau đó mới chia shard trên danh sách còn lại
+  let toRun = selected;
+  if (options.shard) {
+    toRun = shardScripts(selected, options.shard);
+  }
+
   out(
     `Danh sách script E2E: tổng ${allScripts.length} | chọn ${selected.length} | bỏ qua ${skipped.length}`,
   );
+  if (options.shard) {
+    out(
+      `  --shard: ${options.shard.index}/${options.shard.total} (chạy ${toRun.length}/${selected.length} script)`,
+    );
+  }
   if (options.only && options.only.length > 0) {
     out(`  --only: ${options.only.join(", ")}`);
   }
@@ -582,8 +654,8 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
   // Nếu là dry-run, in kế hoạch và kết thúc ngay không tạo thư mục log và không build
   if (options.dryRun) {
     out("\n[DRY RUN] Các script sẽ chạy:");
-    for (let i = 0; i < selected.length; i++) {
-      out(`  ${i + 1}. ${selected[i]}`);
+    for (let i = 0; i < toRun.length; i++) {
+      out(`  ${i + 1}. ${toRun[i]}`);
     }
     if (skipped.length > 0) {
       out("[DRY RUN] Các script bị bỏ qua:");
@@ -626,12 +698,12 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
     });
   }
 
-  out(`\nBắt đầu chạy tuần tự ${selected.length} script...\n`);
+  out(`\nBắt đầu chạy tuần tự ${toRun.length} script...\n`);
 
-  for (let i = 0; i < selected.length; i++) {
-    const script = selected[i];
+  for (let i = 0; i < toRun.length; i++) {
+    const script = toRun[i];
     const logFile = path.join(options.logsDir, `${script.replace(/[:/]/g, "-")}.log`);
-    const progress = `[${i + 1}/${selected.length}]`;
+    const progress = `[${i + 1}/${toRun.length}]`;
 
     process.stdout.write(`${progress} ${script} ... `);
 
