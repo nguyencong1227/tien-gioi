@@ -125,6 +125,9 @@ export const FX_CAST_SKILLS = [
   "bang_phach_than_cham",
   "loi_am_an",
   "tu_dien_thoa",
+  "xich_viem",
+  "chu_canh_dao_hong",
+  "hoa_duoc_no",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
