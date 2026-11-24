@@ -83,42 +83,37 @@ export const BANNED_TERMS: readonly BannedTerm[] = [
   },
 ];
 
-/** Là chữ (Unicode letter, kể cả tiếng Việt có dấu) — dùng kiểm ranh giới từ. */
-function isLetter(ch: string | undefined): boolean {
-  return ch !== undefined && /\p{L}/u.test(ch);
+/** Escape ký tự đặc biệt của RegExp trong một mảnh chữ (để nối an toàn vào pattern). */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
  * Tìm mọi chữ cấm trong `text`. Trả danh sách lý do dạng `bị cấm '<chữ thấy>' (<lý do>)` (có gợi ý thì thêm
- * `-> dùng '<thay thế>'`; rỗng = sạch). Khớp KHÔNG phân biệt hoa / thường + ranh giới từ hai bên + NFC.
+ * `-> dùng '<thay thế>'`; rỗng = sạch). Khớp KHÔNG phân biệt hoa / thường + ranh giới chữ hai bên + NFC; các chữ
+ * trong một term cách nhau bởi CHỈ khoảng trắng (nhiều dấu cách / xuống dòng / NBSP đều chấp nhận).
  *
  * KHÔNG phân biệt hoa / thường vì chữ cấm KHÔNG có dạng hợp lệ nào (khác `glossaryViolations` — nơi chỉ báo biến
- * thể sai, bỏ qua dạng chuẩn). Vẫn ranh giới từ để khỏi bám chữ khác: "ok" KHÔNG bám "book"/"OKA"; "Bắc Minh"
- * KHÔNG bám chữ "minh" riêng lẻ. toLowerCase KHÔNG đổi độ dài với tiếng Việt precomposed + ASCII (chữ ta ta chỉ
- * dùng hai tập này) nên vị trí tìm được ở bản thường áp thẳng lại bản gốc để cắt chuỗi + kiểm ranh giới.
+ * thể sai, bỏ qua dạng chuẩn). Ranh giới chữ dùng lookbehind / lookahead `\p{L}` (chữ Unicode, kể cả tiếng Việt có
+ * dấu) để khỏi bám chữ khác: "ok" KHÔNG bám "book"/"OKA"; "Bắc Minh" KHÔNG bám chữ "minh" riêng lẻ. MỖI term dựng
+ * MỘT RegExp (flag `giu` = global + KHÔNG phân biệt hoa thường + Unicode); các chữ trong term nối bằng `\s+` để
+ * chịu nhiều dấu cách / xuống dòng / NBSP giữa chúng.
+ *
+ * KHÔNG dùng `toLowerCase()` + `indexOf`: `İ` (U+0130, "I" có chấm trên) thường hoá thành 2 ký tự làm lệch chỉ số,
+ * bỏ lỡ vi phạm đứng sau nó (đã gặp ở đầu `07ef3b6f`: `"İ Thanh Vân Môn"` báo 0 thay vì 1).
  */
 export function bannedViolations(text: string): string[] {
-  const out: string[] = [];
   const src = text.normalize("NFC");
-  const hay = src.toLowerCase();
+  const out: string[] = [];
   for (const b of BANNED_TERMS) {
-    const term = b.term.normalize("NFC");
+    const term = b.term.normalize("NFC").trim();
     if (!term) continue;
-    const needle = term.toLowerCase();
-    let from = 0;
-    for (;;) {
-      const idx = hay.indexOf(needle, from);
-      if (idx < 0) break;
-      const end = idx + needle.length;
-      const atWordStart = idx === 0 || !isLetter(src[idx - 1]);
-      const atWordEnd = end >= src.length || !isLetter(src[end]);
-      if (atWordStart && atWordEnd) {
-        const seen = src.slice(idx, end);
-        let line = `bị cấm '${seen}' (${b.reason})`;
-        if (b.suggest) line += ` -> dùng '${b.suggest}'`;
-        out.push(line);
-      }
-      from = end;
+    // Ranh giới chữ hai bên (?<!\p{L}) / (?!\p{L}); các chữ trong term cách nhau bởi \s+ (nhiều khoảng / xuống dòng / NBSP).
+    const pattern = "(?<!\\p{L})" + term.split(/\s+/).map(escapeRegex).join("\\s+") + "(?!\\p{L})";
+    for (const m of src.matchAll(new RegExp(pattern, "giu"))) {
+      let line = `bị cấm '${m[0]}' (${b.reason})`;
+      if (b.suggest) line += ` -> dùng '${b.suggest}'`;
+      out.push(line);
     }
   }
   return out;

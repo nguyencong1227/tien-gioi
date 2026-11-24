@@ -3,7 +3,7 @@
 // chứng minh đỏ khi mã sai (đột biến): bỏ hoa thường -> "thanh vân môn" đỏ; bỏ ranh giới -> "book" đỏ; v.v.
 import { describe, expect, it } from "vitest";
 import { BANNED_TERMS, bannedViolations } from "./glossary-banned";
-import { SKILLS_KIM_THO } from "./skills-kim-tho";
+import { LEARNABLE_SKILLS } from "./skills";
 
 describe("bannedViolations — từ cấm (tên riêng khác truyện + từ hiện đại)", () => {
   it("dữ liệu: mọi mục có term + reason khác rỗng, term duy nhất", () => {
@@ -72,16 +72,34 @@ describe("bannedViolations — từ cấm (tên riêng khác truyện + từ hi�
     expect(bannedViolations(`Nguồn: ${nfd}.`).length).toBe(1);
   });
 
-  it("danh sách rỗng / không có từ cấm -> KHÔNG bắt gì (đột biến: vòng lặp bỏ qua -> đỏ)", () => {
-    // Chứng minh kết quả phụ thuộc vào BANNED_TERMS: cắt tạm danh sách về rỗng thì không còn vi phạm.
-    expect(bannedViolations("Thanh Vân Môn boss level ok").length).toBe(4);
-    // (Nếu ai đó làm hỏng vòng lặp duyệt BANNED_TERMS, ca tổng hợp này sẽ đỏ.)
+  it("bắt vi phạm đứng sau `İ` (U+0130): cũ toLowerCase()+indexOf lệch chỉ số bỏ lỡ (đột biến: quay lại cách đó -> đỏ)", () => {
+    // `İ` thường hoá thành 2 đơn vị byte với một số locale -> `hay.indexOf` lệch so với `src`, bỏ lỡ vi phạm đứng sau.
+    // Cách mới quét `matchAll` trên `src` nên KHÔNG lệch.
+    expect(bannedViolations("İ Thanh Vân Môn").length).toBe(1);
+    expect(bannedViolations("İ ok").length).toBe(1);
+    expect(bannedViolations("thường İ Hàn Lập qua.").length).toBe(1);
   });
 
-  it("hợp với khung: chữ cấm KHÔNG lọt vào mô tả chiêu nhóm Kim+Thổ hiện có (dữ liệu thật đang sạch)", () => {
-    // Kiểm chéo chứng minh bộ cấm KHÔNG dương tính giả với nội dung game thật đang có.
-    // (Nếu thêm từ cấm rộng làm bùng nổ dữ liệu thật, ca này đỏ -> liệt kê chứ KHÔNG sửa dữ liệu.)
-    for (const s of SKILLS_KIM_THO) {
+  it("bắt tên cấm cách nhau nhiều khoảng / xuống dòng / tab / NBSP (đột biến: `\\s+` -> dấu cách đơn -> đỏ)", () => {
+    // Tên cấm gồm hai chữ chỉ khớp khi chúng cách nhau BẤT KỲ khoảng trắng nào, không chỉ một dấu cách.
+    // (Đột biến: đổi `\\s+` thành dấu cách đơn -> các ca dưới báo 0 thay vì 1.)
+    for (const variant of ["Bắc  Minh", "Bắc\nMinh", "Bắc\tMinh", "Bắc\u00A0Minh"]) {
+      expect(bannedViolations(`Ta tu tại ${variant}.`).length, variant).toBe(1);
+    }
+  });
+
+  it("duyệt đủ mọi mục của BANNED_TERMS (đột biến: vòng lặp bỏ qua -> đỏ)", () => {
+    // Chứng minh kết quả phụ thuộc vào MỌI mục BANNED_TERMS: chuỗi chứa đủ mọi term phải bắt đủ mỗi term một lần.
+    // (Nếu ai đó làm hỏng vòng lặp duyệt BANNED_TERMS, ca tổng hợp này sẽ đỏ.)
+    const đủMọiTerm = BANNED_TERMS.map((b) => b.term).join(". ");
+    expect(bannedViolations(`${đủMọiTerm}.`).length).toBe(BANNED_TERMS.length);
+  });
+
+  it("hợp với khung: chữ cấm KHÔNG lọt vào mô tả MỌI chiêu học được (dữ liệu thật đang sạch)", () => {
+    // Kiểm chéo chứng minh bộ cấm KHÔNG dương tính giả với nội dung game thật đang có — quét MỌI chiêu học được
+    // (không chỉ một nhóm hệ), nên bắt rò rỏ tên riêng ở bất kỳ chiêu nào. (Nếu thêm từ cấm rộng làm bùng nổ dữ
+    // liệu thật, ca này đỏ -> liệt kê chứ KHÔNG sửa dữ liệu.)
+    for (const s of LEARNABLE_SKILLS) {
       for (const t of [s.name, s.bookName, s.desc]) {
         expect(bannedViolations(t).length, `${s.id}: ${t}`).toBe(0);
       }

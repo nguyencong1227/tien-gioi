@@ -173,7 +173,7 @@ Số chữ hiển thị (đã trừ dấu thanh). Đây là hướng dẫn **m�
 | Loại | Độ dài (dài nhất hiện có; nên giữ) |
 |---|---|
 | Đan / phù / trang bị (túi, tooltip) | dài nhất 20 ("Thượng Hồi Huyết Đan"); giữ ≤ ~20 |
-| Chiêu (thanh chiêu, tooltip) | dài nhất 24 ("Thanh Vân Vạn Kiếm Quyết", "Khô Mộc Phùng Xuân Quyết"); ≤ ~24, ưu tiên ≤ 20 |
+| Chiêu (thanh chiêu, tooltip) | dài nhất 21 ("Phượng Minh Cầu Hoàng", "Hồi Phong Liên Chưởng"); ≤ ~24, ưu tiên ≤ 20 |
 | Kinh quyển (`bookName`) | dài nhất 24; ≤ ~24 |
 | Tên / danh xưng NPC | dài nhất 22 ("Trạm trưởng Vọng Sương"); ≤ ~22 |
 | Quái (tag trên đầu, tooltip) | dài nhất 19 ("Phân Thân Yêu Vương"); ≤ ~20 |
@@ -261,6 +261,11 @@ Dev F nối `bannedViolations` vào `npm run check:content` (Phần 3 #1200) ch�
 
 > CHƯA phủ hết — gặp rò rỏ mới (tên nhân vật / tông phái truyện khác) thì THÊM dòng vào `BANNED_TERMS`,
 > đừng bịa danh sách rộng không có bằng chứng. Matcher KHÔNG phân biệt hoa / thường nên mọi cách viết đều bị bắt.
+
+> **Ngoại lệ ĐÃ CHỐT (Dev A, PR #1408):** `Thanh Vân Kiếm Khí` / `Thanh Vân Kiếm Quyết` / `Thanh Vân Vạn Kiếm Quyết`
+> (id `thanh_van_kiem_khi`, đã vào hồ sơ lưu) KHÔNG bị cấm — `BANNED_TERMS` chỉ cấm `Thanh Vân Môn` / `Thanh Vân Kiếm
+> Tông` (tông phái cụ thể), KHÔNG cấm chữ "Thanh Vân" đứng riêng. Đổi tên hiển thị của chiêu này chỉ khi người dùng
+> yêu cầu; agent sau KHÔNG cần hỏi lại.
 
 ### Từ hiện đại lạc văn phong (cấm, nhất là trong lời thoại)
 
