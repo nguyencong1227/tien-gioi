@@ -1025,6 +1025,10 @@ const BOOKS = {
   // Lôi (CT15 đợt 2, #1185, D): bìa theo hệ Lôi (vàng); dấu ấn sinh tự động từ id (#1303)
   kinh_loi_hoa_pha_ta_chuong: [0xe0b040, 0xfff0b0],
   kinh_chan_hon_loi_phap: [0xc8b83c, 0xe6dcff],
+  // Vô sắc (CT17 lát 3, G): bìa xám theo hệ none, không dấu (ba tone riêng để không trùng pixel)
+  kinh_huyet_trao_pha_mach: [0x9a7070, 0xf0d0d0],
+  kinh_bach_cot_hong_nhan: [0x888888, 0xf0e8e8],
+  kinh_niep_hon_doat_phat: [0x706878, 0xe0d8e8],
   // Âm (CT16 đợt 2, #1186, E; lô 1 vẽ TRƯỚC dữ liệu): bìa tím đen theo hệ Âm, mỗi quyển một sắc riêng (mực, đêm, kinh mạch độc, vuốt cào); dấu ấn sinh tự động từ id (#1303),
   // riêng "Tịch Dạ Kiếm Quyết" (kiếm đêm tách bóng) có dấu kiếm
   kinh_thuc_hon_nhat_chi: [0x2e2440, 0xb8a0d8],
@@ -1032,6 +1036,28 @@ const BOOKS = {
   kinh_kho_mach_dan_luu: [0x322a3a, 0x7fbf9a],
   // "Thực Phách Âm Trảo" (cg2, thay hai quyển cg4 / cg5 đã bỏ theo quy tắc mục 8 `docs/PHAN_CONG_CHIEU_THUC.md`): ba vệt vuốt cào, bìa tím rượu, vệt trảo hồng tro
   kinh_thuc_phat_am_trao: [0x40283a, 0xd49ab8, "trao"],
+  // Thủy (CT15 đợt 2 lát 2, #1185, D; icon vẽ SAU dữ liệu của D, B): bìa theo hệ Thủy nhưng mỗi quyển một sắc riêng để không trùng Bích Thủy / Hư Thủy (0x3b7bd9); dấu ấn sinh tự động từ id (#1303),
+  // riêng "Tỏa Long Thủ" (cầm nã, siết như xích) có dấu vuốt
+  kinh_thai_hoa_bo_nguyen: [0x2f8f9a, 0xf2d8e8], // sương trên cánh hoa: lam ngọc, viền hồng phấn
+  kinh_huyet_co_bi_kinh: [0x4a3a8a, 0xc880d8], // cổ trùng nuôi bằng máu, máu rỉ màu tím
+  kinh_toa_long_cam_na: [0x2c6a8a, 0xb0d8e8, "trao"],
+  kinh_huyet_ti_phuoc_than: [0x2a2f6a, 0xe06070], // tơ máu: chàm đậm, sợi đỏ
+  kinh_no_dao_bai_khong: [0x1f4a8a, 0xe0f4ff], // sóng lớp lớp: biển sâu, bọt trắng
+  // Hỏa + Phong (CT16 đợt 2 lô 2, #1186, E; B vẽ TRƯỚC dữ liệu chiêu theo thư của Dev E, id quyển = kinh_<id chiêu>, KHÔNG theo tên công pháp): mỗi quyển một sắc riêng
+  // để không trùng Liệt Diễm / Xích Tước (Hỏa) và Phiêu Phong / Hồi Phong (Phong); quyển không chỉ định dấu tay thì có ấn sinh từ id (#1303)
+  kinh_quy_hoa_phe_hon: [0x8a3048, 0x7fe0d0], // lửa ma trơi xanh lạnh trên bìa đỏ rượu (Luyện Khí, ấn hồn)
+  kinh_ma_trao_phe_huyet: [0x9a2a2a, 0xff7a68, "trao"], // móng vuốt nhuộm lửa máu (Trúc Cơ, chảy máu): ba vệt vuốt cào
+  kinh_phat_hoa_hang_ma: [0xd08a2a, 0xfff0b0], // lửa vàng của lòng bàn tay trừ tà (Kim Đan, thiêu đốt)
+  kinh_huyet_mang_pha_giap: [0x7a1f2e, 0xff9a8a, "tien"], // sợi máu đỏ đâm xuyên giáp (Nguyên Anh, chảy máu): mũi tên xiên
+  kinh_quy_anh_me_tung: [0x3f6a66, 0xc8e8e0], // bóng ma mờ tỏ, âm khí lam lục (Luyện Khí, bộ pháp "Quỷ Ảnh Bộ")
+  kinh_am_phong_quyen_hon: [0x4a5a78, 0xd0c8f0], // gió âm cuốn hồn oan, xám chàm tím (Kim Đan, "Quỷ Phong Quyết")
+  // Băng + Lôi (CT15 đợt 3, #1185, D; icon vẽ SAU dữ liệu của D, B): mỗi quyển một sắc riêng để không trùng Hàn Băng (0x6fb8e8) / Lôi Đình (0xe0c850) / Lôi Hỏa (0xe0b040) / Chấn Hồn (0xc8b83c);
+  // dấu ấn sinh tự động từ id (#1303), riêng cung băng có dấu mũi tên và Hàn Sương Tỏa (bẫy xích) có dấu trận
+  kinh_giao_can_cung: [0x3f7f98, 0xcfeaf2, "tien"], // cung dây gân giao, xanh lam lạnh (Trúc Cơ, mũi băng bắn đi)
+  kinh_han_suong_toa: [0x7a9cb8, 0xeef4fa, "tran"], // xích sương trói chân: xám lam nhạt, viền trắng sương (Kim Đan, bẫy)
+  kinh_bang_phach_than_cham: [0x2a5a7a, 0xe6f8ff], // kim băng xuyên tim: lam sẫm, viền trắng buốt (Nguyên Anh)
+  kinh_loi_am_an: [0x8a6a2a, 0xf4d878], // ấn sét đập xuống, dấu Lôi: đồng thau, ánh vàng (Trúc Cơ)
+  kinh_tu_dien_thoa: [0x5a3a98, 0xd8c0ff], // tia sét tím mảnh như thoi (Kim Đan, kích dấu Lôi)
 };
 
 /**

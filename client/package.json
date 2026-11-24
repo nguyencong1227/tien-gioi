@@ -2,7 +2,7 @@
   "name": "@tien-gioi/client",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

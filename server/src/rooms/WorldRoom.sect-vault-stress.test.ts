@@ -536,6 +536,13 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     expect(vSlot).toBeGreaterThanOrEqual(0);
     Chu.room.send(SECT_MSG.vaultWithdraw, { slot: vSlot, itemId: MAT.id, qty: 15 });
     await waitFor(() => countInSlots(ctrlOf(Chu).inv, MAT.id) === 15, 4000, "Chu rút được 15");
+    // `vaultSlotsOf` đọc bản chụp kho MÀ CLIENT NHẬN, và máy chủ chỉ gửi sau khi LƯU hồ sơ (`sectVaultWithdraw`: kho trừ -> cộng túi -> lưu -> gửi),
+    // nên túi đã 15 mà bản chụp còn 20 là chuyện thường khi máy chậm: CHỜ bản mới thay vì đọc ngay (#1397).
+    await waitFor(
+      () => countInSlots(vaultSlotsOf(Chu, sectName), MAT.id) === 5,
+      4000,
+      "kho còn 5 (bản chụp kho mới tới client)",
+    );
     expect(countInSlots(vaultSlotsOf(Chu, sectName), MAT.id)).toBe(5);
     expect(countTotalMat()).toBe(INITIAL_MAT); // 15 + 0 + 5 = 20, bảo toàn qua kiếp
   }, 25_000);

@@ -2,7 +2,7 @@
   "name": "@tien-gioi/server",
   "private": true,
   "license": "UNLICENSED",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -55,6 +55,8 @@
     "map:build": "tsx scripts/map-build.ts",
     "map:show": "tsx scripts/map-show.ts",
     "e2e:doc-duoc": "tsx scripts/e2e-doc-duoc.ts",
+    "e2e:inv-select": "node ../client/scripts/check-inv-select.mjs",
+    "e2e:move-keys": "node ../client/scripts/check-move-keys.mjs",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",

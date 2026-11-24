@@ -200,9 +200,9 @@ export function isMockSectEnabled(
 export const MOCK_SECT_SAMPLES = {
   leaderView(): SectView {
     return {
-      name: "Tiêu Dao Phái",
-      tag: "TD",
-      motd: "Bắc Minh Thần Công truyền thiên hạ, Tiêu Dao ngự phong định càn khôn.",
+      name: "Lạc Hà Môn",
+      tag: "LH",
+      motd: "Cùng giữ Lạc Hà, săn yêu luyện đạo; đồng môn gặp nạn thì không ai đứng ngoài.",
       coin: 125_000,
       myRank: "chu",
       createdAt: Date.now() - 86_400_000 * 30,
@@ -247,7 +247,7 @@ export const MOCK_SECT_SAMPLES = {
     };
   },
 
-  invited(from = "Bùi Chấn Nhạc", sect = "Tiêu Dao Phái", tag = "TD"): SectInvitedMsg {
+  invited(from = "Bùi Chấn Nhạc", sect = "Lạc Hà Môn", tag = "LH"): SectInvitedMsg {
     return {
       from,
       sect,

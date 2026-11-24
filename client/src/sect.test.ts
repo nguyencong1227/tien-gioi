@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   formatSectInviteCountdown,
   formatSectTreasury,
@@ -182,8 +184,36 @@ describe("client sect pure logic", () => {
 
     const inv = MOCK_SECT_SAMPLES.invited();
     expect(inv.from).toBe("Bùi Chấn Nhạc");
-    expect(inv.sect).toBe("Tiêu Dao Phái");
+    expect(inv.sect).toBe("Lạc Hà Môn");
     expect(inv.ttlMs).toBe(30_000);
+  });
+
+  it("dữ liệu mẫu và ví dụ nhập tên tông môn không mượn tên của truyện / game khác", () => {
+    // Tên môn công / môn phái của truyện khác (quy tắc Asset của AGENTS.md): "Bắc Minh Thần Công", "Tiêu Dao Phái".
+    // Khoảng trắng giữa các chữ khớp mọi dạng (cách kép, xuống dòng, NBSP), không phân biệt hoa thường.
+    const FOREIGN = /Bắc\s+Minh|Thần\s+Công|Tiêu\s+Dao\s+Phái/iu;
+    const sample = JSON.stringify([
+      MOCK_SECT_SAMPLES.leaderView(),
+      MOCK_SECT_SAMPLES.elderView(),
+      MOCK_SECT_SAMPLES.memberView(),
+      MOCK_SECT_SAMPLES.presence(),
+      MOCK_SECT_SAMPLES.invited(),
+    ]);
+    expect(sample).not.toMatch(FOREIGN);
+    // Ô nhập tên ở trang vào game (người chơi nào cũng thấy dòng gợi ý này).
+    const html = readFileSync(resolve(__dirname, "..", "index.html"), "utf8");
+    const hint = html.match(/id="sect-input-name"[\s\S]*?placeholder="([^"]*)"/);
+    expect(hint, "không tìm thấy placeholder của #sect-input-name").not.toBeNull();
+    expect(hint![1]).not.toMatch(FOREIGN);
+    // Bộ lọc có răng: bắt đủ các dạng viết.
+    for (const t of [
+      "Bắc Minh Thần Công",
+      "bắc  minh",
+      "THẦN\nCÔNG",
+      "Tiêu Dao Phái",
+      "Bắc\u00a0Minh",
+    ])
+      expect(FOREIGN.test(t), JSON.stringify(t)).toBe(true);
   });
 
   it("fmt định dạng số HUD an toàn, không bao giờ in NaN khi giá trị không hợp lệ", async () => {
