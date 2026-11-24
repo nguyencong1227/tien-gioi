@@ -1058,6 +1058,11 @@ const BOOKS = {
   kinh_bang_phach_than_cham: [0x2a5a7a, 0xe6f8ff], // kim băng xuyên tim: lam sẫm, viền trắng buốt (Nguyên Anh)
   kinh_loi_am_an: [0x8a6a2a, 0xf4d878], // ấn sét đập xuống, dấu Lôi: đồng thau, ánh vàng (Trúc Cơ)
   kinh_tu_dien_thoa: [0x5a3a98, 0xd8c0ff], // tia sét tím mảnh như thoi (Kim Đan, kích dấu Lôi)
+  // Hỏa Luyện Khí bán cửa hàng (CT15 đợt 2 bổ sung, #1185 / #1418, D; icon vẽ SAU dữ liệu của D, B): mỗi quyển một sắc riêng để không trùng Liệt Hỏa (0xd9433b) / Quỷ Hỏa (0x8a3048) /
+  // Phật Hỏa (0xd08a2a) / Xuyên Giáp (0x7a1f2e); dấu ấn sinh tự động từ id (#1303)
+  kinh_xich_viem: [0xb4552e, 0xffc15a], // ấn đồng khắc văn chu sa, quả cầu lửa: đồng đỏ gạch, viền vàng lửa (bỏng)
+  kinh_chu_canh_dao_hong: [0xc0243a, 0xffd878], // cặp nến hỷ chạm rồng phượng: đỏ son tươi, viền vàng nến (choáng)
+  kinh_hoa_duoc_no: [0x3a3230, 0xff9a3a], // ống tre nhồi diêm tiêu: đen thuốc súng, tia lửa cam
 };
 
 /**

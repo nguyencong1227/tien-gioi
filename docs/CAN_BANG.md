@@ -1131,7 +1131,7 @@ Cảnh báo (không chặn):
 
 > Chạy trong `World` thật (`cast` + `tickWorld`: bẫy / vùng / tượng / đạn bay / chiêu vận đúng như máy chủ), 30 giây mỗi lần đo, người chơi đúng cảnh giới yêu cầu của chiêu, linh lực hồi 20/giây, bù nhìn "lang" đứng yên cách 40 px (một, hoặc ba dàn hàng ngang cách 40 px). **Tỉ lệ** = sát thương bù nhìn mất khi luân phiên chiêu so với CHỈ chém thường cùng bố trí (chiêu thủ / hồi / tăng ích ~1 hoặc thấp hơn vì mất lượt chém). Số có hạt giống, ổn định. Mã: `server/src/balance/skills-dps.ts`.
 
-### Luyện Khí (17 chiêu)
+### Luyện Khí (20 chiêu)
 | Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
 |---|---|---|---|---:|---:|---:|---:|
 | **Hỏa Vân Kiếm** | hoa | cone | sát thương | 3.0s | 0.027 | 1.25× | 1.26× |
@@ -1147,6 +1147,9 @@ Cảnh báo (không chặn):
 | **Hủ Thủy Kình** | thuy | cone | sát thương | 3.0s | 0.020 | 1.25× | 1.27× |
 | **Triền Xà Tỏa Hầu** | moc | cone | sát thương | 3.0s | 0.020 | 1.16× | 1.19× |
 | **Liệt Diễm Chưởng** | hoa | cone | sát thương | 3.0s | 0.020 | 1.25× | 1.22× |
+| **Xích Viêm** | hoa | cone | sát thương | 3.0s | 0.020 | 1.22× | 1.24× |
+| **Chúc Ảnh Dao Hồng** | hoa | cone | khống chế | 4.0s | 0.018 | 1.15× | 1.29× |
+| **Hỏa Dược Nổ** | hoa | cone | sát thương | 3.0s | 0.017 | 1.15× | 1.14× |
 | **Quỷ Hỏa Phệ Hồn** | hoa | cone | sát thương | 3.0s | 0.020 | 1.20× | 1.18× |
 | **Huyết Ảnh Xuyên Tâm** | none | line | sát thương | 3.0s | 0.020 | 1.22× | 1.25× |
 | **Thực Hồn Nhất Chỉ** | am | cone | sát thương | 3.0s | 0.020 | 1.20× | 1.17× |
