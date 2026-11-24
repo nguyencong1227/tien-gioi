@@ -280,6 +280,13 @@ import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from 
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
 import {
+  SHOP_FILTER_MIN,
+  cleanShopQuery,
+  filterShopIds,
+  shopFilterActive,
+  shopFilterSummary,
+} from "./shop-filter";
+import {
   DEFAULT_SKILL_FILTER,
   cleanSkillFilter,
   elementCounts,
@@ -2918,6 +2925,8 @@ function renderForgeModalImpl() {
 let shopModalOpen = false;
 let shopNpcId = "duoc_su";
 let shopTab: "buy" | "sell" = "buy";
+/** Chuỗi tìm ở tab Mua (rà giao diện 25/11: cửa hàng 22 món); trống = không lọc. Về trống mỗi lần mở cửa hàng. */
+let shopQuery = "";
 const shopBuyQuantities: Record<string, number> = {};
 /** Số lượng định bán theo `ô:món` (không chỉ theo ô: ô đổi sang món khác thì không thừa kế số lượng của món cũ) */
 const shopSellQuantities: Record<string, number> = {};
@@ -2986,8 +2995,48 @@ function renderShopModal() {
     tabSell.classList.add("active");
     listBuy.hidden = true;
     listSell.hidden = false;
+    $("shop-filter").hidden = true;
+    $("shop-nomatch").hidden = true;
     renderShopSell();
   }
+}
+
+/** Thanh tìm món (không đụng danh sách, để ô tìm giữ nguyên con trỏ khi gõ): hiện / ẩn, dòng đếm "Hiện X / Y món", nút Bỏ lọc, dòng "không khớp". */
+function renderShopFilterBar(show: boolean, shown: number, total: number) {
+  const active = show && shopFilterActive(shopQuery);
+  $("shop-filter").hidden = !show;
+  $("shop-count").textContent = shopFilterSummary(shown, total, active);
+  $("shop-filter-clear").hidden = !active;
+  $("shop-nomatch").hidden = !(show && total > 0 && shown === 0);
+}
+
+/** Nối ô tìm món (một lần lúc dựng giao diện). Chuỗi gõ vào đi qua `cleanShopQuery` trước khi dùng. */
+function bindShopFilter() {
+  const input = document.getElementById("shop-q") as HTMLInputElement | null;
+  if (!input) return;
+  input.addEventListener("input", () => {
+    shopQuery = cleanShopQuery(input.value);
+    renderShopBuy();
+  });
+  input.addEventListener("keydown", (e) => {
+    // Esc trong ô tìm: có chữ thì xoá chữ (không đóng bảng); hết chữ thì bỏ focus để Esc đóng bảng như thường (như ô tìm chiêu)
+    if (e.key !== "Escape") return;
+    if (shopQuery !== "") {
+      e.preventDefault();
+      e.stopPropagation();
+      input.value = "";
+      shopQuery = "";
+      renderShopBuy();
+    } else {
+      input.blur();
+    }
+  });
+  document.getElementById("shop-filter-clear")?.addEventListener("click", () => {
+    shopQuery = "";
+    input.value = "";
+    renderShopBuy();
+    input.focus();
+  });
 }
 
 function renderShopBuy() {
@@ -3000,6 +3049,7 @@ function renderShopBuyImpl() {
 
   const shop = SHOP_BY_NPC[shopNpcId];
   if (!shop || shop.itemIds.length === 0) {
+    renderShopFilterBar(false, 0, 0);
     const emptyP = document.createElement("p");
     emptyP.className = "shop-empty";
     emptyP.textContent = "Cửa hàng hiện chưa có mặt hàng nào.";
@@ -3007,7 +3057,14 @@ function renderShopBuyImpl() {
     return;
   }
 
-  for (const itemId of shop.itemIds) {
+  // ô tìm chỉ hiện khi cửa hàng bán nhiều món (rà giao diện 25/11); dưới ngưỡng thì luôn hiện đủ, bất kể chuỗi tìm cũ
+  const showBar = shop.itemIds.length >= SHOP_FILTER_MIN;
+  const shownIds = showBar
+    ? filterShopIds(shop.itemIds, shopQuery, (id) => ITEM_BY_ID[id])
+    : shop.itemIds;
+  renderShopFilterBar(showBar, shownIds.length, shop.itemIds.length);
+
+  for (const itemId of shownIds) {
     const def = ITEM_BY_ID[itemId];
     if (!def) continue;
 
@@ -5429,6 +5486,7 @@ export const ui = {
     bindTap("btn-skills", () => this.toggleSkillsModal());
     bindTap("skills-close", () => this.toggleSkillsModal(false));
     bindSkillFilter();
+    bindShopFilter();
     bindTap("tab-q-active", () => {
       questTab = "active";
       $("tab-q-active").classList.add("active");
@@ -5917,6 +5975,10 @@ export const ui = {
     shopModalOpen = force ?? !shopModalOpen;
     $("shop-modal").hidden = !shopModalOpen;
     if (shopModalOpen) {
+      // mở cửa hàng nào cũng bắt đầu không lọc (chuỗi tìm của lần trước không được giấu món của cửa hàng này)
+      shopQuery = "";
+      const q = document.getElementById("shop-q") as HTMLInputElement | null;
+      if (q) q.value = "";
       modalStack.push("shop-modal");
       focusModal($("shop-modal"));
       renderShopModal();

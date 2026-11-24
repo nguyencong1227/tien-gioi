@@ -1103,6 +1103,28 @@
           <button type="button" class="q-tab active" id="tab-shop-buy">Mua Đan Dược</button>
           <button type="button" class="q-tab" id="tab-shop-sell">Thu Mua Vật Phẩm</button>
         </div>
+        <!-- Tìm món ở tab Mua (rà giao diện 25/11): chỉ hiện khi cửa hàng bán từ SHOP_FILTER_MIN món trở lên (ui.ts). Trên điện thoại cả tấm cuộn nên thanh này dính đầu tấm. -->
+        <div
+          id="shop-filter"
+          class="shop-filter"
+          role="search"
+          aria-label="Tìm món trong cửa hàng"
+          hidden
+        >
+          <input
+            id="shop-q"
+            type="search"
+            class="shop-q"
+            maxlength="64"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Tìm món…"
+            aria-label="Tìm món theo tên hoặc mô tả (không cần gõ dấu)"
+          />
+          <button type="button" id="shop-filter-clear" class="sk-slot-btn" hidden>Bỏ lọc</button>
+          <small id="shop-count" class="shop-count" aria-live="polite"></small>
+        </div>
+        <p id="shop-nomatch" class="shop-empty" hidden>Không có món nào khớp.</p>
         <div id="shop-buy-list" class="shop-list"></div>
         <div id="shop-sell-list" class="shop-list" hidden></div>
       </section>
