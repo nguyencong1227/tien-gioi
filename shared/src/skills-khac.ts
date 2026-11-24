@@ -455,7 +455,7 @@ export const SKILLS_KHAC: readonly SkillDef[] = [
     grade: 0,
   },
   {
-    // Quỷ Phong Quyết -> chiêu "Âm Phong Quyển Hồn": gió âm cuốn hồn oan, khống chế lan. Nguồn cg2 pham4, uy0,57 phi4 hoi2, scope spread, controlChance 0,5, `ma_hoa` (mô tả). Vai khống chế: mult thấp + choáng ngắn.
+    // Quỷ Phong Quyết -> chiêu "Âm Phong Quyển Hồn": gió âm cuốn hồn oan, khống chế lan. Nguồn cg2 pham4, uy0,57 phi4 hoi2, scope spread, controlChance 0,5, `ma_hoa` (mô tả). Vai khống chế: mult thấp + choáng ngắn. mult 1,6 (khung DPS CT10: fan 3 tia nhưng mục tiêu đứng chỉ trúng ~1 tia, single nhích rất chậm theo mult — đo thật mult 1,3 → 1,088×, 1,5 → 1,103×, 1,6 → 1,111×; chọn 1,6 để single 1,111× vượt sàn 1,10 với đệm an toàn, group vẫn 0,949× << trần 2,0).
     id: "am_phong_quyen_hon",
     name: "Âm Phong Quyển Hồn",
     bookName: "Quỷ Phong Quyết",
@@ -468,7 +468,7 @@ export const SKILLS_KHAC: readonly SkillDef[] = [
     width: 14,
     count: 3,
     arc: Math.PI * 0.55,
-    mult: 1.2,
+    mult: 1.6,
     effects: [skillEffect("stun", 0.5, 0, 0.5)],
     reqRealm: 3,
     reqTier: 0,
