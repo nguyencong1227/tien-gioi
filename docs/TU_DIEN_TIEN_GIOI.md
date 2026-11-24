@@ -107,11 +107,129 @@ NPC để bổ sung sau.
 
 ## Quy ước đặt tên
 
-<!-- do Dev G viết, issue #1199 — để trống -->
+> Lấy mẫu từ dữ liệu hiện có (`shared/src/items.ts`, `skills-*.ts`, `game.ts` quái,
+> `npcs.ts`); quy tắc dưới là cái mọi người **đang theo**, KHÔNG bịa. Thêm loại tên
+> mới thì thêm mục ở đây. Issue #1199.
+
+### Hoa / thường
+
+- **Thuật ngữ, chiêu, đan, phù, trang bị, quái, NPC, địa danh** — viết hoa chữ cái
+  đầu MỌI từ (title case): "Hồi Huyết Đan", "Liệt Diễm Chưởng", "Xích Mãng Kiếm",
+  "Hắc Hổ", "Lâm Thanh Tùng", "Hắc Phong Cốc".
+- **Nguyên liệu (vật liệu thường)** — danh từ chung, chữ đầu **thường**, chỉ chữ chỉ
+  loài đôi khi hoa: "Lông thỏ", "Nanh sói", "Da hổ", "Vảy mãng", "Sương mao",
+  "Quy giáp", "Độc nang". (Khác đan: đan luôn title case vì là danh từ riêng của
+  một loại thuốc.)
+- **`id` luôn `snake_case` roman hoá KHÔNG dấu** — `hoi_huyet_dan`, `nanh_soi`,
+  `liet_diem_chuong`. `id` KHÔNG hiển thị, nhưng giữ nhất quán để tra bảng dễ.
+
+### Hậu tố chiêu thức (theo phong cách võ học)
+
+Tên chiêu = [biểu tượng / nguyên tố] + [dáng] + **hậu tố chỉ loại hình**. Dùng đúng
+một hậu tố chuẩn, đừng mô tả dài thay thế. Các hậu tố đã có trong dữ liệu:
+
+> Bảng 2 cột (KHÔNG quét bởi test đồng bộ GLOSSARY — chỉ quét bảng 3 cột thuật
+> ngữ): hậu tố ghi kèm nghĩa trong ngoặc.
+
+| Hậu tố (nghĩa) | Ví dụ |
+|---|---|
+| Kiếm (kiếm) | Thanh Vân Kiếm Khí, Thu Thủy Kiếm Ảnh, Vạn Kiếm Quy Tông |
+| Quyền (đấm) | Liệt Địa Nhất Quyền |
+| Chưởng (bàn tay) | Liệt Diễm Chưởng, Thiết Sa Chưởng, Hàn Băng Nhất Chưởng, Hồi Phong Liên Chưởng |
+| Chỉ (ngón tay) | Huyết Ảnh Chỉ, Đoạn Trường Chỉ Pháp |
+| Ấn (triệu hồi / áp) | Hộ Thân Ấn, Xích Diễm Ấn, Hàn Băng Ấn (thường là pháp bảo) |
+| Phù (phù) | Xích Tước Phù, Hỏa Đạn Phù |
+| Thuật (thuật) | Phi Thoa Thuật |
+| Tán (vũ khí nhỏ) | Thực Giáp Tán |
+| Công (khẩu quyết) | Bàn Thạch Hộ Thể Công, Ngũ Chướng Huyền Công, Huyết Trảo Công |
+| Quyết (kinh quyển) | Thanh Vân Kiếm Quyết, Điện Mâu Quyết, Phượng Cầu Hoàng Quyết |
+| Lục (sách ghi) | Xích Tước Phù Lục |
+| Pháp (phương pháp) | Nhiếp Hồn Đại Pháp, Hóa Huyết Đại Pháp, Chấn Hồn Lôi Pháp |
+| Kinh (sách) | Độc Đằng Phục Kinh, Liên Châu Lôi Kinh |
+| Đồ (biểu đồ) | Liệt Diễm Trận Đồ |
+| Trận (thành trận) | Liệt Diễm Trận, Thiên La Lôi Trận |
+| Hống (tiếng kêu) | Sư Tử Hống |
+| Thủ (tay pháp) | Cầm Long Thủ, Triền Xà Thủ |
+| Kình (lực đấm) | Hủ Thủy Kình |
+| Kích (đòn đánh) | Phá Sơn Nhất Kích |
+| Trảm (chém) | Phân Nhạc Trảm |
+
+> **Kinh quyển (`bookName`)** thường = tên chiêu + hậu tố `Kinh / Quyết / Công /
+> Pháp / Lục / Đồ` (vd chiêu "Xích Tước Phù" → quyển "Xích Tước Phù Lục"; chiêu
+> "Phá Sơn Nhất Kích" → quyển "Phá Sơn Quyền Kinh").
+
+### Quái
+
+2–4 từ, [đặc điểm màu / loại] + [loài]: "Linh Thố", "Hôi Lang", "Hắc Hổ", "Xích
+Mãng", "Sương Hồ", "Thạch Quy", "Độc Thiềm", "Hắc Giao", "Hàn Lang", "Phong Nha",
+"Cốt Tượng", "Độc Tước". **Trùm** thêm danh xưng "Vương": "Thiên Hàn Vương",
+"Linh Hư Yêu Vương", "Phân Thân Yêu Vương".
+
+### Độ dài hiển thị tối đa (đo từ dữ liệu thật)
+
+Số chữ hiển thị (đã trừ dấu thanh). Đây là hướng dẫn **mềm** theo bố cục hiện tại
+(thanh chiêu, tooltip túi, tag quái, danh xưng NPC) — CHƯA có test bắt cứng:
+
+| Loại | Độ dài (dài nhất hiện có; nên giữ) |
+|---|---|
+| Đan / phù / trang bị (túi, tooltip) | dài nhất 20 ("Thượng Hồi Huyết Đan"); giữ ≤ ~20 |
+| Chiêu (thanh chiêu, tooltip) | dài nhất 24 ("Thanh Vân Vạn Kiếm Quyết", "Khô Mộc Phùng Xuân Quyết"); ≤ ~24, ưu tiên ≤ 20 |
+| Kinh quyển (`bookName`) | dài nhất 24; ≤ ~24 |
+| Tên / danh xưng NPC | dài nhất 22 ("Trạm trưởng Vọng Sương"); ≤ ~22 |
+| Quái (tag trên đầu, tooltip) | dài nhất 19 ("Phân Thân Yêu Vương"); ≤ ~20 |
+
+> Vượt ~24 thì rút gọn (bỏ tính từ thừa) thay vì để tràn tooltip.
+
+### Ví dụ đúng / sai
+
+| Loại | Đúng | Sai | Vì sao |
+|---|---|---|---|
+| Đan | Hồi Huyết Đan | hồi huyết đan | đan là thuật ngữ, title case |
+| Nguyên liệu | Nanh sói | Nanh Sói | vật liệu là danh từ chung, chữ đầu thường |
+| `id` đan | `hoi_huyet_dan` | `HồiHuyetDan` / `hoi_huyết_đan` | `id` snake_case KHÔNG dấu, KHÔNG hiển thị |
+| Chiêu | Liệt Diễm Chưởng | Liệt Diễm chiêu lửa | dùng hậu tố chuẩn "Chưởng", KHÔNG mô tả dài |
+| Chiêu `id` | `liet_diem_chuong` | `LiệtDiemChuong` | snake_case KHÔNG dấu |
+| Quái | Xích Mãng | xích mãng | quái viết title case |
+| Trùm | Thiên Hàn Vương | Thiên Hàn vua | "Vương" là danh xưng cố định, KHÔNG dịch |
+
+---
 
 ## Văn phong
 
-<!-- do Dev G viết, issue #1199 — để trống -->
+> Giọng chung: văn mạch tu tiên kinh điển — gọn, hàm súc, KHÔNG hiện đại, KHÔNG
+> hoa mỹ rườm rà. Lời thoại NPC ngắn (mỗi NPC ~5 dòng), mỗi câu một ý. Mô tả sự
+> kiện (dữ liệu `ambush-data.ts`) ngôi ba, có chữ "ngươi", KHÔNG đặt tên nhân vật
+> phụ. Issue #1199.
+
+### Xưng hô theo loại nhân vật
+
+| Loại nhân vật | Tự xưng | Gọi người chơi | Giọng | Ví dụ (thật / viết mới hợp phong cách) |
+|---|---|---|---|---|
+| **Trưởng trấn / Trạm trưởng / Trưởng lão** (người đứng đầu, giữ gìn) | "ta" (già thì "lão phu") | "đạo hữu" (tôn trọng) hoặc "ngươi" (khi dặn việc) | điềm tĩnh, che chở | *"Có việc gì cứ tới tìm ta."* (Trưởng trấn Lâm Thanh Tùng) — *"Kim Đan mới dám đi sâu... Có việc thì nói với ta."* (Trạm trưởng Vọng Sương) |
+| **Lão dược sư / Lão đan sư / Lão phù sư** (thợ cả, hiền) | "lão phu" / "ta" | "ngươi" (bề trên dạy dỗ) xen "đạo hữu" | từ tốn, nhắc nhở | *"Mang da lông yêu thú tới, lão phu luyện cho ngươi vài viên."* (Dược sư) — *"Mang nguyên liệu yêu thú tới, ta sẽ nấu cho ngươi viên hộ đạo đúng cảnh giới của mình."* (Lão đan sư Mộc Diên) |
+| **Thợ rèn** | "ta" | "ngươi" | cứng cỏi, thực dụng | *"Lò đã đỏ lửa. Mang nanh, da, vảy yêu thú tới đây, ta rèn cho ngươi món ra hồn."* (Thiết Ngưu) |
+| **Lái buôn** | "ta" | "ngươi" / "đạo hữu" | tính toán, trả giá; nhắc đối thủ bằng "hắn / hắn ta" | *"Thu được gì cứ bán cho ta... ta trả giá công bằng."* (Phó Quang) — *"Xuống Âm Sương thì tìm Phó Quang, hắn mua bán dưới đầm giỏi không kém ta."* |
+| **Đệ tử** (tu sĩ trẻ, tông môn) | "ta" / "tiểu hữu" / "tại hạ" | "trưởng lão" / "đạo hữu" | kính cẩn, xông pha | *"Trưởng lão giao tiểu hữu ra trừ hổ, tiểu hữu dám nhận."* (viết mới — danh vị Tông chủ / Trưởng lão / Đệ tử, `sect.ts`) |
+| **Tán tu** (tu sĩ lang thang) | "ta" | "đạo hữu" | tự do, từng trải | *"Gặp đạo hữu giữa đường là duyên, lấy hết đan dược ta còn lại chia đôi đi."* (viết mới) |
+| **Tà tu / Ma tu** (phản diện) | "ta" (kẻ khác gọi "hắn") | "đồng đạo" (giả tạo) hoặc "ngươi" (khinh thường) | đe doạ, tàn nhẫn, mỉa mai | *"Đồng đạo cứ chọn một đứa, coi như quà gặp mặt."* (Ma tu tế huyết trì) — *"Đường này qua lại phải nộp mạng, hoặc nộp tiền."* (Trại chủ sơn trại) — *"Qua ải nộp hai mươi linh thạch. Không có thì ở lại giữ tường một đêm."* (thủ ải) |
+| **Yêu thú biết nói** (quái cổ xưa) | "ta" / không xưng | "kẻ sống" / "ngươi" | giọng cũ, ngắn, lạnh | *"Dưới này là mộ, kẻ sống không được qua."* (Giao thủ mộ, `ambush-data.ts`) |
+
+### Giọng mô tả vật phẩm (`desc`)
+
+Gọn, chức năng, nêu rõ **tác dụng + số**; KHÔNG kể chuyện, KHÔNG hoa mỹ.
+
+- Đan / phù / trang bị: *"Hồi 40% khí huyết."*, *"Hồi 50% linh lực."*, *"Tăng 5%
+  thanh tu vi của bậc hiện tại (tối đa 300 tu vi mỗi viên)."*
+- Nguyên liệu: một câu nêu nguồn / gốc: *"Lông mềm của Linh Thố."*
+
+### Ví dụ đúng / sai (văn phong)
+
+| Sai | Đúng — và vì sao |
+|---|---|
+| "Ok đạo hữu, ta cho ngươi đồ tốt nè!" | "Đồ tốt ta có sẵn, đạo hữu cần thì nói." — "ok" là từ hiện đại (xem Từ cấm), giọng điềm tĩnh |
+| "Item này level cao lắm bro" | "Đồ này bảo phẩm, cảnh giới cao mới dùng được." — KHÔNG "item" / "level" / "bro"; dùng "phẩm cấp" / "cảnh giới" |
+| "Ta là boss ở đây đấy" | "Ta giữ trạm này bao năm." — KHÔNG gọi mình là "boss"; xưng "ta" + chức danh |
+| "Mang đồ tới ta cho ngươi rất nhiều kinh nghiệm wow" | "Mang nguyên liệu yêu thú tới, ta luyện cho ngươi đan." — KHÔNG "wow" / cảm thán hiện đại; gọn, nêu rõ trao đổi |
 
 ## Từ cấm
 
