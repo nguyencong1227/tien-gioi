@@ -7299,6 +7299,13 @@ html[data-form="phone"] :is(.forge-list, .shop-list) {
   overflow: visible;
 }
 
+/* Bảng Công pháp trên điện thoại: bỏ trần 440 px của danh sách chiêu. Bảng là tấm toàn màn hình, danh sách (flex, co theo chỗ còn lại) tự dài ra tới sát nút Đóng;
+   trần 440 px chỉ để lại khoảng trống 182 px (390x844) / 253 px (412x915) dưới danh sách khi sổ chiêu đã dài tới 87 chiêu. Ô lọc vẫn cố định phía trên (khác nhiệm vụ / cửa hàng:
+   ở đây KHÔNG để cả tấm cuộn, vì cuộn cả tấm làm ô tìm trôi mất giữa 87 hàng). Màn thấp (360x640, điện thoại ngang) đã co sẵn nên không đổi; máy tính giữ trần 440 px. */
+html[data-form="phone"] .skills-list {
+  max-height: none;
+}
+
 /* Bản đồ lớn trong ngăn kéo điện thoại ngang: vuông vừa chiều cao còn lại (đầu tấm ~70 px + chú giải ~35 px + chỗ nút đóng ~80 px) để thấy trọn bản đồ không phải cuộn */
 html[data-form="phone"][data-orient="landscape"] #worldmap {
   width: min(92vw, 320px, calc(var(--vh, 100dvh) - 180px));
