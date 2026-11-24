@@ -1115,10 +1115,18 @@ async function main() {
     if (await tab.ev(`!document.getElementById('reconnect-banner')?.hidden`))
       throw new Error("Ca 7: banner nối lại hiện khi chỉ có độ trễ");
 
-    // (d) hết trễ: trung vị trôi về nhỏ, vùng báo trở lại gần nguyên
+    // (d) hết trễ: trung vị phải RƠI XUỐNG khỏi mức trễ, chứng minh bỏ độ trễ thì tracker đo lại nhanh, vùng báo trở lại gần nguyên
     proxy.setDelay(NEN_MS);
-    // trần theo NỀN đo được lúc đầu (nền runner CI dao động 40-120 ms giữa các lần chạy): quay về gần nền là đủ
-    await waitRtt(0, Math.max(120, rtt0 * 1.6 + 40), "RTT về gần nền sau khi bỏ độ trễ", 30000);
+    // KHÔNG so với nền `rtt0` đo ở đầu ca: nền runner CI phụ thuộc luồng chính Chrome WebGL (pong chờ render), dao động mạnh giữa các
+    // lần chạy — nightly 23/11: rtt0=71 ms ở ca (a) nhưng trôi lên 183 ms khi tới ca (d) vì runner nóng dần => trần theo nền cũ
+    // (rtt0*1.6+40=153,6) RED chập chờn dù tracker hoàn toàn bình thường. Trần CỐ ĐỊNH 400 ms: dưới mức trễ đã bảo đảm >= 650 của ca (c)
+    // (vừa khẳng định RTT đã rơi = bỏ trễ có tác dụng), trên nền xấu nhất đã đo (~183) => không phụ thuộc nền cũ nhạy tải runner.
+    await waitRtt(
+      0,
+      400,
+      "RTT rơi về dưới 400 ms sau khi bỏ độ trễ (không so nền cũ nhạy tải runner)",
+      30000,
+    );
     const c4 = await castAndRead(1000);
     if (
       c4.rings !== 1 ||
