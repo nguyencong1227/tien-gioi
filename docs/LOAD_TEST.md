@@ -2320,3 +2320,32 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=30 --m7 --bos
 Đối chứng 10 phút (cùng tham số, `575a3887`): PASS, 23 lượt, 4 / 4 (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); nhóm săn trùm (Bot 001-015): 13 / 15 bot có lượt thi triển.
 
 Giới hạn: mỗi cấu hình chạy MỘT lần (n = 1) nên không ước được tỉ lệ chập chờn của `--boss`; thử bằng kho tệp (không qua PostgreSQL). Tải chồng lên hai lần chạy (theo Dev B, kiểm bằng `ps`): lần 10 phút (09:34:27-09:44:30) bị `npm test` đầy đủ của B (09:34:11-09:35:49, `nice 10`) chồng 82 giây đầu cộng build client ~10 giây (~09:36:45); lần 30 phút (09:46:07-10:16:28) bị soak 100 bot của C (PID 2451046, 09:42:16-09:52:33) chồng 6,5 phút đầu, B không chạy gì nặng trong 09:46-10:16. Cả hai lần có tải chồng đều ĐẠT 4/4 nên tải chồng không làm trượt tiêu chí `--boss` ở hai lần này; n = 1 nên chưa đủ để nói `--boss` nhạy hay không nhạy với tải. Số tick của lần 3 chỉ để kiểm 'vẫn trong ngưỡng xa', số tick sạch hơn là của lần 2.
+
+### 41.5. Thử tải 10 phút kiểm tra trên `main` mới `c6d1418c` (Dev C, 25/11/2026, Refs #1290, #1301)
+
+Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --boss --out=/tmp/c-soak-10m.json` (chạy trên nhánh `main` mới nhất sau khi hoàn tất toàn bộ 3 đợt chuyển đổi E2E #1432).
+
+| Chỉ số | Lần 3 (`575a3887`, đối chứng 10m) | Lần này (`c6d1418c`, 10 phút) | Ngưỡng / Tiêu chuẩn | Đánh giá |
+|---|---:|---:|---:|:---:|
+| Bot khởi tạo -> kết thúc | 100 -> 100 | **100 -> 100 (rớt 0)** | rớt <= 5% | **ĐẠT** |
+| VmRSS ban đầu / sau 5 phút / cuối | — / — / — | **166,26 / 195,59 / 196,71 MB** | — | — |
+| Tăng sau warmup (5.0m) | — | **+1,12 MB** | <= 50 MB | **ĐẠT** |
+| Dốc nửa sau (OLS) | — | **+0,178 MB/phút** | <= 1,00 MB/phút | **ĐẠT** |
+| Tick p95 phòng tệ nhất (TB / max) | 1,61 / 2,00 ms | **1,30 / 1,98 ms** | <= 10 ms | **ĐẠT** |
+| Tick overrun (> 50 ms) | 0 | **0** | 0 | **ĐẠT** |
+| CPU luồng chính / tick | — | **TB 3,24 ms/tick** | — | **ĐẠT** |
+| Hàng đợi ghi nhân vật | Inflight 0, Tuổi 0,0s, Lỗi 0 | **Inflight max 0, Tuổi max 0,0 s, Lỗi 0** | — | **ĐẠT** |
+| Độ trễ vòng lặp p99 | 30,1 ms | **22,8 ms** | <= 100 ms | **ĐẠT** |
+| Băng thông nhận TB (p95) | 148 B/tick | **145 B/tick (p95 219 B/tick)** | <= 600 B/tick | **ĐẠT** |
+| Băng thông nhận TB / bot | — | **2,82 KB/s** | — | **ĐẠT** |
+| Cảnh báo / lỗi log / lỗi `/metrics` | 0 / 0 / 0 | **0 / 0 / 0** | 0 | **ĐẠT** |
+| `kiem-save` (nhân vật / chân linh / tông môn) | 0 lỗi | **0 lỗi (100 / 100 / 4)** | 0 | **ĐẠT** |
+| Tệp hỏng `*.hong-*` | 0 | **0** | 0 | **ĐẠT** |
+| Bảo toàn Linh thạch | ĐẠT (lệch 0) | **ĐẠT (lệch ví 0)** | lệch ví bot = 0 | **ĐẠT** |
+| Nội dung M7 | 6 / 6 chiêu Nguyên Anh | **599 lượt thi triển, 6 / 6 chiêu Nguyên Anh** | đủ 6 / 6 | **ĐẠT** |
+| Chiêu trùm `--boss` | **4 / 4**, 23 lượt: `quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1 | **4 / 4**, 16 lượt: `quat_duoi` 8, `phun_doc` 4, `cuon_minh` 2, `goi_ran_con` 2 | đủ 4 / 4 | **ĐẠT** |
+
+**Nhận xét:**
+- Kết quả chạy trên `main` mới nhất (`c6d1418c`) xác nhận 100% các chỉ số ổn định, bộ nhớ, hiệu năng tick, băng thông và tính toàn vẹn dữ liệu đều nằm sâu trong ngân sách an toàn.
+- Cơ chế `--boss` tiếp tục đạt 4/4 chiêu trùm Xích Mãng trong 10 phút, không có hiện tượng rớt chiêu hay lỗi điều khiển bot.
+
