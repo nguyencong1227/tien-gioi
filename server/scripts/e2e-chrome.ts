@@ -75,6 +75,7 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
 
   let currentPort = opts.cdpPort;
   let lastDiag: ChromeDiag | null = null;
+  const allDiags: ChromeDiag[] = [];
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     if (attempt === 2) {
@@ -146,7 +147,9 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
         break;
       }
       try {
-        const res = await fetch(`http://127.0.0.1:${currentPort}/json`);
+        const res = await fetch(`http://127.0.0.1:${currentPort}/json`, {
+          signal: AbortSignal.timeout(2000),
+        });
         if (res.ok) {
           const data = (await res.json()) as any[];
           if (Array.isArray(data)) {
@@ -158,6 +161,11 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
         // Cổng chưa mở
       }
       await sleep(pollIntervalMs);
+    }
+
+    // Đợi ngắn để pipe stderr flush hết dữ liệu nếu tiến trình vừa thoát
+    if (exitCode !== null) {
+      await sleep(50);
     }
 
     const elapsedMs = Date.now() - start;
@@ -175,6 +183,7 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
       signal: exitSignal,
       stderrTail: [...stderrTail],
     };
+    allDiags.push(lastDiag);
 
     const first = targets.find((t) => t.type === "page");
     if (first?.webSocketDebuggerUrl) {
@@ -192,19 +201,38 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
     killChrome(chrome);
   }
 
-  // Cả hai lần thử đều thất bại: ném lỗi kèm chẩn đoán chi tiết
+  // Cả hai lần thử đều thất bại: ném lỗi kèm chẩn đoán chi tiết cả hai lần
   const diag = lastDiag!;
   const diagLines = [
     `Không kết nối được Chrome DevTools sau ${diag.elapsedMs} ms (đã thử ${diag.attempts} lần).`,
     `exitCode: ${diag.exitCode !== null ? diag.exitCode : "null"}, signal: ${diag.signal ?? "null"}, port: ${currentPort}`,
   ];
-  if (diag.stderrTail.length > 0) {
-    diagLines.push(`Stderr (~${diag.stderrTail.length} dòng cuối):`);
-    for (const l of diag.stderrTail) {
-      diagLines.push(`  ${l}`);
+
+  if (allDiags.length > 1) {
+    diagLines.push("Chi tiết các lần thử:");
+    for (let i = 0; i < allDiags.length; i++) {
+      const d = allDiags[i];
+      diagLines.push(
+        `--- Lần ${i + 1} (${d.elapsedMs} ms, exitCode: ${d.exitCode !== null ? d.exitCode : "null"}, signal: ${d.signal ?? "null"}) ---`,
+      );
+      if (d.stderrTail.length > 0) {
+        diagLines.push(`Stderr (~${d.stderrTail.length} dòng cuối):`);
+        for (const l of d.stderrTail) {
+          diagLines.push(`  ${l}`);
+        }
+      } else {
+        diagLines.push("Stderr: (trống)");
+      }
     }
   } else {
-    diagLines.push("Stderr: (trống)");
+    if (diag.stderrTail.length > 0) {
+      diagLines.push(`Stderr (~${diag.stderrTail.length} dòng cuối):`);
+      for (const l of diag.stderrTail) {
+        diagLines.push(`  ${l}`);
+      }
+    } else {
+      diagLines.push("Stderr: (trống)");
+    }
   }
 
   throw new Error(diagLines.join("\n"));
