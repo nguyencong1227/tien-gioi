@@ -29,9 +29,9 @@ export interface BannedTerm {
 }
 
 /**
- * DANH SÁCH TỪ CẤM. Dữ liệu lấy từ những chỗ đã xác nhận rò rỏ tên riêng của nguồn khác: AGENTS.md (Asset nguồn 3:
+ * DANH SÁCH TỪ CẤM. Dữ liệu lấy từ những chỗ đã xác nhận rò rỉ tên riêng của nguồn khác: AGENTS.md (Asset nguồn 3:
  * Thanh Vân Môn, Bắc Minh, Huyền Vũ Môn, Kim Đạo Tự, Đan Hà Cốc), test `skills-kim-tho.test.ts` (VKTT_PROPER), và
- * ví dụ người dùng trong issue #1199 (Hàn Lập). CHƯA phủ hết — gặp rò rỏ mới (tên nhân vật / tông phái truyện khác)
+ * ví dụ người dùng trong issue #1199 (Hàn Lập). CHƯA phủ hết — gặp rò rỉ mới (tên nhân vật / tông phái truyện khác)
  * thì THÊM dòng vào đây, đừng bịa danh sách rộng không có bằng chứng.
  */
 export const BANNED_TERMS: readonly BannedTerm[] = [
