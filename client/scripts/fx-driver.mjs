@@ -128,6 +128,13 @@ export const FX_CAST_SKILLS = [
   "xich_viem",
   "chu_canh_dao_hong",
   "hoa_duoc_no",
+  // Hỏa + Phong lô 2 (#1186, E): cone chém (Hỏa) + self aura / fan khống chế (Phong)
+  "quy_hoa_phe_hon",
+  "ma_trao_phe_huyet",
+  "phat_hoa_hang_ma",
+  "huyet_mang_pha_giap",
+  "quy_anh_me_tung",
+  "am_phong_quyen_hon",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
