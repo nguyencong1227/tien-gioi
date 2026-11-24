@@ -26,6 +26,9 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
   afterEach(async () => {
     for (const s of createdServers) {
       try {
+        if (typeof (s as any).closeAllConnections === "function") {
+          (s as any).closeAllConnections();
+        }
         await new Promise<void>((r) => s.close(() => r()));
       } catch {
         /* bỏ qua */
@@ -136,18 +139,31 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     launched.kill();
   });
 
-  it("Ca 3: Chrome giả không bao giờ mở cổng -> thử lại 1 lần rồi ném lỗi có chẩn đoán chi tiết (thời gian, exitCode, stderr tail)", async () => {
+  it("Ca 3: Chrome giả không bao giờ mở cổng -> thử lại 1 lần rồi ném lỗi có chẩn đoán chi tiết cả hai lần (thời gian, exitCode, stderr tail riêng biệt)", async () => {
     const port = await freePort();
     const fakeScript = path.join(tmpDir, "fake-chrome-fail.js");
+    const markerFile = path.join(tmpDir, "marker-ca3.txt");
 
-    // Script Node giả lập: in nhiều dòng stderr rồi thoát mà không bao giờ mở HTTP server
+    // Script Node giả lập: in stderr với marker riêng biệt cho từng lần thử
     writeFileSync(
       fakeScript,
       `
-      for (let i = 1; i <= 25; i++) {
-        process.stderr.write("Stderr line " + i + "\\n");
+      const fs = require("node:fs");
+      const marker = ${JSON.stringify(markerFile)};
+      if (!fs.existsSync(marker)) {
+        fs.writeFileSync(marker, "attempt-1-done");
+        for (let i = 1; i <= 20; i++) {
+          process.stderr.write("Stderr lan 1 line " + i + "\\n");
+        }
+        process.stderr.write("marker-lan-1\\n");
+        process.exit(2);
+      } else {
+        for (let i = 1; i <= 20; i++) {
+          process.stderr.write("Stderr lan 2 line " + i + "\\n");
+        }
+        process.stderr.write("marker-lan-2\\n");
+        process.exit(3);
       }
-      process.exit(2);
       `,
     );
 
@@ -175,11 +191,17 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     expect(logs).toContain("đã dựng lại Chrome lần 2");
     // Phải có thông tin thời gian chờ và số lần thử
     expect(msg).toMatch(/Không kết nối được Chrome DevTools sau \d+ ms \(đã thử 2 lần\)/);
-    // Phải có exitCode
+    // Phải có tiêu đề chẩn đoán cho cả Lần 1 và Lần 2
+    expect(msg).toContain("--- Lần 1");
+    expect(msg).toContain("--- Lần 2");
+    // Phải có exitCode của cả hai lần
     expect(msg).toContain("exitCode: 2");
-    // Phải in stderr đuôi (~20 dòng cuối)
-    expect(msg).toContain("Stderr line 25");
-    expect(msg).toContain("Stderr line 10");
+    expect(msg).toContain("exitCode: 3");
+    // Phải in stderr đuôi với marker riêng biệt của cả hai lần
+    expect(msg).toContain("marker-lan-1");
+    expect(msg).toContain("marker-lan-2");
+    expect(msg).toContain("Stderr lan 1 line 20");
+    expect(msg).toContain("Stderr lan 2 line 20");
   });
 
   it("Ca 4: Khi thử lại có thể cấp cổng mới qua allocPort", async () => {
@@ -317,5 +339,80 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     );
 
     launched.kill();
+  });
+
+  it("Ca 6: Chrome giả nhận kết nối TCP nhưng không phản hồi HTTP (treo) -> fetchTimeoutMs ngắt kết nối giúp vòng chờ kết thúc có hạn", async () => {
+    const port = await freePort();
+    const openSockets = new Set<net.Socket>();
+    // Tạo TCP server nhận kết nối nhưng không gửi dữ liệu phản hồi (treo socket)
+    const hangingServer = net.createServer((socket) => {
+      openSockets.add(socket);
+      socket.on("close", () => openSockets.delete(socket));
+    });
+    createdServers.push(hangingServer as any);
+    await new Promise<void>((r) => hangingServer.listen(port, "127.0.0.1", r));
+
+    // Dùng Node script chạy giả lập Chrome để tiến trình vẫn sống
+    const fakeScript = path.join(tmpDir, "fake-chrome-idle.js");
+    writeFileSync(
+      fakeScript,
+      `
+      setInterval(() => {}, 1000);
+      `,
+    );
+
+    const start = Date.now();
+    let caught: Error | null = null;
+    try {
+      await launchChrome({
+        cdpPort: port,
+        userDataDir: path.join(tmpDir, "user-data"),
+        executable: process.execPath,
+        customArgs: () => [fakeScript],
+        timeoutMs: 300,
+        pollIntervalMs: 50,
+        fetchTimeoutMs: 100,
+        log: () => {},
+      });
+    } catch (err) {
+      caught = err as Error;
+    }
+
+    const elapsed = Date.now() - start;
+    expect(caught).not.toBeNull();
+    // 2 lần thử x 300ms + overhead fetch timeout 100ms: kết thúc có hạn (< 3500ms), không bị treo vĩnh viễn
+    expect(elapsed).toBeLessThan(3500);
+    expect(caught!.message).toMatch(/Không kết nối được Chrome DevTools/);
+
+    for (const s of openSockets) {
+      s.destroy();
+    }
+  });
+
+  it("Ca 7: Executable không tồn tại -> reject ngay lập tức không sập tiến trình và không thử lại", async () => {
+    const port = await freePort();
+    const logs: string[] = [];
+    const nonExistentExec = path.join(tmpDir, "nonexistent-google-chrome-xyz");
+
+    const start = Date.now();
+    let caught: Error | null = null;
+    try {
+      await launchChrome({
+        cdpPort: port,
+        userDataDir: path.join(tmpDir, "user-data"),
+        executable: nonExistentExec,
+        timeoutMs: 5000,
+        log: (m) => logs.push(m),
+      });
+    } catch (err) {
+      caught = err as Error;
+    }
+
+    const elapsed = Date.now() - start;
+    expect(caught).not.toBeNull();
+    // Bắt lỗi spawnError và thoát ngay lập tức (< 1000 ms), không chờ hết 5000 ms timeout
+    expect(elapsed).toBeLessThan(1000);
+    expect(caught!.message).toContain(`Không chạy được ${nonExistentExec}:`);
+    expect(logs).not.toContain("đã dựng lại Chrome lần 2");
   });
 });
