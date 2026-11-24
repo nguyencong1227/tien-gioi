@@ -3,10 +3,21 @@
 // chỉ khẳng định "đứng yên khi túi mở / đi khi túi đóng"): ca người dùng báo là GIỮ PHÍM LIÊN TỤC LÂU (tới ~30 giây) rồi
 // nhân vật "giật / liệt nút" — vị trí KHÔNG tăng đều. Script này giữ mũi tên phải một nhịp dài, LẤY MẪU vị trí server (me.x,
 // đọc thẳng state phòng, không qua mạng) nhiều mốc, rồi khẳng định: (1) đơn điệu không giảm (không giật lùi), (2) không interval
-// nào đứng yên (KHÔNG "liệt nút" giữa đường), (3) mọi interval gần bằng trung vị (tăng đều, không burst), (4) thả phím thì dừng.
+// nào đứng yên (KHÔNG "liệt nút" giữa đường), (3) tăng đều (không burst), (4) thả phím thì dừng.
 // Cơ chế token-bucket + cắt backlog của applyInputs (mục 41) là bất biến theo thời gian nên 6 giây đủ đại diện cho 30 giây;
 // độ dài giữ lấy từ env E2E_KE_PHIM_MS (mặc định 6000) để chạy nhanh, có thể nâng lên 30000 khi muốn lặp ca thật.
-// Chạy: `npm run e2e:ke-phim-dau-ban -w server`.
+//
+// FPS-AWARE (#1394, theo B + A): runner GitHub chạy WebGL phần mềm / bị bóp CPU (`CI=true taskset -c 0`) nên khung hình CHẬM
+// (vài khung / giây); khi đó client chỉ tiến MỘT bước ~8 px mỗi khung → vị trí tăng theo FPS chứ KHÔNG theo đồng hồ thật, đo
+// px/giây cố định sẽ ĐỎ giả (đỏ 2/2 trên runner ở đầu 4ad40ad6). Script ĐO thời gian khung hình bằng rAF TRƯỚC khi giữ phím:
+//   - KHUNG CHẬM (frameMs > SLOW_FRAME_MS, hoặc tốc độ mẫu < SLOW_FRAC×mong đợi): chỉ đòi bất biến theo FPS — đơn điệu, MỖI
+//     interval nhích >= một bước (KHÔNG liệt nút), trần không burst theo tốc độ danh nghĩa, thả phím dừng; BỎ kiểm tốc độ tuyệt
+//     đối (trung vị ≈ mong đợi / min >= 0,85×) và in `⚠ khung chậm ... bỏ qua`. Đột biến "liệt nút" (ngừng gửi input) vẫn ĐỎ vì
+//     các interval sau ngừng tăng.
+//   - KHUNG NHANH: nới biên per-interval (0,6×/1,4× mong đợi, hấp thụ ±1 tick lấy mẫu) + khẳng định tốc độ TB TOÀN cửa sổ trong
+//     ±10% mong đợi (không theo từng interval 350 ms — biên tuyệt đối theo đồng hồ thật chập chờn ở dải khung 25-50 ms, A #1394).
+// `--slow-frame <ms>` / `TG_SLOW_FRAME_MS` giả lập khung chậm (client/scripts/slow-frame.mjs) để kiểm cả hai nhánh không cần runner.
+// Chạy: `npm run e2e:ke-phim-dau-ban -w server` [--slow-frame 150].
 import { spawn, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
@@ -18,6 +29,27 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { DEFAULT_MAP_ID, roomNameOf, statsFor } from "@tien-gioi/shared";
 import { Tab, sleep, listenWithRetry, getChromeGpuFlags } from "./e2e-kit";
+
+// Giả lập KHUNG CHẬM (copy từ client/scripts/slow-frame.mjs — module JS thuần không kèm .d.ts nên KHÔNG import được trong TS;
+// giữ nguyên bản chất: mỗi requestAnimationFrame bận luồng chính `ms` ms). `--slow-frame <ms>` / `TG_SLOW_FRAME_MS` bật, 0 = tắt.
+function slowFrameMs(): number {
+  const idx = process.argv.indexOf("--slow-frame");
+  const raw = idx >= 0 ? process.argv[idx + 1] : process.env.TG_SLOW_FRAME_MS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 && n <= 2000 ? Math.floor(n) : 0;
+}
+function slowFrameSource(ms: number): string {
+  if (!ms) return "";
+  return `(() => {
+    const real = performance.now.bind(performance);
+    const spin = () => {
+      const t = real();
+      while (real() - t < ${ms}) { /* bận luồng chính */ }
+      requestAnimationFrame(spin);
+    };
+    requestAnimationFrame(spin);
+  })();`;
+}
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -32,6 +64,24 @@ const HOLD_MS = Math.max(3000, Number(process.env.E2E_KE_PHIM_MS ?? 6000));
 const SAMPLE_MS = 350; // lấy mẫu vị trí server mỗi 350 ms (~10 tick)
 const WARMUP_MS = 1200; // bỏ các mốc đầu (client mới bắt đầu gửi input, chưa ổn định)
 const EPS = 0.5; // sai số float khi khẳng định đơn điệu (px)
+
+// ---- FPS-aware (#1394) ----
+const SLOW_FRAME_MS = 40; // khung hình > 40 ms (~25 FPS) coi là khung chậm (dưới đây là runner WebGL phần mềm / taskset -c 0)
+const SLOW_FRAC = 0.85; // hoặc tốc độ mẫu < SLOW_FRAC×mong đợi → coi là khung chậm (chậm theo hiệu quả, dù frameMs biên)
+const FAST_LO = 0.6; // khung nhanh: sàn per-interval (nới so 0,85× để hấp thụ ±1 tick = ±23 px/s lấy mẫu)
+const FAST_HI = 1.4; // khung nhanh: trần per-interval (nới so 1,15× vì lý do trên)
+const WINDOW_FRAC = 0.1; // khung nhanh: tốc độ TB toàn cửa sổ phải trong ±10% mong đợi
+// "Liệt nút" = plateau DỪNG đứng KÉO DÀI (đột biến ngừng gửi input → dx≈0 mọi interval tới cuối). Máy chậm KHỎE chỉ có blip lẻ
+// (jitter gửi input không đều ở khung rất chậm) nên KHÔNG có plateau dài. Kiểm theo độ dài plateau (tốc độ-độc lập) chứ KHÔNG
+// theo "mỗi interval phải nhích" (quá chặt ở khung cực chậm: lấy mẫu 350 ms có interval bắt đúng 0 bước → false red).
+const STALL_EPS_PX = 1; // interval coi là "đứng" nếu dx < 1 px
+const STALL_MAX_MS = 2200; // plateau đứng dài >= 2,2 s (≈ 6 interval) mới coi là liệt nút thật (blip jitter ngắn hơn thì qua)
+/** Đột biến TEST-ONLY (env `E2E_KE_PHIM_MUTATE=stall:<N>`): ngừng gửi input di chuyển sau N bước → giả "liệt nút" giữa đường.
+ *  Chỉ dùng để chứng minh kiểm "không plateau đứng dài" có răng; KHÔNG bật khi chạy thường (mặc định tắt). */
+const MUTATE_STALL_AT = (() => {
+  const m = /^stall:(\d+)$/.exec(process.env.E2E_KE_PHIM_MUTATE ?? "");
+  return m ? Number(m[1]) : 0;
+})();
 
 interface Key {
   key: string;
@@ -57,6 +107,45 @@ function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+}
+
+/** Đo thời gian khung hình trung bình (ms) trong trang bằng requestAnimationFrame (~600 ms) — tín hiệu chính để biết máy có chậm không. */
+function measureFrameMs(tab: Tab): Promise<number> {
+  return tab.ev(
+    `new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 >= 600) res((performance.now() - t0) / n); else requestAnimationFrame(f); }; requestAnimationFrame(f); })`,
+  );
+}
+
+/**
+ * Mã đột biến TEST-ONLY (nạp ở đầu trang): poll tới khi `window.__scene` sẵn rồi bao gói `fixedStep` — sau bước thứ N (tính TỪ khi
+ * giữ phím di chuyển) thì no-op (không gửi input, không đoán trước) → server ngừng nhận input di chuyển → `me.x` đứng yên giữa đường
+ * = giả "liệt nút". Làm ở tầng scene (KHÔNG đụng WebSocket) vì colyseus.js 0.16 mã hoá MSGPACK binary (`packr.buffer`), không dò được
+ * bằng chuỗi. KHÔNG chạy thường (N=0 → bỏ qua).
+ *
+ * Đếm CHỈ SAU KHI GIỮ PHÍM (cờ `__kphHoldStarted`): `fixedStep` chạy MỌI khung kể cả khi nhân vật đứng yên (warmup trước khi giữ
+ * phím), nên đếm mọi lời gọi sẽ hết N bước trong giai đoạn warmup → đột biến no-op NGAY khi giữ phím → zero movement = stall giả
+ * (hết 12 bước trong warmup). Scene đặt cờ `__kphHoldStarted` NGAY TRƯỚC khi gửi input bước đầu tiên khi đang có hướng đi; đột biến
+ * chỉ đếm các bước sau cờ đó, nên N bước thực sự là N bước GIỮ PHÍM.
+ */
+function mutateStallSource(at: number): string {
+  return `
+      (() => {
+        const AT = ${at};
+        let done = false, tries = 0;
+        const iv = setInterval(() => {
+          if (done || ++tries > 200) { clearInterval(iv); return; } // hết hạn (30 s) nếu scene KHÔNG xuất hiện
+          const sc = window.__scene;
+          if (!sc || typeof sc.fixedStep !== "function") return;
+          done = true; clearInterval(iv);
+          const orig = sc.fixedStep.bind(sc);
+          let n = 0;
+          sc.fixedStep = () => {
+            if (!window.__kphHoldStarted) return orig(); // chưa giữ phím: KHÔNG đếm (bỏ qua giai đoạn warmup nhân vật đứng yên)
+            if (++n > AT) return; // liệt nút: ngừng sau bước thứ AT kể từ khi giữ phím
+            return orig();
+          };
+        }, 100);
+      })();`;
 }
 
 async function main() {
@@ -123,9 +212,13 @@ async function main() {
     const first = targets.find((t) => t.type === "page");
     if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
     tab = await Tab.open("A", first.webSocketDebuggerUrl);
-    await tab.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)}); localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});`,
-    });
+    // Khởi tạo trang (chạy TRƯỚC mọi script của game): localStorage đạo hiệu/mã + giả lập khung chậm (slow-frame.mjs) + đột biến TEST-ONLY.
+    const initSource = `
+      localStorage.setItem("tien-gioi:name", ${JSON.stringify(NAME)});
+      localStorage.setItem("tien-gioi:secret", ${JSON.stringify(SECRET)});
+      ${slowFrameSource(slowFrameMs())}
+      ${MUTATE_STALL_AT > 0 ? mutateStallSource(MUTATE_STALL_AT) : ""}`;
+    await tab.send("Page.addScriptToEvaluateOnNewDocument", { source: initSource });
     await tab.send("Page.navigate", { url: `http://127.0.0.1:${PORT}/?debug` });
     await tab.waitFor(
       `typeof window.__switchAuthView === 'function' && !!document.getElementById('login-form')`,
@@ -186,6 +279,9 @@ async function main() {
     );
     await sleep(300);
 
+    // ---- Đo thời gian khung hình TRƯỚC khi giữ phím (tín hiệu chính để biết máy có chậm không — FPS-aware #1394) ----
+    const frameMs = await measureFrameMs(t);
+
     // ---- Giữ phím mũi tên phải LIÊN TỤC, lấy mẫu vị trí server nhiều mốc ----
     const x0 = me.x;
     const holdStart = Date.now();
@@ -199,11 +295,28 @@ async function main() {
     const xEndHold = me.x;
     await dispatchKey(t, K_RIGHT, "keyUp"); // thả phím
 
+    if (process.env.E2E_KE_PHIM_DEBUG) {
+      const flagAt = await t.ev(`window.__kphHoldStarted ? "set" : "unset"`).catch(() => "?");
+      out(`  [DBG] __kphHoldStarted sau hold: ${flagAt}`);
+      let prevx = raw[0]?.x ?? x0;
+      out(`  [DBG] t(ms từ holdStart), x, dx`);
+      for (const s of raw) {
+        out(
+          `  [DBG] ${(s.t - holdStart).toFixed(0)}, ${s.x.toFixed(1)}, ${(s.x - prevx).toFixed(1)}`,
+        );
+        prevx = s.x;
+      }
+    }
+
     check(
       "Giữ phím phải: nhân vật đi sang phải (server)",
       xEndHold - x0 > 40,
       `${x0} -> ${xEndHold} (chỉ giữ ${HOLD_MS} ms)`,
     );
+
+    // Tốc độ mong đợi (hằng, không buff trong ca này): dùng để phân loại + so sánh. So TUYỆT ĐỐI chứ không tương đối với trung vị
+    // (một đột biến làm đứng movement sẽ kéo trung vị về ~0 rồi ngưỡng tương đối ">= 0,4×trung vị" bỏ lọt — false green).
+    const expected = statsFor(me.realm, me.tier, me).speed; // px/giây (moveMul = 1 vì không tông môn / vật phẩm)
 
     if (failures.length === 0) {
       // Hiệu số giữa các mốc liên tiếp; bỏ giai đoạn warmup (client mới bắt đầu gửi input)
@@ -216,43 +329,72 @@ async function main() {
         if (prev.t - holdStart < WARMUP_MS) continue;
         steady.push({ dx: cur.x - prev.x, dt });
       }
-      // Đơn điệu: không mốc nào lùi (cho phép sai số float)
+      const rates = steady.map((s) => s.dx / s.dt); // px/giây
+      const med = median(rates);
+      const minR = Math.min(...rates);
+      const maxR = Math.max(...rates);
+      const totalDx = steady.reduce((a, s) => a + s.dx, 0);
+      const totalDt = steady.reduce((a, s) => a + s.dt, 0);
+      const base = totalDt > 0 ? totalDx / totalDt : 0; // tốc độ TB TOÀN cửa sổ (px/giây)
+      // Plateau đứng dài nhất (ms): chuỗi interval liên tiếp dx < STALL_EPS_PX. Đột biến "liệt nút" → plateau tới cuối (rất dài);
+      // máy chậm khỏe chỉ blip jitter ngắn. Bất biến tốc độ-độc lập → dùng cho CẢ hai chế độ.
+      let plateauMs = 0,
+        longestStallMs = 0;
+      for (const s of steady) {
+        if (s.dx < STALL_EPS_PX) {
+          plateauMs += s.dt * 1000;
+          if (plateauMs > longestStallMs) longestStallMs = plateauMs;
+        } else plateauMs = 0;
+      }
+      // Phân loại: khung hình chậm HOẶC tốc độ TB hiệu quả dưới sàn → máy chậm (runner WebGL phần mềm / taskset -c 0).
+      const slow = frameMs > SLOW_FRAME_MS || base < SLOW_FRAC * expected;
+      out(
+        `  (khung hình ${frameMs.toFixed(0)} ms; tốc độ TB toàn cửa sổ ${base.toFixed(1)} px/s, trung vị ${med.toFixed(1)}, min ${minR.toFixed(1)}, max ${maxR.toFixed(1)}; plateau đứng dài nhất ${longestStallMs.toFixed(0)} ms; mong đợi ${expected} px/s; ${steady.length} interval)`,
+      );
+
+      // Đơn điệu: không mốc nào lùi (CHO PHÉP ở CẢ hai chế độ — bất biến cơ bản, không phụ thuộc tốc độ tuyệt đối).
       const mono = steady.every((s) => s.dx >= -EPS);
       check(
         "Vị trí đơn điệu không giảm (KHÔNG giật lùi)",
         mono,
         `${steady.filter((s) => s.dx < -EPS).length} interval lùi / ${steady.length}`,
       );
-      const rates = steady.map((s) => s.dx / s.dt); // px/giây
-      const med = median(rates);
-      const minR = Math.min(...rates);
-      const maxR = Math.max(...rates);
-      // Tốc độ mong đợi (hằng, không buff trong ca này): so sánh TUYỆT ĐỐI chứ không tương đối — nếu tương đối, một đột biến
-      // làm đứng hầu hết movement sẽ kéo trung vị về ~0 rồi ngưỡng ">= 0,4×trung vị" trở thành ">= 0" và bỏ lọt (false green).
-      const expected = statsFor(me.realm, me.tier, me).speed; // px/giây (moveMul = 1 vì không tông môn / vật phẩm)
-      const LO = 0.85 * expected;
-      const HI = 1.15 * expected;
-      out(
-        `  (tốc độ mẫu: trung vị ${med.toFixed(1)}, min ${minR.toFixed(1)}, max ${maxR.toFixed(1)} px/s; mong đợi ${expected}; ${steady.length} interval)`,
-      );
-      // Tăng đều: tốc độ trung bình gần đúng tốc độ mong đợi (không chậm dần / không nhanh hơn thật)
+      // Không "liệt nút": KHÔNG được có plateau đứng dài >= STALL_MAX_MS giữa đường. Đột biến "liệt nút" (ngừng gửi input) → mọi
+      // interval sau ngừng tăng (dx≈0) tạo plateau kéo dài tới cuối → kiểm này ĐỎ (đó là răng của đột biến, CẢ chế độ chậm lẫn nhanh).
       check(
-        "Tốc độ trung bình ≈ tốc độ mong đợi (đều, không chậm/lỡ)",
-        med >= LO && med <= HI,
-        `trung vị ${med.toFixed(1)} vs mong đợi ${expected} px/s`,
+        "Không liệt nút giữa đường (không có plateau đứng dài)",
+        longestStallMs < STALL_MAX_MS,
+        `plateau đứng dài nhất ${longestStallMs.toFixed(0)} ms vs ngưỡng ${STALL_MAX_MS} ms`,
       );
-      // Không "liệt nút": KHÔNG interval ổn định nào chậm hơn 0,85× mong đợi (đặc biệt KHÔNG = 0 — ca liệt nút giữa đường)
-      check(
-        "Không interval nào đứng yên / liệt nút giữa đường",
-        minR >= LO,
-        `min ${minR.toFixed(1)} vs ngưỡng ${LO.toFixed(1)} px/s`,
-      );
-      // Không burst / nhảy cóc: interval nhanh nhất KHÔNG vượt quá 1,15× mong đợi
-      check(
-        "Vị trí tăng ĐỀU (không burst)",
-        maxR <= HI,
-        `max ${maxR.toFixed(1)} vs ngưỡng ${HI.toFixed(1)} px/s`,
-      );
+
+      if (slow) {
+        // KHUNG CHẬM: vị trí tăng theo FPS chứ không theo đồng hồ thật → KHÔNG đòi tốc độ tuyệt đối (B + A, #1394).
+        out(
+          `  ⚠ khung chậm (frameMs ${frameMs.toFixed(0)} > ${SLOW_FRAME_MS} hoặc TB ${base.toFixed(0)} < ${SLOW_FRAC}×mong đợi): bỏ kiểm tốc độ tuyệt đối, chỉ đòi bất biến theo FPS`,
+        );
+        // Không burst bất thường: interval nhanh nhất KHÔNG vượt quá trần danh nghĩa (máy chậm KHÔNG thể nhanh hơn tốc độ thật).
+        check(
+          "Vị trí tăng đều (không burst vượt tốc độ danh nghĩa)",
+          maxR <= FAST_HI * expected,
+          `max ${maxR.toFixed(1)} vs trần ${(FAST_HI * expected).toFixed(0)} px/s`,
+        );
+      } else {
+        // KHUNG NHANH: khẳng định tốc độ TB TOÀN cửa sổ trong ±10% mong đợi (không theo từng interval — biên tuyệt đối theo đồng
+        // hồ thật chập chờn ở dải khung 25-50 ms, A #1394).
+        const wLO = (1 - WINDOW_FRAC) * expected;
+        const wHI = (1 + WINDOW_FRAC) * expected;
+        check(
+          "Tốc độ trung bình toàn cửa sổ ≈ mong đợi (đều, không chậm/lỡ)",
+          base >= wLO && base <= wHI,
+          `TB cửa sổ ${base.toFixed(1)} vs mong đợi ${expected} px/s (±${(WINDOW_FRAC * 100).toFixed(0)}%)`,
+        );
+        // Nới biên per-interval (0,6×/1,4×) để hấp thụ ±1 tick (~±23 px/s) jitter lấy mẫu; lỗi burst thật (gấp đôi) vẫn đỏ.
+        check(
+          "Mỗi interval tăng đều (không chậm/lỡ, không burst)",
+          rates.every((r) => r >= FAST_LO * expected && r <= FAST_HI * expected),
+          `min ${minR.toFixed(1)} / max ${maxR.toFixed(1)} vs biên ${(FAST_LO * expected).toFixed(0)}..${(FAST_HI * expected).toFixed(0)} px/s`,
+        );
+      }
     }
 
     // ---- Thả phím: nhân vật dừng trong ~0,5 giây ----
