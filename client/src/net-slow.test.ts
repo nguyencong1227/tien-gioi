@@ -252,6 +252,42 @@ describe("NetSlowMonitor", () => {
     h.mon.stop();
   });
 
+  it("ping đã đi, MỘT patch về rồi mạng đứng (pong bị nuốt, nhịp tim không gửi ping mới vì còn ping chờ): chip vẫn hiện ~2 giây sau patch cuối (e2e:nhip-tim Ca 6 khi chạy 1 lõi)", () => {
+    const h = harness();
+    h.mon.start();
+    h.advance(1000);
+    h.fr.pong(); // máy chủ hiểu ping
+    h.fr.room.send("ping", { t: 1 }); // ping đi
+    h.advance(500);
+    h.fr.patch(); // patch về TRƯỚC khi đường hầm đứng: chứng minh mạng sống, nhưng ping vẫn chưa được đáp
+    // từ đây không pong, không patch, không ping mới
+    h.advance(SLOW_AFTER_MS);
+    expect(h.calls).toEqual([]); // chưa quá SLOW_AFTER_MS kể từ patch cuối
+    h.advance(SLOW_POLL_MS);
+    expect(h.calls).toEqual([true]);
+    expect(h.mon.isSlow()).toBe(true);
+    h.mon.stop();
+  });
+
+  it("ping còn chờ pong mà patch về đều: không bao giờ báo chậm (mạng sống); pong về rồi patch dừng: lặng im KHÔNG phải mạng chậm", () => {
+    const h = harness();
+    h.mon.start();
+    h.advance(1000);
+    h.fr.pong();
+    h.fr.room.send("ping", { t: 1 });
+    for (let i = 0; i < 120; i++) {
+      h.fr.patch(); // 120 x 500 ms = 60 giây, patch mỗi 500 ms
+      h.advance(500);
+    }
+    expect(h.calls).toEqual([]);
+    h.fr.pong(); // ping được đáp: hết chờ
+    h.fr.patch(); // một patch nữa SAU pong: không còn tin nào đang chờ nên không đặt mốc
+    h.advance(60_000); // phòng lặng im hẳn (không ai chơi thì patch = 0 byte)
+    expect(h.calls).toEqual([]);
+    expect(h.mon.isSlow()).toBe(false);
+    h.mon.stop();
+  });
+
   it("đang đi, patch state dừng về: chip hiện; patch về lại thì tắt", () => {
     const h = harness();
     h.mon.start();
