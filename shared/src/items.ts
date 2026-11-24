@@ -927,6 +927,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("cam_long_khau"), chance: 0.006, min: 1, max: 1 },
     // Mộc Trúc Cơ, Huyền phẩm (CT17 lát 2, G): rơi hiếm từ Xích Mãng (trùm Trúc Cơ), KHÔNG từ Hắc Hổ (giữ `balance/dungeon.test.ts`)
     { itemId: bookIdOf("me_hon_huong_quyet"), chance: 0.006, min: 1, max: 1 },
+    // Băng + Lôi Trúc Cơ, Huyền phẩm (CT15 đợt 3, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ (lý do tương tự: giữ `balance/dungeon.test.ts`). Hàn Giao Tiễn (bolt băng) + Lôi Âm (ấn gắn dấu cho cặp dấu+kích)
+    { itemId: bookIdOf("giao_can_cung"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("loi_am_an"), chance: 0.006, min: 1, max: 1 },
     // Lôi Trúc Cơ, Huyền phẩm (CT15 đợt 2, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ — Hắc Hổ là con săn Linh thạch/phút cao nhất cùng bậc, thêm sách vào nó đẩy denominator của `balance/dungeon.test.ts` lên làm bí cảnh Linh Hư < 15 phút (đỏ ở 14,90)
     { itemId: bookIdOf("loi_hoa_pha_ta_chuong"), chance: 0.006, min: 1, max: 1 },
     // Thủy Trúc Cơ, Huyền phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi từ TRÙM Trúc Cơ (Xích Mãng), KHÔNG từ Hắc Hổ (lý do tương tự Lôi ở trên)
@@ -949,6 +952,9 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Thủy Kim Đan, Huyền phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi hiếm từ Sương Hồ (quái Kim Đan hệ băng, hợp thủy)
     { itemId: bookIdOf("huyet_co_bi_kinh"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("toa_long_cam_na"), chance: 0.006, min: 1, max: 1 },
+    // Băng + Lôi Kim Đan, Huyền phẩm (CT15 đợt 3, D #1185): rơi hiếm từ Sương Hồ (quái Kim Đan hệ băng/thủy). Hàn Sương Phong Mạch (trap xích băng) + Tử Điện Xuyên Vân (bolt kích dấu Lôi)
+    { itemId: bookIdOf("han_suong_toa"), chance: 0.006, min: 1, max: 1 },
+    { itemId: bookIdOf("tu_dien_thoa"), chance: 0.006, min: 1, max: 1 },
   ],
   thach_quy: [
     { itemId: "quy_giap", chance: 0.5, min: 1, max: 2 },
@@ -995,6 +1001,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Thủy Nguyên Anh, Địa phẩm (CT15 đợt 2 slice THỦY, D #1185): rơi hiếm từ Hàn Lang (quái Nguyên Anh hệ thủy, hợp thủy)
     { itemId: bookIdOf("huyet_ti_phuoc_than"), chance: 0.006, min: 1, max: 1 },
     { itemId: bookIdOf("no_dao_bai_khong"), chance: 0.006, min: 1, max: 1 },
+    // Băng Nguyên Anh, Địa phẩm (CT15 đợt 3, D #1185): rơi hiếm từ Hàn Lang (quái Nguyên Anh hệ băng, hợp băng). Băng Phách Xuyên Tâm (bolt kim băng)
+    { itemId: bookIdOf("bang_phach_than_cham"), chance: 0.006, min: 1, max: 1 },
   ],
   phong_nha: [
     { itemId: "phong_nha_vu", chance: 0.5, min: 1, max: 2 },

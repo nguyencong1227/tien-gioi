@@ -80,7 +80,7 @@ Mô hình kinh tế dựa trên hợp đồng `shared/src/currency.ts`: tiền r
 | Linh Thố (`tho`) | 0 | 40 | 1.20 | 1.23 | **2.43** | Lông thỏ (1 LT), Hồi huyết đan (6 LT) |
 | Hôi Lang (`lang`) | 1 | 140 | 2.80 | 2.55 | **5.35** | Nanh sói (2 LT), Hồi huyết đan (6 LT), Hồi linh đan (6 LT) |
 | Hắc Hổ (`ho`) | 7 | 600 | 11.20 | 11.37 | **22.57** | Da hổ (9 LT), Đan hồi phục (6 LT), Tụ khí đan (45 LT) |
-| Xích Mãng (`mang`) | 12 | 4000 | 225.00 | 249.03 | **474.03** | Vảy mãng (60 LT), Tụ khí đan (45 LT), Hồi huyết đan (6 LT) |
+| Xích Mãng (`mang`) | 12 | 4000 | 225.00 | 249.90 | **474.90** | Vảy mãng (60 LT), Tụ khí đan (45 LT), Hồi huyết đan (6 LT) |
 
 ### 2. Thu nhập Linh thạch mỗi giờ khi săn một loại quái
 
@@ -133,7 +133,7 @@ Giả định người chơi đánh đơn lẻ (solo), dùng Kiếm chém, đả
   - **Đánh giá:** Đường đổi nguyên liệu (6.7 con thỏ) **rẻ hơn đáng kể** (~1.5× – 1.8×) so với mua thẳng bằng tiền (10–12 con thỏ). Đây là thiết kế cố ý: đổi đồ là đường rẻ nhất cho người mới bắt đầu và người chịu khó gom nguyên liệu; cửa hàng tiền tệ đóng vai trò tiện lợi, xả tiền tích lũy khi không muốn gom nguyên liệu.
 - **Quái cấp cao & Thiếu hụt chỗ tiêu tiền (Linh thạch sink):**
   - Hắc Hổ (cấp 2, an toàn từ Luyện Khí Tầng 6): thu nhập tăng mạnh từ ~2,570 LT/h lên ~4,650 LT/h ở Trúc Cơ.
-  - Xích Mãng (trùm cấp 3): cho kỳ vọng tới 474.0 LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
+  - Xích Mãng (trùm cấp 3): cho kỳ vọng tới 474.9 LT/con nhưng không an toàn khi solo trước Kim Đan; thích hợp đi săn theo tổ đội (xem mục "Đi theo đội" ở trên).
   - **Lưu ý cân bằng:** Hiện tại cửa hàng Lão dược sư chỉ bán 2 loại đan hồi phục cơ bản (24 LT/viên), trang bị chỉ rèn qua nguyên liệu rơi mà không tốn tiền. Người chơi từ Luyện Khí hậu kỳ đến Trúc Cơ sẽ nhanh chóng tích lũy hàng ngàn đến hàng vạn Linh thạch mà **gần như không có chỗ tiêu** từ giữa game. Cần bổ sung các chỗ xả tiền lớn (mua bí kíp, phí nâng cấp/rèn trang bị cao cấp, phí dịch chuyển, vào bí cảnh hoặc đấu giá) trong các sprint tiếp theo của M3.
 
 
@@ -382,16 +382,16 @@ Mục tiêu: không bãi nào cho tu vi / giờ vượt ~1,5x bãi mới tốt n
 
 | Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
 |---|---|---:|---:|---:|---:|
-| Kim Đan Sơ kỳ | Xích Mãng | 33,407 | 15,836 | 33 | 45% |
-| Kim Đan Sơ kỳ | Sương Hồ | 34,746 | 8,411 | 151 | 46% |
+| Kim Đan Sơ kỳ | Xích Mãng | 33,407 | 15,866 | 33 | 45% |
+| Kim Đan Sơ kỳ | Sương Hồ | 34,746 | 8,592 | 151 | 46% |
 | Kim Đan Sơ kỳ | Thạch Quy | 35,131 | 7,438 | 80 | 49% |
 | Kim Đan Sơ kỳ | Độc Thiềm | không an toàn solo (97% khí huyết / trận) | – | – | – |
-| Kim Đan Trung kỳ | Xích Mãng | 34,502 | 16,383 | 35 | 32% |
-| Kim Đan Trung kỳ | Sương Hồ | 39,534 | 9,643 | 173 | 33% |
+| Kim Đan Trung kỳ | Xích Mãng | 34,502 | 16,413 | 35 | 32% |
+| Kim Đan Trung kỳ | Sương Hồ | 39,534 | 9,851 | 173 | 33% |
 | Kim Đan Trung kỳ | Thạch Quy | 40,301 | 8,568 | 92 | 35% |
 | Kim Đan Trung kỳ | Độc Thiềm | không an toàn solo (70% khí huyết / trận) | – | – | – |
-| Kim Đan Hậu kỳ | Xích Mãng | 35,378 | 16,822 | 35 | 24% |
-| Kim Đan Hậu kỳ | Sương Hồ | 44,081 | 10,818 | 194 | 24% |
+| Kim Đan Hậu kỳ | Xích Mãng | 35,378 | 16,853 | 35 | 24% |
+| Kim Đan Hậu kỳ | Sương Hồ | 44,081 | 11,051 | 194 | 24% |
 | Kim Đan Hậu kỳ | Thạch Quy | 45,544 | 9,715 | 104 | 26% |
 | Kim Đan Hậu kỳ | Độc Thiềm | không an toàn solo (51% khí huyết / trận) | – | – | – |
 
@@ -647,52 +647,52 @@ Bốn mức hiểu biết của thợ săn (đo càng thật thì càng chậm):
 | Lạc Hà Trấn | Linh Thố | 40 | 6 | 0.8 (0.5) | 0.8 (0.6) | 0.8 (0.6) | 0.9 (0.4) |
 | Lạc Hà Trấn | Hôi Lang | 30 | 8 | 2.6 (2.1) | 2.7 (2.0) | 2.3 (1.6) | 2.9 (2.5) |
 | Lạc Hà Trấn | Hắc Hổ | 16 | 12 | 2.4 (1.5) | 3.2 (1.9) | 3.5 (1.9) | 4.1 (1.7) |
-| Lạc Hà Trấn | Xích Mãng | 2 | 90 | 10.3 (11.2) | 21.6 (16.4) | 18.6 (13.5) | 22.3 (15.8) |
+| Lạc Hà Trấn | Xích Mãng | 2 | 90 | 8.9 (8.0) | 19.6 (14.0) | 20.4 (14.7) | 25.0 (21.2) |
 | Hắc Phong Cốc | Hôi Lang | 20 | 8 | 3.8 (3.7) | 4.8 (3.0) | 6.1 (4.5) | 4.5 (3.4) |
 | Hắc Phong Cốc | Hắc Hổ | 36 | 12 | 1.9 (1.7) | 2.8 (1.8) | 2.9 (2.1) | 3.3 (1.7) |
-| Hắc Phong Cốc | Xích Mãng | 6 | 90 | 3.2 (2.4) | 4.6 (2.9) | 5.2 (3.5) | 7.4 (3.4) |
-| Âm Sương Trạch | Sương Hồ | 24 | 10 | 3.6 (2.9) | 3.5 (2.3) | 3.8 (2.8) | 4.9 (3.2) |
+| Hắc Phong Cốc | Xích Mãng | 6 | 90 | 3.0 (2.3) | 4.9 (2.9) | 4.6 (3.2) | 5.3 (2.6) |
+| Âm Sương Trạch | Sương Hồ | 24 | 10 | 3.6 (2.3) | 3.7 (2.8) | 4.6 (3.9) | 5.2 (3.2) |
 | Âm Sương Trạch | Thạch Quy | 18 | 12 | 3.9 (2.4) | 6.1 (2.7) | 7.9 (2.3) | 7.2 (3.9) |
 | Âm Sương Trạch | Độc Thiềm | 18 | 14 | 3.2 (2.2) | 5.6 (2.3) | 5.7 (2.3) | 7.8 (4.9) |
 | Âm Sương Trạch | Hắc Giao | 6 | 90 | 4.5 (4.2) | 6.1 (4.8) | 7.5 (5.6) | 8.3 (6.3) |
-| Hàn Vân Lĩnh | Hàn Lang | 20 | 10 | 4.1 (3.6) | 4.2 (3.6) | 4.5 (3.8) | 6.8 (5.8) |
+| Hàn Vân Lĩnh | Hàn Lang | 20 | 10 | 4.0 (3.7) | 4.4 (3.8) | 4.9 (3.8) | 5.7 (5.6) |
 | Hàn Vân Lĩnh | Phong Nha | 16 | 10 | 3.9 (3.9) | 5.1 (4.3) | 4.9 (3.4) | 6.5 (4.9) |
 | Hàn Vân Lĩnh | Cốt Tượng | 12 | 12 | 3.6 (2.8) | 4.7 (2.8) | 5.7 (3.1) | 7.1 (4.4) |
 | Hàn Vân Lĩnh | Độc Tước | 12 | 14 | 4.5 (4.0) | 5.0 (3.3) | 6.0 (3.2) | 5.7 (3.5) |
 | Hàn Vân Lĩnh | Thiên Hàn Vương | 2 | 90 | 8.8 (7.3) | 26.0 (15.9) | 26.4 (18.4) | 26.1 (18.5) |
 
 - **Mô hình KHÔNG lạc quan:** thợ săn biết hết bản đồ (cận dưới) đo tối đa **0.47x** giả định (ngưỡng #406: mô hình lạc quan nếu > 1.25x). `search-check.test.ts` giữ điều này: ai hạ `ASSUME.searchSec` xuống dưới cận dưới thì test đỏ.
-- **Loài thường: giả định nằm trên cận dưới và quanh các mức nhìn thật.** Đo / giả định: 0.14x - 0.60x ở máy tính 1280x720; 0.14x - 0.76x ở điện thoại ngang 844x390; 0.15x - 0.68x ở điện thoại dọc 390x844 (quét theo vùng sinh: người thật có thể khéo hơn nhờ nhớ chỗ quái hay đứng, hoặc vụng hơn vì do dự). Không sửa số nào.
-- **Xích Mãng (giả định 90 giây) và Hắc Giao (90 giây) là chỗ nhạy:** Xích Mãng đo 5 - 22 giây ở máy tính 1280x720; 5 - 19 giây ở điện thoại ngang 844x390; 7 - 22 giây ở điện thoại dọc 390x844 (quái thưa: 2 con ở Lạc Hà Trấn, 6 con ở Hắc Phong Cốc); Hắc Giao (6 con) 6 giây ở máy tính 1280x720; 7 giây ở điện thoại ngang 844x390; 8 giây ở điện thoại dọc 390x844.
+- **Loài thường: giả định nằm trên cận dưới và quanh các mức nhìn thật.** Đo / giả định: 0.14x - 0.60x ở máy tính 1280x720; 0.14x - 0.76x ở điện thoại ngang 844x390; 0.15x - 0.65x ở điện thoại dọc 390x844 (quét theo vùng sinh: người thật có thể khéo hơn nhờ nhớ chỗ quái hay đứng, hoặc vụng hơn vì do dự). Không sửa số nào.
+- **Xích Mãng (giả định 90 giây) và Hắc Giao (90 giây) là chỗ nhạy:** Xích Mãng đo 5 - 20 giây ở máy tính 1280x720; 5 - 20 giây ở điện thoại ngang 844x390; 5 - 25 giây ở điện thoại dọc 390x844 (quái thưa: 2 con ở Lạc Hà Trấn, 6 con ở Hắc Phong Cốc); Hắc Giao (6 con) 6 giây ở máy tính 1280x720; 7 giây ở điện thoại ngang 844x390; 8 giây ở điện thoại dọc 390x844.
 
 **Nhịp tu luyện nhạy với giả định này.** Cùng `simulate(3)` như mục "Kim Đan sau nội dung" (một người, quái an toàn nhanh nhất mỗi bậc; "tối ưu" kể cả Xích Mãng, "bãi mới" không đụng Xích Mãng), thay `ASSUME.searchSec` bằng số đo từng mức nhìn (loài ở nhiều bản đồ: lấy bản đồ chậm hơn). Phút cộng dồn tới hết Luyện Khí và Trúc Cơ, rồi phút RIÊNG cảnh giới Kim Đan (mục tiêu: 5-7 giờ):
 
 | Giả định tìm quái | Hết Luyện Khí (cộng dồn) | Hết Trúc Cơ (cộng dồn) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Nguồn nhanh nhất ở Kim Đan (tối ưu) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
 |---|---:|---:|---:|---:|---|---:|
 | Mô hình (giả định hiện tại) | 51 | 169 | 234 (3.9 giờ) | 234 (3.9 giờ) | Thạch Quy | 0.95 / 0.86 / 0.78 |
-| Biết hết bản đồ | 27 | 72 | 71 (1.2 giờ) | 165 (2.7 giờ) | Xích Mãng | 2.71 / 2.58 / 2.46 |
-| Máy tính 1280x720 (nhìn 1138x640 px) | 28 | 79 | 104 (1.7 giờ) | 164 (2.7 giờ) | Xích Mãng | 1.91 / 1.75 / 1.60 |
-| Điện thoại ngang 844x390 (nhìn 1125x520 px) | 28 | 81 | 95 (1.6 giờ) | 167 (2.8 giờ) | Xích Mãng | 2.11 / 1.95 / 1.81 |
-| Điện thoại dọc 390x844 (nhìn 508x1100 px) | 29 | 86 | 106 (1.8 giờ) | 180 (3.0 giờ) | Xích Mãng | 2.03 / 1.88 / 1.75 |
+| Biết hết bản đồ | 27 | 72 | 67 (1.1 giờ) | 165 (2.7 giờ) | Xích Mãng | 2.84 / 2.72 / 2.61 |
+| Máy tính 1280x720 (nhìn 1138x640 px) | 28 | 79 | 98 (1.6 giờ) | 165 (2.8 giờ) | Xích Mãng | 2.04 / 1.87 / 1.73 |
+| Điện thoại ngang 844x390 (nhìn 1125x520 px) | 28 | 81 | 100 (1.7 giờ) | 177 (2.9 giờ) | Xích Mãng | 2.10 / 1.95 / 1.81 |
+| Điện thoại dọc 390x844 (nhìn 508x1100 px) | 29 | 86 | 113 (1.9 giờ) | 183 (3.1 giờ) | Xích Mãng | 1.94 / 1.79 / 1.66 |
 
-Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nhất cùng bậc", cột cuối): mô hình ĐẠT (tối đa 0.95x); biết hết bản đồ KHÔNG ĐẠT (tối đa 2.71x); máy tính 1280x720 KHÔNG ĐẠT (tối đa 1.91x); điện thoại ngang 844x390 KHÔNG ĐẠT (tối đa 2.11x); điện thoại dọc 390x844 KHÔNG ĐẠT (tối đa 2.03x).
+Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nhất cùng bậc", cột cuối): mô hình ĐẠT (tối đa 0.95x); biết hết bản đồ KHÔNG ĐẠT (tối đa 2.84x); máy tính 1280x720 KHÔNG ĐẠT (tối đa 2.04x); điện thoại ngang 844x390 KHÔNG ĐẠT (tối đa 2.10x); điện thoại dọc 390x844 KHÔNG ĐẠT (tối đa 1.94x).
 
-**So công bằng: hiệu chỉnh theo độ vụng của loài thường.** Thợ săn là thuật toán (biết loài sống ở vùng nào, đường đi hoàn hảo, không bao giờ dừng), nên mọi số đo ở trên đều nhanh hơn giả định của mô hình; mô hình đã chừa cho người chơi thật một khoảng thời gian tìm quái lớn hơn thợ săn (do dự, đả tọa, nhặt đồ, tranh quái). So Xích Mãng / Hắc Giao với số đo THÔ là so không công bằng (mô hình cho chúng 90 giây, không chừa khoảng ấy). Bảng dưới giữ giả định mô hình cho loài thường và đặt Xích Mãng / Hắc Giao = số đo (bản đồ chậm hơn) cộng độ vụng. Độ vụng chỉ ước lượng được từ các loài thường (trung vị trên 36 dòng: 8 loài x 3 cỡ màn hình, 3 hạt giống) và **dạng của nó là giả thuyết chưa kiểm chứng**, nên cho hai dạng: NHÂN (người chậm gấp k lần thợ săn ở mọi nơi) và CỘNG (người mất thêm b giây cố định mỗi lần tìm). Một hệ số CHUNG cho cả ba cỡ màn hình, vì số đo thô của trùm gần y hệt giữa ba cỡ (Xích Mãng Lạc Hà 21.6 / 18.6 / 22.3 giây) nên hệ số riêng từng cỡ chỉ thêm nhiễu của loài thường. Thật nằm đâu đó giữa hai dạng; **số đo của bot / người (#410) mới phân xử được**.
+**So công bằng: hiệu chỉnh theo độ vụng của loài thường.** Thợ săn là thuật toán (biết loài sống ở vùng nào, đường đi hoàn hảo, không bao giờ dừng), nên mọi số đo ở trên đều nhanh hơn giả định của mô hình; mô hình đã chừa cho người chơi thật một khoảng thời gian tìm quái lớn hơn thợ săn (do dự, đả tọa, nhặt đồ, tranh quái). So Xích Mãng / Hắc Giao với số đo THÔ là so không công bằng (mô hình cho chúng 90 giây, không chừa khoảng ấy). Bảng dưới giữ giả định mô hình cho loài thường và đặt Xích Mãng / Hắc Giao = số đo (bản đồ chậm hơn) cộng độ vụng. Độ vụng chỉ ước lượng được từ các loài thường (trung vị trên 36 dòng: 8 loài x 3 cỡ màn hình, 3 hạt giống) và **dạng của nó là giả thuyết chưa kiểm chứng**, nên cho hai dạng: NHÂN (người chậm gấp k lần thợ săn ở mọi nơi) và CỘNG (người mất thêm b giây cố định mỗi lần tìm). Một hệ số CHUNG cho cả ba cỡ màn hình, vì số đo thô của trùm gần y hệt giữa ba cỡ (Xích Mãng Lạc Hà 19.6 / 20.4 / 25.0 giây) nên hệ số riêng từng cỡ chỉ thêm nhiễu của loài thường. Thật nằm đâu đó giữa hai dạng; **số đo của bot / người (#410) mới phân xử được**.
 
 | Giả thuyết độ vụng | Mức nhìn | Xích Mãng (s, giả định 90) | Hắc Giao (s, giả định 90) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
 |---|---|---:|---:|---:|---:|---:|
-| Nhân (người chậm gấp 2.5x) | Máy tính 1280x720 (nhìn 1138x640 px) | 53 | 15 | 196 (3.3 giờ) | 234 (3.9 giờ) | 1.44 / 1.32 / 1.22 |
-| Nhân (người chậm gấp 2.5x) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 46 | 18 | 174 (2.9 giờ) | 234 (3.9 giờ) | 1.61 / 1.49 / 1.38 |
-| Nhân (người chậm gấp 2.5x) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 55 | 20 | 200 (3.3 giờ) | 234 (3.9 giờ) | 1.41 / 1.29 / 1.19 |
-| Cộng (người mất thêm 6 giây) | Máy tính 1280x720 (nhìn 1138x640 px) | 27 | 12 | 121 (2.0 giờ) | 234 (3.9 giờ) | 2.27 / 2.14 / 2.03 |
-| Cộng (người mất thêm 6 giây) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 24 | 13 | 112 (1.9 giờ) | 234 (3.9 giờ) | 2.43 / 2.31 / 2.20 |
-| Cộng (người mất thêm 6 giây) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 28 | 14 | 123 (2.0 giờ) | 234 (3.9 giờ) | 2.23 / 2.11 / 1.99 |
+| Nhân (người chậm gấp 2.4x) | Máy tính 1280x720 (nhìn 1138x640 px) | 48 | 15 | 180 (3.0 giờ) | 234 (3.9 giờ) | 1.56 / 1.44 / 1.33 |
+| Nhân (người chậm gấp 2.4x) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 50 | 18 | 186 (3.1 giờ) | 234 (3.9 giờ) | 1.51 / 1.39 / 1.28 |
+| Nhân (người chậm gấp 2.4x) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 61 | 20 | 217 (3.6 giờ) | 234 (3.9 giờ) | 1.30 / 1.19 / 1.09 |
+| Cộng (người mất thêm 6 giây) | Máy tính 1280x720 (nhìn 1138x640 px) | 25 | 12 | 114 (1.9 giờ) | 234 (3.9 giờ) | 2.39 / 2.27 / 2.15 |
+| Cộng (người mất thêm 6 giây) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 26 | 13 | 116 (1.9 giờ) | 234 (3.9 giờ) | 2.34 / 2.22 / 2.10 |
+| Cộng (người mất thêm 6 giây) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 31 | 14 | 130 (2.2 giờ) | 234 (3.9 giờ) | 2.12 / 1.99 / 1.87 |
 
-Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: máy tính 1280x720 1.44x ĐẠT; điện thoại ngang 844x390 1.61x KHÔNG ĐẠT; điện thoại dọc 390x844 1.41x ĐẠT. Cộng: máy tính 1280x720 2.27x KHÔNG ĐẠT; điện thoại ngang 844x390 2.43x KHÔNG ĐẠT; điện thoại dọc 390x844 2.23x KHÔNG ĐẠT. Xích Mãng tìm mỗi 46-55 giây (nhân) hoặc 24-28 giây (cộng) chứ không phải 90; nhịp Kim Đan "tối ưu" ra 2.9-3.3 giờ (nhân) hoặc 1.9-2.0 giờ (cộng), mục tiêu 5-7. Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối. Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô 4.6-7.4 giây so với 18.6-22.3 giây).
+Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: máy tính 1280x720 1.56x KHÔNG ĐẠT; điện thoại ngang 844x390 1.51x KHÔNG ĐẠT; điện thoại dọc 390x844 1.30x ĐẠT. Cộng: máy tính 1280x720 2.39x KHÔNG ĐẠT; điện thoại ngang 844x390 2.34x KHÔNG ĐẠT; điện thoại dọc 390x844 2.12x KHÔNG ĐẠT. Xích Mãng tìm mỗi 48-61 giây (nhân) hoặc 25-31 giây (cộng) chứ không phải 90; nhịp Kim Đan "tối ưu" ra 3.0-3.6 giờ (nhân) hoặc 1.9-2.2 giờ (cộng), mục tiêu 5-7. Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối. Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô 4.6-5.3 giây so với 19.6-25.0 giây).
 
 **Ngưỡng hoà vốn cho #410.** Chạy `simulate` với `ASSUME.searchSec.mang` = T (thời gian TÌM: từ lúc hạ con trước tới lúc chạm con kế, KHÔNG gồm trận và đả tọa hồi sức), tiêu chí #406 mục 1 đạt khi T >= **51 giây** (mô hình hiện tại: 90 giây, tối đa 0.95x). Trận + đả tọa hồi sức của Xích Mãng theo mô hình thêm 17.8 / 14.2 / 11.4 giây mỗi con (Sơ / Trung / Hậu kỳ), nên nếu bot đo từ lúc hạ tới lúc hạ con kế (kill-to-kill) thì phải trừ khoảng đó trước khi so với ngưỡng (khoảng 68 / 65 / 62 giây kill-to-kill ở ba bậc). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo THỜI GIAN TÌM của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~21 giây (giả thuyết nhân) hoặc ~45 giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
 
-Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra 3.9 giờ (tối ưu) / 3.9 giờ (bãi mới); thợ săn máy tính 1280x720 1.7 / 2.7 giờ, điện thoại ngang 844x390 1.6 / 2.8 giờ, điện thoại dọc 390x844 1.8 / 3.0 giờ; biết hết bản đồ 1.2 / 2.7 giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: Thạch Quy): giả định 90 giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Kết luận (chốt trước phát hành 0.2.0, #406 mục 7): GIỮ NGUYÊN `ASSUME.searchSec`, mật độ và EXP Xích Mãng; chấp nhận đường tắt Xích Mãng và theo dõi bằng số liệu thật.** Lý do: (1) số đo là thợ săn thuật toán, không phải người, nên chỉ là cận dưới (mô hình không lạc quan); người chơi chậm hơn bao nhiêu thì không ai biết: hai giả thuyết hiệu chỉnh ở trên cho thời gian TÌM Xích Mãng 46-55 giây (nhân) và 24-28 giây (cộng), cả hai dưới ngưỡng hoà vốn, tức tiêu chí 1,5x CHƯA đạt ở bãi Xích Mãng và nhịp Kim Đan "tối ưu" ngắn hơn mục tiêu (cột "Riêng Kim Đan (tối ưu)" ở bảng hiệu chỉnh); nhưng nhịp "bãi mới" (người không cày Xích Mãng) vẫn 3.9 giờ, trong mục tiêu 5-7 giờ. (2) Chỉnh mật độ hay EXP Xích Mãng bây giờ là căn theo MỘT trong hai giả thuyết trái nhau, kéo theo chạy lại mô phỏng luân hồi, nhiệm vụ và trang bị ngay trước phát hành: rủi ro cao hơn lợi ích. Bot (`bots.ts`) cũng không phân xử được vì cũng là thuật toán, nên phần "bot săn Kim Đan" của #410 được thay bằng chính phép đo này (thợ săn trong `World` thật, vùng nhìn chữ nhật như client) cùng `hunt-check` (mục 9). (3) Đường tắt đã biết và đã chặn bớt (Tụ Khí Đan trần 300 tu vi mỗi viên, Xích Mãng rơi ít hơn, #403 / #425; ca "tìm nhanh" 30 giây có trong `kim-dan.ts`). **Sau phát hành:** tệp lưu ghi `life.playMs` cùng cảnh giới / bậc; nếu trung vị người chơi hết Kim Đan trong dưới ~4 giờ thì chỉnh ở bản 0.2.x theo thứ tự (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (`shared/`, PR riêng, B review), (b) chỉnh EXP; KHÔNG sửa `ASSUME.searchSec` cho tới khi có số đo người thật. Số hạt giống nhiều hơn (12 cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
+Đọc bảng: nhịp Kim Đan là hàm của giả định tìm quái. Mô hình ra 3.9 giờ (tối ưu) / 3.9 giờ (bãi mới); thợ săn máy tính 1280x720 1.6 / 2.8 giờ, điện thoại ngang 844x390 1.7 / 2.9 giờ, điện thoại dọc 390x844 1.9 / 3.1 giờ; biết hết bản đồ 1.1 / 2.7 giờ. Phần lớn chênh lệch tới từ Xích Mãng (nguồn nhanh nhất của cả ba bậc ở kịch bản tối ưu: Thạch Quy): giả định 90 giây cho nó là một con số đoán và là cái quyết định nhịp "tối ưu". **Kết luận (chốt trước phát hành 0.2.0, #406 mục 7): GIỮ NGUYÊN `ASSUME.searchSec`, mật độ và EXP Xích Mãng; chấp nhận đường tắt Xích Mãng và theo dõi bằng số liệu thật.** Lý do: (1) số đo là thợ săn thuật toán, không phải người, nên chỉ là cận dưới (mô hình không lạc quan); người chơi chậm hơn bao nhiêu thì không ai biết: hai giả thuyết hiệu chỉnh ở trên cho thời gian TÌM Xích Mãng 48-61 giây (nhân) và 25-31 giây (cộng), cả hai dưới ngưỡng hoà vốn, tức tiêu chí 1,5x CHƯA đạt ở bãi Xích Mãng và nhịp Kim Đan "tối ưu" ngắn hơn mục tiêu (cột "Riêng Kim Đan (tối ưu)" ở bảng hiệu chỉnh); nhưng nhịp "bãi mới" (người không cày Xích Mãng) vẫn 3.9 giờ, trong mục tiêu 5-7 giờ. (2) Chỉnh mật độ hay EXP Xích Mãng bây giờ là căn theo MỘT trong hai giả thuyết trái nhau, kéo theo chạy lại mô phỏng luân hồi, nhiệm vụ và trang bị ngay trước phát hành: rủi ro cao hơn lợi ích. Bot (`bots.ts`) cũng không phân xử được vì cũng là thuật toán, nên phần "bot săn Kim Đan" của #410 được thay bằng chính phép đo này (thợ săn trong `World` thật, vùng nhìn chữ nhật như client) cùng `hunt-check` (mục 9). (3) Đường tắt đã biết và đã chặn bớt (Tụ Khí Đan trần 300 tu vi mỗi viên, Xích Mãng rơi ít hơn, #403 / #425; ca "tìm nhanh" 30 giây có trong `kim-dan.ts`). **Sau phát hành:** tệp lưu ghi `life.playMs` cùng cảnh giới / bậc; nếu trung vị người chơi hết Kim Đan trong dưới ~4 giờ thì chỉnh ở bản 0.2.x theo thứ tự (a) giảm mật độ / kéo dài hồi sinh Xích Mãng (`shared/`, PR riêng, B review), (b) chỉnh EXP; KHÔNG sửa `ASSUME.searchSec` cho tới khi có số đo người thật. Số hạt giống nhiều hơn (12 cho trùm) và thợ săn khoá mục tiêu / quét vòng đã loại các lần kẹt hàng nghìn giây mô phỏng của bản đầu (#459).
 
 ## Nguyên Anh sau nội dung (M7.5 / M7.9)
 
@@ -702,15 +702,15 @@ Tính SỐNG từ `shared/` bằng mô hình ở trên. Quái mới ở Hàn Vâ
 
 | Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
 |---|---|---:|---:|---:|---:|
-| Nguyên Anh Sơ kỳ | Hàn Lang | 198,974 | 23,676 | 150 | 46% |
+| Nguyên Anh Sơ kỳ | Hàn Lang | 198,974 | 23,776 | 150 | 46% |
 | Nguyên Anh Sơ kỳ | Phong Nha | không an toàn solo (52% khí huyết / trận) | – | – | – |
 | Nguyên Anh Sơ kỳ | Cốt Tượng | 202,666 | 25,045 | 78 | 49% |
 | Nguyên Anh Sơ kỳ | Độc Tước | không an toàn solo (97% khí huyết / trận) | – | – | – |
-| Nguyên Anh Trung kỳ | Hàn Lang | 221,840 | 26,419 | 167 | 36% |
+| Nguyên Anh Trung kỳ | Hàn Lang | 221,840 | 26,531 | 167 | 36% |
 | Nguyên Anh Trung kỳ | Phong Nha | 248,718 | 31,956 | 163 | 40% |
 | Nguyên Anh Trung kỳ | Cốt Tượng | 226,751 | 28,035 | 88 | 38% |
 | Nguyên Anh Trung kỳ | Độc Tước | không an toàn solo (75% khí huyết / trận) | – | – | – |
-| Nguyên Anh Hậu kỳ | Hàn Lang | 244,902 | 29,189 | 184 | 27% |
+| Nguyên Anh Hậu kỳ | Hàn Lang | 244,902 | 29,313 | 184 | 27% |
 | Nguyên Anh Hậu kỳ | Phong Nha | 275,963 | 35,484 | 180 | 31% |
 | Nguyên Anh Hậu kỳ | Cốt Tượng | 252,311 | 31,208 | 97 | 29% |
 | Nguyên Anh Hậu kỳ | Độc Tước | không an toàn solo (58% khí huyết / trận) | – | – | – |
@@ -876,7 +876,7 @@ Lên cấp là chuyện của TUẦN, không phải GIỜ: tông 3 người tíc
 
 Cận trên giá trị (Linh thạch theo GIÁ MUA NPC) một người mua trong một ngày với 140 cống hiến (knapsack phân số theo sức mua mỗi cống hiến, tới hạn mức `limitDay` của từng món). Cột còn lại: sức mua đó bằng bao nhiêu GIỜ săn solo của cảnh giới (loại quái tốt nhất ở bậc đầu, `monsterEconomy`).
 
-| Cấp tông | món đã mở | sức mua tối đa / ngày (LT) | giờ săn Phàm Nhân (1.075 LT/h) | giờ săn Luyện Khí (1.377 LT/h) | giờ săn Trúc Cơ (5.036 LT/h) | giờ săn Kim Đan (15.836 LT/h) |
+| Cấp tông | món đã mở | sức mua tối đa / ngày (LT) | giờ săn Phàm Nhân (1.075 LT/h) | giờ săn Luyện Khí (1.377 LT/h) | giờ săn Trúc Cơ (5.036 LT/h) | giờ săn Kim Đan (15.866 LT/h) |
 |:-:|--:|--:|--:|--:|--:|--:|
 | 1 (Sơ Lập) | 5 | 660 | 0,61 | 0,48 | 0,13 | 0,04 |
 | 2 (Tiểu Thành) | 13 | 687 | 0,64 | 0,50 | 0,14 | 0,04 |
@@ -969,7 +969,7 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 | Khung | Trùm (máu thật) | Bản đồ | Giờ / thời lượng | DPS mỗi người | **Người tối thiểu** | Thưởng một người (đội 10): quỹ -> phút săn (tu vi / Linh thạch) | Né hoàn hảo: 5 / 20 / 50 người | Không né: 5 / 20 / 50 người (thắng, thời gian thật, chết) |
 |---|---|---|---|--:|--:|---|---|---|
 | han_van_trua | Thiên Hàn Vương x38 (4.674.000 máu) | han_van | 12:00 / 30 ph | 456 | **6** | 69.000 + 51.000 -> 17,4 / 17,2 ph | 34,2 ph / 8,5 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 75% 3,9 ph, 36,5 chết |
-| am_suong_toi | Hắc Giao x40 (3.000.000 máu) | am_suong | 21:00 / 30 ph | 290 | **6** | 94.000 + 49.000 -> 17,5 / 17,5 ph | 34,4 ph / 8,6 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 0%, 50 chết |
+| am_suong_toi | Hắc Giao x40 (3.000.000 máu) | am_suong | 21:00 / 30 ph | 290 | **6** | 94.000 + 49.000 -> 17,5 / 17,4 ph | 34,4 ph / 8,6 ph / 3,4 ph | 0%, 5 chết / 0%, 20 chết / 0%, 50 chết |
 
 **Không vi phạm mục tiêu nào.**
 
@@ -1014,16 +1014,16 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 | hac_phong_ho_ba | hac_phong | 11 | thường | Hắc Hổ x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 556 + 348 | 417 + 261 | 3,9 ph |
 | hac_phong_quy_chan | hac_phong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 1.056 | 1.521 + 792 | 3,5 ph |
 | hac_phong_ho_tinh_anh | hac_phong | 11 | tinh anh | Hắc Hổ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 20 s | 834 + 522 | 417 + 261 | 5,7 ph |
-| hac_phong_ho_tinh_anh_doi | hac_phong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 28 s | 3.138 + 1.638 | 1.569 + 819 | 5,5 ph |
+| hac_phong_ho_tinh_anh_doi | hac_phong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 28 s | 3.138 + 1.644 | 1.569 + 822 | 5,5 ph |
 | hac_phong_yeu_vuong | hac_phong | 11 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 0% / 100% / 0% | 28 s | 1.390 + 870 | 417 + 261 | -3,5 ph |
 | am_suong_ho_suong | am_suong | 13 | thường | Sương Hồ x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.028 + 1.056 | 1.521 + 792 | 3,8 ph |
 | am_suong_quy_le | am_suong | 13 | thường | Thạch Quy x1 | 100% / 0% / 0% | 100% / 0% / 0% | 32 s | 2.028 + 1.056 | 1.521 + 792 | 3,5 ph |
-| am_suong_thiem_doc | am_suong | 15 | thường | Độc Thiềm x1 | 100% / 0% / 0% | 100% / 0% / 0% | 15 s | 2.144 + 1.120 | 1.608 + 840 | 3,8 ph |
-| am_suong_ho_tinh_anh | am_suong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 23 s | 3.138 + 1.638 | 1.569 + 819 | 5,6 ph |
+| am_suong_thiem_doc | am_suong | 15 | thường | Độc Thiềm x1 | 100% / 0% / 0% | 100% / 0% / 0% | 15 s | 2.144 + 1.124 | 1.608 + 843 | 3,8 ph |
+| am_suong_ho_tinh_anh | am_suong | 14 | tinh anh | Hắc Hổ x2 | 100% / 0% / 0% | 100% / 0% / 0% | 23 s | 3.138 + 1.644 | 1.569 + 822 | 5,6 ph |
 | am_suong_yeu_vuong | am_suong | 13 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 18 s | 5.070 + 2.640 | 1.521 + 792 | 9,7 ph |
 | han_van_lang_le | han_van | 16 | thường | Hàn Lang x1 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 2.208 + 1.160 | 1.656 + 870 | 3,9 ph |
-| han_van_lang_doi | han_van | 18 | thường | Hàn Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 14 s | 1.584 + 1.184 | 1.188 + 888 | 3,8 ph |
-| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 1.172 | 1.425 + 879 | 3,5 ph |
+| han_van_lang_doi | han_van | 18 | thường | Hàn Lang x2 | 100% / 0% / 0% | 100% / 0% / 0% | 14 s | 1.584 + 1.188 | 1.188 + 891 | 3,8 ph |
+| han_van_tuong_xuong | han_van | 17 | thường | Cốt Tượng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 29 s | 1.900 + 1.176 | 1.425 + 882 | 3,5 ph |
 | han_van_nha_gio | han_van | 16 | thường | Phong Nha x1 | 100% / 0% / 0% | 100% / 0% / 0% | 12 s | 2.208 + 1.160 | 1.656 + 870 | 3,8 ph |
 | han_van_soi_tuyet | han_van | 16 | tinh anh | Hôi Lang x3 | 100% / 0% / 0% | 100% / 0% / 0% | 8 s | 3.312 + 1.740 | 1.656 + 870 | 5,9 ph |
 | han_van_yeu_vuong | han_van | 16 | kẻ cầm đầu | Xích Mãng x1 | 100% / 0% / 0% | 100% / 0% / 0% | 10 s | 5.520 + 2.900 | 1.656 + 870 | 9,8 ph |
@@ -1152,7 +1152,7 @@ Cảnh báo (không chặn):
 
 Chiêu gây sát thương: trung vị **1.23×**, cao nhất **1.25×** (1 mục tiêu).
 
-### Trúc Cơ (19 chiêu)
+### Trúc Cơ (21 chiêu)
 | Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
 |---|---|---|---|---:|---:|---:|---:|
 | **Thanh Tùng Phi Châm** | moc | line | sát thương | 3.0s | 0.033 | 1.26× | 1.24× |
@@ -1173,11 +1173,13 @@ Chiêu gây sát thương: trung vị **1.23×**, cao nhất **1.25×** (1 mục
 | **Cầm Long Khấu** | none | cone | khống chế | 5.0s | 0.016 | 1.14× | 1.17× |
 | **Lôi Hỏa Chưởng** | loi | cone | sát thương | 3.0s | 0.020 | 1.26× | 1.28× |
 | **Tịch Dạ Phân Ảnh** | am | fan | sát thương | 3.0s | 0.033 | 1.17× | 1.20× |
+| **Hàn Giao Tiễn** | bang | bolt | khống chế | 3.0s | 0.020 | 1.19× | 1.21× |
+| **Lôi Âm** | loi | ground | sát thương | 5.0s | 0.012 | 1.13× | 1.14× |
 | **Độc Đằng Phục** | moc | trap | sát thương | 8.0s | 0.013 | 1.19× | 1.22× |
 
 Chiêu gây sát thương: trung vị **1.21×**, cao nhất **1.31×** (1 mục tiêu).
 
-### Kim Đan (16 chiêu)
+### Kim Đan (18 chiêu)
 | Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
 |---|---|---|---|---:|---:|---:|---:|
 | **Thu Thủy Kiếm Ảnh** | kim | cone | sát thương | 5.0s | 0.020 | 1.14× | 1.21× |
@@ -1193,13 +1195,15 @@ Chiêu gây sát thương: trung vị **1.21×**, cao nhất **1.31×** (1 mục
 | **Hồi Phong Liên Chưởng** | phong | cone | sát thương | 3.0s | 0.033 | 1.20× | 1.18× |
 | **Hóa Huyết Phệ Nguyên** | none | cone | sát thương | 5.0s | 0.020 | 1.16× | 1.27× |
 | **Thực Phách Âm Trảo** | am | cone | sát thương | 5.0s | 0.020 | 1.13× | 1.11× |
+| **Hàn Sương Phong Mạch** | bang | trap | khống chế | 9.0s | 0.017 | 1.12× | 1.15× |
+| **Tử Điện Xuyên Vân** | loi | bolt | sát thương | 5.0s | 0.036 | 1.11× | 1.15× |
 | **Phi Kiếm Tam Liên** | kim | bolt | sát thương | 5.5s | 0.024 | 1.17× | 1.24× |
 | **Liệt Diễm Trận** | hoa | zone | sát thương | 8.0s | 0.020 | 1.13× | 1.18× |
 | **Liên Châu Lôi** | loi | chain | khống chế | 4.5s | 0.031 | 1.13× | 1.12× |
 
-Chiêu gây sát thương: trung vị **1.14×**, cao nhất **1.20×** (1 mục tiêu).
+Chiêu gây sát thương: trung vị **1.13×**, cao nhất **1.20×** (1 mục tiêu).
 
-### Nguyên Anh (23 chiêu)
+### Nguyên Anh (24 chiêu)
 | Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
 |---|---|---|---|---:|---:|---:|---:|
 | **Hàn Quang Tiễn** | bang | line | khống chế | 3.0s | 0.037 | 1.33× | 1.31× |
@@ -1223,6 +1227,7 @@ Chiêu gây sát thương: trung vị **1.14×**, cao nhất **1.20×** (1 mục
 | **Long Tượng Hộ Thể** | none | self | thủ | 7.0s | 0.023 | 0.95× | 1.04× |
 | **Âm Lôi Chấn Hồn** | loi | fan | sát thương | 5.0s | 0.028 | 1.12× | 1.18× |
 | **Khô Mạch Đoạn Lưu** | am | cone | sát thương | 5.0s | 0.030 | 1.11× | 1.22× |
+| **Băng Phách Xuyên Tâm** | bang | bolt | khống chế | 5.0s | 0.040 | 1.12× | 1.16× |
 | **Hồn Phiên Tượng** | am | totem | khống chế | 12.0s | 0.017 | 1.13× | 1.18× |
 | **Phá Sơn Nhất Kích** | tho | ground | khống chế | 9.0s | 0.022 | 1.17× | 1.51× |
 

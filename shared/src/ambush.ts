@@ -139,7 +139,7 @@ export function ambushHuntExpPerMin(step: unknown): number {
  * `chan-duong.test.ts` buộc bảng này khớp bản sinh, đổi số liệu quái / đồ làm lệch thì test đỏ và in ra bảng đúng để dán lại. CD6b chốt (comment #1066 7078639156).
  */
 export const AMBUSH_HUNT_COIN_PER_MIN: readonly number[] = [
-  18, 23, 25, 27, 28, 30, 50, 63, 68, 73, 84, 87, 91, 264, 273, 280, 290, 293, 296,
+  18, 23, 25, 27, 28, 30, 50, 63, 68, 73, 84, 87, 91, 264, 274, 281, 290, 294, 297,
 ];
 
 /** Linh thạch / phút săn ở bậc `step` (kẹp vào bảng: bậc ngoài bảng lấy bậc gần nhất; không phải số hữu hạn -> bậc 0). Thuần. */

@@ -119,6 +119,12 @@ export const FX_CAST_SKILLS = [
   "toa_long_cam_na",
   "huyet_ti_phuoc_than",
   "no_dao_bai_khong",
+  // Băng + Lôi (CT15 đợt 3, #1185, D): bolt / trap / ground (dấu + kích Lôi)
+  "giao_can_cung",
+  "han_suong_toa",
+  "bang_phach_than_cham",
+  "loi_am_an",
+  "tu_dien_thoa",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */

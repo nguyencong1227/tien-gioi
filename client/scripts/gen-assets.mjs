@@ -1051,6 +1051,13 @@ const BOOKS = {
   kinh_huyet_mang_pha_giap: [0x7a1f2e, 0xff9a8a, "tien"], // sợi máu đỏ đâm xuyên giáp (Nguyên Anh, chảy máu): mũi tên xiên
   kinh_quy_anh_me_tung: [0x3f6a66, 0xc8e8e0], // bóng ma mờ tỏ, âm khí lam lục (Luyện Khí, bộ pháp "Quỷ Ảnh Bộ")
   kinh_am_phong_quyen_hon: [0x4a5a78, 0xd0c8f0], // gió âm cuốn hồn oan, xám chàm tím (Kim Đan, "Quỷ Phong Quyết")
+  // Băng + Lôi (CT15 đợt 3, #1185, D; icon vẽ SAU dữ liệu của D, B): mỗi quyển một sắc riêng để không trùng Hàn Băng (0x6fb8e8) / Lôi Đình (0xe0c850) / Lôi Hỏa (0xe0b040) / Chấn Hồn (0xc8b83c);
+  // dấu ấn sinh tự động từ id (#1303), riêng cung băng có dấu mũi tên và Hàn Sương Tỏa (bẫy xích) có dấu trận
+  kinh_giao_can_cung: [0x3f7f98, 0xcfeaf2, "tien"], // cung dây gân giao, xanh lam lạnh (Trúc Cơ, mũi băng bắn đi)
+  kinh_han_suong_toa: [0x7a9cb8, 0xeef4fa, "tran"], // xích sương trói chân: xám lam nhạt, viền trắng sương (Kim Đan, bẫy)
+  kinh_bang_phach_than_cham: [0x2a5a7a, 0xe6f8ff], // kim băng xuyên tim: lam sẫm, viền trắng buốt (Nguyên Anh)
+  kinh_loi_am_an: [0x8a6a2a, 0xf4d878], // ấn sét đập xuống, dấu Lôi: đồng thau, ánh vàng (Trúc Cơ)
+  kinh_tu_dien_thoa: [0x5a3a98, 0xd8c0ff], // tia sét tím mảnh như thoi (Kim Đan, kích dấu Lôi)
 };
 
 /**
