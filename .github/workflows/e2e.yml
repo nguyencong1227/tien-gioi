@@ -72,6 +72,9 @@ jobs:
         # Nếu trong tương lai có kịch bản đòi hỏi GPU phần cứng chuyên dụng, hãy cấu hình --skip
         # kèm lý do kỹ thuật rõ ràng ngay tại đây.
         env:
+          # Kịch bản CHẬP CHỜN đã đo hai lượt (cùng đầu main) thì tạm bỏ ở ĐÂY kèm lý do, dạng "tên1,tên2" (tên không có tiền tố e2e:): đừng để đỏ kéo dài che lỗi thật,
+          # và mở issue dev-b nói rõ khi nào gỡ (docs/VAN_HANH.md mục 10.3). Hiện: rỗng. Gộp với đầu vào `skip` khi chạy tay.
+          NIGHTLY_SKIP: ""
           IN_ONLY: ${{ inputs.only }}
           IN_SKIP: ${{ inputs.skip }}
           IN_TIMEOUT: ${{ inputs.timeout }}
@@ -88,12 +91,16 @@ jobs:
             args+=(--only "$IN_ONLY")
           fi
 
+          skip_all="$NIGHTLY_SKIP"
           if [ -n "$IN_SKIP" ]; then
-            if [[ ! "$IN_SKIP" =~ ^[a-z0-9:,_-]*$ ]]; then
-              echo "Lỗi: input 'skip' chứa ký tự không hợp lệ: $IN_SKIP" >&2
+            skip_all="${skip_all:+$skip_all,}$IN_SKIP"
+          fi
+          if [ -n "$skip_all" ]; then
+            if [[ ! "$skip_all" =~ ^[a-z0-9:,_-]*$ ]]; then
+              echo "Lỗi: danh sách skip chứa ký tự không hợp lệ: $skip_all" >&2
               exit 1
             fi
-            args+=(--skip "$IN_SKIP")
+            args+=(--skip "$skip_all")
           fi
 
           if [ -n "$IN_TIMEOUT" ]; then

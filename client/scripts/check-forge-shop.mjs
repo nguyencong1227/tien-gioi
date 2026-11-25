@@ -1,4 +1,3 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 /* global console, setTimeout, Buffer */
 /**
  * Kiểm bảng Lò Rèn và Cửa hàng ở năm khung nhìn (M6 #409 mục 2 và 4): Chrome thật, chế độ mock (không cần server / Vite).
@@ -14,14 +13,13 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
-import { waitPageTarget, waitUntilTrue } from "./chrome-wait.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -116,23 +114,11 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-forge-shop-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore" },
-  );
   let failures = 0;
+  let launched = null;
   try {
-    const page = await waitPageTarget(CDP_PORT);
+    launched = await launchChrome({ name: "forge-shop" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -361,13 +347,8 @@ async function main() {
     }
     ws.close();
   } finally {
-    chrome.kill("SIGKILL");
     server.close();
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true });
-    } catch {
-      // Bỏ qua
-    }
+    if (launched) await launched.close();
   }
   if (failures > 0) {
     console.error(`\n❌ ${failures} lỗi.`);

@@ -62,25 +62,33 @@ export interface ScriptResult {
 }
 
 /**
- * Hạn chờ RIÊNG (giây) cho kịch bản chậm: hạn thực = max(--timeout, giá trị này), nên `--timeout` nhỏ hơn không cắt ngang chúng.
- * Các `check-*.mjs` nối vào nightly (#1458): đo tay trên máy nhà 107-144 s (`sect-*`, `text-size`), `social-shell` ~5-9 phút (8 khung); runner CI chậm hơn ~2 lần
- * nên để dư. Thêm kịch bản chậm mới thì thêm vào đây, đừng nâng `--timeout` chung.
+ * Sàn hạn chờ RIÊNG (giây) cho kịch bản chậm: hạn thực = max(--timeout, sàn), nên `--timeout` nhỏ hơn không cắt ngang chúng (#1458, A: KHÔNG nâng chung lên 600 s).
+ * Sàn ~3 lần thời gian ĐO TRÊN CI (runner SwiftShader, không GPU; run 45539915300 ngày 25/11): social-shell 380 s -> 1200; sect-vault 165 s -> 500; text-size 158 s -> 480;
+ * sect-hall ~170 s ước (đo CI chưa có) -> 540; sect-confirm ~150 s ước -> 450. Kịch bản có 3 x thời gian CI <= 300 s không cần dòng ở đây. Thêm kịch bản chậm mới thì thêm vào
+ * đây theo số đo CI (REPORT.md), đừng nâng `--timeout` chung.
  */
 export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
-  "e2e:social-shell": 1500,
-  "e2e:skills-panel": 600,
-  "e2e:sect-hall": 600,
-  "e2e:sect-confirm": 600,
-  "e2e:sect-vault": 600,
-  "e2e:text-size": 600,
+  "e2e:social-shell": 1200,
+  "e2e:sect-vault": 500,
+  "e2e:text-size": 480,
+  "e2e:sect-hall": 540,
+  "e2e:sect-confirm": 450,
 };
 
-/** Hạn chờ thực của một kịch bản: max(hạn chung, hạn riêng). Tra bằng `hasOwnProperty` (tên script đến từ package.json, không tin `constructor`). */
+/** Kịch bản có hạn chờ thực LỚN HƠN ngưỡng này KHÔNG được thử lại: một lần treo + thử lại sẽ ăn quá `timeout-minutes` của cả shard (A ở #1458). */
+export const RETRY_MAX_TIMEOUT_SEC = 600;
+
+/** Hạn chờ thực của một kịch bản: max(hạn chung, sàn riêng). Tra bằng `hasOwnProperty` (tên script đến từ package.json, không tin `constructor`). */
 export function timeoutSecFor(script: string, globalSec: number): number {
   const own = Object.prototype.hasOwnProperty.call(SCRIPT_TIMEOUT_SEC, script)
     ? SCRIPT_TIMEOUT_SEC[script]
     : 0;
   return Math.max(globalSec, own);
+}
+
+/** Có được thử lại khi lần đầu đỏ không: chỉ khi hạn chờ thực <= `RETRY_MAX_TIMEOUT_SEC`. */
+export function retryAllowed(script: string, globalSec: number): boolean {
+  return timeoutSecFor(script, globalSec) <= RETRY_MAX_TIMEOUT_SEC;
 }
 
 /** Đọc danh sách các script bắt đầu bằng "e2e" từ package.json, loại bỏ e2e:all và e2e-all */
@@ -750,8 +758,8 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
       continue;
     }
 
-    // Nếu thất bại ở lần 1 và có bật retry
-    if (options.retry) {
+    // Nếu thất bại ở lần 1 và có bật retry (kịch bản có hạn chờ > RETRY_MAX_TIMEOUT_SEC thì không thử lại)
+    if (options.retry && retryAllowed(script, options.timeoutSec)) {
       process.stdout.write(
         `⚠️ Lần 1 thất bại (${run1.durationSec.toFixed(1)}s). Thử lại lần 2... `,
       );
@@ -797,7 +805,11 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
         status: "ĐỎ",
         durationSec: run1.durationSec,
         attempts: 1,
-        note: run1.timedOut ? "Hết thời gian (timeout)" : `Mã thoát ${run1.exitCode}`,
+        note:
+          (run1.timedOut ? "Hết thời gian (timeout)" : `Mã thoát ${run1.exitCode}`) +
+          (options.retry && !retryAllowed(script, options.timeoutSec)
+            ? `; không thử lại (hạn chờ > ${RETRY_MAX_TIMEOUT_SEC}s)`
+            : ""),
         logPath: logFile,
         lastLines,
       });

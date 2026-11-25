@@ -11,10 +11,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Chờ Chrome mở cổng CDP và có một target loại `page`. Trả target (có `webSocketDebuggerUrl`) hoặc `null` khi hết hạn.
- * Lỗi nối / JSON hỏng / chưa có page đều chỉ là "chưa sẵn sàng", thử lại sau 150 ms.
+ * Lỗi nối / JSON hỏng / chưa có page đều chỉ là "chưa sẵn sàng", thử lại sau 150 ms. `shouldStop()` trả đúng (vd Chrome đã thoát) thì thôi chờ, trả `null` ngay.
  */
-export async function waitPageTarget(cdpPort, timeoutMs = START_WAIT_MS) {
-  for (const t0 = Date.now(); Date.now() - t0 < timeoutMs;) {
+export async function waitPageTarget(cdpPort, timeoutMs = START_WAIT_MS, shouldStop = () => false) {
+  for (const t0 = Date.now(); Date.now() - t0 < timeoutMs && !shouldStop();) {
     try {
       const res = await fetch(`http://127.0.0.1:${cdpPort}/json`);
       const list = await res.json();

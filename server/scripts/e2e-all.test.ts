@@ -13,6 +13,8 @@ import {
   getE2eScripts,
   parseCliArgs,
   parseShard,
+  retryAllowed,
+  RETRY_MAX_TIMEOUT_SEC,
   runE2eAll,
   SCRIPT_TIMEOUT_SEC,
   shardScripts,
@@ -91,6 +93,22 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(timeoutSecFor("e2e:ban-phim", 300)).toBe(300);
       expect(timeoutSecFor("constructor", 300)).toBe(300);
       expect(timeoutSecFor("toString", 300)).toBe(300);
+    });
+
+    it("retryAllowed: kịch bản có hạn chờ thực > 600 s (social-shell) KHÔNG thử lại; còn lại thử lại như cũ", () => {
+      expect(RETRY_MAX_TIMEOUT_SEC).toBe(600);
+      expect(retryAllowed("e2e:social-shell", 300)).toBe(false);
+      expect(retryAllowed("e2e:ban-phim", 300)).toBe(true);
+      expect(retryAllowed("e2e:sect-vault", 300)).toBe(true); // sàn 500 s <= 600 s
+      // --timeout chung lớn hơn 600 s cũng làm mọi kịch bản không được thử lại (chống treo + thử lại ăn hết timeout-minutes)
+      expect(retryAllowed("e2e:ban-phim", 900)).toBe(false);
+    });
+
+    it("không script nào có sàn <= 300 s (thừa) và mọi sàn <= 1500 s (không để treo ăn quá nửa timeout-minutes của shard)", () => {
+      for (const [k, v] of Object.entries(SCRIPT_TIMEOUT_SEC)) {
+        expect(v, `${k} sàn thừa (<= --timeout mặc định 300 s)`).toBeGreaterThan(300);
+        expect(v, `${k} sàn quá lớn`).toBeLessThanOrEqual(1500);
+      }
     });
 
     it("mọi khoá trong SCRIPT_TIMEOUT_SEC là script e2e:* có thật ở server/package.json (chống gõ sai tên)", () => {
