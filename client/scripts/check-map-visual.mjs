@@ -280,6 +280,43 @@ async function main() {
         );
         check(s.fades === 1, `gói về muộn sau nền cũ: làm mờ chuyển ĐÚNG MỘT lần (${s.fades})`);
         check(!s.legacy && !s.decor && !s.water, "lớp ô cũ, trang trí cũ và nước cũ KHÔNG còn");
+        // CÂY NGUYÊN KHỐI (mục 73): mỗi ô thân cây (GID 620 ở lớp decor của visual.json) là MỘT sprite cây neo ở gốc, độ sâu = y gốc; hai lớp ô KHÔNG còn ô thân / tán (620 / 621)
+        const trees = await evalJs(`(() => {
+          const sc = window.__scene, vm = sc.visualMap;
+          let want = 0;
+          for (let i = 0; i < vm.decor.length; i++) if (vm.decor[i] === 620) want++;
+          let leftTiles = 0;
+          for (const l of sc.visualLayers) l.forEachTile((t) => { if (t.index === 620 || t.index === 621) leftTiles++; });
+          const sp = sc.visualTrees;
+          return {
+            want, have: sp.length, leftTiles,
+            origin: sp.length ? [sp[0].originX, sp[0].originY] : null,
+            depthIsY: sp.every((o) => o.depth === o.y),
+            scale: sp.length ? sp[0].scaleX : null,
+            frame: sp.length ? sp[0].frame.name : null,
+            size: sp.length ? [sp[0].frame.width, sp[0].frame.height] : null,
+          };
+        })()`);
+        check(trees.want > 0, `lớp decor của gói có ô thân cây (${trees.want})`);
+        check(
+          trees.have === trees.want,
+          `MỖI ô thân cây là một sprite cây nguyên khối (${trees.have} / ${trees.want})`,
+        );
+        check(
+          trees.leftTiles === 0,
+          `hai lớp ô KHÔNG còn ô thân / tán cũ 620 / 621 (còn ${trees.leftTiles})`,
+        );
+        check(
+          trees.origin?.[0] === 0.5 &&
+            trees.origin?.[1] === 1 &&
+            trees.depthIsY &&
+            trees.scale === 2,
+          `cây neo ở GỐC (giữa đáy), độ sâu = y gốc, phóng 2 lần: ${JSON.stringify(trees)}`,
+        );
+        check(
+          trees.frame === "tg-tree" && trees.size?.[0] === 32 && trees.size?.[1] === 32,
+          `khung cây 32 x 32 "tg-tree": ${trees.frame} ${JSON.stringify(trees.size)}`,
+        );
         await sleep(900); // làm mờ chuyển (350 ms) đã xong: lớp hình đặc hẳn, nền cũ đã gỡ khỏi danh sách hiển thị
         const done = await evalJs(`(() => {
           const s = window.__scene;

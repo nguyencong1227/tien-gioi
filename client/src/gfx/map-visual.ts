@@ -147,6 +147,64 @@ export function visualRows(layer: Uint16Array, width: number, height: number): n
   return rows;
 }
 
+/**
+ * CÂY NGUYÊN KHỐI (QUYET_DINH_M3 mục 73). Gói Ninja Adventure KHÔNG có "thân" và "tán" rời: cây là một khối tán tròn 32 x 31 kèm rễ ở đáy. Trước đây dữ liệu bản đồ chia mỗi cây
+ * thành ô thân (lớp decor, GID 620: chỉ đáy rễ) + ô tán (lớp over, GID 621: búp lá tự vẽ 16 px) nên hai nửa lệch nhau, hàng cây dày thành dải tán + dải thân. Nay client vẽ MỖI ô thân
+ * (GID 620) thành MỘT sprite cây trọn vẹn neo ở GỐC (giữa đáy rễ), xếp lớp theo `y` như mọi thực thể (đứng sau cây thì bị tán che, đứng trước thì che rễ), và BỎ ô 620 / 621 khỏi
+ * hai lớp ô. Va chạm không đổi: vẫn theo ô logic `T.Tree` của `shared` (chặn ở gốc). Cây lớn / thân gỗ riêng của gói để dành cho bước sau.
+ */
+/** GID ô thân / tán cây trong dữ liệu bản đồ: KHỚP `GID_TREE_TRUNK` / `GID_TREE_CANOPY` của server/src/systems/map-builder.ts (`map-visual.test.ts` đối chiếu hai nơi). */
+export const VISUAL_GID_TREE_TRUNK = 620;
+export const VISUAL_GID_TREE_CANOPY = 621;
+/** Tên khung sprite cây thêm vào texture tileset đã nạp. */
+export const VISUAL_TREE_FRAME_NAME = "tg-tree";
+/**
+ * Khung sprite cây (x, y, rộng, cao) trong ảnh tileset ĐÃ ĐÙN MÉP: vùng trống ở ô (12..13, 0..1). KHỚP `TREE_FRAME` của client/scripts/art/dung-tileset-world.py
+ * (`map-visual.test.ts` đọc script để đối chiếu). Điểm neo ở GỐC = giữa đáy khung.
+ */
+export const VISUAL_TREE_FRAME = { x: 217, y: 1, w: 32, h: 32 } as const;
+/** Gốc cây cách đáy ô logic chừng này (px thế giới) để rễ nằm TRONG ô bị chặn, không thò ra ô phía nam. */
+export const VISUAL_TREE_BASE_INSET = 3;
+
+export interface VisualTreeSpot {
+  /** Giữa gốc cây (px thế giới) */
+  x: number;
+  /** Đáy rễ (px thế giới) = độ sâu xếp lớp (cùng quy ước thực thể xếp theo `y` của chân) */
+  y: number;
+  /** Lật ngang cho đỡ lặp (tất định theo ô) */
+  flip: boolean;
+}
+
+/**
+ * Vị trí các cây của bản đồ: MỖI ô GID thân cây (`VISUAL_GID_TREE_TRUNK`) ở lớp decor là một cây. `tile` = cỡ ô thế giới (px). Hàm thuần, tất định (lật ngang theo băm của ô,
+ * không dùng `Math.random`). Lớp ngắn hơn `width x height` thì chỉ duyệt phần có.
+ */
+export function visualTreeSpots(
+  decor: Uint16Array,
+  width: number,
+  height: number,
+  tile: number,
+): VisualTreeSpot[] {
+  const out: VisualTreeSpot[] = [];
+  const n = Math.min(decor.length, width * height);
+  for (let i = 0; i < n; i++) {
+    if (decor[i] !== VISUAL_GID_TREE_TRUNK) continue;
+    const cx = i % width;
+    const cy = Math.floor(i / width);
+    out.push({
+      x: (cx + 0.5) * tile,
+      y: (cy + 1) * tile - VISUAL_TREE_BASE_INSET,
+      flip: ((Math.imul(cx, 73856093) ^ Math.imul(cy, 19349663)) & 1) === 1,
+    });
+  }
+  return out;
+}
+
+/** Bản sao lớp ô đã BỎ ô thân / tán cây (0 = trống): cây nay vẽ bằng sprite nguyên khối (`visualTreeSpots`). */
+export function visualWithoutTreeTiles(layer: Uint16Array): Uint16Array {
+  return layer.map((g) => (g === VISUAL_GID_TREE_TRUNK || g === VISUAL_GID_TREE_CANOPY ? 0 : g));
+}
+
 /** Phần của `Phaser.Scene` mà bộ nạp ảnh dùng (giao diện hẹp để test bằng bản giả). */
 export interface VisualLoaderScene {
   textures: {

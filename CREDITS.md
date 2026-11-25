@@ -39,10 +39,10 @@ Bốn ảnh tileset của lớp hình bản đồ do nhóm Tiên Giới (Dev B) 
 
 | Tệp | Nội dung | SHA-256 |
 |---|---|---|
-| `client/public/packs/map-lac_ha/tileset_world.png` | Tileset lớp hình bản đồ Lạc Hà (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `6eec7c3d6a351b1002dbe49f664e78c90081602c684fa83a94ba7ceb538676ee` |
-| `client/public/packs/map-hac_phong/tileset_world.png` | Tileset lớp hình bản đồ Hắc Phong (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `ff4eceb5eb7ae8a50e84da1c4ca00edc56d642985a1fee7d96825db1bb505805` |
-| `client/public/packs/map-am_suong/tileset_world.png` | Tileset lớp hình bản đồ Âm Sương (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `2b027121928e938ce326d0dad5b3abccee43ede1cf1c1042f86157614d0dc7b6` |
-| `client/public/packs/map-han_van/tileset_world.png` | Tileset lớp hình bản đồ Hàn Vân (396x504, đùn mép): cát / đất / nước / đá lát + thân, tán cây, đá, bụi; bảng màu theo vùng | `87d4ee965337097654d7f7268d479227c30a76b08273df0805abafb487a660d8` |
+| `client/public/packs/map-lac_ha/tileset_world.png` | Tileset lớp hình bản đồ Lạc Hà (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `3c2c272d7bfc1c8c498c2b028d5bc2cb6679994eb6677ea6f0b602c6d9178acf` |
+| `client/public/packs/map-hac_phong/tileset_world.png` | Tileset lớp hình bản đồ Hắc Phong (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `402d57d3d6ae62c81130c0728c1dcb157d254f04c6c71de98812824c649a0a64` |
+| `client/public/packs/map-am_suong/tileset_world.png` | Tileset lớp hình bản đồ Âm Sương (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `ba4f437130d7e77c5b65c1528e8d2441ddeea417e285610106e5d4fd4203aa56` |
+| `client/public/packs/map-han_van/tileset_world.png` | Tileset lớp hình bản đồ Hàn Vân (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `57d0265be89d267acc4f4d520ecc03299eb9a7a149aa417119f59b7e8672a9ed` |
 
 ---
 

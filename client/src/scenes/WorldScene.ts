@@ -63,6 +63,10 @@ import {
   visualPackPaths,
   visualFadePlan,
   visualOverDepth,
+  visualTreeSpots,
+  visualWithoutTreeTiles,
+  VISUAL_TREE_FRAME,
+  VISUAL_TREE_FRAME_NAME,
   visualRows,
   visualTextureKey,
   type VisualMap,
@@ -624,6 +628,8 @@ export class WorldScene extends Phaser.Scene {
   private visualMapId = "";
   visualLayers: Phaser.Tilemaps.TilemapLayer[] = [];
   private visualTilemaps: Phaser.Tilemaps.Tilemap[] = [];
+  /** Cây nguyên khối của lớp hình Tiled (mục 73): mỗi ô thân cây là một sprite neo ở gốc, xếp lớp theo y */
+  private visualTrees: Phaser.GameObjects.Image[] = [];
   private visualSeq = 0;
   /** Số lần đã làm mờ chuyển từ nền cũ sang lớp hình (công khai cho script kiểm `?debug`). */
   visualFades = 0;
@@ -1072,8 +1078,10 @@ export class WorldScene extends Phaser.Scene {
   private destroyTiledVisual() {
     for (const l of this.visualLayers) l.destroy();
     for (const t of this.visualTilemaps) t.destroy();
+    for (const tr of this.visualTrees) tr.destroy();
     this.visualLayers = [];
     this.visualTilemaps = [];
+    this.visualTrees = [];
   }
 
   /** Bỏ lớp hình của bản đồ vừa rời: huỷ lớp, quên `visual.json`, xoá texture (gói đã giải phóng), vô hiệu mọi lần xin đang chạy. */
@@ -1166,10 +1174,30 @@ export class WorldScene extends Phaser.Scene {
       this.visualLayers.push(layer);
       return true;
     };
+    // Cây vẽ bằng sprite nguyên khối (mục 73): bỏ ô thân (decor) + ô tán (over) khỏi hai lớp ô
     const ok =
-      mk(vm.ground, -10) && mk(vm.decor, -9) && mk(vm.over, visualOverDepth(this.map.worldH));
-    if (!ok) this.destroyTiledVisual();
-    return ok;
+      mk(vm.ground, -10) &&
+      mk(visualWithoutTreeTiles(vm.decor), -9) &&
+      mk(visualWithoutTreeTiles(vm.over), visualOverDepth(this.map.worldH));
+    if (!ok) {
+      this.destroyTiledVisual();
+      return false;
+    }
+    const tex = this.textures.get(key);
+    const f = VISUAL_TREE_FRAME;
+    if (!tex.has(VISUAL_TREE_FRAME_NAME)) tex.add(VISUAL_TREE_FRAME_NAME, 0, f.x, f.y, f.w, f.h);
+    for (const s of visualTreeSpots(vm.decor, vm.width, vm.height, TILE)) {
+      // gốc ở giữa đáy khung; độ sâu = y của gốc như mọi thực thể (đứng sau cây bị tán che, đứng trước che rễ)
+      this.visualTrees.push(
+        this.add
+          .image(s.x, s.y, key, VISUAL_TREE_FRAME_NAME)
+          .setOrigin(0.5, 1)
+          .setScale(TILE / VISUAL_TILE)
+          .setFlipX(s.flip)
+          .setDepth(s.y),
+      );
+    }
+    return true;
   }
 
   /** Tháo mọi đối tượng của cách vẽ nền CŨ (lớp ô, trang trí, nước, màu phủ) ra khỏi trạng thái cảnh và trả về để gỡ ngay hoặc gỡ sau khi làm mờ. */
@@ -1207,7 +1235,7 @@ export class WorldScene extends Phaser.Scene {
     const plan = visualFadePlan(legacy.length > 0, getQuality().reducedMotion);
     if (tiled && fade && plan.fade) {
       this.visualFades++;
-      const fresh = [...this.visualLayers]; // bản sao: nếu dựng lại giữa chừng thì tween chạy trên lớp đã gỡ (vô hại)
+      const fresh = [...this.visualLayers, ...this.visualTrees]; // bản sao: nếu dựng lại giữa chừng thì tween chạy trên lớp đã gỡ (vô hại)
       for (const l of fresh) l.setAlpha(0);
       this.tweens.add({
         targets: fresh,
