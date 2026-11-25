@@ -962,3 +962,187 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     expect(fullDiffers, "đối chứng: tờ đầy đủ phải đổi khi ảnh gói riêng đổi").toBe(true);
   }, 120_000);
 });
+
+// ---- duyet.json (QUYET_DINH_M3 mục 74): dữ liệu cho trang web duyệt đồ hoạ của Dev G ----
+interface DuyetOpt {
+  chu?: string;
+  nguon: string;
+  rieng: boolean;
+  anh: string | null;
+  co_hinh: boolean;
+  co_goc: number[] | null;
+  so_khung: number;
+}
+interface DuyetItem {
+  ma: string;
+  doi_tuong: string;
+  moi: boolean;
+  khuyen_nghi: string;
+  hien_tai: DuyetOpt;
+  phuong_an: DuyetOpt[];
+}
+interface DuyetGroup {
+  id: string;
+  kieu: string;
+  ma: DuyetItem[];
+}
+interface DuyetJson {
+  phien_ban: number;
+  nguon: Record<string, { ten: string; giay_phep: string; rieng: boolean }>;
+  nhom: DuyetGroup[];
+}
+
+describe("dung-bang-duyet.py: duyet.json cho trang web duyệt (mục 74), phần đọc tệp (chạy mọi máy)", () => {
+  const repo = path.join(here, "..", "..", "..");
+  const data = JSON.parse(
+    fs.readFileSync(path.join(repo, "docs/art/huong-moi/duyet.json"), "utf8"),
+  ) as DuyetJson;
+  const md = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+  const items = data.nhom.flatMap((g) => g.ma.map((m) => ({ g, m })));
+  const KIEU: Record<string, string> = {
+    "10": "NV",
+    "11": "NPC",
+    "12": "Q",
+    "13": "T",
+    "14": "VP",
+    "15": "HU",
+    "16": "UI",
+    "17": "NEN",
+  };
+
+  it("hợp lệ: phiên bản 1, đủ 8 nhóm 10..17 (mỗi tờ ảnh một mục) đúng kiểu, mã duy nhất mang đúng tiền tố của kiểu nhóm", () => {
+    expect(data.phien_ban).toBe(1);
+    // `nhom` có MỘT mục cho MỖI tờ ảnh (nhóm 14 có 7 tờ, nhóm 15 có 10 tờ): id lặp lại, thứ tự nhóm 10..17
+    expect([...new Set(data.nhom.map((g) => g.id))]).toEqual(Object.keys(KIEU));
+    for (const g of data.nhom) expect(g.kieu, `nhóm ${g.id}`).toBe(KIEU[g.id]);
+    const codes = items.map(({ m }) => m.ma);
+    expect(new Set(codes).size, "mã trùng").toBe(codes.length);
+    for (const { g, m } of items)
+      expect(m.ma, `mã ${m.ma} ở nhóm ${g.id}`).toMatch(new RegExp(`^${g.kieu}-\\d+$`));
+    expect(codes.length).toBeGreaterThanOrEqual(300);
+  });
+
+  it("mỗi mã có hình HIỆN TẠI và ĐÚNG ba phương án A / B / C theo thứ tự", () => {
+    for (const { m } of items) {
+      expect(
+        m.phuong_an.map((o) => o.chu),
+        m.ma,
+      ).toEqual(["A", "B", "C"]);
+      expect(m.hien_tai, m.ma).toBeTruthy();
+      expect(m.doi_tuong.length, `${m.ma}: thiếu mô tả đối tượng`).toBeGreaterThan(2);
+    }
+  });
+
+  it("tập mã KHỚP đúng tập mã của DUYET_TUNG_PHAN.md (không thừa / thiếu) và cờ `moi` khớp dấu MỚI trong tài liệu", () => {
+    const rows = new Map<string, boolean>();
+    for (const line of md.split("\n")) {
+      const r = /^\| ((?:NV|NPC|Q|T|VP|HU|UI|NEN)-\d+) \|/.exec(line);
+      if (r) rows.set(r[1], line.includes("MỚI (sau 23/11)"));
+    }
+    const jsonCodes = new Map(items.map(({ m }) => [m.ma, m.moi] as const));
+    expect([...jsonCodes.keys()].sort()).toEqual([...rows.keys()].sort());
+    for (const [ma, moi] of rows)
+      expect(jsonCodes.get(ma), `${ma}: cờ moi lệch tài liệu`).toBe(moi);
+  });
+
+  it("ranh giới GIẤY PHÉP: bảng `nguon` đúng (bốn gói cấm phân phối lại là riêng, ba nguồn công khai thì không) và MỌI ô mang đúng cờ `rieng` của nguồn nó", () => {
+    for (const k of ["wuxia", "sunny", "hicon", "bb"]) expect(data.nguon[k]?.rieng, k).toBe(true);
+    for (const k of ["cur", "ninja", "xian"]) expect(data.nguon[k]?.rieng, k).toBe(false);
+    for (const { m } of items)
+      for (const o of [m.hien_tai, ...m.phuong_an])
+        expect(o.rieng, `${m.ma}/${o.chu ?? "hien-tai"} nguồn ${o.nguon}`).toBe(
+          data.nguon[o.nguon].rieng,
+        );
+  });
+
+  it("đường dẫn ảnh luôn TƯƠNG ĐỐI thư mục preview riêng (duyet/<mã>/<hien-tai|A|B|C>.png), không bao giờ đường dẫn tuyệt đối hay vào repo; ô không hình có anh null", () => {
+    const raw = fs.readFileSync(path.join(repo, "docs/art/huong-moi/duyet.json"), "utf8");
+    // `/mnt/data` chỉ được nhắc ở lời ghi chú đầu tệp (nơi để ảnh), KHÔNG ở đường dẫn ảnh nào
+    expect(raw.split("\n").filter((l) => l.includes("/mnt/data/")).length).toBe(1);
+    for (const { m } of items) {
+      for (const [tag, o] of [
+        ["hien-tai", m.hien_tai] as const,
+        ...m.phuong_an.map((p) => [p.chu as string, p] as const),
+      ]) {
+        if (o.co_hinh) {
+          expect(o.anh, `${m.ma}/${tag}`).toBe(`duyet/${m.ma}/${tag}.png`);
+          expect(o.co_goc?.length, `${m.ma}/${tag} co_goc`).toBe(2);
+          expect(o.co_goc?.every((n) => n > 0)).toBe(true);
+          expect(o.so_khung, `${m.ma}/${tag} so_khung`).toBeGreaterThanOrEqual(1);
+        } else {
+          expect(o.anh, `${m.ma}/${tag}`).toBeNull();
+          expect(o.co_goc).toBeNull();
+        }
+      }
+    }
+  });
+});
+
+describe("dung-bang-duyet.py: duyet.json DỰNG THẬT (cần Pillow + gói ở /mnt/data)", () => {
+  const repo = path.join(here, "..", "..", "..");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-test-duyet-json-"));
+  afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  it.skipIf(!can)(
+    "dựng lại nhóm 10 và 13 ra ĐÚNG các mục trong docs/art/huong-moi/duyet.json (tất định); ảnh cắt riêng có thật, kể cả ô gói riêng, và CHỈ ở thư mục preview",
+    () => {
+      const jsonOut = path.join(tmp, "duyet.json");
+      const pub = path.join(tmp, "pub");
+      const priv = path.join(tmp, "priv");
+      const preview = path.join(tmp, "preview");
+      const ma = path.join(tmp, "ma.json");
+      fs.copyFileSync(path.join(repo, "docs/art/huong-moi/ma-co-dinh.json"), ma);
+      const r = spawnSync(
+        "python3",
+        [
+          "-I",
+          SCRIPT,
+          "--groups",
+          "10,13",
+          "--public",
+          pub,
+          "--private",
+          priv,
+          "--ma",
+          ma,
+          "--json",
+          jsonOut,
+          "--anh-dir",
+          preview,
+        ],
+        { encoding: "utf8", cwd: repo },
+      );
+      expect(r.status, r.stderr).toBe(0);
+      const fresh = JSON.parse(fs.readFileSync(jsonOut, "utf8")) as DuyetJson;
+      const repoData = JSON.parse(
+        fs.readFileSync(path.join(repo, "docs/art/huong-moi/duyet.json"), "utf8"),
+      ) as DuyetJson;
+      const byCode = new Map(repoData.nhom.flatMap((g) => g.ma).map((m) => [m.ma, m] as const));
+      const freshItems = fresh.nhom.flatMap((g) => g.ma);
+      expect(freshItems.map((m) => m.ma)).toEqual([
+        "NV-01",
+        "NV-02",
+        "NV-03",
+        "NV-04",
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04",
+      ]);
+      for (const m of freshItems) expect(m, m.ma).toEqual(byCode.get(m.ma));
+      // ô của gói riêng (Wuxia RTS ở NV-01 B): CÓ ảnh cắt riêng trong thư mục preview, và KHÔNG có trong tờ / thư mục công khai
+      const nv01 = freshItems.find((m) => m.ma === "NV-01")!;
+      const b = nv01.phuong_an.find((o) => o.chu === "B")!;
+      expect(b.rieng).toBe(true);
+      expect(b.co_hinh).toBe(true);
+      const png = fs.readFileSync(path.join(preview, b.anh as string));
+      expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      const publicFiles = fs.readdirSync(pub, { recursive: true }).map(String);
+      expect(
+        publicFiles.every((f) => !f.includes("duyet/")),
+        "ảnh cắt riêng không được vào thư mục công khai",
+      ).toBe(true);
+    },
+    240_000,
+  );
+});
