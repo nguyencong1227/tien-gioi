@@ -12,3 +12,6 @@ client/public/notices.html
 # Tệp SINH bởi `npm run map:bake -w server` và `map:build` (formatTiledJson: mỗi hàng ô một dòng); test giữ khớp bản sinh
 shared/maps/
 client/public/packs/map-*/
+
+# Tệp SINH bởi `client/scripts/art/dung-bang-duyet.py --json` (mỗi MÃ một dòng gọn để diff dễ đọc): định dạng của bộ sinh, không qua Prettier; test dung-bang-duyet.test.ts giữ khớp bản sinh
+docs/art/huong-moi/duyet.json
