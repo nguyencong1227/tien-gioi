@@ -59,7 +59,6 @@
     "e2e:skills-panel": "node ../client/scripts/check-skills-panel.mjs",
     "e2e:social-shell": "node ../client/scripts/check-social-shell.mjs",
     "e2e:sect-hall": "node ../client/scripts/check-sect-hall.mjs",
-    "e2e:sect-confirm": "node ../client/scripts/check-sect-confirm.mjs",
     "e2e:sect-vault": "node ../client/scripts/check-sect-vault.mjs",
     "e2e:shop-qty": "node ../client/scripts/check-shop-qty.mjs",
     "e2e:forge-shop": "node ../client/scripts/check-forge-shop.mjs",

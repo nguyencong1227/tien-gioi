@@ -479,9 +479,11 @@ async function main() {
       await shot("xac-nhan-rut");
       await sleep(560);
       const noBtn = await center("#act-btn-no");
+      // Tính TRƯỚC khi đóng hộp toạ độ nút Rút nằm dưới hộp: giữa lúc đóng hộp và cú bấm "ma" KHÔNG còn vòng gọi trình duyệt nào, nên độ trễ không phụ thuộc tốc độ runner
+      // (trước đây center() chạy SAU khi đóng hộp: runner CI không GPU chậm làm cú bấm rơi ra ngoài cửa sổ chống click ma và hộp mở lại, run 45549071896).
+      const aC = await center("#sect-vault-act");
       await tap(noBtn.x, noBtn.y);
       // click ma: ngay sau khi hộp đóng, một cú bấm chuột / chạm rơi xuống nút Rút nằm dưới hộp: không được mở lại hộp
-      const aC = await center("#sect-vault-act");
       await mouse("mousePressed", aC.x, aC.y);
       await mouse("mouseReleased", aC.x, aC.y);
       await sleep(120);

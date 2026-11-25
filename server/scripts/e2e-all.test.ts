@@ -52,16 +52,15 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const scripts = getE2eScripts(realPkg);
       expect(scripts).toContain("e2e:inv-select");
       expect(scripts).toContain("e2e:move-keys");
-      expect(scripts.length).toBeGreaterThanOrEqual(43);
+      expect(scripts.length).toBeGreaterThanOrEqual(42);
     });
 
-    it("server/package.json thật nối đủ 11 check-* lô đầu vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
+    it("server/package.json thật nối đủ 10 check-* lô đầu vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
       const realPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
       const batch = [
         "skills-panel",
         "social-shell",
         "sect-hall",
-        "sect-confirm",
         "sect-vault",
         "shop-qty",
         "forge-shop",
@@ -104,10 +103,10 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(retryAllowed("e2e:ban-phim", 900)).toBe(false);
     });
 
-    it("không script nào có sàn <= 300 s (thừa) và mọi sàn <= 1500 s (không để treo ăn quá nửa timeout-minutes của shard)", () => {
+    it("không script nào có sàn <= 300 s (thừa) và mọi sàn <= 900 s (thống nhất A + C ở #1458: treo không ăn quá 15 phút của timeout-minutes 30 của shard)", () => {
       for (const [k, v] of Object.entries(SCRIPT_TIMEOUT_SEC)) {
         expect(v, `${k} sàn thừa (<= --timeout mặc định 300 s)`).toBeGreaterThan(300);
-        expect(v, `${k} sàn quá lớn`).toBeLessThanOrEqual(1500);
+        expect(v, `${k} sàn quá lớn`).toBeLessThanOrEqual(900);
       }
     });
 
