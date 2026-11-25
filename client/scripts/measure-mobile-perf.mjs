@@ -242,22 +242,22 @@ export const ALL_SCENARIOS = [
     tier,
     cpuRate: 4,
   })),
-  // Lang Hoang (mục 75, #1467 / A2): thảo nguyên khô, kiểu `lang_hoang` (không hạt thời tiết); CHƯA đo thật (A không chạy Chrome ở bước đăng ký), bậc Cao làm mốc, B / C thêm Thấp / Vừa khi đo
-  {
-    id: "lang-hoang-high-4x",
+  // Lang Hoang (mục 75, #1467; kiểu `lang_hoang`, hạt bụi gió `dust`) và Uy Vân Kinh (kiểu `uy_van`, hạt đốm lửa `ember`): đo ở cả ba bậc như Hàn Vân (bậc Thấp có trần chặt nhất). B đo thật 26/11 (số trong
+  // PR). Mỗi bản đồ một khối riêng vì `perf-gate.test.ts` tìm đúng chuỗi `AMBIENT_QUERY("<id>")` cho từng bản đồ ngoài.
+  ...["low", "mid", "high"].map((tier) => ({
+    id: `lang-hoang-${tier}-4x`,
     name: "Lang Hoang (sương + thời tiết + nước)",
     query: AMBIENT_QUERY("lang_hoang"),
-    tier: "high",
+    tier,
     cpuRate: 4,
-  },
-  // Uy Vân Kinh (mục 75, #1467 / A2 lát 2): huyết trận, kiểu `uy_van` (hạt đốm lửa đỏ); CHƯA đo thật, bậc Cao làm mốc như Lang Hoang (B / C thêm Thấp / Vừa khi đo)
-  {
-    id: "uy-van-high-4x",
+  })),
+  ...["low", "mid", "high"].map((tier) => ({
+    id: `uy-van-${tier}-4x`,
     name: "Uy Vân Kinh (sương + thời tiết + nước)",
     query: AMBIENT_QUERY("uy_van"),
-    tier: "high",
+    tier,
     cpuRate: 4,
-  },
+  })),
   // CÂY NGUYÊN KHỐI (mục 73, nit của A ở #1475): các kịch bản trên chạy `?debug=1` nên lớp hình Tiled TẮT mặc định và KHÔNG đo sprite cây (một sprite mỗi ô thân cây, tối đa 2167
   // ở Hàn Vân). `visual=1` bật lớp hình; `treeCluster` đặt camera lên cụm cây DÀY NHẤT của bản đồ (cùng cửa sổ 40 x 22 ô như snap-ban-do-cay.mjs) để khung hình thật sự có hàng trăm cây.
   // Bậc Thấp (trần chặt nhất) và Cao; Hàn Vân là bản đồ nhiều cây nhất.
