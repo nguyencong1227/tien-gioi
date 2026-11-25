@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   e2e:
-    # Ghi chú khi thay đổi số shard (hiện là 4 shard, từ khi nối 12 check-* vào nightly, #1458): cần cập nhật đồng thời ở 4 vị trí:
+    # Ghi chú khi thay đổi số shard (hiện là 4 shard, từ khi nối 9 check-* vào nightly, #1458): cần cập nhật đồng thời ở 4 vị trí:
     # 1. matrix.shard: [1, 2, 3, 4]
     # 2. name: E2E Shard ${{ matrix.shard }}/4
     # 3. args+=(--shard "${{ matrix.shard }}/4")

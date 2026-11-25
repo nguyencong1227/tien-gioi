@@ -538,6 +538,13 @@ function decodePng(b: Buffer) {
 }
 
 describe("cây nguyên khối: vị trí và bỏ ô thân / tán", () => {
+  it("gốc cây cách đáy ô logic ĐÚNG 3 px (số cứng, không theo hằng): rễ nằm trong ô bị chặn, không thò sang ô phía nam", () => {
+    expect(VISUAL_TREE_BASE_INSET).toBe(3);
+    const decor = new Uint16Array(2 * 2);
+    decor[1] = VISUAL_GID_TREE_TRUNK; // ô (1, 0)
+    expect(visualTreeSpots(decor, 2, 2, 32)).toEqual([{ x: 48, y: 29, flip: expect.any(Boolean) }]);
+  });
+
   it("MỖI ô GID thân cây (620) là một cây: giữa gốc ở giữa ô, đáy rễ cách đáy ô VISUAL_TREE_BASE_INSET, độ sâu = y gốc", () => {
     const w = 4;
     const decor = new Uint16Array(w * 3);
