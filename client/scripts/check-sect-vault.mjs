@@ -2,7 +2,8 @@
 /**
  * Kiểm tab "Kho đồ" của bảng Tông môn (QUYET_DINH_M3 mục 27, K4, issue #788; `sect-vault.ts` + `ui.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-sect-vault.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-sect-vault.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
+ *   (`--slow-frame <ms>` / `TG_SLOW_FRAME_MS`: mỗi khung hình trang bận `ms` ms (`slow-frame.mjs`) để thử khung chậm 25-50 ms, nhiều lõi VÀ một lõi `taskset -c 0`.)
  *
  * Đứng ở bảng Tông môn bằng `window.__ui.onSect` + `window.__ui.onSectVault` (dữ liệu giả), bắt tin gửi đi bằng cách đè `window.__scene.room.send`:
  *   - lưới kho 40 ô + lưới túi; rê chuột KHÔNG chọn ô (mục 24), bấm / chạm / bàn phím (focus) mới chọn;
@@ -22,6 +23,7 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { launchChrome } from "./chrome-launch.mjs";
 import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -116,7 +118,7 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
