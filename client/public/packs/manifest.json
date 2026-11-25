@@ -34,8 +34,8 @@
       "files": [
         {
           "path": "map-am_suong/tileset_world.png",
-          "bytes": 19128,
-          "sha256": "2b027121928e938ce326d0dad5b3abccee43ede1cf1c1042f86157614d0dc7b6"
+          "bytes": 19597,
+          "sha256": "ba4f437130d7e77c5b65c1528e8d2441ddeea417e285610106e5d4fd4203aa56"
         },
         {
           "path": "map-am_suong/visual.json",
@@ -43,7 +43,7 @@
           "sha256": "5ba1cb52022615b3fba01814c3076f8cb498256b27c7142711ba4d6af5032465"
         }
       ],
-      "bytes": 145024
+      "bytes": 145493
     },
     {
       "id": "map:hac_phong",
@@ -52,8 +52,8 @@
       "files": [
         {
           "path": "map-hac_phong/tileset_world.png",
-          "bytes": 19060,
-          "sha256": "ff4eceb5eb7ae8a50e84da1c4ca00edc56d642985a1fee7d96825db1bb505805"
+          "bytes": 19594,
+          "sha256": "402d57d3d6ae62c81130c0728c1dcb157d254f04c6c71de98812824c649a0a64"
         },
         {
           "path": "map-hac_phong/visual.json",
@@ -61,7 +61,7 @@
           "sha256": "215fdc7a6866a11e259a07da16654479c5bb0de195ce92d27b138ff961ecbb0a"
         }
       ],
-      "bytes": 129083
+      "bytes": 129617
     },
     {
       "id": "map:han_van",
@@ -70,8 +70,8 @@
       "files": [
         {
           "path": "map-han_van/tileset_world.png",
-          "bytes": 18749,
-          "sha256": "87d4ee965337097654d7f7268d479227c30a76b08273df0805abafb487a660d8"
+          "bytes": 19237,
+          "sha256": "57d0265be89d267acc4f4d520ecc03299eb9a7a149aa417119f59b7e8672a9ed"
         },
         {
           "path": "map-han_van/visual.json",
@@ -79,7 +79,7 @@
           "sha256": "d1975aec884f726b18b1ad6fd4e8f858eb612073bfb24e88f9539531908892dd"
         }
       ],
-      "bytes": 164803
+      "bytes": 165291
     },
     {
       "id": "map:lac_ha",
@@ -88,8 +88,8 @@
       "files": [
         {
           "path": "map-lac_ha/tileset_world.png",
-          "bytes": 19045,
-          "sha256": "6eec7c3d6a351b1002dbe49f664e78c90081602c684fa83a94ba7ceb538676ee"
+          "bytes": 19543,
+          "sha256": "3c2c272d7bfc1c8c498c2b028d5bc2cb6679994eb6677ea6f0b602c6d9178acf"
         },
         {
           "path": "map-lac_ha/visual.json",
@@ -97,7 +97,7 @@
           "sha256": "215e64a7c48bd21dc59513f1fe190cc54d033c188aee9d1cb2bafcfccc04adca"
         }
       ],
-      "bytes": 101451
+      "bytes": 101949
     }
   ]
 }
