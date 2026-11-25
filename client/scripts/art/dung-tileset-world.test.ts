@@ -10,8 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.join(here, "dung-tileset-world.py");
 const SRC = process.env.NINJA_ADVENTURE_SRC ?? "/mnt/data/assets-src/ninja-adventure";
-// Bản đồ có bảng màu riêng (thêm bản đồ mới: thêm id ở đây VÀ khoá trong PALETTES / MAP_PREVIEW_BOX của dung-tileset-world.py; Lang Hoang từ #1467).
-const MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang"];
+// Bản đồ có bảng màu riêng (thêm bản đồ mới: thêm id ở đây VÀ khoá trong PALETTES / MAP_PREVIEW_BOX của dung-tileset-world.py; Lang Hoang và Uy Vân Kinh từ #1467).
+const MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"];
 const hasPillow =
   spawnSync("python3", ["-I", "-c", "import PIL"], { encoding: "utf8" }).status === 0;
 const hasSource = [
@@ -42,7 +42,7 @@ describe("dung-tileset-world.py: cam kết bố cục (đọc mã, chạy đư�
     expect(builder).toMatch(/spacing: 2\b/);
   });
 
-  it("đủ năm bản đồ có bảng màu riêng, mỗi bản đồ đủ nhóm màu (cỏ, đất, bụi, cát, nước)", () => {
+  it("đủ sáu bản đồ có bảng màu riêng, mỗi bản đồ đủ nhóm màu (cỏ, đất, bụi, cát, nước)", () => {
     for (const id of MAP_IDS) {
       expect(code).toContain(`"${id}": {`);
     }
@@ -98,7 +98,7 @@ describe.skipIf(!can)("dung-tileset-world.py: dựng thật + tự kiểm", () =
   const run = (out: string) =>
     spawnSync("python3", ["-I", SCRIPT, "--src", SRC, "--out", out], { encoding: "utf8" });
 
-  it("dựng đủ 5 ảnh, mỗi ảnh nhỏ (< 30 KB) và đúng cỡ đùn mép 396 x 504", () => {
+  it("dựng đủ 6 ảnh, mỗi ảnh nhỏ (< 30 KB) và đúng cỡ đùn mép 396 x 504", () => {
     const r = run(dir);
     expect(r.status, r.stderr).toBe(0);
     for (const id of MAP_IDS) {
@@ -155,27 +155,30 @@ describe.skipIf(!can)("dung-tileset-world.py: dựng thật + tự kiểm", () =
       ).toBe(true);
   });
 
-  it("--map-view lang_hoang ghi ảnh trước / sau (PNG, vùng bản đồ thật); id không có bảng màu thì lỗi, không ghi ảnh", () => {
-    const view = path.join(dir, "lang_hoang-view.png");
-    const ok = spawnSync(
-      "python3",
-      ["-I", SCRIPT, "--src", SRC, "--map-view", "lang_hoang", view],
-      {
+  // bản đồ có ảnh trước / sau trong docs (thêm bản đồ mới: thêm một dòng + chạy `--map-view <id> docs/art/huong-moi/<ảnh>`)
+  const VIEWS = [
+    ["lang_hoang", "07-lang-hoang-truoc-sau.png"],
+    ["uy_van", "08-uy-van-truoc-sau.png"],
+  ] as const;
+  it("--map-view <id> ghi ảnh trước / sau (PNG, vùng bản đồ thật) == ảnh trong docs; id không có bảng màu thì lỗi, không ghi ảnh", () => {
+    for (const [id, doc] of VIEWS) {
+      const view = path.join(dir, `${id}-view.png`);
+      const ok = spawnSync("python3", ["-I", SCRIPT, "--src", SRC, "--map-view", id, view], {
         encoding: "utf8",
-      },
-    );
-    expect(ok.status, ok.stderr).toBe(0);
-    const b = fs.readFileSync(view);
-    expect(b.subarray(1, 4).toString()).toBe("PNG");
-    // hai nửa (Lạc Hà | riêng) cạnh nhau: vùng 24 x 16 ô x 16 px x 3 lần = 1152 x 768 mỗi nửa
-    expect(b.readUInt32BE(16)).toBe(1152 * 2 + 36);
-    expect(b.readUInt32BE(20)).toBe(768 + 24);
-    // ảnh trước / sau trong docs == bản dựng lại (đổi bảng màu Lang Hoang mà quên dựng lại ảnh thì đỏ)
-    const repoView = path.join(here, "../../..", "docs/art/huong-moi/07-lang-hoang-truoc-sau.png");
-    expect(
-      b.equals(fs.readFileSync(repoView)),
-      "07-lang-hoang-truoc-sau.png trong repo LỆCH bản dựng lại: chạy dung-tileset-world.py --map-view lang_hoang docs/art/huong-moi/07-lang-hoang-truoc-sau.png",
-    ).toBe(true);
+      });
+      expect(ok.status, ok.stderr).toBe(0);
+      const b = fs.readFileSync(view);
+      expect(b.subarray(1, 4).toString()).toBe("PNG");
+      // hai nửa (Lạc Hà | riêng) cạnh nhau: vùng 24 x 16 ô x 16 px x 3 lần = 1152 x 768 mỗi nửa
+      expect(b.readUInt32BE(16), id).toBe(1152 * 2 + 36);
+      expect(b.readUInt32BE(20), id).toBe(768 + 24);
+      // ảnh trước / sau trong docs == bản dựng lại (đổi bảng màu mà quên dựng lại ảnh thì đỏ)
+      const repoView = path.join(here, "../../..", "docs/art/huong-moi", doc);
+      expect(
+        b.equals(fs.readFileSync(repoView)),
+        `${doc} trong repo LỆCH bản dựng lại: chạy dung-tileset-world.py --map-view ${id} docs/art/huong-moi/${doc}`,
+      ).toBe(true);
+    }
     const bad = path.join(dir, "khong-co.png");
     const no = spawnSync("python3", ["-I", SCRIPT, "--src", SRC, "--map-view", "khong_co", bad], {
       encoding: "utf8",

@@ -116,6 +116,24 @@
         }
       ],
       "bytes": 145736
+    },
+    {
+      "id": "map:uy_van",
+      "kind": "map",
+      "mapId": "uy_van",
+      "files": [
+        {
+          "path": "map-uy_van/tileset_world.png",
+          "bytes": 19463,
+          "sha256": "54ed26936c073704e4db26aab213b0011c7459d0979513f053c6614031961185"
+        },
+        {
+          "path": "map-uy_van/visual.json",
+          "bytes": 128308,
+          "sha256": "6d5b9e434855e6ee1c23eea0384638fe33c3023a5f2e1d9f40cd2430233c0eed"
+        }
+      ],
+      "bytes": 147771
     }
   ]
 }
