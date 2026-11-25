@@ -21,6 +21,9 @@ export function mockStartMapId(
   return id;
 }
 
+/** Id phiên của phòng GIẢ (`?dungeon=mock` / `?duel=mock`, `main.ts`): cảnh nhận ra phòng giả bằng id này (phòng thật không bao giờ mang id đó). */
+export const MOCK_SESSION_ID = "mock-session-01";
+
 /**
  * Điểm đứng của người chơi mock trên bản đồ `mapId`: bản đồ mặc định giữ điểm cũ, bản đồ khác đứng giữa trấn an toàn
  * (`GameMap.townPx`, luôn đi được và có sương / nước / trang trí trong tầm nhìn của camera).
