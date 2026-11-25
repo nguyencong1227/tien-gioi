@@ -219,6 +219,7 @@ import {
   isMockDungeonEnabled,
   MOCK_DUNGEON_SAMPLES,
 } from "../dungeon";
+import { MOCK_SESSION_ID } from "../mock-map";
 import { respawnDeathText } from "../death-text";
 import { dropSourceIn, hopLabel, nextHop, questGoal, type NavHop } from "../quest-nav";
 import { npcMarkerStyle } from "../npc-marker";
@@ -2679,7 +2680,11 @@ export class WorldScene extends Phaser.Scene {
     // Phòng đã vào TỪ TRƯỚC khi gắn vào cảnh (qua cổng: đợi gói bản đồ tới 8 s sau khi vào phòng, main.ts `travelTo`): lần đồng bộ state đầu đã xảy ra rồi
     // và nơi đứng yên (không patch) sẽ không có lần nào nữa, nên `predX` / `predY` kẹt ở toạ độ bản đồ CŨ (camera nhìn sai chỗ, đường đi tính sai).
     // Đối chiếu ngay một lần; chưa có state / chưa có mình thì `reconcile` tự bỏ qua.
-    if (!isInitial) this.reconcile();
+    // CẢ LẦN VÀO ĐẦU (không chỉ qua cổng): vào phòng thật rồi mới dựng cảnh (tải gói / phông / cảnh mất vài trăm ms) thì lần đồng bộ state đầu đã xảy ra TRƯỚC `onStateChange` ở trên. Phòng có quái /
+    // người khác thì patch tới liên tục nên tự lành, nhưng BẢN ĐỒ TRỐNG (Lang Hoang, Uy Vân Kinh chưa quái; không ai khác) đứng yên không có patch nào: `hasMe` = false, `predX` / `predY` = (0, 0),
+    // camera nhìn góc trên-trái bản đồ (núi viền) thay vì chỗ người chơi đứng tới khi cử động (đo 26/11 ở Lang Hoang: me() = (2080, 3344), pred = (0, 0), camera (-71, -40) sau 3 s). Phòng GIẢ
+    // (`MOCK_SESSION_ID`) giữ nguyên: mock chỉ đồng bộ khi `?map=` (xem `mock-map.ts` `mockSyncsState`) để ảnh / số đo của các kịch bản cũ không đổi.
+    if (!isInitial || this.room.sessionId !== MOCK_SESSION_ID) this.reconcile();
     // Ghi lại handler theo loại để phát lại các tin server gửi ngay lúc vào phòng (xem early-messages.ts)
     const handlers: Record<string, (msg: any) => void> = {};
     const reg = (type: string, fn: (msg: any) => void) => {
