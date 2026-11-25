@@ -780,8 +780,8 @@ async function main() {
           qt[0].title === hudQuest.title &&
           qt[0].badge === "Tông" &&
           qt[0].ready &&
-          /Mở bảng Tông môn > Nội vụ để trả/.test(qt[0].step),
-        `HUD: nhiệm vụ tông môn hiện tên + huy hiệu 'Tông' + 'Mở bảng Tông môn > Nội vụ để trả': ${JSON.stringify(qt[0])}`,
+          /^ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ/.test(qt[0].step),
+        `HUD: nhiệm vụ tông môn hiện tên + huy hiệu 'Tông' + 'ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ' (questReadyText, mục 66): ${JSON.stringify(qt[0])}`,
       );
       await evalJs(`window.__ui.toggleQuestModal(true); 1`);
       await sleep(200);
@@ -792,7 +792,7 @@ async function main() {
         qc.length === 1 &&
           qc[0].giver === "Nhiệm vụ nội vụ tông môn" &&
           !/tong_mon/.test(qc[0].giver) &&
-          /Mở bảng Tông môn > Nội vụ/.test(qc[0].progress),
+          /ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ/.test(qc[0].progress),
         `sổ nhiệm vụ: không hiện id 'tong_mon', ghi nơi trả là bảng Tông môn: ${JSON.stringify(qc[0])}`,
       );
       await evalJs(
