@@ -568,8 +568,9 @@ async function main() {
         `vào đúng phòng ${roomLabel} (wrong_map đưa về đúng phòng)`,
         30000,
       );
-      // Chờ vị trí THẬT của máy chủ (`me()`) về đúng chỗ xuất hiện. Bản đồ trống (Lang Hoang, Uy Vân Kinh chưa quái) đứng yên không có patch state nào sau lần đồng bộ đầu nên
-      // `predX` / `predY` có thể kẹt (0, 0) (đo: me() = chỗ xuất hiện nhưng pred = 0, 0 sau 3 s đứng yên) và BFS của `walkToPortal` hết đường: nhích joystick một nhịp để có patch rồi chờ pred đúng.
+      // Chờ vị trí THẬT của máy chủ (`me()`) về đúng chỗ xuất hiện rồi tới `predX` / `predY` (dự đoán của cảnh) khớp nó. Bản đồ trống (Lang Hoang, Uy Vân Kinh chưa quái) đứng yên không có patch state
+      // nào sau lần đồng bộ đầu: trước #1500 `predX` kẹt (0, 0) và BFS của `walkToPortal` hết đường (đã lách bằng cách nhích joystick; gỡ sau khi #1500 sửa client, `e2e:ban-do-trong` canh lỗi này).
+      // Hồi quy lại thì bước chờ pred dưới đây ĐỎ đúng chẩn đoán, không bị che.
       const near = (a: string, b: string) =>
         `Math.hypot(${a} - ${spawn.x}, ${b} - ${spawn.y}) < 120`;
       await T.waitFor(
@@ -577,15 +578,6 @@ async function main() {
         `máy chủ đặt nhân vật đúng chỗ xuất hiện (${Math.round(spawn.x)}, ${Math.round(spawn.y)}) ở ${roomLabel}`,
         30000,
       );
-      if (!(await ev(near("window.__scene.predX", "window.__scene.predY")))) {
-        await ev(
-          `(() => { const J = window.__joystick; J.x = 1; J.y = 0; J.active = true; })(); 1`,
-        );
-        await sleep(400);
-        await ev(
-          `(() => { const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; })(); 1`,
-        );
-      }
       await T.waitFor(
         near("window.__scene.predX", "window.__scene.predY"),
         `dự đoán vị trí khớp chỗ xuất hiện ở ${roomLabel}`,
