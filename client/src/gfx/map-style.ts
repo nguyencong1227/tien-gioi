@@ -18,7 +18,7 @@ export const DECOR_VARIANTS = 2;
 export const DECOR_FRAMES = DECOR_KINDS.length * DECOR_VARIANTS;
 
 /** Thời tiết bằng hạt (chỉ khi hồ sơ chất lượng `weather != "off"`). */
-export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow";
+export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow" | "dust";
 
 export interface MapStyle {
   /** Nhãn cho log / doc. */
@@ -185,13 +185,13 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
     },
   },
   // Lang Hoang (mục 75, #1467 / A2; bản đồ thứ năm): thảo nguyên khô sau cửa ải Tuyết Đao Quan. KIỂU TẠM do A đặt để bản đồ có kiểu RIÊNG (test bắt thiếu): ánh sáng vàng rơm nhạt, sương mỏng
-  // gió thổi nhanh, KHÔNG thời tiết hạt (tuyết thưa là việc của bảng màu ô riêng của B, `tileset_world.png`; `snow` dành cho Hàn Vân), cỏ khô thay hoa, đá + bụi lang khô. B chỉnh lại khi có ảnh thật.
+  // gió thổi nhanh, hạt bụi / hạt cỏ khô bay ngang (`dust`, công thức riêng của bản đồ; tuyết thưa là việc của bảng màu ô riêng của B, `tileset_world.png`), cỏ khô thay hoa, đá + bụi lang khô. B chỉnh lại khi có ảnh thật.
   lang_hoang: {
     label: "Lang Hoang (thảo nguyên khô)",
     ambient: { color: 0xd8c9a0, alpha: 0.13 },
     vignette: { color: 0x15110a, strength: 0.46 },
     fog: { color: 0xe6e0d0, alpha: 0.16, speed: 13 },
-    weather: { kind: "none", rate: 0 },
+    weather: { kind: "dust", rate: 9 },
     water: { shimmer: 0xdde6ea, alpha: 0.3, speed: 9 },
     decor: {
       density: { tuft: 0.06, flower: 0.008, pebble: 0.04, mushroom: 0.006, bush: 0.03 },

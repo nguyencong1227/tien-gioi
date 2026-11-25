@@ -76,8 +76,11 @@ describe("MAP_CARDS: mỗi ảnh đã khai là ảnh CÓ THẬT, có nguồn, c�
 });
 
 describe("MAP_CARDS phủ MỌI bản đồ có kiểu riêng (bản đồ mới phải có thẻ, hoặc được miễn kèm lý do)", () => {
-  /** Bản đồ KHÔNG có thẻ minh hoạ, kèm lý do. Rỗng: cả năm bản đồ của lô 1 đều có. */
-  const EXEMPT: Record<string, string> = {};
+  /** Bản đồ KHÔNG có thẻ minh hoạ, kèm lý do. Năm bản đồ của lô 1 đều có; bản đồ mới của mục 75 chờ lô thẻ riêng (bỏ khỏi đây CÙNG PR với ảnh + dòng ở `MAP_CARDS`). */
+  const EXEMPT: Record<string, string> = {
+    lang_hoang:
+      "bản đồ thứ năm (mục 75, #1467): thẻ minh hoạ AI (ComfyUI SDXL, docs/KE_HOACH_DO_HOA_AI.md) do B sinh ở lô thẻ tiếp theo; chưa có ảnh thì client không hiện thẻ (mapCardUrl trả null)",
+  };
 
   it("mỗi mapId trong MAP_STYLES có dòng ở MAP_CARDS (trừ danh sách miễn)", () => {
     for (const id of Object.keys(MAP_STYLES)) {
