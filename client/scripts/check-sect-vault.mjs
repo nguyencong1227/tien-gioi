@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm tab "Kho đồ" của bảng Tông môn (QUYET_DINH_M3 mục 27, K4, issue #788; `sect-vault.ts` + `ui.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
@@ -16,13 +15,13 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -75,36 +74,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-sect-vault-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
-  );
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
+  let launched = null;
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    launched = await launchChrome({ name: "sect-vault" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -156,15 +134,15 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = Boolean(
+        await waitUntilTrue(async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        ),
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
@@ -184,16 +162,27 @@ async function main() {
         );
       };
       /** Tâm của phần tử (cuộn vào tầm nhìn) + phần tử TẠI điểm đó (biết có bị che không) */
-      const center = (sel, idx = 0) =>
-        evalJs(`(() => {
+      const center = (sel, idx = 0, block = "center") =>
+        evalJs(
+          `(() => {
           const e = document.querySelectorAll(${JSON.stringify(sel)})[${idx}];
           if (!e) return null;
-          e.scrollIntoView({ block: "center", inline: "center" });
+          e.scrollIntoView({ block: ${JSON.stringify(block)}, inline: "center" });
           const r = e.getBoundingClientRect();
           const x = r.left + r.width / 2, y = r.top + r.height / 2;
           const top = document.elementFromPoint(x, y);
-          return { x, y, w: r.width, h: r.height, hit: !!top && (top === e || e.contains(top)) };
-        })()`);
+          return {
+            x, y, w: r.width, h: r.height, hit: !!top && (top === e || e.contains(top)),
+            cover: top && top !== e && !e.contains(top) ? (top.id ? "#" + top.id : top.tagName + "." + String(top.className).slice(0, 40)) : "",
+            // chẩn đoán khi bị che: vị trí thanh hành động (sticky), lưới và khung cuộn gần nhất của ô
+            dbg: (() => {
+              const rc = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; };
+              let sc = e.parentElement; while (sc && sc.scrollHeight <= sc.clientHeight + 1) sc = sc.parentElement;
+              return { bar: rc(document.getElementById("sect-vault-actions")), grid: rc(document.getElementById("sect-vault-grid")), scroller: sc ? (sc.id || sc.className) + " " + JSON.stringify(rc(sc)) + " top=" + Math.round(sc.scrollTop) + "/" + (sc.scrollHeight - sc.clientHeight) : null, vp: [innerWidth, innerHeight] };
+            })(),
+          };
+        })()`,
+        );
       const mouse = (type, x, y) =>
         send("Input.dispatchMouseEvent", {
           type,
@@ -314,8 +303,16 @@ async function main() {
       const slotSel = (from, i) =>
         `#sect-vault-${from === "vault" ? "grid" : "bag"} .inv-slot:nth-child(${i + 1})`;
       const tapSel = async (sel) => {
-        const c = await center(sel);
-        if (!c || !c.hit) throw new Error(`không bấm được ${sel}: ${JSON.stringify(c)}`);
+        // CHỜ theo điều kiện (ô nhận được cú bấm), không ngủ cố định: ngay sau khi bảng vừa vẽ lại / cuộn ô có thể còn bị lớp khác che vài khung (chập chờn ~1/3 lượt ở [13b], 25/11)
+        let c = await center(sel);
+        // Bị che (thanh hành động .sect-vault-actions dính đáy cao 166 px trong vùng cuộn 231 px ở 844x390 khi có món được chọn che điểm GIỮA vùng nhìn): cuộn ô lên ĐẦU vùng cuộn, nơi
+        // thanh không tới. Chỉ khi căn giữa hỏng mới đổi, các cú bấm khác giữ nguyên như cũ.
+        if (!c || !c.hit) c = await center(sel, 0, "start");
+        for (let k = 0; k < 40 && (!c || !c.hit); k++) {
+          await sleep(125);
+          c = await center(sel, 0, "start");
+        }
+        if (!c || !c.hit) throw new Error(`không bấm được ${sel} sau 5 s: ${JSON.stringify(c)}`);
         await tap(c.x, c.y);
         await sleep(120);
         return c;
@@ -482,9 +479,11 @@ async function main() {
       await shot("xac-nhan-rut");
       await sleep(560);
       const noBtn = await center("#act-btn-no");
+      // Tính TRƯỚC khi đóng hộp toạ độ nút Rút nằm dưới hộp: giữa lúc đóng hộp và cú bấm "ma" KHÔNG còn vòng gọi trình duyệt nào, nên độ trễ không phụ thuộc tốc độ runner
+      // (trước đây center() chạy SAU khi đóng hộp: runner CI không GPU chậm làm cú bấm rơi ra ngoài cửa sổ chống click ma và hộp mở lại, run 45549071896).
+      const aC = await center("#sect-vault-act");
       await tap(noBtn.x, noBtn.y);
       // click ma: ngay sau khi hộp đóng, một cú bấm chuột / chạm rơi xuống nút Rút nằm dưới hộp: không được mở lại hộp
-      const aC = await center("#sect-vault-act");
       await mouse("mousePressed", aC.x, aC.y);
       await mouse("mouseReleased", aC.x, aC.y);
       await sleep(120);
@@ -747,21 +746,8 @@ async function main() {
       );
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
+    if (launched) await launched.close();
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

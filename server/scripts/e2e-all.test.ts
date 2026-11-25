@@ -13,8 +13,12 @@ import {
   getE2eScripts,
   parseCliArgs,
   parseShard,
+  retryAllowed,
+  RETRY_MAX_TIMEOUT_SEC,
   runE2eAll,
+  SCRIPT_TIMEOUT_SEC,
   shardScripts,
+  timeoutSecFor,
   type ScriptResult,
 } from "./e2e-all.js";
 
@@ -48,7 +52,67 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const scripts = getE2eScripts(realPkg);
       expect(scripts).toContain("e2e:inv-select");
       expect(scripts).toContain("e2e:move-keys");
-      expect(scripts.length).toBeGreaterThanOrEqual(32);
+      expect(scripts.length).toBeGreaterThanOrEqual(41);
+    });
+
+    it("server/package.json thật nối đủ 9 check-* lô đầu vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
+      const realPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
+      const batch = [
+        "skills-panel",
+        "social-shell",
+        "sect-hall",
+        "shop-qty",
+        "forge-shop",
+        "quest-log",
+        "quest-reward",
+        "quest-ready",
+        "text-size",
+      ];
+      for (const n of batch) {
+        expect(realPkg.scripts[`e2e:${n}`], `thiếu e2e:${n}`).toBe(
+          `node ../client/scripts/check-${n}.mjs`,
+        );
+        expect(
+          existsSync(path.resolve(__dirname, `../../client/scripts/check-${n}.mjs`)),
+          `thiếu client/scripts/check-${n}.mjs`,
+        ).toBe(true);
+      }
+    });
+  });
+
+  describe("timeoutSecFor (hạn chờ riêng cho kịch bản chậm, #1458)", () => {
+    it("lấy max(hạn chung, hạn riêng): kịch bản chậm không bị cắt bởi --timeout nhỏ, hạn chung lớn hơn vẫn thắng", () => {
+      expect(timeoutSecFor("e2e:social-shell", 300)).toBe(SCRIPT_TIMEOUT_SEC["e2e:social-shell"]);
+      expect(SCRIPT_TIMEOUT_SEC["e2e:social-shell"]).toBeGreaterThan(300);
+      expect(timeoutSecFor("e2e:social-shell", 5000)).toBe(5000);
+    });
+
+    it("kịch bản không có hạn riêng (kể cả tên lạ như constructor) dùng hạn chung, không ra NaN", () => {
+      expect(timeoutSecFor("e2e:ban-phim", 300)).toBe(300);
+      expect(timeoutSecFor("constructor", 300)).toBe(300);
+      expect(timeoutSecFor("toString", 300)).toBe(300);
+    });
+
+    it("retryAllowed: kịch bản có hạn chờ thực > 600 s (social-shell) KHÔNG thử lại; còn lại thử lại như cũ", () => {
+      expect(RETRY_MAX_TIMEOUT_SEC).toBe(600);
+      expect(retryAllowed("e2e:social-shell", 300)).toBe(false);
+      expect(retryAllowed("e2e:ban-phim", 300)).toBe(true);
+      expect(retryAllowed("e2e:sect-hall", 300)).toBe(true); // sàn 500 s <= 600 s
+      // --timeout chung lớn hơn 600 s cũng làm mọi kịch bản không được thử lại (chống treo + thử lại ăn hết timeout-minutes)
+      expect(retryAllowed("e2e:ban-phim", 900)).toBe(false);
+    });
+
+    it("không script nào có sàn <= 300 s (thừa) và mọi sàn <= 900 s (thống nhất A + C ở #1458: treo không ăn quá 15 phút của timeout-minutes 30 của shard)", () => {
+      for (const [k, v] of Object.entries(SCRIPT_TIMEOUT_SEC)) {
+        expect(v, `${k} sàn thừa (<= --timeout mặc định 300 s)`).toBeGreaterThan(300);
+        expect(v, `${k} sàn quá lớn`).toBeLessThanOrEqual(900);
+      }
+    });
+
+    it("mọi khoá trong SCRIPT_TIMEOUT_SEC là script e2e:* có thật ở server/package.json (chống gõ sai tên)", () => {
+      const realPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
+      const names = getE2eScripts(realPkg);
+      for (const k of Object.keys(SCRIPT_TIMEOUT_SEC)) expect(names, `khoá lạ ${k}`).toContain(k);
     });
   });
 
