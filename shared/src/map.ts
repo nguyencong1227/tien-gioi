@@ -502,6 +502,8 @@ export const HAC_PHONG_ID = "hac_phong";
 export const AM_SUONG_ID = "am_suong";
 /** Bản đồ thứ tư (M7.5, #506): băng nguyên cho Nguyên Anh, nối với Âm Sương Trạch bằng cổng ở rìa bắc / nam. */
 export const HAN_VAN_ID = "han_van";
+/** Bản đồ thứ năm (mục 75, #1467 / A2): thảo nguyên khô + tuyết thưa cho Hóa Thần, sau cửa ải Tuyết Đao Quan; nối với Hàn Vân Lĩnh bằng cổng ở rìa nam (cổng bắc còn trống tới khi có Uy Vân Kinh). */
+export const LANG_HOANG_ID = "lang_hoang";
 
 /**
  * ĐỊNH NGHĨA SINH THEO `seed` của bốn bản đồ thường: nguồn gốc cũ, nay là "đồng hồ chuẩn" của test và đầu vào của công cụ `npm run map:bake -w server`
@@ -638,10 +640,52 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toMap: AM_SUONG_ID,
         toPortal: "am_suong_bac",
       },
+      // Cổng bắc (mục 75, #1467 / A2): đầu mút đường đất phía bắc (ô 59-60, hàng 2-4), tâm ở giữa hai ô đường ở hàng 3; chỗ xuất hiện ở hàng 6 (hàng 7 có cây ở ô 60). Seed của Hàn Vân KHÔNG đổi (ô giữ nguyên, tệp lưu vẫn hợp lệ); chỉ thêm khu an toàn
+      // bán kính 192 px quanh cổng ở rìa bắc, nên quái sinh sau này tránh vùng đó (như `am_suong_bac` ở M7.5).
+      {
+        id: "han_van_bac",
+        name: "Tuyết Lĩnh Quan",
+        x: 1920,
+        y: 112,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 1920, y: 208 },
+        toMap: LANG_HOANG_ID,
+        toPortal: "lang_hoang_nam",
+      },
     ],
     // Bốn loài Nguyên Anh + trùm Thiên Hàn Vương (M7.5b, #506). Tổng 62 (như Hắc Phong Cốc / Âm Sương Trạch; trần ~70 để tick < 10 ms): số liệu quái ở
     // game.ts, vùng sinh theo `minDanger` của từng loài (0,2 / 0,4 / 0,55 / 0,7 / 0,85)
     monsterCap: { han_lang: 20, phong_nha: 16, cot_tuong: 12, doc_tuoc: 12, thien_han_vuong: 2 },
+  },
+  {
+    id: LANG_HOANG_ID,
+    name: "Lang Hoang",
+    // Bản đồ SỬA TAY ngay từ đầu (`handEdited`, #1467 bước 1): `seed` chỉ là hạt giống để B quét ra bố cục (4000 seed: nước + cát 7,4 %, liên thông 97,9 % từ trạm); tệp Tiled là nguồn duy nhất,
+    // `map:bake` bỏ qua nó. Mục này là SỔ ĐĂNG KÝ (`adoptTiledMaps` chỉ thay mục có sẵn; `ARENA_MAPS` / `mapById` dựng từ đây, đấu trường lấy `seed + 7919`), và phải khớp từng byte với tệp (test `tiled-maps`).
+    seed: 20264331,
+    w: 128,
+    h: 112,
+    // Trạm an toàn ở phía nam (Tuyết Đao Quan), cách cổng ~10 ô: càng đi lên bắc càng nguy hiểm (như Âm Sương Trạch)
+    town: { cx: 64, cy: 98, r: 5 },
+    townName: "Tuyết Đao Quan",
+    wildName: "Lang Hoang",
+    portals: [
+      {
+        id: "lang_hoang_nam",
+        name: "Hồi Tuyết Quan",
+        // Đầu mút đường đất phía nam (ô 64-65, hàng 108), tâm ở giữa hai ô đường
+        x: 2080,
+        y: 3472,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2080, y: 3344 },
+        toMap: HAN_VAN_ID,
+        toPortal: "han_van_bac",
+      },
+    ],
+    // CHƯA có quái: loài Hóa Thần (Thiên Lang Vương và đàn) do D1 (#1466) thêm sau A1; cổng bắc tới Uy Vân Kinh do bản đồ đó (B1 lát 2). Không có `monsterCap` thì không sinh quái tự nhiên.
+    monsterCap: {},
   },
 ];
 

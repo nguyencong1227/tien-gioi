@@ -655,14 +655,14 @@ Bốn mức hiểu biết của thợ săn (đo càng thật thì càng chậm):
 | Âm Sương Trạch | Thạch Quy | 18 | 12 | 3.9 (2.4) | 7.2 (2.6) | 6.8 (2.6) | 6.7 (3.0) |
 | Âm Sương Trạch | Độc Thiềm | 18 | 14 | 3.2 (2.2) | 5.6 (2.3) | 5.7 (2.3) | 7.8 (4.9) |
 | Âm Sương Trạch | Hắc Giao | 6 | 90 | 4.5 (4.2) | 6.1 (4.8) | 7.5 (5.6) | 8.3 (6.3) |
-| Hàn Vân Lĩnh | Hàn Lang | 20 | 10 | 4.0 (3.7) | 4.4 (3.8) | 4.9 (3.8) | 5.7 (5.6) |
-| Hàn Vân Lĩnh | Phong Nha | 16 | 10 | 4.7 (3.0) | 4.4 (3.0) | 3.7 (2.3) | 6.3 (3.2) |
-| Hàn Vân Lĩnh | Cốt Tượng | 12 | 12 | 3.6 (2.8) | 4.7 (2.8) | 5.7 (3.1) | 7.1 (4.4) |
-| Hàn Vân Lĩnh | Độc Tước | 12 | 14 | 4.5 (4.0) | 5.0 (3.3) | 6.0 (3.2) | 5.7 (3.5) |
-| Hàn Vân Lĩnh | Thiên Hàn Vương | 2 | 90 | 8.8 (7.3) | 26.0 (15.9) | 26.4 (18.4) | 26.1 (18.5) |
+| Hàn Vân Lĩnh | Hàn Lang | 20 | 10 | 3.6 (3.6) | 4.3 (3.2) | 5.9 (4.9) | 5.3 (3.8) |
+| Hàn Vân Lĩnh | Phong Nha | 16 | 10 | 4.6 (4.3) | 4.7 (4.8) | 5.4 (5.1) | 6.2 (4.0) |
+| Hàn Vân Lĩnh | Cốt Tượng | 12 | 12 | 3.5 (3.3) | 4.9 (4.0) | 5.5 (2.9) | 6.4 (3.2) |
+| Hàn Vân Lĩnh | Độc Tước | 12 | 14 | 3.3 (3.1) | 4.1 (2.7) | 5.6 (3.8) | 5.4 (2.9) |
+| Hàn Vân Lĩnh | Thiên Hàn Vương | 2 | 90 | 9.6 (9.1) | 26.1 (20.9) | 27.1 (22.1) | 32.2 (26.3) |
 
 - **Mô hình KHÔNG lạc quan:** thợ săn biết hết bản đồ (cận dưới) đo tối đa **0.47x** giả định (ngưỡng #406: mô hình lạc quan nếu > 1.25x). `search-check.test.ts` giữ điều này: ai hạ `ASSUME.searchSec` xuống dưới cận dưới thì test đỏ.
-- **Loài thường: giả định nằm trên cận dưới và quanh các mức nhìn thật.** Đo / giả định: 0.14x - 0.60x ở máy tính 1280x720; 0.14x - 0.76x ở điện thoại ngang 844x390; 0.15x - 0.63x ở điện thoại dọc 390x844 (quét theo vùng sinh: người thật có thể khéo hơn nhờ nhớ chỗ quái hay đứng, hoặc vụng hơn vì do dự). Không sửa số nào.
+- **Loài thường: giả định nằm trên cận dưới và quanh các mức nhìn thật.** Đo / giả định: 0.14x - 0.60x ở máy tính 1280x720; 0.14x - 0.76x ở điện thoại ngang 844x390; 0.15x - 0.62x ở điện thoại dọc 390x844 (quét theo vùng sinh: người thật có thể khéo hơn nhờ nhớ chỗ quái hay đứng, hoặc vụng hơn vì do dự). Không sửa số nào.
 - **Xích Mãng (giả định 90 giây) và Hắc Giao (90 giây) là chỗ nhạy:** Xích Mãng đo 5 - 23 giây ở máy tính 1280x720; 5 - 24 giây ở điện thoại ngang 844x390; 6 - 23 giây ở điện thoại dọc 390x844 (quái thưa: 2 con ở Lạc Hà Trấn, 6 con ở Hắc Phong Cốc); Hắc Giao (6 con) 6 giây ở máy tính 1280x720; 7 giây ở điện thoại ngang 844x390; 8 giây ở điện thoại dọc 390x844.
 
 **Nhịp tu luyện nhạy với giả định này.** Cùng `simulate(3)` như mục "Kim Đan sau nội dung" (một người, quái an toàn nhanh nhất mỗi bậc; "tối ưu" kể cả Xích Mãng, "bãi mới" không đụng Xích Mãng), thay `ASSUME.searchSec` bằng số đo từng mức nhìn (loài ở nhiều bản đồ: lấy bản đồ chậm hơn). Phút cộng dồn tới hết Luyện Khí và Trúc Cơ, rồi phút RIÊNG cảnh giới Kim Đan (mục tiêu: 5-7 giờ):
@@ -681,14 +681,14 @@ Tiêu chí #406 mục 1 ("không nguồn nào vượt ~1,5x bãi mới tốt nh�
 
 | Giả thuyết độ vụng | Mức nhìn | Xích Mãng (s, giả định 90) | Hắc Giao (s, giả định 90) | Riêng Kim Đan (tối ưu) | Riêng Kim Đan (bãi mới) | Xích Mãng / bãi mới tốt nhất (Sơ / Trung / Hậu) |
 |---|---|---:|---:|---:|---:|---:|
-| Nhân (người chậm gấp 2.5x) | Máy tính 1280x720 (nhìn 1138x640 px) | 57 | 15 | 206 (3.4 giờ) | 234 (3.9 giờ) | 1.38 / 1.26 / 1.16 |
-| Nhân (người chậm gấp 2.5x) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 58 | 18 | 209 (3.5 giờ) | 234 (3.9 giờ) | 1.36 / 1.24 / 1.14 |
-| Nhân (người chậm gấp 2.5x) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 58 | 20 | 208 (3.5 giờ) | 234 (3.9 giờ) | 1.36 / 1.24 / 1.14 |
+| Nhân (người chậm gấp 2.5x) | Máy tính 1280x720 (nhìn 1138x640 px) | 57 | 15 | 206 (3.4 giờ) | 234 (3.9 giờ) | 1.37 / 1.26 / 1.16 |
+| Nhân (người chậm gấp 2.5x) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 58 | 18 | 209 (3.5 giờ) | 234 (3.9 giờ) | 1.35 / 1.24 / 1.14 |
+| Nhân (người chậm gấp 2.5x) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 58 | 21 | 209 (3.5 giờ) | 234 (3.9 giờ) | 1.36 / 1.24 / 1.14 |
 | Cộng (người mất thêm 6 giây) | Máy tính 1280x720 (nhìn 1138x640 px) | 29 | 12 | 124 (2.1 giờ) | 234 (3.9 giờ) | 2.21 / 2.08 / 1.96 |
-| Cộng (người mất thêm 6 giây) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 29 | 13 | 125 (2.1 giờ) | 234 (3.9 giờ) | 2.19 / 2.06 / 1.94 |
-| Cộng (người mất thêm 6 giây) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 29 | 14 | 125 (2.1 giờ) | 234 (3.9 giờ) | 2.19 / 2.07 / 1.95 |
+| Cộng (người mất thêm 6 giây) | Điện thoại ngang 844x390 (nhìn 1125x520 px) | 29 | 13 | 126 (2.1 giờ) | 234 (3.9 giờ) | 2.18 / 2.06 / 1.94 |
+| Cộng (người mất thêm 6 giây) | Điện thoại dọc 390x844 (nhìn 508x1100 px) | 29 | 14 | 125 (2.1 giờ) | 234 (3.9 giờ) | 2.19 / 2.06 / 1.95 |
 
-Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: máy tính 1280x720 1.38x ĐẠT; điện thoại ngang 844x390 1.36x ĐẠT; điện thoại dọc 390x844 1.36x ĐẠT. Cộng: máy tính 1280x720 2.21x KHÔNG ĐẠT; điện thoại ngang 844x390 2.19x KHÔNG ĐẠT; điện thoại dọc 390x844 2.19x KHÔNG ĐẠT. Xích Mãng tìm mỗi 57-58 giây (nhân) hoặc 29 giây (cộng) chứ không phải 90; nhịp Kim Đan "tối ưu" ra 3.4-3.5 giờ (nhân) hoặc 2.1 giờ (cộng), mục tiêu 5-7. Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối. Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô 4.7-5.8 giây so với 23.1-23.5 giây).
+Tiêu chí #406 mục 1 sau hiệu chỉnh (tối đa của ba bậc; ĐẠT khi <= 1,5x), nhân: máy tính 1280x720 1.37x ĐẠT; điện thoại ngang 844x390 1.35x ĐẠT; điện thoại dọc 390x844 1.36x ĐẠT. Cộng: máy tính 1280x720 2.21x KHÔNG ĐẠT; điện thoại ngang 844x390 2.18x KHÔNG ĐẠT; điện thoại dọc 390x844 2.19x KHÔNG ĐẠT. Xích Mãng tìm mỗi 57-58 giây (nhân) hoặc 29 giây (cộng) chứ không phải 90; nhịp Kim Đan "tối ưu" ra 3.4-3.5 giờ (nhân) hoặc 2.1 giờ (cộng), mục tiêu 5-7. Có dòng ĐẠT, có dòng KHÔNG ĐẠT: xem từng dòng ở cột cuối. Lấy bản đồ CHẬM hơn của Xích Mãng (Lạc Hà Trấn, 2 con) là cách nghiêng về phía mô hình: người chơi chọn Hắc Phong Cốc (6 con) sẽ tìm nhanh hơn (số đo thô 4.7-5.8 giây so với 23.1-23.5 giây).
 
 **Ngưỡng hoà vốn cho #410.** Chạy `simulate` với `ASSUME.searchSec.mang` = T (thời gian TÌM: từ lúc hạ con trước tới lúc chạm con kế, KHÔNG gồm trận và đả tọa hồi sức), tiêu chí #406 mục 1 đạt khi T >= **51 giây** (mô hình hiện tại: 90 giây, tối đa 0.95x). Trận + đả tọa hồi sức của Xích Mãng theo mô hình thêm 17.8 / 14.2 / 11.4 giây mỗi con (Sơ / Trung / Hậu kỳ), nên nếu bot đo từ lúc hạ tới lúc hạ con kế (kill-to-kill) thì phải trừ khoảng đó trước khi so với ngưỡng (khoảng 68 / 65 / 62 giây kill-to-kill ở ba bậc). Bot (#410) là thuật toán như thợ săn ở đây, nên so số đo THỜI GIAN TÌM của bot với ngưỡng đó phải trừ độ vụng: bot đo NGẮN hơn ~21 giây (giả thuyết nhân) hoặc ~45 giây (giả thuyết cộng) thì Xích Mãng nhanh quá mức tiêu chí; dài hơn thì đạt.
 

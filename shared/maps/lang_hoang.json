@@ -32,6 +32,10 @@
    "value": 20264331
   },
   {
+   "name": "monsterCap",
+   "value": "{}"
+  },
+  {
    "name": "handEdited",
    "type": "bool",
    "value": true

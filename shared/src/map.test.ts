@@ -28,6 +28,7 @@ import {
   HAC_PHONG_ID,
   AM_SUONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
   type MapDef,
   type PortalDef,
 } from "./map";
@@ -415,14 +416,22 @@ function reachableFrom(m: GameMap, tx: number, ty: number): Set<number> {
 describe("nhiều bản đồ: danh sách, cổng, khu an toàn (M3 bước 1)", () => {
   const all = MAPS.map((d) => getMap(d.id)!);
 
-  it("MAPS có Lạc Hà, Hắc Phong Cốc, Âm Sương Trạch và Hàn Vân Lĩnh; id duy nhất; getMap dựng được từng bản đồ", () => {
-    expect(MAPS.map((m) => m.id)).toEqual([DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID]);
+  it("MAPS có Lạc Hà, Hắc Phong Cốc, Âm Sương Trạch, Hàn Vân Lĩnh và Lang Hoang; id duy nhất; getMap dựng được từng bản đồ", () => {
+    expect(MAPS.map((m) => m.id)).toEqual([
+      DEFAULT_MAP_ID,
+      HAC_PHONG_ID,
+      AM_SUONG_ID,
+      HAN_VAN_ID,
+      LANG_HOANG_ID,
+    ]);
     expect(new Set(MAPS.map((m) => m.id)).size).toBe(MAPS.length);
     for (const m of all) expect(m).toBeDefined();
     expect(getMap(HAC_PHONG_ID)!.def.w).toBe(128);
     expect(getMap(AM_SUONG_ID)!.def.w).toBe(128);
     expect(getMap(HAN_VAN_ID)!.def.w).toBe(128);
     expect(getMap(HAN_VAN_ID)!.def.h).toBe(128);
+    expect(getMap(LANG_HOANG_ID)!.def.w).toBe(128);
+    expect(getMap(LANG_HOANG_ID)!.def.h).toBe(112);
     expect(getMap("constructor")).toBeUndefined();
   });
 

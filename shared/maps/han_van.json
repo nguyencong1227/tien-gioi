@@ -657,6 +657,48 @@
        "value": 1928
       }
      ]
+    },
+    {
+     "id": 11,
+     "name": "han_van_bac",
+     "class": "portal",
+     "x": 960,
+     "y": 56,
+     "point": true,
+     "properties": [
+      {
+       "name": "id",
+       "value": "han_van_bac"
+      },
+      {
+       "name": "name",
+       "value": "Tuyết Lĩnh Quan"
+      },
+      {
+       "name": "toMap",
+       "value": "lang_hoang"
+      },
+      {
+       "name": "toPortal",
+       "value": "lang_hoang_nam"
+      },
+      {
+       "name": "r",
+       "value": 32
+      },
+      {
+       "name": "safeR",
+       "value": 96
+      },
+      {
+       "name": "spawnX",
+       "value": 960
+      },
+      {
+       "name": "spawnY",
+       "value": 104
+      }
+     ]
     }
    ]
   }

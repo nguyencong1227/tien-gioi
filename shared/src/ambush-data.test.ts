@@ -45,11 +45,17 @@ describe("dữ liệu chặn đường: khung", () => {
 });
 
 describe("dữ liệu chặn đường THẬT: bầy kẻ chặn đường (CD5b #1065)", () => {
-  it("24 bầy; độ phủ chỉ còn thiếu cảnh + bầy CẦM ĐẦU của Lạc Hà (E / D bổ sung cả hai rồi sửa dòng này)", () => {
+  it("24 bầy; độ phủ chỉ còn thiếu cảnh + bầy CẦM ĐẦU của Lạc Hà và cảnh + bầy cả ba bậc của Lang Hoang (bản đồ mới của mục 75; E / D bổ sung rồi sửa dòng này)", () => {
     expect(AMBUSH_FOES.length).toBe(24);
     expect(ambushCoverageViolations()).toEqual([
       "lac_ha / leader: thiếu cảnh",
       "lac_ha / leader: thiếu bầy",
+      "lang_hoang / normal: thiếu cảnh",
+      "lang_hoang / normal: thiếu bầy",
+      "lang_hoang / elite: thiếu cảnh",
+      "lang_hoang / elite: thiếu bầy",
+      "lang_hoang / leader: thiếu cảnh",
+      "lang_hoang / leader: thiếu bầy",
     ]);
   });
 

@@ -184,6 +184,26 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
       },
     },
   },
+  // Lang Hoang (mục 75, #1467 / A2; bản đồ thứ năm): thảo nguyên khô sau cửa ải Tuyết Đao Quan. KIỂU TẠM do A đặt để bản đồ có kiểu RIÊNG (test bắt thiếu): ánh sáng vàng rơm nhạt, sương mỏng
+  // gió thổi nhanh, KHÔNG thời tiết hạt (tuyết thưa là việc của bảng màu ô riêng của B, `tileset_world.png`; `snow` dành cho Hàn Vân), cỏ khô thay hoa, đá + bụi lang khô. B chỉnh lại khi có ảnh thật.
+  lang_hoang: {
+    label: "Lang Hoang (thảo nguyên khô)",
+    ambient: { color: 0xd8c9a0, alpha: 0.13 },
+    vignette: { color: 0x15110a, strength: 0.46 },
+    fog: { color: 0xe6e0d0, alpha: 0.16, speed: 13 },
+    weather: { kind: "none", rate: 0 },
+    water: { shimmer: 0xdde6ea, alpha: 0.3, speed: 9 },
+    decor: {
+      density: { tuft: 0.06, flower: 0.008, pebble: 0.04, mushroom: 0.006, bush: 0.03 },
+      palette: {
+        tuft: [0xb8a368, 0x9c8a55], // cỏ khô vàng rơm
+        flower: [0xe9e4d8, 0xc9b99a], // hoa khô trắng ngà + be
+        pebble: [0x9a958a, 0x7a766d], // đá xám đất
+        mushroom: [0xb98f6c, 0x8c6a4e], // nấm nâu đất
+        bush: [0x6e6a3c, 0x575432], // bụi lang khô
+      },
+    },
+  },
 };
 
 /** Bản đồ này có kiểu RIÊNG (không phải mặc định)? Dùng `Object.hasOwn` nên "constructor" / "__proto__" không lọt. */
