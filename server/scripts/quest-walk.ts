@@ -19,6 +19,8 @@ import {
   EQUIP_SLOTS,
   HAC_PHONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   ITEMS,
   ITEM_BY_ID,
   MONSTER_BY_ID,
@@ -48,7 +50,14 @@ import { safeSpot } from "../src/systems/movement";
 import { hashSecret, savePlayer } from "../src/store";
 import { assertNotProd } from "./assert-not-prod";
 
-export const MAP_ORDER = [DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID] as const;
+export const MAP_ORDER = [
+  DEFAULT_MAP_ID,
+  HAC_PHONG_ID,
+  AM_SUONG_ID,
+  HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
+] as const;
 
 /** Trang bị đầy đủ nhất 6 ô cho bot theo cảnh giới yêu cầu để đủ sức làm các nhiệm vụ nguy hiểm */
 export function buildFullBestGear(realm: number, tier: number): Equipment {
@@ -226,6 +235,8 @@ export function isMapReachableForQuest(
     [HAC_PHONG_ID]: 1,
     [AM_SUONG_ID]: 2,
     [HAN_VAN_ID]: 3,
+    [LANG_HOANG_ID]: 4,
+    [UY_VAN_ID]: 5,
   };
   const r = minRealm?.realm ?? 0;
   const targetReq = mapReqRealm[targetMapId] ?? 0;

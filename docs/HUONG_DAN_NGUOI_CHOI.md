@@ -439,9 +439,22 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Hắc Phong Cốc | 128 × 96 | Thanh Lộ Trạm (nam) |
 | Âm Sương Trạch | 128 × 112 | Vọng Sương Trạm |
 | Hàn Vân Lĩnh | 128 × 128 | Hàn Vân Trạm |
+| Lang Hoang | 128 × 112 | Tuyết Đao Quan (nam) — *Đang xây dựng* |
+| Uy Vân Kinh | 128 × 112 | Uy Vân Kinh (nam) — *Đang xây dựng* |
 | Linh Hư Bí Cảnh | 64 × 64 | Bí cảnh (vào qua Thủ môn) |
 
 Khu an toàn là trong trấn hoặc trong bán kính quanh cổng. Càng ra xa trấn, yêu thú càng mạnh và càng nguy hiểm.
+
+### Chuỗi cổng truyền tống liên thông các vùng đất
+
+Các bản đồ ngoài hoang được kết nối liên tục thành một chuỗi hai chiều:
+1. **Lạc Hà Trấn** (Bắc Môn Quan) ↔ **Hắc Phong Cốc** (Nam Môn Quan)
+2. **Hắc Phong Cốc** (Vọng Trạch Quan) ↔ **Âm Sương Trạch** (Hồi Phong Quan)
+3. **Âm Sương Trạch** (Lăng Hàn Quan) ↔ **Hàn Vân Lĩnh** (Hồi Sương Quan)
+4. **Hàn Vân Lĩnh** (Vọng Lang Quan) ↔ **Lang Hoang** (Hồi Tuyết Quan)
+5. **Lang Hoang** (Vọng Kinh Quan) ↔ **Uy Vân Kinh** (Hồi Lang Quan)
+
+> **Lưu ý:** Hai bản đồ mới **Lang Hoang** và **Uy Vân Kinh** hiện đang trong giai đoạn xây dựng (chưa có quái vật và NPC nhiệm vụ). Người chơi có thể tự do qua lại khám phá cảnh quan và các trạm dịch chuyển an toàn.
 
 ---
 

@@ -225,7 +225,7 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
 - **Cách chạy:**
   ```bash
   # Chạy mô phỏng đồng thời 2 bản đồ: Lạc Hà (50 bot) + Hắc Phong Cốc (50 bot)
-  # (từ M7.10, #666, `--multi` không kèm `--maps` chạy cả BỐN bản đồ: số của bốn bản đồ ở mục 25)
+  # (từ #1470, `--multi` không kèm `--maps` chạy cả SÁU bản đồ thường: số của bốn bản đồ ở mục 25)
   npm run bench -w server -- --multi --maps=lac_ha,hac_phong --seconds 20
 
   # Hoặc chạy mô phỏng riêng 1 bản đồ chỉ định
@@ -1058,7 +1058,7 @@ npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --party
 
 ### 23.1. Bench ba bản đồ trong MỘT tiến trình
 
-`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (lúc viết mục này mặc định là hai bản đồ đầu; từ M7.10, #666, mặc định là cả bốn bản đồ, muốn lại số cũ thì thêm `--maps=lac_ha,hac_phong`) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
+`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (lúc viết mục này mặc định là hai bản đồ đầu; từ #1470 mặc định là cả sáu bản đồ, muốn lại số cũ thì thêm `--maps=lac_ha,hac_phong`) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
 
 ```bash
 npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong --per-map 33 --seconds 20
