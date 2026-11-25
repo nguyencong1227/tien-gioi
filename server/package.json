@@ -66,6 +66,7 @@
     "e2e:quest-ready": "node ../client/scripts/check-quest-ready.mjs",
     "e2e:text-size": "node ../client/scripts/check-text-size.mjs",
     "e2e:act-confirm": "node ../client/scripts/check-act-confirm.mjs",
+    "e2e:sect-confirm": "node ../client/scripts/check-sect-confirm.mjs",
     "e2e:sect-vault": "node ../client/scripts/check-sect-vault.mjs",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
