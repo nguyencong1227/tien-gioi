@@ -2,7 +2,8 @@
 /**
  * Kiểm hộp xác nhận LẬP tông môn và NỘP Linh thạch vào kho (issue #779, docs/RA_SOAT_THAO_TAC.md hàng 13-14; `act-confirm.ts`: `sectCreatePlan` / `sectDepositPlan`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-sect-confirm.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-sect-confirm.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
+ *   (`--slow-frame <ms>` / `TG_SLOW_FRAME_MS`: mỗi khung hình trang bận `ms` ms (`slow-frame.mjs`) để thử khung chậm 25-50 ms, nhiều lõi VÀ một lõi `taskset -c 0`.)
  *
  * Dựng bảng Tông môn bằng `window.__ui.onSect` / `onWallet` (dữ liệu giả), bắt tin gửi đi bằng cách đè `window.__scene.room.send`:
  *   - Lập (ví đủ): hộp nêu tên + biệt hiệu + phí + số dư còn lại + "không hoàn lại"; focus ở "Chưa"; bấm "Lập" NGAY khi hộp vừa mở (click ma) bị bỏ qua; sau cửa sổ chống click ma: đúng MỘT tin `sectCreate`;
@@ -33,6 +34,7 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { launchChrome } from "./chrome-launch.mjs";
 import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -127,7 +129,7 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
@@ -323,13 +325,19 @@ async function main() {
         yes1.hit && (!vp.mobile || (yes1.w >= MIN_TAP_PX && yes1.h >= MIN_TAP_PX)),
         `nút Lập trong hộp bấm được (${Math.round(yes1.w)}x${Math.round(yes1.h)})`,
       );
-      await tap(yes1.x, yes1.y);
-      await sleep(150);
+      await shot("lap-tong-mon");
+      // KHÔNG phụ thuộc đồng hồ: đóng hộp bằng "Chưa" (SAU cửa sổ chống click ma; ngủ dài hơn chỉ an toàn hơn), rồi MỞ LẠI hộp và bấm "Lập" trong CÙNG MỘT lượt JS của trang (độ trễ ~0 ms, không qua CDP):
+      // cú bấm luôn rơi trong cửa sổ ACT_CONFIRM_GUARD_MS (450 ms) dù runner chậm (trước đây tap() chạy SAU khi mở hộp nên trên runner CI không GPU cú bấm trễ quá cửa sổ và được tính là thật)
+      await sleep(560);
+      const no1 = await center("#act-btn-no");
+      await tap(no1.x, no1.y);
+      await evalJs(
+        `(() => { const pd = (id) => document.getElementById(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 })); document.getElementById("sect-btn-create").click(); pd("act-btn-yes"); return 1; })()`,
+      );
       check(
         (await box()).open && (await sentOf(SENT_CREATE)).length === 0,
         "bấm xác nhận NGAY khi hộp vừa mở (click ma): bị bỏ qua",
       );
-      await shot("lap-tong-mon");
       await sleep(560);
       await tap(yes1.x, yes1.y);
       await sleep(300);
@@ -350,12 +358,10 @@ async function main() {
       b = await center("#sect-btn-create");
       await tap(b.x, b.y);
       await sleep(600);
-      const no2 = await center("#act-btn-no");
-      await tap(no2.x, no2.y);
-      // click ma: ngay sau khi hộp đóng, một cú bấm chuột / chạm rơi xuống nút Lập nằm dưới hộp: không được mở lại hộp
-      const again = await center("#sect-btn-create");
-      await mouse("mousePressed", again.x, again.y);
-      await mouse("mouseReleased", again.x, again.y);
+      // click ma: ngay sau khi hộp đóng, một cú bấm chuột / chạm rơi xuống nút Lập nằm dưới hộp: không được mở lại hộp. Cùng MỘT lượt JS (không phụ thuộc đồng hồ): đóng bằng "Chưa" rồi click CHUỘT (detail 1)
+      await evalJs(
+        `(() => { const pd = (id) => document.getElementById(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 })); pd("act-btn-no"); document.getElementById("sect-btn-create").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 })); return 1; })()`,
+      );
       await sleep(150);
       check(
         !(await box()).open && (await sentOf(SENT_CREATE)).length === 0,
@@ -456,11 +462,10 @@ async function main() {
       );
       await shot("nop-kho-de-tu");
       await sleep(560);
-      const no5 = await center("#act-btn-no");
-      await tap(no5.x, no5.y);
-      const dep = await center("#sect-btn-deposit");
-      await mouse("mousePressed", dep.x, dep.y);
-      await mouse("mouseReleased", dep.x, dep.y);
+      // cùng MỘT lượt JS (không phụ thuộc đồng hồ): đóng bằng "Giữ lại" rồi click CHUỘT (detail 1) vào nút Góp nằm dưới hộp
+      await evalJs(
+        `(() => { const pd = (id) => document.getElementById(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 })); pd("act-btn-no"); document.getElementById("sect-btn-deposit").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 })); return 1; })()`,
+      );
       await sleep(150);
       check(
         !(await box()).open && (await sentOf(SENT_DEP)).length === 0,
@@ -653,9 +658,13 @@ async function main() {
       check((await press(3)) === "3000", "bấm ×100 : 130 -> 13000 bị kẹp về ví 3000");
       check((await press(0)) === "2999", "bấm − : 3000 -> 2999");
       check((await press(4)) === "3000", "bấm Tối đa : 3000 (= ví)");
-      // giữ nút +: nhanh dần; nhả thì dừng
+      // giữ nút +: nhanh dần; nhả thì dừng. Nhịp giữ nút theo CHỈ SỐ bước (qtyHoldStep: +1 x6, +5 x6, +10 x8, ...); thời gian thật chỉ quyết định BAO LÂU tới bước kế. Nên kiểm HÌNH DẠNG chuỗi bước ghi trong
+      // trang (mẫu 10 ms) và chờ theo ĐIỀU KIỆN, không đếm số lần trong đúng 1,7 s (runner CI chậm chỉ đạt 13 so với ngưỡng 20 của kiểm cũ)
       await fill("sect-input-deposit", "1");
       const hc = await center("#sect-deposit-qty button", 1);
+      await evalJs(
+        `(() => { const inp = document.getElementById("sect-input-deposit"); window.__qtyTrace = []; window.__qtyTimer = setInterval(() => { const v = Number(inp.value); const l = window.__qtyTrace[window.__qtyTrace.length - 1]; if (!l || l.v !== v) window.__qtyTrace.push({ v, t: performance.now() }); }, 10); return 1; })()`,
+      );
       if (vp.mobile)
         await send("Input.dispatchTouchEvent", {
           type: "touchStart",
@@ -671,15 +680,36 @@ async function main() {
         });
         await mouse("mousePressed", hc.x, hc.y);
       }
-      await sleep(1700);
-      const heldAt = Number((await qtyInfo()).value);
+      let heldAt = 0;
+      for (let i = 0; i < 120 && heldAt < 40; i++) {
+        await sleep(100);
+        heldAt = Number((await qtyInfo()).value);
+      }
       if (vp.mobile) await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       else await mouse("mouseReleased", hc.x, hc.y);
       await sleep(150);
       const afterRelease = Number((await qtyInfo()).value);
       await sleep(700);
       const later = Number((await qtyInfo()).value);
-      check(heldAt > 20, `giữ + 1,7 giây: tăng NHANH dần (1 -> ${heldAt}, nhịp đơn lẻ chỉ cho ~5)`);
+      const trace = JSON.parse(
+        await evalJs(
+          `(() => { clearInterval(window.__qtyTimer); return JSON.stringify(window.__qtyTrace); })()`,
+        ),
+      );
+      const vals = trace.map((x) => x.v);
+      const deltas = vals.slice(1).map((v, i) => v - vals[i]);
+      check(
+        heldAt >= 40,
+        `giữ +: lên tới ${heldAt} (chờ theo điều kiện tối đa 12 s, không theo 1,7 s cố định)`,
+      );
+      check(
+        deltas.length >= 8 &&
+          deltas[0] === 1 &&
+          deltas.every((d, i) => i === 0 || d >= deltas[i - 1]) &&
+          Math.max(...deltas) >= 5,
+        `giữ +: tăng NHANH dần theo nhịp (bước ${[...new Set(deltas)].join(" -> ")}, không bao giờ chậm lại)`,
+      );
+      // (Độ trễ lặp 380 ms KHÔNG kiểm ở đây: đo bằng mốc thời gian của bộ lấy mẫu 10 ms thì CPU runner bận làm mốc lệch, CI đỏ 'lặp đầu sau 180 / 242 ms'; hằng QTY_HOLD_DELAY_MS đã có test đơn vị `qty-input.test.ts`.)
       check(
         later === afterRelease,
         `nhả nút thì dừng hẳn (${afterRelease} -> ${later} sau 0,7 giây)`,
