@@ -17,6 +17,8 @@ import {
   planTileTint,
 } from "./map-style";
 import { NO_DECOR, buildDecorGrid, decorAtTile, decorCounts, hash01, hashId } from "./map-decor";
+import { getRecipe } from "./fx/recipes";
+import { WEATHER_RECIPE } from "./map-weather";
 
 /**
  * Thời gian CPU (ms) của CHÍNH luồng đang chạy bước `fn`, kẹp trên bởi đồng hồ tường: bản sao gọn của `measureSyncStepMs` ở `server/src/perf/bench.ts`
@@ -59,7 +61,9 @@ describe("map-style (dữ liệu kiểu theo bản đồ)", () => {
   it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật (trừ danh sách chờ, và danh sách chờ không được để cũ)", () => {
     // `am_suong` (M6 #408) từng chờ ở đây trước bản đồ của nó; #404 (shared) đã đưa bản đồ vào nên danh sách chờ đã được dọn.
     // `han_van` (M7.8 #509) từng chờ ở đây: có kiểu TRƯỚC bản đồ; M7.5 (#506, `shared/src/map.ts`) đã thêm bản đồ nên danh sách chờ đã được dọn.
-    const waiting: string[] = [];
+    // `lang_hoang` / `uy_van` (#1467, mục 75): kiểu có TRƯỚC bản đồ (tệp Tiled đã vào `shared/maps`, chờ Dev A đăng ký ở `shared/src/map.ts`). PR ĐĂNG KÝ bản đồ PHẢI dọn hai id này khỏi danh
+    // sách chờ (đỏ ở dòng "đã có bản đồ: bỏ khỏi danh sách chờ" nếu quên).
+    const waiting: string[] = ["lang_hoang", "uy_van"];
     for (const id of Object.keys(MAP_STYLES)) {
       if (waiting.includes(id)) continue;
       expect(getMap(id), `kiểu "${id}" không có bản đồ`).toBeDefined();
@@ -383,6 +387,53 @@ describe("Hàn Vân Lĩnh: kiểu băng nguyên (M7.8 #509) và xem trước ?de
     expect(styleIdFor("lac_ha", "?debug=1&style=__proto__")).toBe("lac_ha");
     expect(styleIdFor("lac_ha", "?debug=1")).toBe("lac_ha");
     expect(styleIdFor("lac_ha", "")).toBe("lac_ha");
+  });
+});
+
+describe("Lang Hoang và Uy Vân Kinh: kiểu riêng (#1467, mục 75)", () => {
+  const lh = MAP_STYLES.lang_hoang;
+  const uv = MAP_STYLES.uy_van;
+  const rgb = (c: number) => [(c >> 16) & 255, (c >> 8) & 255, c & 255] as const;
+
+  it("hợp lệ, mỗi bản đồ có thời tiết RIÊNG (bụi gió / đốm huyết) có công thức thật và màu môi trường không trùng bản đồ nào", () => {
+    for (const [id, st, kind] of [
+      ["lang_hoang", lh, "dust"],
+      ["uy_van", uv, "blood"],
+    ] as const) {
+      expect(st, id).toBeDefined();
+      expect(validateStyle(st), id).toEqual([]);
+      expect(st.weather.kind, id).toBe(kind);
+      expect(getRecipe(WEATHER_RECIPE[kind]), id).toBeDefined();
+      for (const [oid, o] of Object.entries(MAP_STYLES)) {
+        if (oid === id) continue;
+        expect(o.weather.kind, `${id} / ${oid} thời tiết`).not.toBe(kind);
+        expect(o.ambient.color, `${id} / ${oid} ánh sáng`).not.toBe(st.ambient.color);
+        expect(JSON.stringify(o.decor.palette), `${id} / ${oid} bảng trang trí`).not.toBe(
+          JSON.stringify(st.decor.palette),
+        );
+      }
+    }
+  });
+
+  it("Lang Hoang: gió (sương trôi NHANH nhất), nắng vàng úa (đỏ + lục trội lam), không hoa; chỉ Hàn Vân có màu phủ nền", () => {
+    for (const [id, o] of Object.entries(MAP_STYLES))
+      if (id !== "lang_hoang") expect(lh.fog.speed, id).toBeGreaterThan(o.fog.speed);
+    const [r, g, b] = rgb(lh.ambient.color);
+    expect(r).toBeGreaterThan(b);
+    expect(g).toBeGreaterThan(b);
+    expect(lh.decor.density.flower ?? 0).toBeLessThanOrEqual(0.01);
+    expect(lh.tileTint).toBeUndefined();
+  });
+
+  it("Uy Vân Kinh: 'ban đêm' (tối mép NẶNG nhất), phủ đỏ (đỏ trội xanh), đốm huyết bay lên, màu phủ nền không khai", () => {
+    for (const [id, o] of Object.entries(MAP_STYLES))
+      if (id !== "uy_van") expect(uv.vignette.strength, id).toBeGreaterThan(o.vignette.strength);
+    const [r, g, b] = rgb(uv.ambient.color);
+    expect(r).toBeGreaterThan(g);
+    expect(r).toBeGreaterThan(b);
+    const blood = getRecipe(WEATHER_RECIPE.blood)!.particles!;
+    expect(blood.gravityY ?? 0, "bay lên").toBeLessThan(0);
+    expect(uv.tileTint).toBeUndefined();
   });
 });
 

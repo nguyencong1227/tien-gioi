@@ -1,5 +1,5 @@
 /**
- * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509). CHỈ là dữ liệu.
+ * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509), bụi cỏ khô gió thổi (Lang Hoang) và đốm huyết đỏ (Uy Vân Kinh) (#1467). CHỈ là dữ liệu.
  *
  * Mỗi lần phát rải `count` (12) hạt ở điểm ngẫu nhiên trong `zone` (`opts.area` ghi đè theo khung nhìn), sống tới ~3,5 s; ưu tiên 0
  * (môi trường: tới 60 % trần, bị bỏ trước mọi hiệu ứng khác). Nhịp phát do `map-weather.ts` tính (số hạt / tốc độ) để một
@@ -97,6 +97,42 @@ export const WEATHER_RECIPES: readonly FxRecipe[] = [
       tint: 0xf2f8ff,
       blend: "normal",
       gravityY: 16,
+      zone: { w: 1200, h: 700 },
+    },
+  },
+  {
+    // Lang Hoang (#1467, thảo nguyên khô): gió thổi bụi cỏ khô và vài hạt tuyết thưa, bay gần NGANG sang phải, nhanh hơn tuyết / tro; cùng chi phí (12 hạt, <= 3,4 s)
+    id: "weather-dust",
+    priority: 0,
+    particles: {
+      frames: ["dot", "smoke"],
+      count: WEATHER_COUNT,
+      lifespan: { min: 2400, max: 3400 },
+      speed: { min: 40, max: 90 },
+      angle: { min: -15, max: 25 },
+      scale: { start: 0.32, end: 0.18 },
+      alpha: { start: 0.6, end: 0 },
+      tint: 0xe2d8b8,
+      blend: "normal",
+      gravityY: 4,
+      zone: { w: 1200, h: 700 },
+    },
+  },
+  {
+    // Uy Vân Kinh (#1467, huyết trận): đốm huyết đỏ sẫm bay LÊN chậm như tàn lửa, tan dần (cộng sáng nhẹ); cùng chi phí (12 hạt, <= 3,8 s)
+    id: "weather-blood",
+    priority: 0,
+    particles: {
+      frames: ["dot", "spark"],
+      count: WEATHER_COUNT,
+      lifespan: { min: 2800, max: 3800 },
+      speed: { min: 8, max: 24 },
+      angle: { min: 250, max: 290 },
+      scale: { start: 0.45, end: 0.1 },
+      alpha: { start: 0.8, end: 0 },
+      tint: 0xd0453c,
+      blend: "add",
+      gravityY: -8,
       zone: { w: 1200, h: 700 },
     },
   },

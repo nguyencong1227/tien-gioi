@@ -18,7 +18,7 @@ export const DECOR_VARIANTS = 2;
 export const DECOR_FRAMES = DECOR_KINDS.length * DECOR_VARIANTS;
 
 /** Thời tiết bằng hạt (chỉ khi hồ sơ chất lượng `weather != "off"`). */
-export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow";
+export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow" | "dust" | "blood";
 
 export interface MapStyle {
   /** Nhãn cho log / doc. */
@@ -181,6 +181,46 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
         pebble: [0xb2bac4, 0x8c95a1], // đá xám lạnh
         mushroom: [0xa8c8e6, 0x7ea3c9], // nhũ băng / nấm băng lam
         bush: [0x39574f, 0x2b4640], // tùng sẫm
+      },
+    },
+  },
+  // Lang Hoang (#1467, mục 75, chương 5): thảo nguyên khô sau cửa ải Tuyết Đao Quan. Nắng nhạt vàng úa, sương lạnh MỎNG nhưng trôi nhanh theo gió, bụi cỏ khô + tuyết thưa
+  // bay gần ngang (`dust`), trang trí cỏ khô + đá, gần như không hoa; nước lạnh. Khác Lạc Hà (ấm, hoa đào), Hàn Vân (trắng xanh, tuyết dày) bằng màu vàng úa và gió ngang.
+  lang_hoang: {
+    label: "Lang Hoang (thảo nguyên khô, gió)",
+    ambient: { color: 0xd8c690, alpha: 0.14 },
+    vignette: { color: 0x15120b, strength: 0.46 },
+    fog: { color: 0xe2e0d4, alpha: 0.2, speed: 24 },
+    weather: { kind: "dust", rate: 10 },
+    water: { shimmer: 0xd9e6ec, alpha: 0.3, speed: 14 },
+    decor: {
+      density: { tuft: 0.055, flower: 0.004, pebble: 0.05, mushroom: 0.004, bush: 0.03 },
+      palette: {
+        tuft: [0xb6a56b, 0x978850], // cỏ khô vàng úa
+        flower: [0xe7e9e3, 0xc4c9c3], // hoa dại trắng như tuyết thưa
+        pebble: [0x9b998f, 0x7c7a72], // đá tảng xám
+        mushroom: [0xc9b89b, 0xa7947b], // nấm khô
+        bush: [0x6e6b46, 0x59563b], // bụi gai khô
+      },
+    },
+  },
+  // Uy Vân Kinh (#1467, mục 75, chương 6): kinh đô bị huyết trận bao quanh, "ban đêm". Phủ đỏ chạng vạng, tối mép NẶNG (vignette đậm nhất), sương xám hồng, đốm huyết đỏ
+  // bay lên như tàn lửa (`blood`), nước đục; trang trí gai máu + nấm đỏ, không hoa.
+  uy_van: {
+    label: "Uy Vân Kinh (huyết trận, đêm)",
+    ambient: { color: 0xc2766a, alpha: 0.2 },
+    vignette: { color: 0x14080a, strength: 0.62 },
+    fog: { color: 0xa88583, alpha: 0.24, speed: 10 },
+    weather: { kind: "blood", rate: 9 },
+    water: { shimmer: 0xd9b5ad, alpha: 0.3, speed: 6 },
+    decor: {
+      density: { tuft: 0.035, flower: 0.003, pebble: 0.06, mushroom: 0.03, bush: 0.04 },
+      palette: {
+        tuft: [0x8a6a55, 0x6e5243], // cỏ úa thấm máu
+        flower: [0xd05a50, 0x9e3a36], // hoa máu hiếm
+        pebble: [0xa8584c, 0x7c3d34], // đá đỏ gạch
+        mushroom: [0xc24a40, 0x8e2f2d], // nấm huyết
+        bush: [0x4d3a33, 0x3a2c27], // gai sẫm
       },
     },
   },
