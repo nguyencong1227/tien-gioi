@@ -128,6 +128,53 @@ ${code}`,
   return { status: r.status, out: String(r.stdout), err: String(r.stderr) };
 }
 
+const MOI_TAG = / · MỚI \(sau 23\/11\)$/;
+/**
+ * Kiểm các hàng `T-nn` của tài liệu duyệt so với bảng mã ỔN ĐỊNH; trả danh sách lỗi (rỗng = khớp).
+ * Hàng có số TRONG bảng: đúng trùm của bảng. Hàng chưa có trong bảng chỉ hợp lệ khi là trùm CHƯA vào bảng, số liền ngay sau số lớn nhất của bảng
+ * (đúng cách `assign_codes` cấp: max + 1, max + 2...), mỗi trùm / mỗi số đúng một hàng: PR nội dung dựng lại tờ bằng `--groups 13 --md` KHÔNG `--ghi-ma` (A chốt ở #1445, để hai PR không cùng cấp một số
+ * T-nn), nên tờ có thể có hàng MỚI tạm trước khi lần dựng lại có chủ ý ghi bảng. Nhãn "· MỚI (sau 23/11)" có đúng khi và chỉ khi số vượt mốc đóng băng.
+ */
+function trumDocErrors(
+  doc: string,
+  table: Record<string, number>,
+  frozenMax: number,
+  bosses: Map<string, string>,
+): string[] {
+  const idOf = new Map(Object.entries(table).map(([id, n]) => [n, id] as const));
+  const maxNum = Math.max(0, ...Object.values(table));
+  const unregistered = new Set(
+    [...bosses].filter(([id]) => !(id in table)).map(([, name]) => name),
+  );
+  const errs: string[] = [];
+  const seenNum = new Set<number>();
+  const seenName = new Set<string>();
+  for (const m of doc.matchAll(/^\| T-(\d+) \| ([^|]*?) \|/gm)) {
+    const n = Number(m[1]);
+    const shown = m[2].replace(MOI_TAG, "");
+    if (MOI_TAG.test(m[2]) !== n > frozenMax)
+      errs.push(`T-${m[1]}: nhãn MỚI sai (mốc đóng băng ${frozenMax})`);
+    if (seenNum.has(n)) errs.push(`T-${m[1]}: số xuất hiện hai lần`);
+    seenNum.add(n);
+    const id = idOf.get(n);
+    if (id !== undefined) {
+      if (shown !== bosses.get(id)) errs.push(`T-${m[1]}: bảng nói ${id}, tờ ghi ${shown}`);
+      continue;
+    }
+    if (!unregistered.has(shown)) errs.push(`T-${m[1]}: ${shown} không phải trùm chưa vào bảng`);
+    if (seenName.has(shown)) errs.push(`T-${m[1]}: ${shown} xuất hiện hai lần`);
+    seenName.add(shown);
+  }
+  [...seenNum]
+    .filter((n) => !idOf.has(n))
+    .sort((a, b) => a - b)
+    .forEach((n, i) => {
+      if (n !== maxNum + 1 + i)
+        errs.push(`T-${n}: số mới phải liền ngay sau T-${maxNum + i} (bảng tới T-${maxNum})`);
+    });
+  return errs;
+}
+
 describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.json)", () => {
   const repo = path.join(here, "..", "..", "..");
 
@@ -182,20 +229,15 @@ describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.js
       new Map(Object.entries(t[kind]).map(([id, n]) => [n, id] as const));
     const vpId = byNum("vp");
     const huId = byNum("hu");
-    const tId = byNum("t");
     const items = new Map(ITEMS.map((i) => [i.id, i.name] as const));
     const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
     const bosses = new Map(MONSTERS.filter((m) => m.boss).map((m) => [m.id, m.name] as const));
     let vpRows = 0;
     let huRows = 0;
-    let tRows = 0;
-    for (const m of doc.matchAll(/^\| (VP|HU|T)-(\d+) \| ([^|]*?) \|/gm)) {
+    for (const m of doc.matchAll(/^\| (VP|HU)-(\d+) \| ([^|]*?) \|/gm)) {
       const n = Number(m[2]);
       const shown = m[3].replace(/ · MỚI \(sau 23\/11\)$/, "");
-      if (m[1] === "T") {
-        tRows++;
-        expect(shown, `T-${m[2]}`).toBe(bosses.get(tId.get(n) ?? ""));
-      } else if (m[1] === "VP") {
+      if (m[1] === "VP") {
         vpRows++;
         expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
       } else {
@@ -207,7 +249,41 @@ describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.js
     }
     expect(vpRows).toBeGreaterThanOrEqual(DONG_BANG.vp);
     expect(huRows).toBeGreaterThanOrEqual(DONG_BANG.hu);
-    expect(tRows).toBeGreaterThanOrEqual(DONG_BANG.t);
+    expect(trumDocErrors(doc, t.t, DONG_BANG.t, bosses)).toEqual([]);
+    expect((doc.match(/^\| T-\d+ \|/gm) ?? []).length).toBeGreaterThanOrEqual(DONG_BANG.t);
+  });
+
+  it("trumDocErrors: hàng T MỚI tạm (trùm chưa vào bảng, số CUỐI, ghi MỚI) được chấp nhận; mọi kiểu lệch khác bị bắt", () => {
+    const table = { mang: 1, hac_giao: 2 };
+    const bosses = new Map([
+      ["mang", "Xích Mãng"],
+      ["hac_giao", "Hắc Giao"],
+      ["thanh_xa", "Thanh Xà"],
+      ["trum_b", "Trùm B"],
+    ]);
+    const row = (n: number, name: string, moi = false) =>
+      `| T-${String(n).padStart(2, "0")} | ${name}${moi ? " · MỚI (sau 23/11)" : ""} | hiện tại |\n`;
+    const old = row(1, "Xích Mãng") + row(2, "Hắc Giao");
+    const check = (doc: string) => trumDocErrors(doc, table, 2, bosses);
+    expect(check(old)).toEqual([]); // bảng == tờ
+    expect(check(old + row(3, "Thanh Xà", true))).toEqual([]); // trùm mới CHƯA ghi bảng: hợp lệ
+    expect(check(old + row(3, "Thanh Xà", true) + row(4, "Trùm B", true))).toEqual([]);
+    // mỗi kiểu lệch phải bị bắt (ít nhất một lỗi)
+    const bad: [string, string][] = [
+      ["tên lệch số đã đóng băng", row(1, "Hắc Giao") + row(2, "Xích Mãng")],
+      ["thiếu nhãn MỚI ở số vượt mốc", old + row(3, "Thanh Xà")],
+      ["nhãn MỚI ở số đã đóng băng", row(1, "Xích Mãng", true) + row(2, "Hắc Giao")],
+      [
+        "trùm chưa vào bảng chiếm số đã dùng (chèn giữa)",
+        row(1, "Thanh Xà", true) + row(2, "Hắc Giao"),
+      ],
+      ["trùm mới không phải trùm có thật", old + row(3, "Trùm Ma", true)],
+      ["trùm ĐÃ ở bảng mang số mới", old + row(3, "Xích Mãng", true)],
+      ["hai hàng cùng số", old + row(3, "Thanh Xà", true) + row(3, "Trùm B", true)],
+      ["một trùm hai hàng", old + row(3, "Thanh Xà", true) + row(4, "Thanh Xà", true)],
+      ["bỏ cách số (T-04 khi bảng mới tới T-02)", old + row(4, "Thanh Xà", true)],
+    ];
+    for (const [what, doc] of bad) expect(check(doc), what).not.toEqual([]);
   });
 
   it.skipIf(!hasPython)(
@@ -685,6 +761,38 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     // --ghi-ma: số ghi vào bảng == số in trên tờ; phần đóng băng không bị đụng
     const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).t;
     expect(written).toEqual({ ...DONG_BANG_T, zz_trum_a: 5, aa_trum_b: 6 });
+
+    // luồng PR nội dung (#1445): dựng lại tờ bằng `--groups 13 --md` KHÔNG `--ghi-ma` => bảng không đổi, tờ có hàng MỚI tạm, và kiểm tài liệu chấp nhận đúng tờ này
+    const md2 = path.join(tmp, "doc-khong-ghi.md");
+    const ma2 = path.join(tmp, "ma-khong-ghi.json");
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md2);
+    fs.copyFileSync(MA_JSON, ma2);
+    const r2 = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "13",
+        "--public",
+        path.join(tmp, "pub2"),
+        "--private",
+        path.join(tmp, "priv2"),
+        "--names",
+        fake,
+        "--ma",
+        ma2,
+        "--md",
+        md2,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r2.status, String(r2.stderr)).toBe(0);
+    expect((JSON.parse(fs.readFileSync(ma2, "utf8")) as MaTable).t).toEqual(DONG_BANG_T); // không --ghi-ma: bảng giữ nguyên
+    const allBosses = new Map(names.mons.filter((m) => m.boss).map((m) => [m.id, m.name] as const));
+    const doc2 = fs.readFileSync(md2, "utf8");
+    expect((doc2.match(/^\| T-\d+ \|/gm) ?? []).length).toBe(6);
+    expect(trumDocErrors(doc2, DONG_BANG_T, DONG_BANG.t, allBosses)).toEqual([]);
   }, 120_000);
 
   it("dựng đủ 4 nhóm: mỗi nhóm một tờ công khai + một tờ đầy đủ, đúng số mã", () => {
