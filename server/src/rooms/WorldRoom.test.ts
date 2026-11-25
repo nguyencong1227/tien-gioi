@@ -53,6 +53,8 @@ import {
   HAC_PHONG_ID,
   AM_SUONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   JOIN_WRONG_MAP,
   MAPS,
   getMap,
@@ -2478,6 +2480,119 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     ).toBeLessThan(2);
     expect(fileOf(name).mapId).toBe(AM_SUONG_ID);
   }, 35000);
+
+  it("mục 75 A2: đi qua cổng xuyên BA phòng Colyseus thật mới (Hàn Vân -> Lang Hoang -> Uy Vân Kinh) và quay về; giữ tu vi / đồ, đúng chỗ xuất hiện, vào nhầm phòng bị chuyển hướng", async () => {
+    const name = "Lang Uy Van";
+    const hanVan = getMap(HAN_VAN_ID)!;
+    const langHoang = getMap(LANG_HOANG_ID)!;
+    const uyVan = getMap(UY_VAN_ID)!;
+    const hvBac = hanVan.portal("han_van_bac")!; // -> lang_hoang_nam
+    const lhNam = langHoang.portal("lang_hoang_nam")!; // -> han_van_bac
+    const lhBac = langHoang.portal("lang_hoang_bac")!; // -> uy_van_nam
+    const uvNam = uyVan.portal("uy_van_nam")!; // -> lang_hoang_bac
+
+    // Nhân vật mới chỉ tạo ở Lạc Hà (cổng bản đồ khác không cho tạo): tạo xong đặt thẳng vào Hàn Vân, cạnh cổng bắc (cổng đi giữa các bản đồ không đòi cảnh giới)
+    const a0 = await join(name);
+    await a0.room.leave(true);
+    rooms.splice(rooms.indexOf(a0.room), 1);
+    await sleep(200);
+    const saved = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .map((x) => path.join(dataDir, x))
+      .find((x) => JSON.parse(readFileSync(x, "utf8")).name === name)!;
+    writeFileSync(
+      saved,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(saved, "utf8")),
+        mapId: HAN_VAN_ID,
+        x: hvBac.spawn.x,
+        y: hvBac.spawn.y,
+        exp: 250,
+      }),
+    );
+    const a = await join(name, secretOf(name), HAN_VAN_ID);
+    expect(serverRoom(a.room).mapId).toBe(HAN_VAN_ID);
+    a.room.send("chat", { text: "/give han_lang_mao 5" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    const gotA = listenTravel(a.room);
+
+    // Bước 1: Hàn Vân -> Lang Hoang (cổng bắc mới)
+    standAt(a.room, hvBac);
+    a.room.send("travel", { portalId: hvBac.id });
+    await waitFor(() => gotA.length === 1);
+    expect(gotA[0]).toEqual({ mapId: LANG_HOANG_ID });
+    await waitFor(() => !a.room.connection.isOpen);
+
+    // 2. Vào phòng Lang Hoang: đúng chỗ xuất hiện của cổng nam, trong khu an toàn, giữ tu vi và đồ
+    const b = await join(name, secretOf(name), LANG_HOANG_ID);
+    expect(serverRoom(b.room).mapId).toBe(LANG_HOANG_ID);
+    expect(Math.hypot(b.me().x - lhNam.spawn.x, b.me().y - lhNam.spawn.y)).toBeLessThan(2);
+    expect(langHoang.inSafe(b.me().x, b.me().y)).toBe(true);
+    expect(b.me().exp).toBe(250);
+    expect(
+      (await waitFor(() => b.invs[0])).slots.find((s) => s?.itemId === "han_lang_mao")?.qty,
+    ).toBe(5);
+    expect(fileOf(name).mapId).toBe(LANG_HOANG_ID);
+    // bản đồ trống: không có quái nào được sinh ở phòng mới (monsterCap rỗng, không rơi về quái Lạc Hà)
+    expect(serverState(b.room).monsters.size).toBe(0);
+    const gotB = listenTravel(b.room);
+
+    // Bước 2: Lang Hoang -> Uy Vân Kinh (cổng bắc)
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(b.room, lhBac);
+    b.room.send("travel", { portalId: lhBac.id });
+    await waitFor(() => gotB.length === 1);
+    expect(gotB[0]).toEqual({ mapId: UY_VAN_ID });
+    await waitFor(() => !b.room.connection.isOpen);
+
+    // 3. Vào phòng Uy Vân Kinh
+    const c = await join(name, secretOf(name), UY_VAN_ID);
+    expect(serverRoom(c.room).mapId).toBe(UY_VAN_ID);
+    expect(Math.hypot(c.me().x - uvNam.spawn.x, c.me().y - uvNam.spawn.y)).toBeLessThan(2);
+    expect(uyVan.inSafe(c.me().x, c.me().y)).toBe(true);
+    expect(c.me().exp).toBe(250);
+    expect(serverState(c.room).monsters.size).toBe(0);
+    expect(fileOf(name).mapId).toBe(UY_VAN_ID);
+
+    // Vào nhầm phòng Lang Hoang từ Uy Vân Kinh: bị từ chối và chỉ sang UY_VAN_ID
+    const wrong = await (async () => {
+      try {
+        await new Client(`ws://localhost:${PORT}`).joinOrCreate(roomNameOf(LANG_HOANG_ID), {
+          name,
+          secret: secretOf(name),
+        });
+      } catch (err: any) {
+        return { code: err.code as number, message: String(err.message) };
+      }
+      throw new Error("đáng ra phải bị chuyển hướng");
+    })();
+    expect(parseWrongMap(wrong.code, wrong.message)).toBe(UY_VAN_ID);
+
+    // Quay về: Uy Vân Kinh -> Lang Hoang -> Hàn Vân
+    const gotC = listenTravel(c.room);
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(c.room, uvNam);
+    c.room.send("travel", { portalId: uvNam.id });
+    await waitFor(() => gotC.length === 1);
+    expect(gotC[0]).toEqual({ mapId: LANG_HOANG_ID });
+    await waitFor(() => !c.room.connection.isOpen);
+
+    const d = await join(name, secretOf(name), LANG_HOANG_ID);
+    expect(Math.hypot(d.me().x - lhBac.spawn.x, d.me().y - lhBac.spawn.y)).toBeLessThan(2);
+    const gotD = listenTravel(d.room);
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(d.room, lhNam);
+    d.room.send("travel", { portalId: lhNam.id });
+    await waitFor(() => gotD.length === 1);
+    expect(gotD[0]).toEqual({ mapId: HAN_VAN_ID });
+    await waitFor(() => !d.room.connection.isOpen);
+
+    const e = await join(name, secretOf(name), HAN_VAN_ID);
+    expect(Math.hypot(e.me().x - hvBac.spawn.x, e.me().y - hvBac.spawn.y)).toBeLessThan(2);
+    expect(hanVan.inSafe(e.me().x, e.me().y)).toBe(true);
+    expect(fileOf(name).mapId).toBe(HAN_VAN_ID);
+    expect(e.me().exp).toBe(250);
+  }, 60000);
 });
 
 describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc thoát phòng (#514, THIET_KE_NGHE_NHO 8.6)", () => {
