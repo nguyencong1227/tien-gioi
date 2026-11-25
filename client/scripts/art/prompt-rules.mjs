@@ -35,7 +35,7 @@ export const STYLE_PALETTE = [
     role: "Lang Hoang: vàng rơm, thảo nguyên khô",
     from: { map: "lang_hoang" },
   },
-  { id: "uy_van", hex: "#a8444a", role: "Uy Vân: đỏ gạch, huyết trận", from: { map: "uy_van" } },
+  { id: "uy_van", hex: "#4a1830", role: "Uy Vân: đỏ gạch, huyết trận", from: { map: "uy_van" } },
 ];
 
 /**
