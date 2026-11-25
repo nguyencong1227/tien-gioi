@@ -473,7 +473,7 @@ Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Mar
 | Kịch bản | Hạn thực cũ | Đo Min (s) | Đo Max (s) | Max / Hạn cũ | Sàn mới đề xuất | Hạn thực mới | Thử lại (`retryAllowed`) | Đánh giá & Ghi chú |
 |---|---|---|---|---|---|---|---|---|
 | `e2e:chuyen-canh` | 300 s | 86.9 s | 173.9 s | 58.0% ⚠️ | 480 s | 480 s | Có (<=600s) | Nâng sàn: bản hiện tại (từ #1499) đo 86.9-173.9s trên 13 lượt (>50% hạn 300s), runner dao động 2.0x |
-| `e2e:inv-select` | 300 s | 133.6 s | 173.9 s | 58.0% ⚠️ | 480 s | 480 s | Có (<=600s) | Nâng sàn: max đo 173.9s (>50% hạn 300s), kiểm tra nhiều slot và drag |
+| `e2e:inv-select` | 300 s | 133.6 s | 173.9 s | 58.0% ⚠️ | 480 s | 480 s | Có (<=600s) | Nâng sàn: max đo 173.9s (>50% hạn 300s); kiểm lỗi túi đồ (mục 24) ở năm khung nhìn |
 | `e2e:ban-phim` | 300 s | 89.7 s | 141.6 s | 47.2% | — (hạn chung 300s) | 300 s | Có (<=600s) | Tiệm cận 50% (141.6s / 300s = 47.2%), tiếp tục theo dõi |
 | `e2e:move-keys` | 300 s | 129.9 s | 134.0 s | 44.7% | — (hạn chung 300s) | 300 s | Có (<=600s) | — |
 | `e2e:map` | 300 s | 83.4 s | 126.7 s | 42.2% | — (hạn chung 300s) | 300 s | Có (<=600s) | — |
