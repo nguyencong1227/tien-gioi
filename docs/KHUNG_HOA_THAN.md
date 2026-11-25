@@ -5,15 +5,15 @@
 ## 1. Kết luận ngắn
 
 - **Công thức người chơi đã tổng quát tới Độ Kiếp**: `REALMS` có đủ mười cảnh giới, `expToNext` (từ Nguyên Anh gấp 6 lần cảnh giới trước), `statsFor` (máu x1,76-1,83 và công x1,71-1,81 mỗi cảnh giới), `breakthroughChance` (0,45 Hóa Thần, giảm 0,08 mỗi cảnh giới, sàn 0,15), `duyenPerStep` (x5 mỗi cảnh giới), `COIN_CAP` (999.999.999 Linh thạch), trường schema `exp` / `expMax` / `hp` / `maxHp` kiểu `number` (không tràn). **Không cần đổi công thức để chạy Hóa Thần.**
-- **Cái còn thiếu là DỮ LIỆU và hai bảng cứng bậc <= 4** (mục 2): `SKILL_MULT_CAP` / kiểm `reqRealm`, `AMBUSH_FOE_LEVEL_CAP`.
+- **Cái còn thiếu là DỮ LIỆU.** Hai bảng cứng bậc <= 4 (mục 2: `SKILL_MULT_CAP` / kiểm `reqRealm`, `AMBUSH_FOE_LEVEL_CAP`) **ĐÃ GỠ** ở #1472 (`ad05c6a3`, 25/11/2026): khung 5-9 đã vào `shared/`.
 - **Điều kiện để mô hình giữ được ~4,5 giờ mỗi cảnh giới: người chơi phải có ĐỒ CÙNG BẬC.** Quái Nguyên Anh được hiệu chỉnh khi người chơi mặc bộ IV (đồ cùng bậc chiếm ~29 % máu và công ở bậc đầu mỗi cảnh giới). Nếu đưa quái Hóa Thần vào mà chưa có bộ V thì mô hình báo "không loài nào săn được" ở Hóa Thần sơ kỳ (đã thử: vô hạn giờ). **Bộ V (đồ Hóa Thần) là việc phải có TRƯỚC khi mở bãi Hóa Thần**, cùng lúc với quái.
 
 ## 2. Kiểm kê: chỗ nào cứng bậc <= 4
 
 | Chỗ | Tình trạng | Việc | Ai |
 | --- | --- | --- | --- |
-| `shared/src/skill-violations.ts` (`reqRealm > 4` bị từ chối "ngoài 0-4"; `SKILL_MULT_CAP` chỉ có 0-4) | **CỨNG**: chiêu Hóa Thần không qua `skillViolations` | thêm khung 5-9 (mục 5) | A (PR `shared/` riêng) |
-| `shared/src/ambush.ts` (`AMBUSH_FOE_LEVEL_CAP` có 0-4; ghi rõ "cảnh giới chưa liệt kê không có bầy hợp lệ") | **CỨNG** có chủ ý: đòi khai trần trước khi thêm nội dung | thêm trần cấp 5-9 (mục 5) | A (cùng PR `shared/`) |
+| `shared/src/skill-violations.ts` (`reqRealm > 4` bị từ chối "ngoài 0-4"; `SKILL_MULT_CAP` chỉ có 0-4) | ~~CỨNG~~ **ĐÃ GỠ** ở #1472: khung 5-9 và cận trên lấy từ bảng khung | xong | A |
+| `shared/src/ambush.ts` (`AMBUSH_FOE_LEVEL_CAP` có 0-4; ghi rõ "cảnh giới chưa liệt kê không có bầy hợp lệ") | ~~CỨNG~~ **ĐÃ GỠ** ở #1472: trần cấp 21 / 24 / 27 / 30 / 33 đã khai | xong | A |
 | `shared/src/book-drop-realm.test.ts` (`MONSTER_REALM`, chú thích bậc 0-4) | không cứng (bảng theo từng quái) nhưng **mỗi quái mới rơi sách phải thêm dòng** với bậc 5+ | thêm dòng khi D thêm quái; cập nhật chú thích trong AGENTS.md | D |
 | `shared/src/items.ts` + `recipes.ts` (đồ cao nhất `reqRealm: 4`, công thức `NGUYEN_ANH_RECIPES`) | **THIẾU DỮ LIỆU**: mô hình dùng đồ Nguyên Anh cho mọi bậc sau | bộ V ... bộ IX (mục 4) + công thức rèn | D / E |
 | `server/src/balance/simulate.ts` (`ASSUME.searchSec` theo id quái; mặc định 10 s nếu thiếu) | không cứng | thêm id quái mới khi hiệu chỉnh | D |
@@ -91,7 +91,7 @@ Bộ I-IV đo được: kiếm +công, bào +máu, phù +mp và tốc độ, m�
 
 **Tốc độ của phù giữ +28** ở mọi bộ (tốc độ người chơi đã dừng ở 198; thêm nữa làm lệch dự đoán di chuyển / va chạm ở `shared/`). Đồ ba ô riêng (hài, ngọc bội, pháp bảo) và đồ hiếm / quái rơi (như `han_bang_an`) theo khuôn bộ IV: D / E soạn, `STAT_CAPS` (bạo kích 40, giảm hồi chiêu 30, giảm sát thương 40) KHÔNG nới. Độ hiếm vẫn `Rarity` 0-4: đồ Hóa Thần trở lên dùng 4 (Thiên); bậc cao hơn nằm ở `reqRealm` và chỉ số, không thêm độ hiếm mới.
 
-## 5. Khung chiêu và chặn đường (đề xuất, vào PR `shared/` ở mục 6)
+## 5. Khung chiêu và chặn đường (ĐÃ vào `main` ở #1472)
 
 **`SKILL_MULT_CAP`** (nay 0: 1,5 / 2; 1: 2,2 / 2,6; 2: 2,8 / 4; 3: 3,4 / 5; 4: 3,8 / 6). Người chơi đã mạnh thêm x1,75 mỗi cảnh giới nên hệ số chiêu chỉ cần nhích chậm (chiêu là "bao nhiêu lần công", DPS thật đã canh bằng `skills-dps.test.ts` 1,10-1,60 lần chỉ chém):
 
@@ -110,6 +110,6 @@ Kèm: `skillViolations` cho `reqRealm` 0-9 (bỏ chặn `> 4`), vẫn `rarity >=
 ## 6. Thứ tự việc của A1
 
 1. **PR này (tài liệu):** `docs/KHUNG_HOA_THAN.md`.
-2. **PR `shared/` riêng** (một dev khác review): `SKILL_MULT_CAP` 5-9, bỏ chặn `reqRealm > 4` (kèm test đột biến: chiêu Hóa Thần qua, chiêu vượt khung đỏ), `AMBUSH_FOE_LEVEL_CAP` 5-9 (test: bầy hợp lệ ở Hóa Thần, loài vượt cấp đỏ), chú thích `MONSTER_REALM` / AGENTS.md "bậc 0-9".
+2. **PR `shared/` riêng** (XONG: #1472, `ad05c6a3`, C duyệt): `SKILL_MULT_CAP` 5-9, bỏ chặn `reqRealm > 4` (kèm test đột biến: chiêu Hóa Thần qua, chiêu vượt khung đỏ), `AMBUSH_FOE_LEVEL_CAP` 5-9 (test: bầy hợp lệ ở Hóa Thần, loài vượt cấp đỏ), chú thích `MONSTER_REALM` / AGENTS.md "bậc 0-9".
 3. **Khi D có quái và đồ bộ V:** A thêm mục "Hóa Thần sau nội dung" ở `can-bang.ts` / `docs/CAN_BANG.md` (khuôn `nguyen-anh-kinh-te.ts`), chạy `bench` bản đồ mới (số phòng, RAM, byte / tick) và ghi vào `docs/COT_TRUYEN.md` mục 9 nếu phải hạn chế số phòng.
 4. Mỗi cảnh giới sau (Luyện Hư ... Độ Kiếp) lặp lại bước 3 khi bản đồ của chương đó tới.
