@@ -127,3 +127,28 @@ npm run map:show -w server -- lac_ha --area 36,36,30,30 --png docs/art/preview-t
    npm test
    npm run typecheck
    ```
+
+---
+
+## 6. Thêm một bản đồ thường MỚI: checklist (rút từ mục 75, Lang Hoang + Uy Vân Kinh, #1467)
+
+Hai bản đồ cuối làm theo hai PR tệp của B rồi hai PR đăng ký của A và chạm khoảng 20 tệp; một số chỗ chỉ lộ khi chạy Chrome thật. Danh sách dưới đây để bản đồ sau (kể cả Vô Nhai Uyên nếu là bản đồ thường) không phải dò lại. **Mỗi bản đồ một PR tệp (B) + một PR đăng ký (A); tệp chưa đăng ký không ảnh hưởng game hay test, nên hai PR độc lập.**
+
+### 6.1. PR tệp (B)
+1. `shared/maps/<id>.json` (soạn) + `<id>.logic.json` (chạy) + `client/public/packs/map-<id>/visual.json`: sinh bằng `map:build`; `handEdited` = true nếu bố cục quét từ seed rồi sửa tay (khi đó `map:bake` bỏ qua tệp).
+2. Bảng màu ô riêng: khoá `<id>` trong `PALETTES` + `MAP_PREVIEW_BOX` của `client/scripts/art/dung-tileset-world.py`, `tileset_world.png`, `client/public/packs/manifest.json`, dòng SHA-256 thật ở `CREDITS.md`, `docs/NGUON_NOI_DUNG.md` mục 3 (nguồn tên địa danh), ảnh trước / sau ở `docs/art/huong-moi/`.
+3. **Ghi NGUYÊN VĂN literal MapDef** (id, tên, `seed`, `w`, `h`, `town`, `townName`, `wildName`, từng cổng: `x`, `y`, `r`, `safeR`, `spawn`, `toMap`, `toPortal`) vào mô tả PR để A dán vào sổ.
+4. Cổng nối với bản đồ KHÁC mà bản đồ đó chưa đăng ký thì `portalLinkViolations` / `map:check` đỏ: đừng soạn cổng trỏ tới bản đồ chưa có (cổng quay lại cùng PR đăng ký bản đồ kia); chỗ xuất hiện (`spawn`) phải đi lại được (`GameMap` ném lỗi khi dựng nếu nằm trên ô chặn hoặc trong vòng `r` của cổng).
+
+### 6.2. PR đăng ký (A)
+1. `shared/src/map.ts`: hằng `<ID>_ID`; MapDef trong **`PROCEDURAL_MAPS`** (tên cũ nhưng là SỔ ĐĂNG KÝ: `adoptTiledMaps` chỉ thay mục có sẵn, `ARENA_MAPS` và `mapById` dựng từ đây, đấu trường lấy `seed + 7919`); cổng mới của bản đồ NỐI TIẾP (thêm đối tượng cổng vào tệp soạn của nó rồi `map:build -- <id>`; seed và ô bản đồ cũ KHÔNG đổi: test băm ô giữ).
+2. `shared/src/map-files.ts`: nhập `<id>.logic.json` + một dòng trong `TILED_MAP_FILES`.
+3. **`monsterCap`: thêm thuộc tính `monsterCap` = `"{}"` vào tệp soạn VÀ đặt `monsterCap: {}` ở sổ khi chưa có quái.** Không khai thì `GameMap` rơi về `MONSTER_CAP` mặc định của Lạc Hà (đo thật: phòng Lang Hoang sinh 83 quái cấp 1). Quái thật: sửa HAI chỗ cho khớp (thuộc tính ở tệp soạn + `map:build`, và mục ở sổ); ca "sổ đăng ký khớp tệp" ở `shared/src/tiled-maps.test.ts` đỏ nếu lệch.
+4. Test cứng danh sách bản đồ phải sửa: `shared/src/{map,dungeon,tiled-maps}.test.ts`, `server/src/rooms/define-rooms.test.ts`, tên phòng ở `server/src/systems/han-van.test.ts`, độ phủ chặn đường ở `shared/src/ambush-data.test.ts` (thêm dòng "thiếu cảnh / thiếu bầy" hoặc dữ liệu thật). Thêm test riêng như `shared/src/lang-hoang.test.ts` / `uy-van.test.ts` (cặp cổng trỏ ngược nhau, chỗ xuất hiện, `monsterCap`) và một ca tích hợp qua cổng ở `WorldRoom.test.ts` ("mục 75 A2").
+5. Client (bắt buộc để test xanh): kiểu `MAP_STYLES.<id>` (`client/src/gfx/map-style.ts`; mỗi bản đồ phải có thời tiết KHÁC bản đồ khác: công thức hạt mới ở `recipes-weather.ts` + `map-weather.ts`), `LEAK_MAP_IDS` (`client/scripts/leak-test.mjs`), kịch bản đo `client/scripts/measure-mobile-perf.mjs`, màu ở `STYLE_PALETTE` (`client/scripts/art/prompt-rules.mjs` + test + `docs/art/PHONG_CACH_MINH_HOA.md`), thẻ minh hoạ hoặc miễn có lý do ở `client/src/map-card.test.ts`, `OUTDOOR_MAPS` của `client/scripts/check-map-zoom.mjs`.
+6. `npm run can-bang -w server` (sinh lại `docs/CAN_BANG.md` khi cổng mới làm đổi khu an toàn của bản đồ cũ), CHANGELOG.
+
+### 6.3. Kiểm (ngoài `npm test`)
+- `npm run map:check -w server`, `map:bake -- --check`, `map:build -- --check`, `check:content`, `check:credits`.
+- **Chrome thật: `node client/scripts/check-map-zoom.mjs`** (KHÔNG nằm trong CI / nightly): thêm bản đồ làm sơ đồ nối dài ra và từng đẩy bản đồ lớn xuống dưới màn hình điện thoại (#1489); chụp ảnh thật bằng `snap-ban-do-cay.mjs --maps <id>` rồi chỉnh ánh sáng / kiểu theo ảnh.
+- Đột biến cho mọi test mới (commit mã thật TRƯỚC): tệp bỏ `monsterCap`, sổ dán sai cổng, quên dòng `map-files.ts`, xoá màu bảng phong cách.

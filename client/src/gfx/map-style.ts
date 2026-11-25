@@ -204,12 +204,12 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
       },
     },
   },
-  // Uy Vân Kinh (mục 75, #1467 / A2 lát 2; bản đồ thứ sáu): kinh đô bị huyết trận bao quanh, ngả "ban đêm" (việc của lớp ánh sáng này, KHÔNG của bộ ô). KIỂU TẠM do A đặt (B chỉnh khi có ảnh thật): ánh đỏ gạch tối,
-  // vignette đậm, sương hồng xám dưới trần 0,4, đốm lửa đỏ bay lên (`ember`), nước đục nâu xám, hoa huyết / nấm đỏ sẫm thay hoa cỏ, bụi cháy sẫm.
+  // Uy Vân Kinh (mục 75, #1467 / A2 lát 2; bản đồ thứ sáu): kinh đô bị huyết trận bao quanh, ngả "ban đêm" (việc của lớp ánh sáng này, KHÔNG của bộ ô). B chỉnh theo ẢNH THẬT (26/11, `snap-ban-do-cay.mjs`): ánh đỏ gạch nhạt của bản A phủ lên bảng màu đã đỏ nâu làm cả cảnh hồng nhạt, mất cảm giác "đêm", nên
+  // ánh môi trường đổi sang đỏ tím SẪM (alpha 0,34, trần 0,4) + vignette 0,66 (trần 0,8): tối hơn mà cây / đá vẫn tách nền; sương hồng xám dưới trần 0,4, đốm lửa đỏ bay lên (`ember`), nước đục nâu xám, hoa huyết / nấm đỏ sẫm thay hoa cỏ, bụi cháy sẫm.
   uy_van: {
     label: "Uy Vân Kinh (huyết trận)",
-    ambient: { color: 0xa8444a, alpha: 0.2 },
-    vignette: { color: 0x120708, strength: 0.55 },
+    ambient: { color: 0x4a1830, alpha: 0.34 },
+    vignette: { color: 0x0c0508, strength: 0.66 },
     fog: { color: 0xb98a86, alpha: 0.24, speed: 8 },
     weather: { kind: "ember", rate: 8 },
     water: { shimmer: 0xb89a96, alpha: 0.3, speed: 5 },

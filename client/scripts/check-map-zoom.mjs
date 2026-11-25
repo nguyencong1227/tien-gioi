@@ -11,6 +11,8 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
 
+// Bản đồ ngoài của game (thêm bản đồ mới: thêm id ở đây; test `client/scripts/*.test.ts` canh các danh sách khác). Sáu bản đồ từ mục 75 (Lang Hoang, Uy Vân Kinh).
+const OUTDOOR_MAPS = ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
 const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
@@ -274,16 +276,16 @@ try {
   await key("Home", "Home", 36);
   check((await cam()).follow, "phím Home: về chỗ mình");
 
-  console.log("\n--- Sơ đồ nối bốn bản đồ, chú giải, xem bản đồ khác ---");
+  console.log("\n--- Sơ đồ nối các bản đồ ngoài, chú giải, xem bản đồ khác ---");
   const nodes = JSON.parse(
     await evalJs(
       `JSON.stringify([...document.querySelectorAll("#map-graph .mg-node")].map((b) => ({ id: b.dataset.mapId, cur: b.getAttribute("aria-current"), pressed: b.getAttribute("aria-pressed"), h: Math.round(b.getBoundingClientRect().height) })))`,
     ),
   );
   check(
-    nodes.length === 4 &&
-      ["lac_ha", "hac_phong", "am_suong", "han_van"].every((id) => nodes.some((n) => n.id === id)),
-    `sơ đồ nối có 4 nút bản đồ, kể cả Hàn Vân (M7.5) (${nodes.map((n) => n.id).join(", ")})`,
+    nodes.length === OUTDOOR_MAPS.length &&
+      OUTDOOR_MAPS.every((id) => nodes.some((n) => n.id === id)),
+    `sơ đồ nối có ${OUTDOOR_MAPS.length} nút bản đồ, kể cả Hàn Vân (M7.5), Lang Hoang và Uy Vân Kinh (mục 75) (${nodes.map((n) => n.id).join(", ")})`,
   );
   const hereNode = nodes.find((n) => n.id === "lac_ha");
   check(
@@ -492,7 +494,7 @@ try {
   );
 
   console.log(
-    "\n--- Điện thoại ngang 844 x 390: bốn nút sơ đồ nằm trên MỘT hàng (không chiếm thêm chiều cao của bản đồ) ---",
+    "\n--- Điện thoại ngang 844 x 390: mọi nút sơ đồ nằm trên MỘT hàng (không chiếm thêm chiều cao của bản đồ) ---",
   );
   await close();
   await send("Emulation.setDeviceMetricsOverride", {
@@ -512,8 +514,10 @@ try {
     })())`),
   );
   check(
-    row.ns.length === 4 && new Set(row.ns.map((n) => n.y)).size <= 2 && row.gh <= 52,
-    `bốn nút cùng một hàng (cao ${row.gh} px; y ${row.ns.map((n) => n.y).join(", ")})`,
+    row.ns.length === OUTDOOR_MAPS.length &&
+      new Set(row.ns.map((n) => n.y)).size === 1 &&
+      row.gh <= 52,
+    `${OUTDOOR_MAPS.length} nút cùng MỘT hàng (cao ${row.gh} px; y ${row.ns.map((n) => n.y).join(", ")})`,
   );
   check(
     row.ns.every((n) => n.h >= 44 && n.right <= row.vw),

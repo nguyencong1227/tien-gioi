@@ -2276,8 +2276,11 @@ async function runLoadTest(
       campX = gate.x + (rnd() - 0.5) * 40;
       campY = gate.y + (rnd() - 0.5) * 40;
     } else if (travel) {
-      // Khi thử tải qua cổng: sinh bot gần cổng (quanh toạ độ spawn của cổng) để bot đi bộ vào cổng
-      const portal = currentMap.portals[0];
+      // Khi thử tải qua cổng: sinh bot gần cổng (rải đều các cổng nếu bản đồ có nhiều cổng) để bot đi bộ vào cổng
+      const portal =
+        currentMap.portals.length > 0
+          ? currentMap.portals[i % currentMap.portals.length]
+          : undefined;
       if (portal) {
         let placed = false;
         for (let tries = 0; tries < 20; tries++) {
@@ -2955,7 +2958,15 @@ async function runLoadTest(
           dx = Math.cos(b.wanderAngle);
           dy = Math.sin(b.wanderAngle);
         } else {
-          const portal = b.map.portals[0];
+          let portal = b.map.portals[0];
+          for (const q of b.map.portals) {
+            if (
+              Math.hypot(q.x - b.predX, q.y - b.predY) <
+              Math.hypot(portal.x - b.predX, portal.y - b.predY)
+            ) {
+              portal = q;
+            }
+          }
           if (portal) {
             const dist = Math.hypot(portal.x - b.predX, portal.y - b.predY);
             if (dist > portal.r - 12) {
