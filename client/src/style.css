@@ -2138,6 +2138,11 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
   #skills-modal.sk-has-filter .skills-hint {
     display: none;
   }
+  /* Màn ngang thấp (844x390): tiêu đề tấm không còn co (flex-shrink 0, 23/11) lấy mất 7 px của danh sách (174 -> 167 px) nên 4 nút ô của chiêu vừa mở bị cắt mép dưới
+     (check-skills-panel đỏ ở khung mobile-l từ 1808279d). Bỏ khoảng cách dưới thanh lọc trả lại 8 px. */
+  #skills-modal.sk-has-filter .sk-filter {
+    margin-bottom: 0;
+  }
 }
 /* Phẩm (Hoàng / Huyền / Địa / Thiên): nhãn nhỏ cạnh tên; màu CHỈ là phụ, chữ vẫn nói phẩm gì (không dựa vào màu) */
 .sk-grade {

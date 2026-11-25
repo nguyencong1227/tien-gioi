@@ -28,3 +28,15 @@ describe("danh sách chiêu (bảng Công pháp): trần chiều cao theo thiế
     expect(body).not.toMatch(/overflow(-y)?:\s*visible/);
   });
 });
+
+describe("bảng Công pháp ở màn ngang thấp (844x390): đủ chỗ cho 4 nút ô của chiêu vừa mở", () => {
+  it("thanh lọc bỏ khoảng cách dưới ở màn thấp (trả lại 8 px sau khi tiêu đề tấm không còn co, check-skills-panel khung mobile-l)", () => {
+    const body = ruleBody("#skills-modal.sk-has-filter .sk-filter");
+    expect(body, "thiếu quy tắc #skills-modal.sk-has-filter .sk-filter").not.toBeNull();
+    expect(body).toMatch(/margin-bottom:\s*0/);
+    // quy tắc phải nằm trong @media (max-height: 520px), không áp cho mọi màn
+    const at = css.indexOf("#skills-modal.sk-has-filter .sk-filter {");
+    const media = css.lastIndexOf("@media", at);
+    expect(css.slice(media, at)).toMatch(/^@media \(max-height:\s*520px\)/);
+  });
+});
