@@ -110,6 +110,16 @@ PALETTES = {
         "water": ["#7f9fae", "#d5e2e8"],
         "stone": {"mortar": "#7f7c76", "stone": "#a5a29a", "deep": "#615e59", "hi": "#c7c4bb"},
     },
+    # Uy Vân Kinh (#1467; docs/COT_TRUYEN.md 6.2: "đá đỏ, cờ huyết, dòng nước đục; ban đêm"): CHỈ qua bảng màu (bố cục chỉ có 4 ô vật thể, không thêm ô "cờ"): cỏ xám nâu úa dưới trời chạng vạng,
+    # đất / đường thành đất thấm máu (đỏ gỉ), "bụi" thành vệt đỏ sẫm (cờ huyết rải trên cỏ), đá lát + tảng đá đỏ gạch, nước đục nâu xám, bờ cát bùn.
+    "uy_van": {
+        "grass": ["#8e8068", "#786b57", "#5f5346", "#42392f"],
+        "dirt": ["#a4564b", "#8b463d", "#bc6e60", "#6c332d"],
+        "tuft": ["#b8403a", "#8f2f2d"],
+        "sand": ["#b9a08c", "#a48b78", "#cdb8a6", "#85705f"],
+        "water": ["#8c7068", "#cdb9b1"],
+        "stone": {"mortar": "#6f3b36", "stone": "#a8564b", "deep": "#4f2623", "hi": "#c97d6f"},
+    },
 }
 
 
@@ -468,6 +478,7 @@ MAP_PREVIEW_BOX = {
     "am_suong": (44, 84, 68, 100),
     "han_van": (48, 26, 72, 42),
     "lang_hoang": (52, 86, 76, 102),
+    "uy_van": (56, 82, 80, 98),
 }
 # Bốn bản đồ ĐẦU của ảnh xem trước 05 / 06 (docs/art/huong-moi; test so từng byte): bản đồ thêm sau KHÔNG làm đổi hai ảnh đó, xem bằng `--map-view <id> <ảnh.png>`.
 PREVIEW_IDS = ("lac_ha", "hac_phong", "am_suong", "han_van")
