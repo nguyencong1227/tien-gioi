@@ -313,7 +313,7 @@ async function main() {
     const checkDest = async (mapId: string) => {
       await sleep(800);
       const dest =
-        await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, vis: s.visualLayers.length, visFades: s.visualFades, visTex: s.textures.exists('map-visual:' + s.map.def.id), staleTex: ['lac_ha', 'hac_phong', 'am_suong', 'han_van'].filter((m) => m !== s.map.def.id && s.textures.exists('map-visual:' + m)), fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
+        await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, vis: s.visualLayers.length, visFades: s.visualFades, visTex: s.textures.exists('map-visual:' + s.map.def.id), staleTex: ['lac_ha', 'hac_phong', 'am_suong', 'han_van', 'lang_hoang', 'uy_van'].filter((m) => m !== s.map.def.id && s.textures.exists('map-visual:' + m)), fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
         decorKey: s.decorLayer ? s.decorLayer.tileset[0].image.key : '', portals: s.map.portals.length, portalVisuals: s.portalVisuals.length,
         zone: document.getElementById('minimap-zone')?.textContent || '', town: s.map.def.townName, wild: s.map.def.wildName }; } catch (e) { return { err: String((e && e.stack) || e) }; } })()`);
       must(!dest.err, `đọc trạng thái bản đồ đích (${dest.err})`);
@@ -526,6 +526,50 @@ async function main() {
       `về Âm Sương xuất hiện cạnh Lăng Hàn Quan: (${backXY.x.toFixed(0)}, ${backXY.y.toFixed(0)}) cách (${amBac.spawn.x}, ${amBac.spawn.y}) < 80 px`,
     );
     ok("về Âm Sương Trạch đúng cạnh Lăng Hàn Quan");
+
+    // ---------------- Chặng bốn (Mục 75, #1470): Hàn Vân Lĩnh -> Lang Hoang -> Uy Vân Kinh và quay về ----------------
+    out(
+      "\n--- Sáu bản đồ: Hàn Vân Lĩnh -> Lang Hoang -> Uy Vân Kinh (cổng thật, nhân vật lưu sẵn cạnh Vọng Lang Quan) ---",
+    );
+    const hvBac = getMap("han_van")!.portal("han_van_bac")!;
+    const NAME4 = "Canh Uy Van";
+    const SECRET4 = "e2e_secret_cc_4444444444444";
+    await savePlayer({
+      name: NAME4,
+      secretHash: hashSecret(SECRET4),
+      realm: 5,
+      tier: 0,
+      exp: 0,
+      mapId: "han_van",
+      x: hvBac.spawn.x,
+      y: hvBac.spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    currentName = NAME4;
+    currentSecret = SECRET4;
+    await setStorage("");
+    await login(url);
+    await ev(
+      `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
+    );
+    await T.waitFor(
+      `window.__scene && window.__scene.map && window.__scene.map.def.id === 'han_van'`,
+      "vào đúng phòng Hàn Vân Lĩnh",
+      30000,
+    );
+    await walkToPortal("han_van_bac");
+    await crossPortal("han_van_bac", "lang_hoang");
+    await checkDest("lang_hoang");
+    await walkToPortal("lang_hoang_bac");
+    await crossPortal("lang_hoang_bac", "uy_van");
+    await checkDest("uy_van");
+    await walkToPortal("uy_van_nam");
+    await crossPortal("uy_van_nam", "lang_hoang");
+    await walkToPortal("lang_hoang_nam");
+    await crossPortal("lang_hoang_nam", "han_van");
+    ok("qua lại thông suốt Hàn Vân Lĩnh <-> Lang Hoang <-> Uy Vân Kinh");
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E CHUYỂN CẢNH QUA CỔNG ĐẠT ===");

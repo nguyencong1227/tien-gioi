@@ -4,6 +4,8 @@ import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   MONSTER_BY_ID,
   QUESTS,
   QUEST_BY_ID,
@@ -104,6 +106,10 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
     expect(isMapReachableForQuest(DEFAULT_MAP_ID, HAN_VAN_ID, { realm: 0, tier: 0 })).toBe(false);
     // han_van_linh với nhiệm vụ Nguyên Anh (realm 4): được
     expect(isMapReachableForQuest(DEFAULT_MAP_ID, HAN_VAN_ID, { realm: 4, tier: 0 })).toBe(true);
+    // lac_ha -> uy_van (cách 5 cấp bản đồ) với nhiệm vụ Phàm Nhân: không được
+    expect(isMapReachableForQuest(DEFAULT_MAP_ID, UY_VAN_ID, { realm: 0, tier: 0 })).toBe(false);
+    // uy_van với cảnh giới Hóa Thần (realm 5): được
+    expect(isMapReachableForQuest(DEFAULT_MAP_ID, UY_VAN_ID, { realm: 5, tier: 0 })).toBe(true);
   });
 
   it("findPortalTo: tìm đúng portal chuyển map giữa các bản đồ kề nhau", () => {
@@ -122,6 +128,22 @@ describe("quest-walk: kiểm tra tính khả thi tĩnh của nhiệm vụ (Issue
     const p4 = findPortalTo(HAN_VAN_ID, AM_SUONG_ID);
     expect(p4).toBeDefined();
     expect(p4?.id).toBe("han_van_nam");
+
+    const p5 = findPortalTo(HAN_VAN_ID, LANG_HOANG_ID);
+    expect(p5).toBeDefined();
+    expect(p5?.id).toBe("han_van_bac");
+
+    const p6 = findPortalTo(LANG_HOANG_ID, UY_VAN_ID);
+    expect(p6).toBeDefined();
+    expect(p6?.id).toBe("lang_hoang_bac");
+
+    const p7 = findPortalTo(UY_VAN_ID, LANG_HOANG_ID);
+    expect(p7).toBeDefined();
+    expect(p7?.id).toBe("uy_van_nam");
+
+    const p8 = findPortalTo(LANG_HOANG_ID, HAN_VAN_ID);
+    expect(p8).toBeDefined();
+    expect(p8?.id).toBe("lang_hoang_nam");
   });
 
   it("portal lac_ha_bac có đường đi hợp lệ từ trấn", () => {
