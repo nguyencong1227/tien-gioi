@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ELEMENTS,
   LEARNABLE_SKILLS,
+  REALMS,
   SKILLS_M7,
   SKILL_BY_ID,
   SKILL_FX_IDS,
@@ -82,14 +83,24 @@ describe("skillViolations", () => {
     expect(skillViolations()).toEqual([]);
   });
 
-  it("khung sát thương theo cảnh giới tồn tại cho cảnh giới 0-4 và tăng dần", () => {
+  it("khung sát thương theo cảnh giới tồn tại cho MỌI cảnh giới của REALMS (0-9) và tăng dần", () => {
     let prev = { hit: 0, total: 0 };
-    for (let r = 0; r <= 4; r++) {
+    for (let r = 0; r < REALMS.length; r++) {
       const c = SKILL_MULT_CAP[r];
       expect(c, `cảnh giới ${r}`).toBeDefined();
       expect(c.hit).toBeGreaterThanOrEqual(prev.hit);
       expect(c.total).toBeGreaterThanOrEqual(c.hit);
       prev = c;
+    }
+    expect(Object.keys(SKILL_MULT_CAP).length).toBe(REALMS.length); // không thừa khoá ngoài thang
+    // từ Hóa Thần (A1 #1461, mục 75): hit tăng NGHIÊM NGẶT mỗi cảnh giới (chiêu cảnh giới cao không bị chặn bởi khung của cảnh giới thấp)
+    for (let r = 5; r < REALMS.length; r++) {
+      expect(SKILL_MULT_CAP[r].hit, `hit cảnh giới ${r}`).toBeGreaterThan(
+        SKILL_MULT_CAP[r - 1].hit,
+      );
+      expect(SKILL_MULT_CAP[r].total, `total cảnh giới ${r}`).toBeGreaterThan(
+        SKILL_MULT_CAP[r - 1].total,
+      );
     }
     // mọi chiêu thật nằm TRONG khung nhưng khung không quá rộng: chiêu mạnh nhất hiện có vượt hơn nửa khung
     for (const s of SKILLS_M7) {
@@ -160,7 +171,8 @@ describe("skillViolations", () => {
       { effects: Array.from({ length: 5 }, () => skillEffect("burn", 1, 0.1, 1)) },
       /quá/,
     ],
-    ["reqRealm ngoài thang", { reqRealm: 9 }, /reqRealm/],
+    ["reqRealm ngoài thang (sau Độ Kiếp)", { reqRealm: 10 }, /reqRealm 10 ngoài 0-9/],
+    ["reqRealm âm", { reqRealm: -1 }, /reqRealm/],
     ["reqRealm lẻ", { reqRealm: 1.5 }, /reqRealm/],
     ["reqTier ngoài thang", { reqTier: 99 }, /reqTier/],
     ["rarity ngoài thang", { rarity: 7 as never }, /rarity/],
@@ -209,6 +221,29 @@ describe("skillViolations", () => {
     const cap = SKILL_MULT_CAP[fan.reqRealm];
     const v = skillViolations([{ ...fan, count: 5, mult: cap.hit - 0.01 }]);
     expect(v.join("\n")).toMatch(/tổng mult/);
+  });
+
+  it("chiêu Hóa Thần -> Độ Kiếp (A1 #1461): mult đúng khung thì qua, vượt khung hit / total thì bị bắt kèm số cảnh giới", () => {
+    for (let r = 5; r < REALMS.length; r++) {
+      const cap = SKILL_MULT_CAP[r];
+      expect(
+        skillViolations([withDef({ reqRealm: r, reqTier: 0, mult: cap.hit })]),
+        `reqRealm ${r} đúng khung`,
+      ).toEqual([]);
+      expect(
+        skillViolations([withDef({ reqRealm: r, reqTier: 0, mult: cap.hit + 0.1 })]).join("\n"),
+        `reqRealm ${r} vượt khung hit`,
+      ).toMatch(new RegExp(`vượt khung ${cap.hit} của cảnh giới ${r}`));
+      const fan = { ...SKILLS_M7.find((s) => s.shape === "fan")!, reqRealm: r, reqTier: 0 };
+      expect(
+        skillViolations([{ ...fan, count: 5, mult: cap.hit - 0.01 }]).join("\n"),
+        `reqRealm ${r} vượt khung total`,
+      ).toMatch(/tổng mult/);
+    }
+    // cảnh giới sau Độ Kiếp không có khung: bị bắt (không âm thầm cho qua)
+    expect(skillViolations([withDef({ reqRealm: REALMS.length })]).join("\n")).toMatch(
+      new RegExp(`reqRealm ${REALMS.length} ngoài 0-${REALMS.length - 1}`),
+    );
   });
 
   it("bắt: dash thiếu reach, ground thiếu bán kính, line thiếu bề rộng, dodgeMs quá lớn", () => {

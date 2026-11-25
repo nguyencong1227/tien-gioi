@@ -24,6 +24,8 @@ const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFin
 /**
  * Khung sát thương theo cảnh giới yêu cầu (`reqRealm`): `hit` = `mult` tối đa MỘT lần trúng; `total` = `mult` x số lần trúng tối đa của một lần dùng (fan: `count` tia).
  * Không chiêu nào áp đảo cả cảnh giới. Cao nhất hiện có: Luyện Khí 1,9 / Trúc Cơ 1,5 (fan 3,5) / Nguyên Anh 2,6 (fan 4,25). TẠM, CT10 chốt.
+ * Hóa Thần (5) -> Độ Kiếp (9) thêm ở A1 #1461 (mục 75, `docs/KHUNG_HOA_THAN.md` mục 5): người chơi đã mạnh thêm x1,75 mỗi cảnh giới nên hệ số chiêu chỉ nhích chậm (hit +0,3 / +0,3 / +0,2 / +0,2 / +0,2,
+ * total +1 mỗi cảnh giới); DPS thật vẫn do `skills-dps.test.ts` canh. Có đủ khoá cho MỌI cảnh giới của `REALMS` (test giữ): chiêu `reqRealm` ngoài bảng này bị `skillViolations` bắt.
  */
 export const SKILL_MULT_CAP: Readonly<Record<number, { hit: number; total: number }>> = {
   0: { hit: 1.5, total: 2 },
@@ -31,7 +33,15 @@ export const SKILL_MULT_CAP: Readonly<Record<number, { hit: number; total: numbe
   2: { hit: 2.8, total: 4 },
   3: { hit: 3.4, total: 5 },
   4: { hit: 3.8, total: 6 },
+  5: { hit: 4.1, total: 7 },
+  6: { hit: 4.4, total: 8 },
+  7: { hit: 4.6, total: 9 },
+  8: { hit: 4.8, total: 10 },
+  9: { hit: 5.0, total: 11 },
 };
+
+/** Cảnh giới cao nhất có khung sát thương (= cảnh giới cuối của `REALMS`, test giữ). */
+const MAX_REQ_REALM = Math.max(...Object.keys(SKILL_MULT_CAP).map(Number));
 
 /** Phẩm cấp <-> độ hiếm (mục 6 của PHAN_CONG_CHIEU_THUC): Hoàng 0-1, Huyền 1-2, Địa 2-3, Thiên 3-4. */
 const GRADE_RARITY: Readonly<Record<number, readonly [number, number]>> = {
@@ -342,10 +352,10 @@ export function skillViolations(defs: readonly SkillDef[] = LEARNABLE_SKILLS): s
     if (
       !isInt(d.reqRealm) ||
       d.reqRealm < 0 ||
-      d.reqRealm > 4 ||
+      d.reqRealm > MAX_REQ_REALM ||
       !hasOwn(SKILL_MULT_CAP, String(d.reqRealm))
     )
-      bad.push(`${at}: reqRealm ${String(d.reqRealm)} ngoài 0-4`);
+      bad.push(`${at}: reqRealm ${String(d.reqRealm)} ngoài 0-${MAX_REQ_REALM}`);
     else {
       const tiers = REALMS[d.reqRealm]?.tiers.length ?? 0;
       if (!isInt(d.reqTier) || d.reqTier < 0 || d.reqTier >= tiers)

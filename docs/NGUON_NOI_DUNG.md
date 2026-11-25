@@ -18,7 +18,9 @@
 - Nội dung chữ và dữ liệu (tên, mô tả, chỉ số làm điểm khởi đầu) của công pháp / kinh văn / chiêu thức, vật phẩm, trang bị, pháp bảo, nguyên liệu, nghề, cảnh giới, sự kiện: dùng **nguyên văn**, chỉnh số cho cân bằng của Tiên Giới.
 - Hình ảnh và âm thanh: dùng **khi phù hợp** (hợp phong cách và kích thước, không còn chữ Hán trên hình, giữ ngân sách hiệu năng, chỉ lấy từ bản sao lưu trên máy, không tải thêm từ Internet).
 
-**Không thuộc phạm vi:** nhân vật, cốt truyện, quốc gia, tông phái riêng của game đó làm nhân vật / địa danh của Tiên Giới (thế giới của Tiên Giới giữ nguyên); mã nguồn (không có công khai); bản tiếng Trung (`content-zh-*.json`, vi phạm quy tắc không chữ Hán).
+**Mở rộng ngày 25/11/2026 (`QUYET_DINH_M3.md` mục 75):** người dùng yêu cầu làm CỐT TRUYỆN và BẢN ĐỒ theo Vạn Kiếp Tu Tiên, nên ĐƯỢC dùng thêm **cốt truyện, sự kiện, địa danh, nhân vật, quốc gia và tông phái** của game đó (người phát triển đã cho phép theo xác nhận của người dùng). Mạch truyện, nhân vật và bản đồ mới ở `docs/COT_TRUYEN.md`. Điều kiện giữ nguyên như trên: chỉ lấy từ bản sao trên máy, tiếng Việt, KHÔNG dùng `ten_han` / chữ Hán, mỗi mục một dòng ở bảng nguồn mục 3 (sự kiện / mạch truyện: loại `su_kien`; địa danh và nhân vật: loại `du_lieu`; cột Nguồn ghi khoá trong `site/assets/content-ClG6Ha-i.json` hoặc `site/data/dia-danh.json` + id). Tông phái của game đó dùng làm NPC / địa danh trong truyện được, nhưng KHÔNG thay tên tông môn do người chơi lập.
+
+**Không thuộc phạm vi:** mã nguồn (không có công khai); bản tiếng Trung (`content-zh-*.json`, vi phạm quy tắc không chữ Hán); tên riêng của truyện / game KHÁC (vd Hàn Lập). (Câu cũ "nhân vật, cốt truyện, quốc gia, tông phái riêng của game đó không làm của Tiên Giới" đã được mục 75 thay thế.)
 
 **Lời ghi công trong game** (màn Giới thiệu / Cài đặt; B làm ở M7): "Một phần nội dung, hình ảnh và âm thanh trong Tiên Giới lấy từ Vạn Kiếp Tu Tiên (tác giả Hải Quân · Bắc Team), dùng với sự cho phép của tác giả."
 

@@ -39,8 +39,10 @@ export const AMBUSH_FALL_MS = 3_000;
 export const AMBUSH_FLEE_CHANNEL_MS = 1_000;
 /**
  * Trần CẤP (`MonsterKind.level`) của loài kẻ chặn đường theo cảnh giới tối thiểu của bầy (mục 53: đối thủ không mạnh vượt cảnh giới người chơi). Phàm Nhân 1 (Sói Hoang), Luyện Khí 7 (Hắc Hổ), Trúc Cơ 12 (Xích Mãng),
- * Kim Đan 15 (Độc Thiềm), Nguyên Anh 18 (Độc Tước, Hắc Giao). `ambushViolations` bắt bầy có loài cấp cao hơn trần của cảnh giới của `minStep`; cảnh giới chưa liệt kê (Hóa Thần trở lên) thì
- * không có bầy hợp lệ (đòi khai báo trần trước khi thêm nội dung).
+ * Kim Đan 15 (Độc Thiềm), Nguyên Anh 18 (Độc Tước, Hắc Giao). `ambushViolations` bắt bầy có loài cấp cao hơn trần của cảnh giới của `minStep`; cảnh giới chưa liệt kê thì không có bầy hợp lệ
+ * (đòi khai báo trần trước khi thêm nội dung). Hóa Thần (5) -> Độ Kiếp (9) khai ở A1 #1461 (mục 75, `docs/KHUNG_HOA_THAN.md` mục 5): mỗi cảnh giới có 3 bậc nên cấp loài thường cao nhất tăng 3
+ * mỗi cảnh giới (Nguyên Anh 18 -> 21 / 24 / 27 / 30 / 33, đúng cấp vai "đòn nặng + độc" ở khung quái); trùm cấp cao hơn trần (như Thiên Hàn Vương cấp 21 ở Nguyên Anh) vẫn KHÔNG vào bầy chặn đường.
+ * Test giữ: có đủ khoá cho MỌI cảnh giới của `REALMS`.
  */
 export const AMBUSH_FOE_LEVEL_CAP: Readonly<Record<number, number>> = {
   0: 1,
@@ -48,6 +50,11 @@ export const AMBUSH_FOE_LEVEL_CAP: Readonly<Record<number, number>> = {
   2: 12,
   3: 15,
   4: 18,
+  5: 21,
+  6: 24,
+  7: 27,
+  8: 30,
+  9: 33,
 };
 /** Bảo hộ sau khi về chỗ cũ (quái quanh đó không nhắm, không đánh được). */
 export const AMBUSH_RETURN_GRACE_MS = 5_000;
