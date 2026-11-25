@@ -329,6 +329,7 @@ async function main() {
       (world.ctrl.get(sid) as any)?.windup !== undefined,
       "máy chủ: bắt đầu vận Huyết Ảnh Xuyên Tâm",
     );
+    must(hpDrop() === 0, "máy chủ vừa bắt đầu vận: CHƯA có sát thương");
     await T.waitFor(
       `window.__fxLog.filter((e) => e.kind === 'cast' && e.skill === ${JSON.stringify(WINDUP)}).length >= 1`,
       "client nhận `fx cast` của Huyết Ảnh Xuyên Tâm",
@@ -339,7 +340,9 @@ async function main() {
       w0.windup.length === 1 && w0.windup[0]!.mine,
       `chiêu vận trên tia: vòng tụ khí hiện NGAY khi nhận tin (${JSON.stringify(w0.windup)})`,
     );
-    must(hpDrop() === 0, "đang vận: CHƯA có sát thương");
+    if ((world.ctrl.get(sid) as any)?.windup !== undefined) {
+      must(hpDrop() === 0, "trong lúc máy chủ đang vận: CHƯA có sát thương");
+    }
 
     // 2. Chờ vòng tụ khí tiến dần theo điều kiện (không sleep cố định)
     await T.waitFor(
