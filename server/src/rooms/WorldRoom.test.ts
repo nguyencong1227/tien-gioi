@@ -498,10 +498,15 @@ describe("rớt mạng và nối lại (#116)", () => {
     const sr = serverRoom(a.room) as any;
     const sid = a.room.sessionId;
     const restorePersist = slowPersist(sr, 400);
-    dropConnection(a.room);
-    await waitGhost(a);
-    const r2 = await reconnectTo(a.room);
-    restorePersist();
+    let r2: Awaited<ReturnType<typeof reconnectTo>>;
+    try {
+      dropConnection(a.room);
+      await waitGhost(a);
+      r2 = await reconnectTo(a.room);
+    } finally {
+      // Nối lại ném lỗi thì vẫn phải gỡ persist chậm: phòng dùng chung giữa các ca, để rò sẽ làm ca sau đỏ khó hiểu (nit của B ở #1449)
+      restorePersist();
+    }
     // Nối lại thì được hộ thể (`reconnected` -> `grantShield`). Kéo hạn dài để `tickNetGuard` KHÔNG kịp gỡ trước khi rời: ca này chỉ đo việc dọn khi rời phòng, không phụ thuộc tải máy
     // `reconnected` chạy SAU `await this.persist(...)` của `onLeave` nên có thể trễ hơn lúc client nhận Room mới (`slowPersist` bắt buộc cuộc đua): chờ theo điều kiện, không khẳng định ngay
     await waitFor(() => sr.world.shielded.has(sid), 2000);
