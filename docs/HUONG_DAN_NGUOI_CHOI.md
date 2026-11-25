@@ -448,7 +448,7 @@ Khu an toàn là trong trấn hoặc trong bán kính quanh cổng. Càng ra xa 
 ### Chuỗi cổng truyền tống liên thông các vùng đất
 
 Các bản đồ ngoài hoang được kết nối liên tục thành một chuỗi hai chiều:
-1. **Lạc Hà Trấn** (Bắc Môn Quan) ↔ **Hắc Phong Cốc** (Nam Cốc Quan)
+1. **Lạc Hà Trấn** (Bắc Môn Quan) ↔ **Hắc Phong Cốc** (Nam Môn Quan)
 2. **Hắc Phong Cốc** (Vọng Trạch Quan) ↔ **Âm Sương Trạch** (Hồi Phong Quan)
 3. **Âm Sương Trạch** (Lăng Hàn Quan) ↔ **Hàn Vân Lĩnh** (Hồi Sương Quan)
 4. **Hàn Vân Lĩnh** (Vọng Lang Quan) ↔ **Lang Hoang** (Hồi Tuyết Quan)
