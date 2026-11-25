@@ -315,15 +315,7 @@ async function main() {
       check(st.yes === "Đột phá" && st.no === "Chưa", `nút: "${st.no}" / "${st.yes}"`);
       check(st.active === "act-btn-no", `focus ở "Chưa" (${st.active})`);
       check((await sentCount("breakthrough")) === 0, "chưa gửi breakthrough khi chưa xác nhận");
-      // click ma: bấm Đột phá NGAY
       const yes = await center("#act-btn-yes");
-      await tap(yes.x, yes.y);
-      await sleep(100);
-      st = await box();
-      check(
-        st.open && (await sentCount("breakthrough")) === 0,
-        "bấm Đột phá ngay khi hộp vừa mở (click ma): bị bỏ qua, hộp vẫn mở",
-      );
       await shot("xac-nhan-dot-pha");
       await sleep(560);
       check(
@@ -340,9 +332,18 @@ async function main() {
         !(await box()).open && (await sentCount("breakthrough")) === 0,
         "Chưa: hộp đóng, không gửi",
       );
-      // xác nhận: đúng MỘT
-      b = await center("#sk-break");
-      await tap(b.x, b.y);
+      // click ma: bấm Đột phá NGAY khi hộp vừa mở. KHÔNG phụ thuộc đồng hồ: mở hộp VÀ bấm "Đột phá" trong CÙNG MỘT lượt JS của trang (độ trễ ~0 ms, không qua CDP; `pointerdown` tổng hợp), nên cú bấm luôn rơi trong
+      // cửa sổ chống click ma ACT_CONFIRM_GUARD_MS (450 ms) dù runner chậm (trước đây center() + tap() chạy SAU khi mở hộp: trên runner CI không GPU cú bấm trễ quá 450 ms nên được tính là thật)
+      // (nút HUD và nút trong hộp nối `pointerdown`, nên dùng PointerEvent tổng hợp chứ không `.click()`)
+      await evalJs(
+        `(() => { const pd = (id) => document.getElementById(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 })); pd("sk-break"); pd("act-btn-yes"); return 1; })()`,
+      );
+      st = await box();
+      check(
+        st.open && (await sentCount("breakthrough")) === 0,
+        "bấm Đột phá ngay khi hộp vừa mở (click ma): bị bỏ qua, hộp vẫn mở",
+      );
+      // xác nhận: đúng MỘT (hộp đang mở từ bước trên; chờ ĐÃ QUA cửa sổ rồi mới bấm: ngủ dài hơn cửa sổ chỉ an toàn hơn trên runner chậm)
       await sleep(600);
       const yes2 = await center("#act-btn-yes");
       await tap(yes2.x, yes2.y);
@@ -370,9 +371,10 @@ async function main() {
       await press2("x", "KeyX");
       await sleep(150);
       check(!(await box()).open && (await sentCount("breakthrough")) === 0, "X = giữ lại");
-      await press2("v", "KeyV");
-      await sleep(80);
-      await press2("y", "KeyY");
+      // Y NGAY khi hộp vừa mở: V rồi Y trong CÙNG MỘT lượt JS của trang (keydown tổng hợp, độ trễ ~0 ms) thay vì hai phím CDP cách nhau 80 ms + độ trễ runner
+      await evalJs(
+        `(() => { const k = (type, key, code) => window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true })); k("keydown", "v", "KeyV"); k("keyup", "v", "KeyV"); k("keydown", "y", "KeyY"); k("keyup", "y", "KeyY"); return 1; })()`,
+      );
       await sleep(100);
       check(
         (await box()).open && (await sentCount("breakthrough")) === 0,
