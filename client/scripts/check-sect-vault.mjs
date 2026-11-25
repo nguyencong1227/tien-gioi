@@ -335,15 +335,41 @@ async function main() {
       await setSect("chu");
       await setVault();
       await evalJs(`window.__ui.toggleSectModal(true); 1`);
-      await sleep(300);
-      const tabBtn = await center("#sect-tab-btn-vault");
+      // CHỜ theo điều kiện, không ngủ cố định 300 ms: nút tab phải ĐỨNG YÊN (hết hiệu ứng mở bảng) và nhận được cú bấm rồi mới chạm. Ở một lõi + khung 35-50 ms hiệu ứng còn chạy sau 300 ms,
+      // cú chạm rơi vào chỗ nút vừa rời đi và tab không mở (đỏ ~2 / 4 lượt một lõi ở khung cảm ứng, ma trận 25/11).
+      let tabBtn = null;
+      for (let k = 0, last = ""; k < 60; k++) {
+        tabBtn = await center("#sect-tab-btn-vault");
+        const pos = tabBtn ? `${Math.round(tabBtn.x)},${Math.round(tabBtn.y)}` : "";
+        if (tabBtn && tabBtn.hit && pos === last) break;
+        last = pos;
+        await sleep(100);
+      }
       check(tabBtn && tabBtn.hit, "nút tab Kho đồ bấm được");
       check(
         !vp.mobile || tabBtn.h >= MIN_TAP_PX,
         `tab Kho đồ >= ${MIN_TAP_PX}px cao trên điện thoại (${Math.round(tabBtn.h)})`,
       );
-      await tap(tabBtn.x, tabBtn.y);
-      await sleep(250);
+      // Chạm rồi CHỜ tab thật sự mở (không ngủ cố định 250 ms); chưa mở thì chạm lại (tối đa 3 lần, mỗi lần tính lại toạ độ): một cú chạm rơi do CPU bị bỏ đói không làm đỏ cả khung nhìn,
+      // còn tab hỏng hẳn (không bao giờ mở) vẫn đỏ ở kiểm bên dưới.
+      let tabAttempts = 0;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        tabAttempts = attempt + 1;
+        if (attempt > 0) tabBtn = (await center("#sect-tab-btn-vault")) ?? tabBtn;
+        await tap(tabBtn.x, tabBtn.y);
+        const opened = await waitUntilTrue(
+          async () =>
+            Boolean(
+              await evalJs(
+                `!document.getElementById("sect-tab-vault").hidden && document.getElementById("sect-vault-count").textContent !== ""`,
+              ),
+            ),
+          2500,
+          100,
+        );
+        if (opened) break;
+      }
+      if (tabAttempts > 1) console.log(`  (chạm tab Kho đồ ${tabAttempts} lần mới mở được)`);
       let s = await st();
       check(s.vaultCells === 40, `lưới kho có 40 ô (${s.vaultCells})`);
       check(s.bagCells > 0, `lưới túi có ô (${s.bagCells})`);
