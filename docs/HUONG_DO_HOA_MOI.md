@@ -232,11 +232,17 @@ Người dùng đã **duyệt phần cảnh** (mặt đất, cỏ, bụi, cây, 
 | (0, 7) ĐẤT | như trên, đất theo màu vùng; **ô cỏ trơn nền = (2, 11)** (cục bộ (2, 4)) | khối cỏ / đất |
 | (0, 21) NƯỚC | 47 ô blob; nền trắng của băng -> trong suốt rồi **NƯỚNG lên ô cỏ trơn** nên mọi ô nước là ô ĐẶC (không cần lớp nền cỏ riêng, không cần đổi cấu trúc lớp của Tiled) | khối băng |
 | (11, 7) ĐÁ LÁT | sàn trấn `T.Stone`: 47 ô blob + ô cỏ trơn; điểm ảnh "đất chính" thay bằng hoạ tiết đá cuội LIỀN MẠCH 16 x 16 (ô sàn nội thất, đổi sang bảng đá của vùng; căn theo lưới ô nên ô đầy liền nhau không lộ khe), bóng / sáng / mép của đất thành đá tối / sáng / vữa | khối cỏ / đất + `tileset_interior_floor.png` ô (6, 13) |
-| (16, 27) THÂN CÂY | `GID_TREE_TRUNK` 620, lớp `decor`: đáy cây nhỏ (đáy tán lá + rễ), lá theo vùng, rễ theo màu đất vùng | `tileset_village_abandoned.png` (72, 112, 16 x 16 điểm ảnh) |
-| (17, 27) TÁN CÂY | `GID_TREE_CANOPY` 621, lớp `over`: búp lá tròn 16 x 12 viền đen, góc trong suốt, 4 hàng đáy để hở cho rễ; VẼ BẰNG MÃ (gói chỉ có cây 2 x 2 / 4 x 3 ô, không có tán 1 ô) | script |
+| (16, 27) THÂN CÂY | `GID_TREE_TRUNK` 620, lớp `decor`: đáy rễ của cây nhỏ. **Từ mục 73 (25/11/2026) client KHÔNG vẽ ô này nữa**: mỗi ô 620 là MỘT CÂY NGUYÊN KHỐI (sprite 32 x 32, xem "Cây nguyên khối" dưới bảng); ô giữ lại trong dữ liệu để bản đồ cũ vẫn hợp lệ và để chỉ vị trí cây | `tileset_village_abandoned.png` (72, 112, 16 x 16 điểm ảnh) |
+| (17, 27) TÁN CÂY | `GID_TREE_CANOPY` 621, lớp `over`: búp lá tròn 16 x 12 tự vẽ. **Từ mục 73 client bỏ ô này khỏi lớp `over`** (cây nguyên khối đã có tán); giữ trong dữ liệu để tương thích | script |
 | (18, 27) ĐÁ | `GID_ROCK` 622, lớp `decor`: tảng đá phủ rêu, rêu theo màu cỏ vùng, đá theo bảng đá lát | `tileset_village_abandoned.png` ô (3, 5) |
 | (19, 27) BỤI CỎ | `GID_TALL_GRASS` 623, lớp `decor`: bụi lá, lá đậm hơn nền cỏ một nấc | `tileset_village_abandoned.png` ô (4, 5) |
 | còn lại | để trống (trong suốt): vách đá cho bước sau | |
+
+**Cây nguyên khối (mục 73, 25/11/2026).** Gói Ninja Adventure không có "thân" và "tán" rời: cây là một khối tán tròn kèm rễ ở đáy, nên cặp ô thân (đáy rễ 16 x 16) + ô tán (búp lá tự vẽ 16 x 12) lệch nhau, hàng cây dày thành dải tán + dải thân (người dùng báo ở cả 4 bản đồ). Cách làm nay:
+- Ảnh `tileset_world.png` (đã đùn mép) có thêm **sprite cây 32 x 32** (cây nhỏ 2 x 2 ô của gói, `tileset_village_abandoned.png` (64, 96, 32 x 32)) ở khung `TREE_FRAME` = (217, 1, 32, 32), vùng trống ô (12..13, 0..1); lá + rễ đổi màu theo vùng như mọi vật thể (cây tuyết Hàn Vân trắng xanh). Sprite KHÔNG nằm trên lưới ô vì đùn mép chèn khe 2 px giữa các ô.
+- Client (`client/src/gfx/map-visual.ts`: `visualTreeSpots`, `visualWithoutTreeTiles`; `WorldScene.buildTiledVisual`): MỖI ô GID 620 ở lớp `decor` thành một sprite cây neo ở GỐC (giữa đáy rễ, cách đáy ô logic 3 px để rễ nằm trong ô bị chặn), lật ngang tất định theo ô, **độ sâu = y của gốc** như mọi thực thể (đứng phía bắc cây thì bị tán che, đứng phía nam thì che rễ); ô 620 / 621 bị bỏ khỏi hai lớp ô. Rừng dày: tán các cây chồng nhau theo thứ tự y, chỉ hàng ngoài cùng lộ rễ.
+- Va chạm KHÔNG đổi: vẫn theo ô logic `T.Tree` của `shared` (chặn ở gốc, một ô). Bụi cỏ (623) và đá (622) giữ là ô phẳng ở lớp `decor` (dưới chân nhân vật).
+- Hằng `VISUAL_TREE_FRAME` (client) và `TREE_FRAME` (script) đối chiếu bằng test; ảnh tileset thật có sprite trong khung được test giải mã PNG. Chụp ảnh cỡ thật 4 bản đồ trước / sau: `node client/scripts/snap-ban-do-cay.mjs --out <thư mục> --tag truoc|sau`; ảnh của lượt sửa ở `docs/screenshots/cay-truoc-*.webp` / `cay-sau-*.webp`.
 
 **Hai điều tìm ra khi dựng (đã xử lý, test canh):**
 
