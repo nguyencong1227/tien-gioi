@@ -638,10 +638,24 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toMap: AM_SUONG_ID,
         toPortal: "am_suong_bac",
       },
+      { id: "han_van_bac", name: "Vọng Lang Quan", x: 1920, y: 112, r: 64, safeR: 192, spawn: { x: 1904, y: 240 }, toMap: "lang_hoang", toPortal: "lang_hoang_nam" },
     ],
     // Bốn loài Nguyên Anh + trùm Thiên Hàn Vương (M7.5b, #506). Tổng 62 (như Hắc Phong Cốc / Âm Sương Trạch; trần ~70 để tick < 10 ms): số liệu quái ở
     // game.ts, vùng sinh theo `minDanger` của từng loài (0,2 / 0,4 / 0,55 / 0,7 / 0,85)
     monsterCap: { han_lang: 20, phong_nha: 16, cot_tuong: 12, doc_tuoc: 12, thien_han_vuong: 2 },
+  },
+  {
+    id: "lang_hoang", name: "Lang Hoang", seed: 20264331, w: 128, h: 112, town: { cx: 64, cy: 98, r: 5 }, townName: "Tuyết Đao Quan", wildName: "Lang Hoang",
+    portals: [
+      { id: "lang_hoang_nam", name: "Hồi Tuyết Quan", x: 2080, y: 3472, r: 64, safeR: 192, spawn: { x: 2080, y: 3344 }, toMap: HAN_VAN_ID, toPortal: "han_van_bac" },
+      { id: "lang_hoang_bac", name: "Vọng Kinh Quan", x: 2112, y: 112, r: 64, safeR: 192, spawn: { x: 2096, y: 240 }, toMap: "uy_van", toPortal: "uy_van_nam" },
+    ],
+    monsterCap: { han_lang: 20, phong_nha: 16 },
+  },
+  {
+    id: "uy_van", name: "Uy Vân Kinh", seed: 20267448, w: 128, h: 112, town: { cx: 64, cy: 98, r: 5 }, townName: "Uy Vân Kinh", wildName: "Huyết Trận Uy Vân",
+    portals: [{ id: "uy_van_nam", name: "Hồi Lang Quan", x: 2048, y: 3472, r: 64, safeR: 192, spawn: { x: 2048, y: 3344 }, toMap: "lang_hoang", toPortal: "lang_hoang_bac" }],
+    monsterCap: { han_lang: 20, phong_nha: 16 },
   },
 ];
 
