@@ -44,7 +44,7 @@
 
 ## 7. Đã làm cùng PR thiết kế này (không phụ thuộc hợp đồng)
 - `MAP_STYLES.han_van` + `WeatherKind "snow"` + công thức hạt `weather-snow` (`recipes-weather.ts`), `styleIdFor` và xem trước `?debug&style=<id>` (id lạ / thiếu `?debug` bị bỏ qua), 4 test mới (nhiều khẳng định mỗi ca) + 1 test sửa (danh sách chờ), 6 đột biến đỏ.
-- `client/scripts/check-han-van-style.mjs` (Chrome thật): có hạt tuyết (tint `#f2f8ff`) mà cảnh mặc định không có; màu trung bình vùng giữa lạnh hơn bản mặc định (xanh - đỏ -47,4 -> -16,7); `?style=constructor` bị bỏ qua.
+- `client/scripts/check-map-style.mjs (trước là check-han-van-style.mjs)` (Chrome thật): có hạt tuyết (tint `#f2f8ff`) mà cảnh mặc định không có; màu trung bình vùng giữa lạnh hơn bản mặc định (xanh - đỏ -47,4 -> -16,7); `?style=constructor` bị bỏ qua.
 
 ## 8. Câu hỏi cho A và TRẢ LỜI (A, 15/11/2026; đây là hợp đồng để A viết `shared/` của M7.4, #505)
 1. **Ba ô riêng của chủ: trường `Player` `@view(TAG_OWNER)`** (`boots`, `jade`, `treasure`: chuỗi id, `""` = trống), như đề xuất: cùng đường với ba ô cũ, tự đồng bộ khi nối lại / qua cổng, không thêm loại tin, người khác không nhận byte nào. Máy chủ ghi vào `save.equipment` (đủ sáu ô) rồi phản chiếu ra `Player`. KHÔNG mở rộng `InvMsg`. `PROTOCOL_VERSION` đã là 3 cho M7 chưa phát hành; thêm trường trước khi phát hành thì không cần tăng thêm. `EquipSlot` thêm `boots | jade | treasure`, `EQUIP_SLOTS` theo thứ tự mục 2.1; `EQUIP_SLOT_UNLOCK_REALM: Partial<Record<EquipSlot, number>> = { treasure: 3 }` (Kim Đan là `realm` 3 trong `REALMS`).

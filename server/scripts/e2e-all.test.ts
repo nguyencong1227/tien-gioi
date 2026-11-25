@@ -52,10 +52,10 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const scripts = getE2eScripts(realPkg);
       expect(scripts).toContain("e2e:inv-select");
       expect(scripts).toContain("e2e:move-keys");
-      expect(scripts.length).toBeGreaterThanOrEqual(45);
+      expect(scripts.length).toBeGreaterThanOrEqual(46);
     });
 
-    it("server/package.json thật nối đủ 14 check-* (lô đầu + act-confirm + sect-confirm + sect-vault nối lại ở #1477 + map-zoom + map-card) vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
+    it("server/package.json thật nối đủ 15 check-* (lô đầu + act-confirm + sect-confirm + sect-vault nối lại ở #1477 + map-zoom + map-card + map-style) vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
       const realPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
       const batch = [
         "skills-panel",
@@ -72,6 +72,7 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
         "sect-vault",
         "map-zoom",
         "map-card",
+        "map-style",
       ];
       for (const n of batch) {
         expect(realPkg.scripts[`e2e:${n}`], `thiếu e2e:${n}`).toBe(
