@@ -178,7 +178,7 @@ Lời sấm: đến kỳ, "người đời sau phải chọn lại: phong tiếp
 
 | Mã | Việc | Ai | Ghi chú |
 | --- | --- | --- | --- |
-| A1 | **Tiền đề kỹ thuật Hóa Thần trở lên:** `REALM_EXP_BASE` mới chỉ có tới Kim Đan (từ Nguyên Anh dùng nhân 6 đặt tạm), `MONSTER_REALM` / `reqRealm` / độ hiếm sách mới tới bậc 4, đường cong chỉ số `statsFor`, đo `can-bang`, ngân sách `perf` / `bench` | A | chặn mọi việc số liệu của D / E |
+| A1 | **(XONG: tài liệu #1471, mã `shared/` #1472)** Tiền đề kỹ thuật Hóa Thần trở lên: `REALM_EXP_BASE` mới chỉ có tới Kim Đan (từ Nguyên Anh dùng nhân 6 đặt tạm), `MONSTER_REALM` / `reqRealm` / độ hiếm sách mới tới bậc 4, đường cong chỉ số `statsFor`, đo `can-bang`, ngân sách `perf` / `bench` | A | chặn mọi việc số liệu của D / E |
 | A2 | Đăng ký bản đồ mới: tệp Tiled vào `adoptTiledMaps`, danh sách `MAPS`, cổng bắc Hàn Vân Lĩnh, `validate()` | A (+ B) | sau khi B có tệp |
 | A3 | Thiết kế Vô Nhai Uyên (bí cảnh nhiều tầng) | A | đợt sau |
 | G1 | **Gỡ từ cấm Vạn Kiếp:** `shared/src/glossary-banned.ts` (+ test, `TU_DIEN_TIEN_GIOI.md` mục từ cấm) chỉ còn cấm tên của game / truyện KHÁC; thêm địa danh và nhân vật mới vào Từ điển | G (PR riêng `shared/`, thêm một dev xem) | chặn `check:content` cho nội dung mới |
