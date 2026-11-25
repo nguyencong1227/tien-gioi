@@ -1198,4 +1198,31 @@ describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn V
     expect(ok.me().x).toBeCloseTo(spawn.x, 0);
     expect(ok.me().y).toBeCloseTo(spawn.y, 0);
   }, 35_000);
+
+  it("mục 75 / #1470: đo RAM khi chạy đồng thời 6 phòng bản đồ thường (Lạc Hà -> Uy Vân Kinh): mỗi phòng < 10 MB heap", async () => {
+    if (global.gc) global.gc();
+    const m0 = process.memoryUsage();
+
+    const roomNames = [
+      roomNameOf(DEFAULT_MAP_ID),
+      roomNameOf(HAC_PHONG_ID),
+      roomNameOf(AM_SUONG_ID),
+      roomNameOf(HAN_VAN_ID),
+      roomNameOf(LANG_HOANG_ID),
+      roomNameOf(UY_VAN_ID),
+    ];
+
+    const created: any[] = [];
+    for (const name of roomNames) {
+      const r = await matchMaker.createRoom(name, {});
+      created.push(r);
+    }
+
+    if (global.gc) global.gc();
+    const m1 = process.memoryUsage();
+
+    const heapPerRoomMb = (m1.heapUsed - m0.heapUsed) / roomNames.length / 1024 / 1024;
+    expect(created.length).toBe(6);
+    expect(heapPerRoomMb).toBeLessThan(10); // Ngân sách < 10 MB heap/phòng
+  });
 });
