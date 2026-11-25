@@ -100,6 +100,16 @@ PALETTES = {
         "water": ["#9fcfe3", "#eaf5fa"],
         "stone": {"mortar": "#8d9aa7", "stone": "#aebbc7", "deep": "#6e7b88", "hi": "#cfd9e2"},
     },
+    # Lang Hoang (QUYET_DINH_M3 mục 75, #1467; docs/COT_TRUYEN.md 6.1: "thảo nguyên khô, đá tảng, tuyết thưa; sương lạnh"): cỏ úa vàng ô-liu (khác hẳn cỏ xanh của Lạc Hà và
+    # tuyết trắng của Hàn Vân), đất nâu nhạt gió thổi, "bụi" cam của gói đổi thành mảng trắng ngà, bờ cát -> TUYẾT THƯA đọng quanh nước lạnh xám xanh (xem `--map-view`), đá lát xám phiến.
+    "lang_hoang": {
+        "grass": ["#b4a66f", "#9f9260", "#857a4f", "#5f5a3b"],
+        "dirt": ["#a08a6c", "#8a7358", "#b9a68a", "#6b5942"],
+        "tuft": ["#e4e6df", "#c3c8c2"],
+        "sand": ["#dadedb", "#c3c9c7", "#eceeeb", "#a6adab"],
+        "water": ["#7f9fae", "#d5e2e8"],
+        "stone": {"mortar": "#7f7c76", "stone": "#a5a29a", "deep": "#615e59", "hi": "#c7c4bb"},
+    },
 }
 
 
@@ -452,7 +462,15 @@ def preview(images, path):
 
 
 # Vùng xem trước (x0, y0, x1, y1 theo ô) của từng bản đồ: chọn chỗ có đủ đất, cát, nước, đá lát, cây, đá, bụi
-MAP_PREVIEW_BOX = {"lac_ha": (24, 44, 48, 60), "hac_phong": (64, 66, 88, 82), "am_suong": (44, 84, 68, 100), "han_van": (48, 26, 72, 42)}
+MAP_PREVIEW_BOX = {
+    "lac_ha": (24, 44, 48, 60),
+    "hac_phong": (64, 66, 88, 82),
+    "am_suong": (44, 84, 68, 100),
+    "han_van": (48, 26, 72, 42),
+    "lang_hoang": (52, 86, 76, 102),
+}
+# Bốn bản đồ ĐẦU của ảnh xem trước 05 / 06 (docs/art/huong-moi; test so từng byte): bản đồ thêm sau KHÔNG làm đổi hai ảnh đó, xem bằng `--map-view <id> <ảnh.png>`.
+PREVIEW_IDS = ("lac_ha", "hac_phong", "am_suong", "han_van")
 
 
 def render_map(sheet, map_id, box, k=2):
@@ -486,12 +504,24 @@ def map_preview(sheets, path, k=2):
     canvas.save(path, optimize=True)
 
 
+def map_view(sheets, map_id, path, k=3):
+    """Ảnh TRƯỚC / SAU của MỘT bản đồ (#1467): trái = vùng bản đồ vẽ bằng tileset Lạc Hà (bảng màu chung, "trước": bản đồ mới chưa có bảng riêng), phải = bằng tileset của chính nó."""
+    box = MAP_PREVIEW_BOX[map_id]
+    left, right = render_map(sheets["lac_ha"], map_id, box, k), render_map(sheets[map_id], map_id, box, k)
+    w, h = left.size
+    canvas = Image.new("RGB", (w * 2 + 36, h + 24), (36, 33, 44))
+    canvas.paste(left.convert("RGB"), (12, 12))
+    canvas.paste(right.convert("RGB"), (24 + w, 12))
+    canvas.save(path, optimize=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=SRC_DEFAULT)
     ap.add_argument("--out", default=None, help="thư mục ghi tileset_world_<id>.png (không có thì chỉ kiểm, không ghi)")
     ap.add_argument("--preview", default=None)
     ap.add_argument("--map-preview", default=None, help="ghi ảnh 2 x 2: bốn bản đồ thật vẽ bằng tileset vừa dựng (xem trước, không phải bản chạy)")
+    ap.add_argument("--map-view", nargs=2, metavar=("ID", "ẢNH"), default=None, help="ghi ảnh xem trước MỘT bản đồ thật (vùng MAP_PREVIEW_BOX): trái = bảng màu Lạc Hà (nền chung), phải = bảng màu riêng của nó")
     a = ap.parse_args()
     src = load_sources(a.src)
     sheets = {mid: build_world(src, pal) for mid, pal in PALETTES.items()}
@@ -502,10 +532,15 @@ def main():
             p = os.path.join(a.out, f"tileset_world_{mid}.png")
             with_trees(extrude(sh), src, PALETTES[mid]).save(p, optimize=True)
             print(p, os.path.getsize(p), "byte")
+    old4 = {mid: sheets[mid] for mid in PREVIEW_IDS}
     if a.preview:
-        preview(sheets, a.preview)
+        preview(old4, a.preview)
     if a.map_preview:
-        map_preview(sheets, a.map_preview)
+        map_preview(old4, a.map_preview)
+    if a.map_view:
+        mid, path = a.map_view
+        assert mid in sheets, f"--map-view: chưa có bảng màu '{mid}' (có: {', '.join(sheets)})"
+        map_view(sheets, mid, path)
     for line in map_builder_report():
         print("CẦN SỬA ở server/src/systems/map-builder.ts:", line)
     print("ĐÃ DỰNG", ", ".join(sheets))

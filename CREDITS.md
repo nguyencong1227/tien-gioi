@@ -35,7 +35,7 @@ Khi bổ sung thêm sprite, biểu tượng hoặc hiệu ứng từ thư viện
 
 ### 2b. Tệp DẪN XUẤT từ Ninja Adventure (CC0) trong gói bản đồ (QUYET_DINH_M3 mục 67.1, issue #1330)
 
-Bốn ảnh tileset của lớp hình bản đồ do nhóm Tiên Giới (Dev B) **sinh bằng mã** `client/scripts/art/dung-tileset-world.py` (tất định: cùng gói gốc + cùng script cho cùng từng byte; test đối chiếu) từ ba tệp của **Ninja Adventure Asset Pack** (Pixel-boy & AAA, **CC0 1.0**): `content/map/tileset_floor.png` (cỏ / đất / cát / băng, đổi màu theo vùng), `content/map/tileset_interior_floor.png` (hoạ tiết đá cuội) và `content/map/tileset_village_abandoned.png` (đáy cây, tảng đá, bụi lá). Tán cây vẽ bằng mã. Tệp dẫn xuất cũng là **CC0 1.0**; không dùng tài nguyên của gói riêng nào (nguồn 4 của AGENTS.md). Tệp nằm trong gói tải `map:<id>` (`client/public/packs/map-<id>/`, tải theo nhu cầu, thiếu thì client vẽ cách cũ).
+Năm ảnh tileset của lớp hình bản đồ do nhóm Tiên Giới (Dev B) **sinh bằng mã** `client/scripts/art/dung-tileset-world.py` (tất định: cùng gói gốc + cùng script cho cùng từng byte; test đối chiếu) từ ba tệp của **Ninja Adventure Asset Pack** (Pixel-boy & AAA, **CC0 1.0**): `content/map/tileset_floor.png` (cỏ / đất / cát / băng, đổi màu theo vùng), `content/map/tileset_interior_floor.png` (hoạ tiết đá cuội) và `content/map/tileset_village_abandoned.png` (đáy cây, tảng đá, bụi lá). Tán cây vẽ bằng mã. Tệp dẫn xuất cũng là **CC0 1.0**; không dùng tài nguyên của gói riêng nào (nguồn 4 của AGENTS.md). Tệp nằm trong gói tải `map:<id>` (`client/public/packs/map-<id>/`, tải theo nhu cầu, thiếu thì client vẽ cách cũ).
 
 | Tệp | Nội dung | SHA-256 |
 |---|---|---|
@@ -43,6 +43,7 @@ Bốn ảnh tileset của lớp hình bản đồ do nhóm Tiên Giới (Dev B) 
 | `client/public/packs/map-hac_phong/tileset_world.png` | Tileset lớp hình bản đồ Hắc Phong (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `402d57d3d6ae62c81130c0728c1dcb157d254f04c6c71de98812824c649a0a64` |
 | `client/public/packs/map-am_suong/tileset_world.png` | Tileset lớp hình bản đồ Âm Sương (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `ba4f437130d7e77c5b65c1528e8d2441ddeea417e285610106e5d4fd4203aa56` |
 | `client/public/packs/map-han_van/tileset_world.png` | Tileset lớp hình bản đồ Hàn Vân (396x504, đùn mép): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng | `57d0265be89d267acc4f4d520ecc03299eb9a7a149aa417119f59b7e8672a9ed` |
+| `client/public/packs/map-lang_hoang/tileset_world.png` | Tileset lớp hình bản đồ Lang Hoang (396x504, đùn mép; #1467): cát / đất / nước / đá lát + cây nguyên khối 32 x 32 (mục 73) + ô thân / tán cũ, đá, bụi; bảng màu theo vùng (thảo nguyên khô, tuyết thưa quanh nước) | `dc561eaba99b852498af2a5d590e83e3b20f14f26d0f0ca9bf78ed3fb098abea` |
 
 ---
 
