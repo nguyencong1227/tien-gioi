@@ -165,4 +165,16 @@ describe("dirOfArrowKey / ownsArrowKeys", () => {
       expect(ownsArrowKeys(el("INPUT", "text"), d)).toBe(true);
     }
   });
+  it("ô tìm một dòng (type=search): chỉ Trái / Phải là của nó, Lên / Xuống chuyển focus (không bẫy ở cửa hàng 22 món)", () => {
+    const search = el("INPUT", "search");
+    expect(ownsArrowKeys(search, "left")).toBe(true);
+    expect(ownsArrowKeys(search, "right")).toBe(true);
+    expect(ownsArrowKeys(search, "up")).toBe(false);
+    expect(ownsArrowKeys(search, "down")).toBe(false);
+    // không biết hướng thì vẫn coi là của ô (hành vi cũ của lời gọi không truyền dir)
+    expect(ownsArrowKeys(search)).toBe(true);
+    // ô số: Lên / Xuống đổi giá trị nên vẫn là của nó
+    for (const d of ["up", "down"] as const)
+      expect(ownsArrowKeys(el("INPUT", "number"), d)).toBe(true);
+  });
 });

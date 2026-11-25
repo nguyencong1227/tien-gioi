@@ -97,6 +97,9 @@ export function pickNeighborSkipFixed(
  * Phần tử mà mũi tên là của CHÍNH nó (chỉnh thanh trượt, đổi lựa chọn, di chuyển con trỏ chữ): không cướp mũi tên.
  * Thanh trượt nằm NGANG: chỉ Trái / Phải là của nó khi biết `dir`; Lên / Xuống vẫn chuyển focus, nếu không người chơi đứng ở thanh âm lượng
  * đầu Cài đặt sẽ không đi tiếp xuống được bằng mũi tên (chỉ còn Tab). Ô chọn (select) và ô chữ giữ mọi mũi tên (Tab là lối thoát).
+ * Ô TÌM một dòng (`type="search"`: ô tìm món ở cửa hàng, ô tìm chiêu) cũng chỉ giữ Trái / Phải (con trỏ chữ): Lên / Xuống không có nghĩa gì trong ô một dòng,
+ * mà giữ lại thì ô tìm là BẪY BÀN PHÍM (e2e:ban-phim đỏ ở cửa hàng 22 món từ khi có ô tìm: mũi tên đi xuống từ tab Mua rơi vào ô tìm rồi kẹt, không tới được nút + / Mua).
+ * Ô số (`number`) vẫn giữ cả bốn phím vì Lên / Xuống đổi giá trị của nó.
  */
 export function ownsArrowKeys(el: Element | null, dir?: NavDir): boolean {
   if (!el) return false;
@@ -104,7 +107,7 @@ export function ownsArrowKeys(el: Element | null, dir?: NavDir): boolean {
   if (tag === "select" || tag === "textarea") return true;
   if (tag === "input") {
     const type = (el as HTMLInputElement).type?.toLowerCase();
-    if (type === "range" && dir) return dir === "left" || dir === "right";
+    if ((type === "range" || type === "search") && dir) return dir === "left" || dir === "right";
     return !(type === "checkbox" || type === "button" || type === "submit");
   }
   return Boolean((el as HTMLElement).isContentEditable);
