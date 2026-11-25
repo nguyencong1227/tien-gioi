@@ -179,7 +179,7 @@ Lời sấm: đến kỳ, "người đời sau phải chọn lại: phong tiếp
 | Mã | Việc | Ai | Ghi chú |
 | --- | --- | --- | --- |
 | A1 | **(XONG: tài liệu #1471, mã `shared/` #1472)** Tiền đề kỹ thuật Hóa Thần trở lên: `REALM_EXP_BASE` mới chỉ có tới Kim Đan (từ Nguyên Anh dùng nhân 6 đặt tạm), `MONSTER_REALM` / `reqRealm` / độ hiếm sách mới tới bậc 4, đường cong chỉ số `statsFor`, đo `can-bang`, ngân sách `perf` / `bench` | A | chặn mọi việc số liệu của D / E |
-| A2 | Đăng ký bản đồ mới: tệp Tiled vào `adoptTiledMaps`, danh sách `MAPS`, cổng bắc Hàn Vân Lĩnh, `validate()` | A (+ B) | **Lang Hoang: PR xếp chồng trên `b/map-lang-hoang` (cổng bắc Hàn Vân `han_van_bac` đã thêm); Uy Vân Kinh: còn lại, kèm cổng bắc Lang Hoang** |
+| A2 | Đăng ký bản đồ mới: tệp Tiled vào `adoptTiledMaps`, danh sách `MAPS`, cổng bắc Hàn Vân Lĩnh, `validate()` | A (+ B) | **Lang Hoang: PR xếp chồng trên #1483 (đăng ký + cổng bắc Hàn Vân `han_van_bac`; CHƯA có quái / cổng bắc). Uy Vân Kinh: còn lại, kèm cổng bắc `lang_hoang_bac` của Lang Hoang (B đã soạn ở `a370601f`)** |
 | A3 | Thiết kế Vô Nhai Uyên (bí cảnh nhiều tầng) | A | đợt sau |
 | G1 | **Gỡ từ cấm Vạn Kiếp:** `shared/src/glossary-banned.ts` (+ test, `TU_DIEN_TIEN_GIOI.md` mục từ cấm) chỉ còn cấm tên của game / truyện KHÁC; thêm địa danh và nhân vật mới vào Từ điển | G (PR riêng `shared/`, thêm một dev xem) | chặn `check:content` cho nội dung mới |
 | G2 | Sổ lore chọn lọc theo chương: bảng địa danh / nhân vật / sự kiện từ nguồn, mỗi mục kèm khoá nguồn, để E / D lấy | G | tài liệu |

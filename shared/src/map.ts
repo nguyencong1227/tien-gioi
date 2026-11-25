@@ -640,16 +640,16 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toMap: AM_SUONG_ID,
         toPortal: "am_suong_bac",
       },
-      // Cổng bắc (mục 75, #1467 / A2): đầu mút đường đất phía bắc (ô 59-60, hàng 2-4), tâm ở giữa hai ô đường ở hàng 3; chỗ xuất hiện ở hàng 6 (hàng 7 có cây ở ô 60). Seed của Hàn Vân KHÔNG đổi (ô giữ nguyên, tệp lưu vẫn hợp lệ); chỉ thêm khu an toàn
+      // Cổng bắc (mục 75, #1467 / A2): đầu mút đường đất phía bắc (ô 59-60, hàng 2-4), tâm ở giữa hai ô đường ở hàng 3; chỗ xuất hiện lệch sang ô 59 vì hàng 7 có cây ở ô 60 (B đã kiểm bằng `circleBlocked`). Seed của Hàn Vân KHÔNG đổi (ô giữ nguyên, tệp lưu vẫn hợp lệ); chỉ thêm khu an toàn
       // bán kính 192 px quanh cổng ở rìa bắc, nên quái sinh sau này tránh vùng đó (như `am_suong_bac` ở M7.5).
       {
         id: "han_van_bac",
-        name: "Tuyết Lĩnh Quan",
+        name: "Vọng Lang Quan",
         x: 1920,
         y: 112,
         r: 64,
         safeR: 192,
-        spawn: { x: 1920, y: 208 },
+        spawn: { x: 1904, y: 240 },
         toMap: LANG_HOANG_ID,
         toPortal: "lang_hoang_nam",
       },
@@ -684,7 +684,7 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toPortal: "han_van_bac",
       },
     ],
-    // CHƯA có quái: loài Hóa Thần (Thiên Lang Vương và đàn) do D1 (#1466) thêm sau A1; cổng bắc tới Uy Vân Kinh do bản đồ đó (B1 lát 2). Không có `monsterCap` thì không sinh quái tự nhiên.
+    // CHƯA có quái: loài Hóa Thần (Thiên Lang Vương và đàn) do D1 (#1466) thêm sau A1. CHƯA có cổng bắc: `lang_hoang_bac` -> `uy_van` / `uy_van_nam` (B đã soạn ở a370601f, đường đất ô 65-66 hàng 2-3) vào cùng PR đăng ký Uy Vân Kinh (A2 lát 2), vì cổng trỏ tới bản đồ chưa có thì `portalLinkViolations` đỏ.
     monsterCap: {},
   },
 ];

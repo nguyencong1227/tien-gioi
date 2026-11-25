@@ -672,7 +672,7 @@
       },
       {
        "name": "name",
-       "value": "Tuyết Lĩnh Quan"
+       "value": "Vọng Lang Quan"
       },
       {
        "name": "toMap",
@@ -692,11 +692,11 @@
       },
       {
        "name": "spawnX",
-       "value": 960
+       "value": 952
       },
       {
        "name": "spawnY",
-       "value": 104
+       "value": 120
       }
      ]
     }
