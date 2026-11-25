@@ -3,7 +3,7 @@
 > Người dùng duyệt theo MÃ, ví dụ: "duyệt NV-01 phương án B, Q-02 phương án A, giữ nguyên T-03, bỏ NPC-04". **Chỉ thay những mã đã duyệt**; mã không nhắc tới giữ nguyên hình hiện tại. Người soạn: Dev B (nhóm 10-13 đã xong; 14-16 đang làm cùng Dev G).
 > Phần CẢNH (đất, cỏ, cây, nước, bờ, vách) đã được duyệt riêng ở mục 67.1 và đang làm (PR #1332), không nằm trong bảng này.
 
-> **Mã VP / HU ĐÃ ĐÓNG BĂNG (25/11, theo A):** tờ người dùng nhận ngày 23/11 13:00 +0700 (commit `dd32ff1b`: **VP-001..128**, **HU-01..59**) giữ NGUYÊN mã. Vật phẩm / chiêu thêm sau đó nhận mã MỚI ở CUỐI (**VP-129.. / HU-60..**), hàng ghi "· MỚI (sau 23/11)"; kinh quyển mới ở tờ riêng `14-vat-pham-kinh-quyen-moi`, chiêu mới nối ở cuối tờ hệ của chúng. Các nhóm khác (NV, NPC, Q, T, UI, NEN) không bị nhích. Bảng id -> mã: `ma-co-dinh.json` (cạnh tệp này; generator `client/scripts/art/dung-bang-duyet.py` chỉ ĐỌC bảng, `--ghi-ma` mới ghi mã mới vào; PR nội dung KHÔNG dựng lại tờ).
+> **Mã T / VP / HU ĐÃ ĐÓNG BĂNG (25/11, theo A):** tờ người dùng nhận ngày 23/11 13:00 +0700 (commit `dd32ff1b`: **T-01..04**, **VP-001..128**, **HU-01..59**) giữ NGUYÊN mã. Trùm / vật phẩm / chiêu thêm sau đó nhận mã MỚI ở CUỐI (**T-05.. / VP-129.. / HU-60..**), hàng ghi "· MỚI (sau 23/11)"; kinh quyển mới ở tờ riêng `14-vat-pham-kinh-quyen-moi`, chiêu mới nối ở cuối tờ hệ của chúng, trùm mới nối cuối tờ nhóm 13. Các nhóm khác (NV, NPC, Q, UI, NEN) không bị nhích (Q vẫn gán theo thứ tự quái thường: đóng băng nốt khi người dùng duyệt nhóm 12). Bảng id -> mã: `ma-co-dinh.json` (cạnh tệp này; generator `client/scripts/art/dung-bang-duyet.py` chỉ ĐỌC bảng, `--ghi-ma` mới ghi mã mới vào; PR nội dung KHÔNG dựng lại tờ).
 
 ## Cách xem
 
