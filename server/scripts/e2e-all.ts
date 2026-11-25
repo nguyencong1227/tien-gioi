@@ -66,8 +66,9 @@ export interface ScriptResult {
  * Sàn ~2,4-3 lần thời gian ĐO TRÊN CI (runner SwiftShader, không GPU; run 45539915300 và 45549071896 ngày 25/11): social-shell 380 s -> 900 (thống nhất A + C);
  * text-size 131-159 s -> 480; sect-hall 167-205 s -> 500; sect-confirm 167-210 s -> 540; sect-vault 164-182 s -> 540 (#1477).
  * Issue #1501 (C khảo sát số đo thật 3 lượt main 45658493051, 45691664338, 45701781366):
- * chuyen-canh sau #1499 đo 101,7-173,9 s -> sàn 480 s (trước đó 300 s, tỷ lệ 58,0% nguy hiểm khi runner dao động 1,7x);
+ * chuyen-canh bản hiện tại sau #1499 đo 86,9-173,9 s trên 13 lượt CI -> sàn 480 s (trước đó 300 s, tỷ lệ 58,0% nguy hiểm khi runner dao động 2,0x);
  * inv-select đo 133,6-173,9 s -> sàn 480 s (trước đó 300 s, tỷ lệ 58,0%). Cả hai hạn thực 480 s <= 600 s nên vẫn được thử lại.
+ * Lưu ý: cả chuyen-canh và inv-select cùng nằm Shard 3 nên sàn giữ 480 s để nếu một script treo + thử lại không vượt trần 30 phút của shard.
  * Kịch bản có 3 x thời gian CI <= 300 s không cần dòng ở đây. Thêm kịch bản chậm mới thì thêm vào đây theo số đo CI, đừng nâng `--timeout` chung.
  */
 export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
