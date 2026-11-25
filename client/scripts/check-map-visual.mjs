@@ -33,6 +33,8 @@ const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
 const MAP_ID = "lac_ha";
+// Rộng ảnh tileset lớp hình ĐÃ ĐÙN MÉP: 2 x margin 1 + 22 cột x 16 px + 21 khe x 2 px = 396 (cùng bố cục `dung-tileset-world.py` / `TILES_WORLD_COLUMNS` của map-builder; `visualImageFits` của client chỉ nhận đúng rộng này)
+const TILESET_W = 2 + 22 * 16 + 21 * 2;
 
 export const VIEWPORTS = [
   { name: "1280x720", w: 1280, h: 720, dpr: 1, mobile: false },
@@ -325,7 +327,7 @@ async function main() {
           done.legacyAlive === 0,
           `không còn lớp ô cũ nào trong danh sách hiển thị (${done.legacyAlive})`,
         );
-        check(s.texW === 396, `texture ảnh tileset nạp, rộng 396: ${s.texW}`);
+        check(s.texW === TILESET_W, `texture ảnh tileset nạp, rộng ${TILESET_W}: ${s.texW}`);
         check(
           exceptions.length === 0,
           `không lỗi JS (${exceptions.length}): ${exceptions[0] ?? ""}`,
@@ -447,7 +449,10 @@ async function main() {
           o.layers === 3 && !o.legacy,
           `${id}: gói hình nạp, ba lớp hình dựng, lớp ô cũ không còn (${o.layers} lớp)`,
         );
-        check(o.texW === 396, `${id}: texture ảnh tileset nạp, rộng 396 (${o.texW})`);
+        check(
+          o.texW === TILESET_W,
+          `${id}: texture ảnh tileset nạp, rộng ${TILESET_W} (${o.texW})`,
+        );
         check(
           o.vm?.[0] === o.def[0] && o.vm?.[1] === o.def[1],
           `${id}: visual.json cùng cỡ bản đồ (${JSON.stringify(o.vm)} / ${JSON.stringify(o.def)})`,

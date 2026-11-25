@@ -232,19 +232,8 @@ try {
     `màu trung bình vùng giữa ngả ĐỎ hơn: đỏ - lục ${(base.color.r - base.color.g).toFixed(1)} (mặc định) -> ${(uv.color.r - uv.color.g).toFixed(1)} (huyết trận)`,
   );
 
-  console.log("--- bản phát hành / id lạ: không đổi được diện mạo ---");
-  const noDebug = await (async () => {
-    await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&weather=1&style=han_van` });
-    await waitUntilTrue(
-      () => evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"),
-      60000,
-      300,
-    );
-    await sleep(1500);
-    return evalJs("Boolean(window.__scene)");
-  })();
-  // Không `?debug` thì `window.__scene` không lộ ra ở bản phát hành nhưng ở Vite dev vẫn có (`import.meta.env.DEV`): kiểm bằng hạt qua đường dev
-  void noDebug;
+  // Bản phát hành (không `?debug`) không đổi được diện mạo bằng `?style=`: đã có test đơn vị (`styleIdFor`, map-decor.test.ts); ở đây chỉ kiểm id lạ ở đường `?debug`.
+  console.log("--- id lạ: ?debug&style=constructor bị bỏ qua ---");
   const proto = await measure("constructor", "&style=constructor", PETAL_TINT);
   check(
     count(proto.seen, SNOW_TINT) === 0 && count(proto.seen, PETAL_TINT) > 0 && proto.wash === null,
