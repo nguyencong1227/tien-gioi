@@ -1,5 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm bảng CÔNG PHÁP (M7.6, #507, docs/THIET_KE_THANH_CHIEU.md mục 4) trong Chrome THẬT qua CDP, chế độ `?skills=mock&n=2` (Trúc Cơ: ô 2, 3 mở; ô 4, 5 khoá), KHÔNG cần
 // máy chủ: Shift+K / nút HUD mở, Esc đóng và trả focus; phím thế giới (L U I O) không chạy khi bảng mở; danh sách chiêu ĐÃ học với số thật (sát thương, linh lực, hồi chiêu),
 // nhãn ô ("Ô N" / "Chưa gắn") trên MỖI HÀNG GỌN (một chiêu một hàng, #668); bấm / Enter mở chi tiết (mỗi lúc một hàng, đóng bảng thì gập lại), gắn ô bằng Enter -> đúng một tin
@@ -15,6 +15,7 @@ import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { waitPageTarget } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -45,19 +46,7 @@ const check = (ok, msg) => {
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  const page = await waitPageTarget(CDP_PORT);
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {

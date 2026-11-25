@@ -1,5 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm KHUNG bảng "Xã hội" (M9, #1025; `client/src/social-tabs.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite),
  * ở sáu khung nhìn (năm khung chuẩn + điện thoại ngang nhỏ 568x320):
@@ -35,6 +35,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { waitPageTarget, waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -108,16 +109,7 @@ async function main() {
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    const page = await waitPageTarget(CDP_PORT);
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -174,15 +166,15 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = Boolean(
+        await waitUntilTrue(async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        ),
+      );
       await sleep(400);
       await evalJs(
         `["dungeon-mock-badge", "duel-mock-badge"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; })`,

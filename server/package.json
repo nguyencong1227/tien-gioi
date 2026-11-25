@@ -67,7 +67,6 @@
     "e2e:quest-reward": "node ../client/scripts/check-quest-reward.mjs",
     "e2e:quest-ready": "node ../client/scripts/check-quest-ready.mjs",
     "e2e:text-size": "node ../client/scripts/check-text-size.mjs",
-    "e2e:act-confirm": "node ../client/scripts/check-act-confirm.mjs",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
     "chuyen-du-lieu": "tsx scripts/chuyen-du-lieu.ts",

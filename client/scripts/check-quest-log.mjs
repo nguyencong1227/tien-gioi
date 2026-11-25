@@ -1,5 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm Sổ nhiệm vụ khi chuỗi dài (M6 #409 mục 2 và 4): tab "Đã hoàn thành" với MỌI nhiệm vụ chính tuyến + nhiệm vụ lặp đã xong,
  * ở năm khung nhìn (1280x720, 768x1024, 844x390, 390x844, 360x640), trong Chrome thật bằng chế độ mock (không cần server / Vite).
@@ -19,6 +19,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { waitPageTarget, waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -114,16 +115,7 @@ async function main() {
   );
   let failures = 0;
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    const page = await waitPageTarget(CDP_PORT);
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -173,16 +165,16 @@ async function main() {
       // Đánh dấu trang CŨ: khung nhìn sau không được coi "đã sẵn sàng" khi trang cũ còn sống lúc chưa kịp chuyển sang trang mới
       await evalJs("window.__qlOldPage = true");
       await send("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1` });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        // `__getMap` được đặt ở CUỐI `WorldScene.create` (sau `ui.init`: nút đã gắn sự kiện); `__scene` thì đặt sớm hơn ở main.ts
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__qlOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      // `__getMap` được đặt ở CUỐI `WorldScene.create` (sau `ui.init`: nút đã gắn sự kiện); `__scene` thì đặt sớm hơn ở main.ts
+      const ready = Boolean(
+        await waitUntilTrue(async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__qlOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        ),
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng");
         failures++;

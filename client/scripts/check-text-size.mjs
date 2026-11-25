@@ -1,5 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
+/* global console, setTimeout, process */
 // Cổng kiểm cỡ chữ (M5.1 #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2 điều 2) trong Chrome thật: trên điện thoại chữ NỘI DUNG (bảng, hộp thoại)
 // >= 14 px và nhãn HUD >= 12 px, kể cả khi chọn cỡ chữ Nhỏ; trên máy tính cỡ chữ gốc giữ nguyên ở Vừa và co giãn theo Nhỏ / Lớn; không tràn
 // ngang ở cỡ Lớn. Đo `font-size` TÍNH RA của mọi nút văn bản đang hiện. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
@@ -12,6 +12,7 @@ import { spawn } from "node:child_process";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { waitPageTarget } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
@@ -36,19 +37,7 @@ const check = (ok, msg) => {
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  const page = await waitPageTarget(CDP_PORT);
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {

@@ -1,5 +1,5 @@
 import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm bảng Lò Rèn và Cửa hàng ở năm khung nhìn (M6 #409 mục 2 và 4): Chrome thật, chế độ mock (không cần server / Vite).
  *
@@ -21,6 +21,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { waitPageTarget, waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -131,16 +132,7 @@ async function main() {
   );
   let failures = 0;
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    const page = await waitPageTarget(CDP_PORT);
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -230,16 +222,16 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        // `__getMap` được đặt ở CUỐI `WorldScene.create` (sau `ui.init`: nút đã gắn sự kiện)
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__fsOldPage && window.__getMap && window.__catalog && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      // `__getMap` được đặt ở CUỐI `WorldScene.create` (sau `ui.init`: nút đã gắn sự kiện)
+      const ready = Boolean(
+        await waitUntilTrue(async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__fsOldPage && window.__getMap && window.__catalog && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        ),
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
