@@ -478,18 +478,30 @@ async function main() {
       check((await vaultMsgs()).length === 0, "chưa gửi gì khi chưa xác nhận");
       await shot("xac-nhan-rut");
       await sleep(560);
+      // Cú bấm THẬT (chuột / chạm) vào "Giữ lại": đóng hộp, không gửi gì. Hai kiểm "ngay" bên dưới KHÔNG dùng cú bấm thật vì độ trễ giữa các lệnh CDP phụ thuộc tốc độ khung
+      // của runner (khung 30-250 ms: nhiều lệnh chồng lên có thể vượt cửa sổ 450 ms và làm kiểm đỏ oan, A thấy ở run 45556979540): cú bấm "ma" / "ngay" chạy trong CÙNG MỘT lượt JS
+      // với thao tác đóng / mở hộp nên khoảng cách giữa chúng gần 0 ms, đúng bằng thứ cửa sổ chống click ma phải chặn, không phụ thuộc đồng hồ.
       const noBtn = await center("#act-btn-no");
-      // Tính TRƯỚC khi đóng hộp toạ độ nút Rút nằm dưới hộp: giữa lúc đóng hộp và cú bấm "ma" KHÔNG còn vòng gọi trình duyệt nào, nên độ trễ không phụ thuộc tốc độ runner
-      // (trước đây center() chạy SAU khi đóng hộp: runner CI không GPU chậm làm cú bấm rơi ra ngoài cửa sổ chống click ma và hộp mở lại, run 45549071896).
-      const aC = await center("#sect-vault-act");
       await tap(noBtn.x, noBtn.y);
-      // click ma: ngay sau khi hộp đóng, một cú bấm chuột / chạm rơi xuống nút Rút nằm dưới hộp: không được mở lại hộp
-      await mouse("mousePressed", aC.x, aC.y);
-      await mouse("mouseReleased", aC.x, aC.y);
-      await sleep(120);
+      await sleep(150);
       check(
         !(await box()).open && (await vaultMsgs()).length === 0,
-        "click ma ngay sau khi đóng hộp: bị bỏ qua (không mở lại hộp, không gửi)",
+        "'Giữ lại' (cú bấm thật): đóng hộp, không gửi",
+      );
+      await sleep(560);
+      await tapSel("#sect-vault-act");
+      check((await box()).open, "sau 'Giữ lại' + hết cửa sổ chống click ma: bấm Rút mở lại hộp");
+      await sleep(560);
+      // click ma: ngay sau khi hộp đóng (pointerdown "Giữ lại"), click chuột (detail 1) rơi xuống nút Rút nằm dưới hộp: không được mở lại hộp. Cùng một lượt JS.
+      const ghost = await evalJs(`(() => {
+        const g = (id) => document.getElementById(id);
+        g("act-btn-no").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 }));
+        g("sect-vault-act").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+        return { open: window.__ui.isActConfirmOpen(), n: window.__sent.filter((m) => /^sectVault/.test(m[0])).length };
+      })()`);
+      check(
+        !ghost.open && ghost.n === 0,
+        `click ma ngay sau khi đóng hộp: bị bỏ qua (không mở lại hộp, không gửi) (${JSON.stringify(ghost)})`,
       );
       await sleep(560);
       await tapSel("#sect-vault-act");
@@ -499,14 +511,24 @@ async function main() {
         yes.hit && (!vp.mobile || (yes.w >= MIN_TAP_PX && yes.h >= MIN_TAP_PX)),
         `nút Rút trong hộp bấm được (${Math.round(yes.w)}x${Math.round(yes.h)})`,
       );
-      await tap(yes.x, yes.y);
-      await sleep(150);
+      await sleep(560);
+      // xác nhận "NGAY khi hộp vừa mở": đóng hộp, mở lại (Rút bằng click không chuột: không bị chặn) và bấm "Rút" trong hộp, cùng MỘT lượt JS: phải bị bỏ qua
+      const imm = await evalJs(`(() => {
+        const g = (id) => document.getElementById(id);
+        const pd = (id) => g(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 }));
+        pd("act-btn-no");
+        g("sect-vault-act").click();
+        const opened = window.__ui.isActConfirmOpen();
+        pd("act-btn-yes");
+        return { opened, open: window.__ui.isActConfirmOpen(), n: window.__sent.filter((m) => /^sectVault/.test(m[0])).length };
+      })()`);
       check(
-        (await box()).open && (await vaultMsgs()).length === 0,
-        "bấm xác nhận NGAY khi hộp vừa mở: bị bỏ qua",
+        imm.opened && imm.open && imm.n === 0,
+        `bấm xác nhận NGAY khi hộp vừa mở: bị bỏ qua (${JSON.stringify(imm)})`,
       );
       await sleep(560);
-      await tap(yes.x, yes.y);
+      const yes2 = await center("#act-btn-yes");
+      await tap(yes2.x, yes2.y);
       await sleep(250);
       m = await vaultMsgs();
       check(
