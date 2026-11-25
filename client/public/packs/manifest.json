@@ -98,6 +98,24 @@
         }
       ],
       "bytes": 101949
+    },
+    {
+      "id": "map:lang_hoang",
+      "kind": "map",
+      "mapId": "lang_hoang",
+      "files": [
+        {
+          "path": "map-lang_hoang/tileset_world.png",
+          "bytes": 19473,
+          "sha256": "dc561eaba99b852498af2a5d590e83e3b20f14f26d0f0ca9bf78ed3fb098abea"
+        },
+        {
+          "path": "map-lang_hoang/visual.json",
+          "bytes": 126263,
+          "sha256": "d74dcb175ede6cc8791da76aafc70ab788b04e04346d00bbdfee515dca92fd57"
+        }
+      ],
+      "bytes": 145736
     }
   ]
 }
