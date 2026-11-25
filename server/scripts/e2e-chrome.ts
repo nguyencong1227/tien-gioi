@@ -5,8 +5,9 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { getChromeGpuFlags, killChrome, sleep } from "./e2e-kit";
 
-/** Hạn chờ CDP mặc định: 30 giây (đáp ứng khởi động lạnh trên runner CI, #694, #1432). */
-export const DEFAULT_CDP_TIMEOUT_MS = 30000;
+/** Chờ page target mỗi lần thử: 60 s khi CI (khởi động nguội chậm), 30 s ở máy dev (#694, #1432, #1506). */
+export const cdpWaitMs = () => (process.env.CI ? 60000 : 30000);
+export const DEFAULT_CDP_TIMEOUT_MS = process.env.CI ? 60000 : 30000;
 /** Khoảng thời gian giữa các lần thăm dò /json. */
 export const DEFAULT_POLL_INTERVAL_MS = 150;
 /** Số dòng stderr cuối cùng giữ trong bộ đệm vòng. */
@@ -70,7 +71,7 @@ export interface LaunchChromeOptions {
  * Tự động thử lại đúng một lần nếu lần đầu thất bại (tiến trình chết hoặc hết hạn mở cổng).
  */
 export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedChrome> {
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_CDP_TIMEOUT_MS;
+  const timeoutMs = opts.timeoutMs ?? cdpWaitMs();
   const pollIntervalMs = opts.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const fetchTimeoutMs = opts.fetchTimeoutMs ?? 2000;
   const executable = opts.executable ?? "google-chrome";
@@ -170,8 +171,11 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
         if (res.ok) {
           const data = (await res.json()) as any[];
           if (Array.isArray(data)) {
-            targets = data;
-            break;
+            const page = data.find((t) => t?.type === "page" && t.webSocketDebuggerUrl);
+            if (page) {
+              targets = data;
+              break;
+            }
           }
         }
       } catch {

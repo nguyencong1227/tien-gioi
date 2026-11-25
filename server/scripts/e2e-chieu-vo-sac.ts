@@ -170,8 +170,8 @@ async function main() {
     const me = world.state.players.get(sid)!;
     must(me.realm === 4, `nhân vật ở Nguyên Anh (realm ${me.realm})`);
 
-    // Linh Thố (quái hiền) làm bao cát; người đứng cách 70 px phía tây (tia của Huyết Ảnh Xuyên Tâm dài 160, quạt của Cầm Long Khấu tầm 110) ở chỗ THOÁNG
-    const STAND_DX = 100;
+    // Linh Thố (quái hiền) làm bao cát; người đứng cách 80 px phía tây (tia của Huyết Ảnh Xuyên Tâm dài 160, quạt của Cầm Long Khấu tầm 110) ở chỗ THOÁNG
+    const STAND_DX = 80;
     let monId = "";
     let monXY = { x: 0, y: 0 };
     world.state.monsters.forEach((m, id) => {
@@ -184,12 +184,39 @@ async function main() {
     });
     must(monId !== "", "có Linh Thố ở chỗ thoáng trong phòng");
     const mon = world.state.monsters.get(monId)!;
-    // Các quái KHÁC cất vào góc xa bản đồ (ngủ vì không ai ở gần); chúng tự đi về chỗ sinh sau một lúc nên cất lại ở MỖI lần `reset`
+    // Các quái KHÁC cất vào góc xa bản đồ và đóng băng (không đi về chỗ sinh, không cản đường hay bị nhắm)
     const stashOthers = () =>
       world.state.monsters.forEach((m, id) => {
         if (id === monId) return;
         m.x = world.map.worldW - 150;
         m.y = world.map.worldH - 150;
+        const mc = world.mctrl.get(id);
+        if (mc) {
+          mc.homeX = world.map.worldW - 150;
+          mc.homeY = world.map.worldH - 150;
+          mc.wanderX = world.map.worldW - 150;
+          mc.wanderY = world.map.worldH - 150;
+          mc.target = null;
+          mc.st = {
+            list: [
+              {
+                id: "stun",
+                until: world.now + 3600_000,
+                ratio: 0,
+                dps: 0,
+                pool: 0,
+                last: world.now,
+                src: "",
+              },
+            ],
+            stunImmuneUntil: 0,
+          };
+          if (mc.nav) {
+            mc.nav.pts = null;
+            mc.nav.evadeUntil = 0;
+            mc.nav.stuckMs = 0;
+          }
+        }
       });
     stashOthers();
     const stand = { x: monXY.x - STAND_DX, y: monXY.y };
@@ -201,17 +228,43 @@ async function main() {
         `(() => { const s = window.__scene; s.predX = ${x}; s.predY = ${y}; s.facing = 0; return 1; })()`,
       );
     };
-    /** Đưa người về chỗ đứng, quái về trước mặt, đầy máu + linh lực; quái CHOÁNG dài (không trả đòn); dấu cũ (nếu còn) bị gỡ */
+    /** Đưa người về chỗ đứng, quái về trước mặt, đầy máu + linh lực; quái CHOÁNG dài (không trả đòn / di chuyển); dấu cũ (nếu còn) bị gỡ */
     const reset = async () => {
       stashOthers();
       await place(stand.x, stand.y);
       mon.x = monXY.x;
       mon.y = monXY.y;
       mon.hp = BIG_HP;
-      applyMonsterStatus(world, monId, { status: "stun", ms: 60_000, ratio: 0, chance: 1 }, 0, "");
+      const mc = world.mctrl.get(monId);
+      if (mc) {
+        mc.homeX = monXY.x;
+        mc.homeY = monXY.y;
+        mc.wanderX = monXY.x;
+        mc.wanderY = monXY.y;
+        mc.target = null;
+        mc.st = {
+          list: [
+            {
+              id: "stun",
+              until: world.now + 3600_000,
+              ratio: 0,
+              dps: 0,
+              pool: 0,
+              last: world.now,
+              src: "",
+            },
+          ],
+          stunImmuneUntil: 0,
+        };
+        if (mc.nav) {
+          mc.nav.pts = null;
+          mc.nav.evadeUntil = 0;
+          mc.nav.stuckMs = 0;
+        }
+      }
       me.mp = me.maxMp;
       me.hp = me.maxHp;
-      await sleep(250);
+      await sleep(100);
     };
     serverDiag = () => {
       const c: any = world.ctrl.get(sid);
@@ -270,7 +323,12 @@ async function main() {
     // ---------- 1. CHIÊU VẬN TRÊN HÌNH TIA: Huyết Ảnh Xuyên Tâm ----------
     await reset();
     await cast(2);
-    const tCast = Date.now(); // mốc đồng hồ THẬT sau khi gửi phím: máy chủ bắt đầu vận SAU mốc này
+    // 1. Chờ máy chủ bắt đầu vận khí và client nhận fx cast
+    await waitCond(() => (world.ctrl.get(sid) as any)?.windup !== undefined, 4000);
+    must(
+      (world.ctrl.get(sid) as any)?.windup !== undefined,
+      "máy chủ: bắt đầu vận Huyết Ảnh Xuyên Tâm",
+    );
     await T.waitFor(
       `window.__fxLog.filter((e) => e.kind === 'cast' && e.skill === ${JSON.stringify(WINDUP)}).length >= 1`,
       "client nhận `fx cast` của Huyết Ảnh Xuyên Tâm",
@@ -282,29 +340,38 @@ async function main() {
       `chiêu vận trên tia: vòng tụ khí hiện NGAY khi nhận tin (${JSON.stringify(w0.windup)})`,
     );
     must(hpDrop() === 0, "đang vận: CHƯA có sát thương");
-    await sleep(300);
+
+    // 2. Chờ vòng tụ khí tiến dần theo điều kiện (không sleep cố định)
+    await T.waitFor(
+      `(() => { const s = window.__scene?.windups?.snapshot(window.__scene?.time?.now); return Array.isArray(s) && s.length === 1 && s[0].progress >= 0.05; })()`,
+      "vòng tụ khí bắt đầu tiến (progress >= 0.05)",
+      4000,
+    );
     const p1 = await windupNow();
-    await sleep(300);
+    must(p1.length === 1 && p1[0]!.progress > 0, "đo được mốc p1 của vòng tụ khí");
+
+    await T.waitFor(
+      `(() => { const s = window.__scene?.windups?.snapshot(window.__scene?.time?.now); return Array.isArray(s) && s.length === 1 && s[0].progress >= ${p1[0]!.progress + 0.15}; })()`,
+      "vòng tụ khí tiến tiếp (progress tăng thêm)",
+      4000,
+    );
     const p2 = await windupNow();
-    // ĐỌC máu quái NGAY sau lần đo thứ hai (cùng tiến trình; chụp ảnh chậm ở CI không được nằm giữa phép đo và phép kiểm), chỉ khẳng định khi đồng hồ thật < 1100 ms
-    const dropAtP2 = hpDrop();
-    const sinceCast = Date.now() - tCast;
     must(
-      p1.length === 1 &&
-        p2.length === 1 &&
-        p1[0]!.progress > 0 &&
-        p2[0]!.progress > p1[0]!.progress,
+      p2.length === 1 && p2[0]!.progress > p1[0]!.progress,
       `vòng tụ khí TIẾN DẦN (${p1[0]?.progress.toFixed(2)} -> ${p2[0]?.progress.toFixed(2)})`,
     );
-    if (sinceCast < 1100)
-      must(dropAtP2 === 0, `vận được ${sinceCast} ms trên 1200 ms: vẫn CHƯA có sát thương`);
-    else
-      out(
-        `  (máy chậm: đo xong sau ${sinceCast} ms >= 1100 ms nên bỏ qua kiểm 'chưa có sát thương lúc vận')`,
-      );
+
+    // Trong lúc máy chủ còn đang vận: khẳng định CHƯA có sát thương
+    if ((world.ctrl.get(sid) as any)?.windup !== undefined) {
+      must(hpDrop() === 0, "trong lúc máy chủ đang vận: vẫn CHƯA có sát thương");
+    }
+
     await T.shot("chieu-vo-sac-1-van-tia");
-    await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 3000);
-    await waitCond(() => hpDrop() > 0, 3000);
+
+    // 3. Chờ máy chủ hết vận và đòn đáp: vòng tắt, quái mất máu
+    await waitCond(() => (world.ctrl.get(sid) as any)?.windup === undefined, 4000);
+    await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 4000);
+    await waitCond(() => hpDrop() > 0, 4000);
     must(hpDrop() > 0, "hết vận: đòn ĐÁP xuống trên tia, quái mất máu");
     ok(
       `chiêu vận trên tia: vòng tụ khí hiện ngay, tiến dần (${p1[0]!.progress.toFixed(2)} -> ${p2[0]!.progress.toFixed(2)}), chưa sát thương lúc vận; hết vận đòn đáp (-${hpDrop()} máu), vòng tắt`,

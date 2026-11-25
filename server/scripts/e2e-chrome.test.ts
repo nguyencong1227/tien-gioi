@@ -4,7 +4,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { launchChrome } from "./e2e-chrome";
+import { launchChrome, cdpWaitMs } from "./e2e-chrome";
 
 /** Tìm một cổng TCP rảnh cục bộ. */
 async function freePort(): Promise<number> {
@@ -414,5 +414,18 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     expect(elapsed).toBeLessThan(1000);
     expect(caught!.message).toContain(`Không chạy được ${nonExistentExec}:`);
     expect(logs).not.toContain("đã dựng lại Chrome lần 2");
+  });
+
+  it("Ca 8: cdpWaitMs trả 60000 ms khi CI, 30000 ms ở máy dev (#1506)", () => {
+    const oldCi = process.env.CI;
+    try {
+      process.env.CI = "true";
+      expect(cdpWaitMs()).toBe(60000);
+      delete process.env.CI;
+      expect(cdpWaitMs()).toBe(30000);
+    } finally {
+      if (oldCi !== undefined) process.env.CI = oldCi;
+      else delete process.env.CI;
+    }
   });
 });
