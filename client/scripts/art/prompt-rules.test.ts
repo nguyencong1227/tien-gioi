@@ -158,10 +158,10 @@ describe("luật được GHIM bằng chữ (xoá nhầm một từ khỏi danh 
 });
 
 describe("bảng màu khớp nguồn thật (style.css + MAP_STYLES)", () => {
-  it("10 màu, không trùng id / màu; mỗi màu bằng ĐÚNG giá trị ở nguồn của nó", () => {
-    expect(STYLE_PALETTE).toHaveLength(10);
-    expect(new Set(STYLE_PALETTE.map((c) => c.id)).size).toBe(10);
-    expect(new Set(STYLE_PALETTE.map((c) => c.hex)).size).toBe(10);
+  it("11 màu, không trùng id / màu; mỗi màu bằng ĐÚNG giá trị ở nguồn của nó", () => {
+    expect(STYLE_PALETTE).toHaveLength(11);
+    expect(new Set(STYLE_PALETTE.map((c) => c.id)).size).toBe(11);
+    expect(new Set(STYLE_PALETTE.map((c) => c.hex)).size).toBe(11);
     for (const c of STYLE_PALETTE) {
       expect(c.hex, c.id).toMatch(/^#[0-9a-f]{6}$/);
       if ("css" in c.from) {

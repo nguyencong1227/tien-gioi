@@ -6,7 +6,7 @@
 ## 1. Tinh thần
 Tranh phong cảnh **vẽ tay mềm** (mực loang + bột màu), màu **dịu và trầm**, nhiều **sương** tạo chiều sâu, ánh sáng đổi theo bản đồ; không có người, không có chữ, không có khung viền. Ảnh phải ĂN MÀU với trò chơi: cùng bảng màu với nền bản đồ trong game (`MAP_STYLES`) và giao diện (`style.css`), để thẻ minh hoạ đặt cạnh bản đồ thật không lạc tông.
 
-## 2. Bảng màu (10 màu)
+## 2. Bảng màu (11 màu)
 Lấy THẲNG từ mã (test đối chiếu từng màu với `style.css` / `MAP_STYLES`). Dùng làm **neo màu trong prompt** (bằng lời, vì SDXL không nhận mã hex) và làm thước để B duyệt: ảnh chọn phải có màu chủ đạo gần màu của bản đồ nó minh hoạ, ít nhất một vùng gần `ink` làm bóng và một vùng gần `paper` làm sáng, `red` chỉ là điểm nhấn nhỏ.
 
 | id | màu | vai trò | nguồn |
@@ -21,6 +21,7 @@ Lấy THẲNG từ mã (test đối chiếu từng màu với `style.css` / `MAP
 | `bi_canh_linh_hu` | `#7fe3d4` | Linh Hư: lam ngọc | `MAP_STYLES.bi_canh_linh_hu.ambient.color` |
 | `am_suong` | `#7c9a76` | Âm Sương: xanh rêu, sương | `MAP_STYLES.am_suong.ambient.color` |
 | `han_van` | `#bcd6f2` | Hàn Vân: băng, tuyết | `MAP_STYLES.han_van.ambient.color` |
+| `lang_hoang` | `#d8c9a0` | Lang Hoang: vàng rơm, thảo nguyên khô | `MAP_STYLES.lang_hoang.ambient.color` |
 
 ## 3. Luật prompt (máy kiểm, `promptViolations`)
 **Bắt buộc trong prompt dương:** ít nhất MỘT neo phong cách tranh (`painterly`, `painting`, `ink wash`, `gouache`, `watercolor`, `watercolour`, `matte painting`) và đúng mệnh đề `no text` (mệnh đề = đoạn giữa hai dấu phẩy).

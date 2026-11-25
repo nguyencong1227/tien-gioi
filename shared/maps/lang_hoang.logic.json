@@ -32,6 +32,10 @@
    "value": 20264331
   },
   {
+   "name": "monsterCap",
+   "value": "{}"
+  },
+  {
    "name": "handEdited",
    "type": "bool",
    "value": true
@@ -221,48 +225,6 @@
       {
        "name": "spawnY",
        "value": 1672
-      }
-     ]
-    },
-    {
-     "id": 11,
-     "name": "lang_hoang_bac",
-     "class": "portal",
-     "x": 1056,
-     "y": 56,
-     "point": true,
-     "properties": [
-      {
-       "name": "id",
-       "value": "lang_hoang_bac"
-      },
-      {
-       "name": "name",
-       "value": "Vọng Kinh Quan"
-      },
-      {
-       "name": "toMap",
-       "value": "uy_van"
-      },
-      {
-       "name": "toPortal",
-       "value": "uy_van_nam"
-      },
-      {
-       "name": "r",
-       "value": 32
-      },
-      {
-       "name": "safeR",
-       "value": 96
-      },
-      {
-       "name": "spawnX",
-       "value": 1048
-      },
-      {
-       "name": "spawnY",
-       "value": 120
       }
      ]
     }

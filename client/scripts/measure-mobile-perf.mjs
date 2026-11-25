@@ -242,6 +242,14 @@ export const ALL_SCENARIOS = [
     tier,
     cpuRate: 4,
   })),
+  // Lang Hoang (mục 75, #1467 / A2): thảo nguyên khô, kiểu `lang_hoang` (không hạt thời tiết); CHƯA đo thật (A không chạy Chrome ở bước đăng ký), bậc Cao làm mốc, B / C thêm Thấp / Vừa khi đo
+  {
+    id: "lang-hoang-high-4x",
+    name: "Lang Hoang (sương + thời tiết + nước)",
+    query: AMBIENT_QUERY("lang_hoang"),
+    tier: "high",
+    cpuRate: 4,
+  },
   // CÂY NGUYÊN KHỐI (mục 73, nit của A ở #1475): các kịch bản trên chạy `?debug=1` nên lớp hình Tiled TẮT mặc định và KHÔNG đo sprite cây (một sprite mỗi ô thân cây, tối đa 2167
   // ở Hàn Vân). `visual=1` bật lớp hình; `treeCluster` đặt camera lên cụm cây DÀY NHẤT của bản đồ (cùng cửa sổ 40 x 22 ô như snap-ban-do-cay.mjs) để khung hình thật sự có hàng trăm cây.
   // Bậc Thấp (trần chặt nhất) và Cao; Hàn Vân là bản đồ nhiều cây nhất.

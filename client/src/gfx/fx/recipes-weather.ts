@@ -1,5 +1,5 @@
 /**
- * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509). CHỈ là dữ liệu.
+ * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509), bụi gió (Lang Hoang, mục 75). CHỈ là dữ liệu.
  *
  * Mỗi lần phát rải `count` (12) hạt ở điểm ngẫu nhiên trong `zone` (`opts.area` ghi đè theo khung nhìn), sống tới ~3,5 s; ưu tiên 0
  * (môi trường: tới 60 % trần, bị bỏ trước mọi hiệu ứng khác). Nhịp phát do `map-weather.ts` tính (số hạt / tốc độ) để một
@@ -97,6 +97,24 @@ export const WEATHER_RECIPES: readonly FxRecipe[] = [
       tint: 0xf2f8ff,
       blend: "normal",
       gravityY: 16,
+      zone: { w: 1200, h: 700 },
+    },
+  },
+  {
+    // Bụi và hạt cỏ khô bay NGANG theo gió thảo nguyên (Lang Hoang, mục 75 / A2: công thức TẠM do A đặt, B chỉnh khi có ảnh thật): nhanh hơn tro, gần như không rơi, vàng rơm nhạt; cùng chi phí (12 hạt, <= 3,2 s)
+    id: "weather-dust",
+    priority: 0,
+    particles: {
+      frames: ["dot", "smoke"],
+      count: WEATHER_COUNT,
+      lifespan: { min: 2200, max: 3200 },
+      speed: { min: 40, max: 90 },
+      angle: { min: 160, max: 200 },
+      scale: { start: 0.3, end: 0.18 },
+      alpha: { start: 0.6, end: 0 },
+      tint: 0xd9cfa8,
+      blend: "normal",
+      gravityY: 2,
       zone: { w: 1200, h: 700 },
     },
   },
