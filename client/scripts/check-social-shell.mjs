@@ -629,7 +629,7 @@ async function main() {
             barTop: parseFloat(getComputedStyle(bar).top), wbH: getComputedStyle(document.documentElement).getPropertyValue("--wb-h").trim(),
             overflow: banner.scrollWidth - banner.clientWidth, pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
             vw: window.innerWidth, vh: window.innerHeight,
-            tab: { status: q("wbt-status").textContent, detail: q("wbt-detail").textContent, retryHidden: q("wbt-retry").hidden, retryH: r(q("wbt-retry")).h, emptyHidden: q("wbt-empty").hidden, wrapHidden: q("wbt-wrap").hidden, tz: q("wbt-tz").textContent },
+            tab: { status: q("wbt-status").textContent, detail: q("wbt-detail").textContent, retryHidden: q("wbt-retry").hidden, retryH: r(q("wbt-retry")).h, emptyHidden: q("wbt-empty").hidden, wrapHidden: q("wbt-wrap").hidden, tz: q("wbt-tz").textContent, sched: [...q("wbt-body").children].map((tr) => [...tr.children].map((td) => td.textContent)) },
             toasts: [...document.querySelectorAll("#toast p")].map((p) => p.className + ":" + p.textContent),
           };
         })()`);
@@ -657,11 +657,26 @@ async function main() {
         `máy chủ im quá 6 s: nút Tải lại (${Math.round(w.tab.retryH)} px), "${w.tab.status}"`,
       );
       check(w.hidden, "chưa có tin: banner ẩn");
-      // lịch hằng ngày: dữ liệu thật còn RỖNG (E chưa nhập) -> câu giữ chỗ, không bảng rỗng
-      check(
-        !w.tab.emptyHidden && w.tab.wrapHidden && w.tab.tz === "",
-        "lịch rỗng: 'Lịch sự kiện chưa được công bố.', không hiện bảng / ghi chú múi giờ",
-      );
+      // lịch hằng ngày theo DỮ LIỆU THẬT của shared (WORLD_BOSS_SCHEDULE): có khung giờ -> bảng + ghi chú múi giờ, câu giữ chỗ ẩn; rỗng -> câu giữ chỗ, không bảng rỗng.
+      // (trước 25/11 kiểm cứng 'lịch rỗng' nên đỏ từ khi A nhập lịch thật ở M9.10; nay đúng cả hai trạng thái dữ liệu)
+      const sched = w.tab.sched;
+      if (sched.length > 0) {
+        check(
+          w.tab.emptyHidden && !w.tab.wrapHidden && w.tab.tz !== "",
+          `lịch có ${sched.length} khung giờ: bảng hiện, câu giữ chỗ ẩn, ghi chú múi giờ "${w.tab.tz}"`,
+        );
+        check(
+          sched.every(
+            (r) => r.length === 4 && /^\d{1,2}:\d\d/.test(r[0]) && r.every((c) => c !== ""),
+          ),
+          `mỗi hàng lịch đủ 4 ô (giờ / trùm / bản đồ / thời lượng), không ô trống: ${JSON.stringify(sched[0])}`,
+        );
+      } else {
+        check(
+          !w.tab.emptyHidden && w.tab.wrapHidden && w.tab.tz === "",
+          "lịch rỗng: 'Lịch sự kiện chưa được công bố.', không hiện bảng / ghi chú múi giờ",
+        );
+      }
 
       // sắp xuất hiện (5 phút): trạng thái ở tab + đếm ngược GIẢM theo thời gian; banner hiện
       await sendWb("soon");
