@@ -528,46 +528,97 @@ async function main() {
     ok("về Âm Sương Trạch đúng cạnh Lăng Hàn Quan");
 
     // ---------------- Chặng bốn (Mục 75, #1470): Hàn Vân Lĩnh -> Lang Hoang -> Uy Vân Kinh và quay về ----------------
+    // HAI nhân vật lưu sẵn cạnh cổng (như chặng hai / ba), KHÔNG đi bộ xuyên Lang Hoang: bản đồ 128 x 112 ô, từ cổng nam lên cổng bắc ~3000 px; runner CI
+    // chạy ~4 FPS nên nhân vật đi ~14 px/s và 90 s không tới (run 45691664338 trên `main` 0001a87f: "tới sát tâm cổng lang_hoang_bac" hết 90 s, đỏ 2/2 lần,
+    // máy dev 60 FPS thì xanh). Mỗi đoạn chỉ đi bộ một quãng ngắn từ chỗ xuất hiện của cổng tới tâm cổng.
     out(
-      "\n--- Sáu bản đồ: Hàn Vân Lĩnh -> Lang Hoang -> Uy Vân Kinh (cổng thật, nhân vật lưu sẵn cạnh Vọng Lang Quan) ---",
+      "\n--- Sáu bản đồ: Hàn Vân Lĩnh <-> Lang Hoang <-> Uy Vân Kinh (cổng thật, nhân vật lưu sẵn cạnh từng cổng) ---",
     );
     const hvBac = getMap("han_van")!.portal("han_van_bac")!;
-    const NAME4 = "Canh Uy Van";
-    const SECRET4 = "e2e_secret_cc_4444444444444";
-    await savePlayer({
-      name: NAME4,
-      secretHash: hashSecret(SECRET4),
-      realm: 5,
-      tier: 0,
-      exp: 0,
-      mapId: "han_van",
-      x: hvBac.spawn.x,
-      y: hvBac.spawn.y,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    currentName = NAME4;
-    currentSecret = SECRET4;
-    await setStorage("");
-    await login(url);
-    await ev(
-      `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
-    );
-    await T.waitFor(
-      `window.__scene && window.__scene.map && window.__scene.map.def.id === 'han_van'`,
-      "vào đúng phòng Hàn Vân Lĩnh",
-      30000,
+    const lhBacPortal = getMap("lang_hoang")!.portal("lang_hoang_bac")!;
+    // Lưu một nhân vật Hóa Thần đứng ở chỗ xuất hiện của cổng `portal` trên bản đồ `mapId`, đăng nhập và chờ vào đúng phòng (qua `wrong_map`)
+    const enterSaved = async (
+      name: string,
+      secret: string,
+      mapId: string,
+      spawn: { x: number; y: number },
+      roomLabel: string,
+    ) => {
+      await savePlayer({
+        name,
+        secretHash: hashSecret(secret),
+        realm: 5,
+        tier: 0,
+        exp: 0,
+        mapId,
+        x: spawn.x,
+        y: spawn.y,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      currentName = name;
+      currentSecret = secret;
+      await setStorage("");
+      await login(url);
+      await ev(
+        `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
+      );
+      await T.waitFor(
+        `window.__scene && window.__scene.map && window.__scene.map.def.id === ${JSON.stringify(mapId)}`,
+        `vào đúng phòng ${roomLabel} (wrong_map đưa về đúng phòng)`,
+        30000,
+      );
+      // Chờ vị trí THẬT của máy chủ (`me()`) về đúng chỗ xuất hiện. Bản đồ trống (Lang Hoang, Uy Vân Kinh chưa quái) đứng yên không có patch state nào sau lần đồng bộ đầu nên
+      // `predX` / `predY` có thể kẹt (0, 0) (đo: me() = chỗ xuất hiện nhưng pred = 0, 0 sau 3 s đứng yên) và BFS của `walkToPortal` hết đường: nhích joystick một nhịp để có patch rồi chờ pred đúng.
+      const near = (a: string, b: string) =>
+        `Math.hypot(${a} - ${spawn.x}, ${b} - ${spawn.y}) < 120`;
+      await T.waitFor(
+        `(() => { const m = window.__scene.me && window.__scene.me(); return !!m && ${near("m.x", "m.y")}; })()`,
+        `máy chủ đặt nhân vật đúng chỗ xuất hiện (${Math.round(spawn.x)}, ${Math.round(spawn.y)}) ở ${roomLabel}`,
+        30000,
+      );
+      if (!(await ev(near("window.__scene.predX", "window.__scene.predY")))) {
+        await ev(
+          `(() => { const J = window.__joystick; J.x = 1; J.y = 0; J.active = true; })(); 1`,
+        );
+        await sleep(400);
+        await ev(
+          `(() => { const J = window.__joystick; J.x = 0; J.y = 0; J.active = false; })(); 1`,
+        );
+      }
+      await T.waitFor(
+        near("window.__scene.predX", "window.__scene.predY"),
+        `dự đoán vị trí khớp chỗ xuất hiện ở ${roomLabel}`,
+        30000,
+      );
+      ok(`nhân vật lưu ở ${roomLabel} vào đúng phòng (qua wrong_map)`);
+    };
+    // 4a: cổng bắc Hàn Vân Lĩnh <-> cổng nam Lang Hoang (đi và về)
+    await enterSaved(
+      "Canh Lang Hoang",
+      "e2e_secret_cc_4444444444444",
+      "han_van",
+      hvBac.spawn,
+      "Hàn Vân Lĩnh",
     );
     await walkToPortal("han_van_bac");
     await crossPortal("han_van_bac", "lang_hoang");
     await checkDest("lang_hoang");
+    await walkToPortal("lang_hoang_nam");
+    await crossPortal("lang_hoang_nam", "han_van");
+    // 4b: cổng bắc Lang Hoang <-> cổng nam Uy Vân Kinh (đi và về)
+    await enterSaved(
+      "Canh Uy Van",
+      "e2e_secret_cc_5555555555555",
+      "lang_hoang",
+      lhBacPortal.spawn,
+      "Lang Hoang",
+    );
     await walkToPortal("lang_hoang_bac");
     await crossPortal("lang_hoang_bac", "uy_van");
     await checkDest("uy_van");
     await walkToPortal("uy_van_nam");
     await crossPortal("uy_van_nam", "lang_hoang");
-    await walkToPortal("lang_hoang_nam");
-    await crossPortal("lang_hoang_nam", "han_van");
     ok("qua lại thông suốt Hàn Vân Lĩnh <-> Lang Hoang <-> Uy Vân Kinh");
 
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
