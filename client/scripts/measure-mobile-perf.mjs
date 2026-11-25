@@ -242,6 +242,17 @@ export const ALL_SCENARIOS = [
     tier,
     cpuRate: 4,
   })),
+  // CÂY NGUYÊN KHỐI (mục 73, nit của A ở #1475): các kịch bản trên chạy `?debug=1` nên lớp hình Tiled TẮT mặc định và KHÔNG đo sprite cây (một sprite mỗi ô thân cây, tối đa 2167
+  // ở Hàn Vân). `visual=1` bật lớp hình; `treeCluster` đặt camera lên cụm cây DÀY NHẤT của bản đồ (cùng cửa sổ 40 x 22 ô như snap-ban-do-cay.mjs) để khung hình thật sự có hàng trăm cây.
+  // Bậc Thấp (trần chặt nhất) và Cao; Hàn Vân là bản đồ nhiều cây nhất.
+  ...["low", "high"].map((tier) => ({
+    id: `han-van-cay-${tier}-4x`,
+    name: "Hàn Vân Lĩnh (lớp hình Tiled, cụm cây dày nhất)",
+    query: `${AMBIENT_QUERY("han_van")}&visual=1`,
+    tier,
+    cpuRate: 4,
+    treeCluster: true,
+  })),
   // Đánh TRÙM (M6 #409, nit của A ở #450): đòn thường -> boss-hit, trùm gục -> boss-vanish (ưu tiên 2) theo nhịp dồn dập; bậc Thấp (trần chặt
   // nhất) và Cao. Trước đây hai công thức trùm chỉ được giữ bằng test FxBudget + trần mỗi công thức, chưa bằng số đo của perf-gate.
   {
@@ -434,6 +445,29 @@ try {
 
     const ttgMs = Date.now() - t0;
     console.log(`  - Thời gian tới lúc vào game (TTG): ${(ttgMs / 1000).toFixed(2)}s`);
+
+    // Kịch bản cây: chờ lớp hình Tiled dựng xong (gói + ảnh tải về MUỘN sau cảnh) rồi đặt camera lên cụm cây dày nhất (như snap-ban-do-cay.mjs)
+    if (sc.treeCluster) {
+      let treesReady = false;
+      for (let i = 0; i < 100 && !treesReady; i++) {
+        await sleep(200);
+        const t = await cdpSend("Runtime.evaluate", {
+          expression: `Boolean(window.__scene.visualMap && window.__scene.visualTrees && window.__scene.visualTrees.length > 0)`,
+          returnByValue: true,
+        });
+        treesReady = Boolean(t?.result?.result?.value);
+      }
+      if (!treesReady) {
+        console.error("  ✗ Lớp hình Tiled / cây không dựng xong sau 20s (gói chưa tải?).");
+        loadFailures++;
+      } else {
+        const placed = await cdpSend("Runtime.evaluate", {
+          expression: `(() => { const sc = window.__scene, vm = sc.visualMap, W = vm.width, H = vm.height; let best = { n: -1, x: 0, y: 0 }; for (let y0 = 0; y0 + 22 <= H; y0 += 4) for (let x0 = 0; x0 + 40 <= W; x0 += 4) { let c = 0; for (let y = y0; y < y0 + 22; y++) for (let x = x0; x < x0 + 40; x++) if (vm.decor[y * W + x] === 620) c++; if (c > best.n) best = { n: c, x: x0, y: y0 }; } sc.room.send = () => {}; sc.predX = (best.x + 20) * 32; sc.predY = (best.y + 11) * 32; sc.cameras.main.centerOn(sc.predX, sc.predY); return JSON.stringify({ cayDay: best.n, cayTong: sc.visualTrees.length }); })()`,
+          returnByValue: true,
+        });
+        console.log(`  - Camera ở cụm cây dày nhất: ${placed?.result?.result?.value}`);
+      }
+    }
 
     // Chờ 1.5s cho cảnh ổn định rồi reset bộ đếm
     await sleep(1500);

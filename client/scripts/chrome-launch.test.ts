@@ -6,6 +6,7 @@ import { launchChrome } from "./chrome-launch.mjs";
 
 // "Chrome giả": script Node nhận đúng các cờ Chrome (--remote-debugging-port, --user-data-dir) rồi hành xử theo FAKE_MODE:
 //   ok         mở cổng sau FAKE_DELAY_MS, /json trả một page
+//   ok-child   như ok, nhưng THÊM một tiến trình CON (cùng nhóm tiến trình) ghi pid vào FAKE_CHILD_PID: kiểm close() dọn CẢ NHÓM, không chỉ tiến trình Chrome (A ở #1474)
 //   die-first  lần chạy ĐẦU (đếm bằng tệp FAKE_COUNTER) in lỗi ra stderr rồi thoát mã 3; lần sau chạy như ok
 //   die        luôn in lỗi ra stderr rồi thoát mã 3
 //   hang       không bao giờ mở cổng
@@ -24,6 +25,10 @@ if (mode === "die" || (mode === "die-first" && n === 0)) {
   console.error("loi gia: khong mo duoc man hinh");
   process.exit(3);
 }
+if (mode === "ok-child") {
+  const cp = require("node:child_process").spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  fs.writeFileSync(process.env.FAKE_CHILD_PID, String(cp.pid));
+}
 if (mode === "hang") setInterval(() => {}, 1000);
 else setTimeout(() => {
   http.createServer((req, res) => {
@@ -40,7 +45,8 @@ chmodSync(bin, 0o755);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 function setEnv(env: Record<string, string>) {
-  for (const k of ["FAKE_MODE", "FAKE_COUNTER", "FAKE_DELAY_MS"]) delete process.env[k];
+  for (const k of ["FAKE_MODE", "FAKE_COUNTER", "FAKE_DELAY_MS", "FAKE_CHILD_PID"])
+    delete process.env[k];
   Object.assign(process.env, env);
 }
 
@@ -55,6 +61,33 @@ describe("chrome-launch: khởi động Chrome cho check-*.mjs ở nightly (#145
     await h.close();
     expect(existsSync(h.tmp)).toBe(false);
     expect(() => process.kill(pid, 0)).toThrow(); // tiến trình đã chết
+  });
+
+  it("close() dọn CẢ NHÓM tiến trình: tiến trình CON của Chrome cũng chết (chrome.kill() đơn lẻ để lại tiến trình mồ côi)", async () => {
+    const pidFile = path.join(dir, "child-pid");
+    rmSync(pidFile, { force: true });
+    setEnv({ FAKE_MODE: "ok-child", FAKE_DELAY_MS: "100", FAKE_CHILD_PID: pidFile });
+    const h = await launchChrome({ name: "thu", bin, waitMs: 8000 });
+    // pid con được ghi ngay khi Chrome giả chạy (trước khi mở cổng): phải có và đang sống
+    const childPid = Number(readFileSync(pidFile, "utf8"));
+    expect(childPid).toBeGreaterThan(1);
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    try {
+      expect(alive(childPid), "tiến trình con phải đang sống trước close()").toBe(true);
+      await h.close();
+      // SIGKILL tới cả nhóm: con chết gần như ngay; chờ tối đa 3 s theo điều kiện
+      for (let i = 0; i < 30 && alive(childPid); i++) await new Promise((r) => setTimeout(r, 100));
+      expect(alive(childPid), "tiến trình CON vẫn sống sau close(): chưa dọn cả nhóm").toBe(false);
+    } finally {
+      if (alive(childPid)) process.kill(childPid, "SIGKILL"); // không để rò khi test đỏ
+    }
   });
 
   it("lần đầu Chrome thoát sớm (mã 3) thì THỬ LẠI đúng một lần và thành công ở lần 2", async () => {
