@@ -9,7 +9,7 @@
  */
 
 /**
- * Bảng màu 11 màu của phong cách minh hoạ: 5 màu của giao diện (`client/src/style.css`) + 6 màu môi trường của sáu bản đồ
+ * Bảng màu 12 màu của phong cách minh hoạ: 5 màu của giao diện (`client/src/style.css`) + 7 màu môi trường của bảy bản đồ
  * (`MAP_STYLES[mapId].ambient.color`). `from` nói màu lấy ở đâu để test đối chiếu với nguồn thật (tránh bảng màu trôi khỏi mã).
  * @type {ReadonlyArray<{ id: string, hex: string, role: string, from: { css: string } | { map: string } }>}
  */
@@ -35,6 +35,7 @@ export const STYLE_PALETTE = [
     role: "Lang Hoang: vàng rơm, thảo nguyên khô",
     from: { map: "lang_hoang" },
   },
+  { id: "uy_van", hex: "#a8444a", role: "Uy Vân: đỏ gạch, huyết trận", from: { map: "uy_van" } },
 ];
 
 /**
