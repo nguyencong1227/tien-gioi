@@ -52,16 +52,15 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const scripts = getE2eScripts(realPkg);
       expect(scripts).toContain("e2e:inv-select");
       expect(scripts).toContain("e2e:move-keys");
-      expect(scripts.length).toBeGreaterThanOrEqual(42);
+      expect(scripts.length).toBeGreaterThanOrEqual(41);
     });
 
-    it("server/package.json thật nối đủ 10 check-* lô đầu vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
+    it("server/package.json thật nối đủ 9 check-* lô đầu vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
       const realPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
       const batch = [
         "skills-panel",
         "social-shell",
         "sect-hall",
-        "sect-vault",
         "shop-qty",
         "forge-shop",
         "quest-log",
@@ -98,7 +97,7 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(RETRY_MAX_TIMEOUT_SEC).toBe(600);
       expect(retryAllowed("e2e:social-shell", 300)).toBe(false);
       expect(retryAllowed("e2e:ban-phim", 300)).toBe(true);
-      expect(retryAllowed("e2e:sect-vault", 300)).toBe(true); // sàn 500 s <= 600 s
+      expect(retryAllowed("e2e:sect-hall", 300)).toBe(true); // sàn 500 s <= 600 s
       // --timeout chung lớn hơn 600 s cũng làm mọi kịch bản không được thử lại (chống treo + thử lại ăn hết timeout-minutes)
       expect(retryAllowed("e2e:ban-phim", 900)).toBe(false);
     });

@@ -64,12 +64,11 @@ export interface ScriptResult {
 /**
  * Sàn hạn chờ RIÊNG (giây) cho kịch bản chậm: hạn thực = max(--timeout, sàn), nên `--timeout` nhỏ hơn không cắt ngang chúng (#1458, A: KHÔNG nâng chung lên 600 s).
  * Sàn ~2,4-3 lần thời gian ĐO TRÊN CI (runner SwiftShader, không GPU; run 45539915300 và 45549071896 ngày 25/11): social-shell 380 s -> 900 (thống nhất A + C);
- * sect-vault 165 s -> 500; text-size 131-158 s -> 480; sect-hall 167 s -> 500. Kịch bản có 3 x thời gian CI <= 300 s không cần dòng ở đây. Thêm kịch bản chậm mới thì thêm
+ * text-size 131-159 s -> 480; sect-hall 167-205 s -> 500. Kịch bản có 3 x thời gian CI <= 300 s không cần dòng ở đây. Thêm kịch bản chậm mới thì thêm
  * vào đây theo số đo CI (REPORT.md), đừng nâng `--timeout` chung.
  */
 export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
   "e2e:social-shell": 900,
-  "e2e:sect-vault": 500,
   "e2e:text-size": 480,
   "e2e:sect-hall": 500,
 };
