@@ -434,8 +434,8 @@ Hệ thống kiểm thử E2E (End-to-End) của Tiên Giới sử dụng trình
 # Chạy toàn bộ các kịch bản E2E tuần tự (tự động thử lại 1 lần nếu gặp lỗi thoáng qua)
 npm run e2e:all -w server
 
-# Chạy phân bổ theo shard (hỗ trợ chạy song song trên nhiều runner CI, ví dụ shard 1 của 2 shard)
-npm run e2e:all -w server -- --shard 1/2
+# Chạy phân bổ theo shard (hỗ trợ chạy song song trên nhiều runner CI, ví dụ shard 1 của 4 shard)
+npm run e2e:all -w server -- --shard 1/4
 
 # Chạy có tự động build client trước nếu có thay đổi
 npm run e2e:all -w server -- --build
@@ -465,7 +465,9 @@ Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Mar
 
 ### 10.3. Quy trình Chạy Hằng Đêm trên GitHub Actions (`.github/workflows/e2e.yml`)
 - **Tần suất & Kích hoạt:** Tự động kích hoạt lúc 03:00 AM (giờ Việt Nam, tức `20:00 UTC`) hằng đêm hoặc kích hoạt thủ công qua `workflow_dispatch` (hỗ trợ các tham số `only`, `skip`, `timeout`, `no_retry`).
-- **Ma trận 2 Shard Song Song (#1404):** Workflow sử dụng chiến lược ma trận GitHub Actions (`strategy.matrix.shard: [1, 2]`) chạy song song 2 runner độc lập với cờ `--shard ${{ matrix.shard }}/2`. Danh sách kịch bản được phân bổ tự động bằng thuật toán round-robin thuần (`idx % N === M - 1`), đảm bảo chia đều tải và mỗi kịch bản chỉ xuất hiện đúng 1 lần duy nhất, kéo thời gian chạy của workflow từ ~32-34 phút xuống dưới 20 phút mỗi shard (timeout mỗi runner giảm từ 60 phút về 30 phút). Nếu trong tương lai một shard vượt ~25 phút thì đổi sang chia theo trọng số thời gian đo từ `REPORT.md` (hiện tại thuật toán round-robin đã cân đối tốt với ~18m57s và ~11m10s).
+- **Ma trận 4 Shard Song Song (#1404, nâng từ 2 lên 4 ở #1458):** Workflow dùng ma trận GitHub Actions (`strategy.matrix.shard: [1, 2, 3, 4]`) chạy song song 4 runner độc lập với cờ `--shard ${{ matrix.shard }}/4`. Danh sách kịch bản (32 `e2e*` ban đầu + 12 `check-*.mjs` nối thêm ở #1458 = 44) phân bổ bằng round-robin thuần (`idx % N === M - 1`, theo thứ tự trong `server/package.json`): mỗi kịch bản đúng một lần. Ước lượng theo số đo CI 25/11 (mỗi `check-*` mới tính gấp đôi số đo máy nhà): 2 shard ~28 phút mỗi shard (sát hạn 30 phút) nên lên 4 shard ~12-17 phút; 5 shard không tốt hơn vì `e2e:social-shell` một mình ~11 phút. Nếu một shard vượt ~25 phút thì đổi sang chia theo trọng số thời gian đo từ `REPORT.md`.
+- **Hạn chờ riêng cho kịch bản chậm (#1458):** `--timeout` chung mặc định 300 s; `SCRIPT_TIMEOUT_SEC` trong `server/scripts/e2e-all.ts` đặt hạn riêng (hạn thực = max(chung, riêng)): `e2e:social-shell` 1500 s (8 khung, ~5-9 phút), `skills-panel` / `sect-hall` / `sect-confirm` / `sect-vault` / `text-size` 600 s. Kịch bản chậm mới thì thêm vào bảng này, đừng nâng `--timeout` chung. Chạy tay một `check-*` ngoài nightly: dùng `timeout >= 600 s` (cắt ngang bằng `timeout` ngắn để lại Chrome mồ côi; `e2e:all` thì dọn cả cây tiến trình).
+- **`check-*` đã nối nightly (lô 1, #1458):** `skills-panel`, `social-shell`, `sect-hall`, `sect-confirm`, `sect-vault`, `shop-qty`, `forge-shop`, `quest-log`, `quest-reward`, `quest-ready`, `text-size`, `act-confirm` (cùng `inv-select`, `move-keys` từ #1386), đều kiểm bố cục / chữ của bảng. Các `check-*` còn lại CHƯA nối: kịch bản có THỜI GIAN / khung hình (`move-stop`, `tween`, `anim`, `*-fx`...) phải qua đột biến + `--slow-frame` + >= 5 lượt `no_retry` xanh (mục 10.3, quy tắc AGENTS.md) trước khi nối.
 - **Không chặn PR:** Workflow chạy độc lập theo lịch định kỳ, không nằm trong luồng kiểm tra của pull request để tiết kiệm thời gian và tài nguyên CI.
 - **Môi trường & GPU:** Chạy trên runner `ubuntu-latest`. Toàn bộ các kịch bản E2E đều dùng `getChromeGpuFlags()` (`server/scripts/e2e-kit.ts`), tự động lùi về `--disable-gpu` (phần mềm rasterization SwiftShader của Chrome) khi phát hiện biến môi trường `CI=true`. Không cần thiết bị GPU vật lý và không kịch bản nào bị bỏ qua theo mặc định.
 - **Báo cáo & Nhật ký:** Bảng tổng kết kết quả Markdown tự động được xuất ra GitHub Step Summary cho từng shard độc lập; toàn bộ file log chi tiết của từng kịch bản được lưu trữ dưới dạng artifact riêng theo từng shard (`e2e-logs-shard-<shard>-<sha>`) trong vòng 30 ngày.

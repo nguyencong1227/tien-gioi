@@ -61,6 +61,28 @@ export interface ScriptResult {
   lastLines?: string[];
 }
 
+/**
+ * Hạn chờ RIÊNG (giây) cho kịch bản chậm: hạn thực = max(--timeout, giá trị này), nên `--timeout` nhỏ hơn không cắt ngang chúng.
+ * Các `check-*.mjs` nối vào nightly (#1458): đo tay trên máy nhà 107-144 s (`sect-*`, `text-size`), `social-shell` ~5-9 phút (8 khung); runner CI chậm hơn ~2 lần
+ * nên để dư. Thêm kịch bản chậm mới thì thêm vào đây, đừng nâng `--timeout` chung.
+ */
+export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
+  "e2e:social-shell": 1500,
+  "e2e:skills-panel": 600,
+  "e2e:sect-hall": 600,
+  "e2e:sect-confirm": 600,
+  "e2e:sect-vault": 600,
+  "e2e:text-size": 600,
+};
+
+/** Hạn chờ thực của một kịch bản: max(hạn chung, hạn riêng). Tra bằng `hasOwnProperty` (tên script đến từ package.json, không tin `constructor`). */
+export function timeoutSecFor(script: string, globalSec: number): number {
+  const own = Object.prototype.hasOwnProperty.call(SCRIPT_TIMEOUT_SEC, script)
+    ? SCRIPT_TIMEOUT_SEC[script]
+    : 0;
+  return Math.max(globalSec, own);
+}
+
 /** Đọc danh sách các script bắt đầu bằng "e2e" từ package.json, loại bỏ e2e:all và e2e-all */
 export function getE2eScripts(pkgJson: { scripts?: Record<string, string> }): string[] {
   const scripts = pkgJson.scripts ?? {};
@@ -710,7 +732,7 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
     // Chạy lần 1
     const run1 = await executeScriptOnce(script, {
       cwd: repoRoot,
-      timeoutSec: options.timeoutSec,
+      timeoutSec: timeoutSecFor(script, options.timeoutSec),
       logFile,
       logsDir: options.logsDir,
       attempt: 1,
@@ -736,7 +758,7 @@ export async function runE2eAll(args: string[] = process.argv.slice(2)): Promise
 
       const run2 = await executeScriptOnce(script, {
         cwd: repoRoot,
-        timeoutSec: options.timeoutSec,
+        timeoutSec: timeoutSecFor(script, options.timeoutSec),
         logFile,
         logsDir: options.logsDir,
         attempt: 2,
