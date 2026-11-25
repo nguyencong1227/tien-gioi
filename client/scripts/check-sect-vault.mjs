@@ -2,7 +2,8 @@
 /**
  * Kiểm tab "Kho đồ" của bảng Tông môn (QUYET_DINH_M3 mục 27, K4, issue #788; `sect-vault.ts` + `ui.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-sect-vault.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-sect-vault.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
+ *   (`--slow-frame <ms>` / `TG_SLOW_FRAME_MS`: mỗi khung hình trang bận `ms` ms (`slow-frame.mjs`) để thử khung chậm 25-50 ms, nhiều lõi VÀ một lõi `taskset -c 0`.)
  *
  * Đứng ở bảng Tông môn bằng `window.__ui.onSect` + `window.__ui.onSectVault` (dữ liệu giả), bắt tin gửi đi bằng cách đè `window.__scene.room.send`:
  *   - lưới kho 40 ô + lưới túi; rê chuột KHÔNG chọn ô (mục 24), bấm / chạm / bàn phím (focus) mới chọn;
@@ -22,6 +23,7 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { launchChrome } from "./chrome-launch.mjs";
 import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -116,7 +118,7 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
@@ -333,15 +335,41 @@ async function main() {
       await setSect("chu");
       await setVault();
       await evalJs(`window.__ui.toggleSectModal(true); 1`);
-      await sleep(300);
-      const tabBtn = await center("#sect-tab-btn-vault");
+      // CHỜ theo điều kiện, không ngủ cố định 300 ms: nút tab phải ĐỨNG YÊN (hết hiệu ứng mở bảng) và nhận được cú bấm rồi mới chạm. Ở một lõi + khung 35-50 ms hiệu ứng còn chạy sau 300 ms,
+      // cú chạm rơi vào chỗ nút vừa rời đi và tab không mở (đỏ ~2 / 4 lượt một lõi ở khung cảm ứng, ma trận 25/11).
+      let tabBtn = null;
+      for (let k = 0, last = ""; k < 60; k++) {
+        tabBtn = await center("#sect-tab-btn-vault");
+        const pos = tabBtn ? `${Math.round(tabBtn.x)},${Math.round(tabBtn.y)}` : "";
+        if (tabBtn && tabBtn.hit && pos === last) break;
+        last = pos;
+        await sleep(100);
+      }
       check(tabBtn && tabBtn.hit, "nút tab Kho đồ bấm được");
       check(
         !vp.mobile || tabBtn.h >= MIN_TAP_PX,
         `tab Kho đồ >= ${MIN_TAP_PX}px cao trên điện thoại (${Math.round(tabBtn.h)})`,
       );
-      await tap(tabBtn.x, tabBtn.y);
-      await sleep(250);
+      // Chạm rồi CHỜ tab thật sự mở (không ngủ cố định 250 ms); chưa mở thì chạm lại (tối đa 3 lần, mỗi lần tính lại toạ độ): một cú chạm rơi do CPU bị bỏ đói không làm đỏ cả khung nhìn,
+      // còn tab hỏng hẳn (không bao giờ mở) vẫn đỏ ở kiểm bên dưới.
+      let tabAttempts = 0;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        tabAttempts = attempt + 1;
+        if (attempt > 0) tabBtn = (await center("#sect-tab-btn-vault")) ?? tabBtn;
+        await tap(tabBtn.x, tabBtn.y);
+        const opened = await waitUntilTrue(
+          async () =>
+            Boolean(
+              await evalJs(
+                `!document.getElementById("sect-tab-vault").hidden && document.getElementById("sect-vault-count").textContent !== ""`,
+              ),
+            ),
+          2500,
+          100,
+        );
+        if (opened) break;
+      }
+      if (tabAttempts > 1) console.log(`  (chạm tab Kho đồ ${tabAttempts} lần mới mở được)`);
       let s = await st();
       check(s.vaultCells === 40, `lưới kho có 40 ô (${s.vaultCells})`);
       check(s.bagCells > 0, `lưới túi có ô (${s.bagCells})`);
@@ -478,19 +506,36 @@ async function main() {
       check((await vaultMsgs()).length === 0, "chưa gửi gì khi chưa xác nhận");
       await shot("xac-nhan-rut");
       await sleep(560);
+      // Cú bấm THẬT (chuột / chạm) vào "Giữ lại": đóng hộp, không gửi gì. Hai kiểm "ngay" bên dưới KHÔNG dùng cú bấm thật vì độ trễ giữa các lệnh CDP phụ thuộc tốc độ khung
+      // của runner (khung 30-250 ms: nhiều lệnh chồng lên có thể vượt cửa sổ 450 ms và làm kiểm đỏ oan, A thấy ở run 45556979540): cú bấm "ma" / "ngay" chạy trong CÙNG MỘT lượt JS
+      // với thao tác đóng / mở hộp nên khoảng cách giữa chúng gần 0 ms, đúng bằng thứ cửa sổ chống click ma phải chặn, không phụ thuộc đồng hồ.
       const noBtn = await center("#act-btn-no");
-      // Tính TRƯỚC khi đóng hộp toạ độ nút Rút nằm dưới hộp: giữa lúc đóng hộp và cú bấm "ma" KHÔNG còn vòng gọi trình duyệt nào, nên độ trễ không phụ thuộc tốc độ runner
-      // (trước đây center() chạy SAU khi đóng hộp: runner CI không GPU chậm làm cú bấm rơi ra ngoài cửa sổ chống click ma và hộp mở lại, run 45549071896).
-      const aC = await center("#sect-vault-act");
       await tap(noBtn.x, noBtn.y);
-      // click ma: ngay sau khi hộp đóng, một cú bấm chuột / chạm rơi xuống nút Rút nằm dưới hộp: không được mở lại hộp
-      await mouse("mousePressed", aC.x, aC.y);
-      await mouse("mouseReleased", aC.x, aC.y);
-      await sleep(120);
+      await sleep(150);
       check(
         !(await box()).open && (await vaultMsgs()).length === 0,
-        "click ma ngay sau khi đóng hộp: bị bỏ qua (không mở lại hộp, không gửi)",
+        "'Giữ lại' (cú bấm thật): đóng hộp, không gửi",
       );
+      await sleep(560);
+      await tapSel("#sect-vault-act");
+      check((await box()).open, "sau 'Giữ lại' + hết cửa sổ chống click ma: bấm Rút mở lại hộp");
+      await sleep(560);
+      // click ma: ngay sau khi hộp đóng (pointerdown "Giữ lại"), click chuột (detail 1) rơi xuống nút Rút nằm dưới hộp: không được mở lại hộp. Cùng một lượt JS.
+      const ghost = await evalJs(`(() => {
+        const g = (id) => document.getElementById(id);
+        g("act-btn-no").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 }));
+        g("sect-vault-act").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+        return { open: window.__ui.isActConfirmOpen(), n: window.__sent.filter((m) => /^sectVault/.test(m[0])).length };
+      })()`);
+      check(
+        !ghost.open && ghost.n === 0,
+        `click ma ngay sau khi đóng hộp: bị bỏ qua (không mở lại hộp, không gửi) (${JSON.stringify(ghost)})`,
+      );
+      // Đường LỖI: click ma mở lại hộp (chốt hỏng) thì đóng hộp đó đi (Esc không bị chốt chặn) để các kiểm sau chạy tiếp và đỏ ĐỘC LẬP, không ném lỗi 'không bấm được' che kiểm kế
+      if (ghost.open) {
+        await key("Escape", "Escape", 27);
+        await sleep(150);
+      }
       await sleep(560);
       await tapSel("#sect-vault-act");
       check((await box()).open, "sau cửa sổ chống click ma: bấm Rút mở lại hộp");
@@ -499,14 +544,24 @@ async function main() {
         yes.hit && (!vp.mobile || (yes.w >= MIN_TAP_PX && yes.h >= MIN_TAP_PX)),
         `nút Rút trong hộp bấm được (${Math.round(yes.w)}x${Math.round(yes.h)})`,
       );
-      await tap(yes.x, yes.y);
-      await sleep(150);
+      await sleep(560);
+      // xác nhận "NGAY khi hộp vừa mở": đóng hộp, mở lại (Rút bằng click không chuột: không bị chặn) và bấm "Rút" trong hộp, cùng MỘT lượt JS: phải bị bỏ qua
+      const imm = await evalJs(`(() => {
+        const g = (id) => document.getElementById(id);
+        const pd = (id) => g(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 }));
+        pd("act-btn-no");
+        g("sect-vault-act").click();
+        const opened = window.__ui.isActConfirmOpen();
+        pd("act-btn-yes");
+        return { opened, open: window.__ui.isActConfirmOpen(), n: window.__sent.filter((m) => /^sectVault/.test(m[0])).length };
+      })()`);
       check(
-        (await box()).open && (await vaultMsgs()).length === 0,
-        "bấm xác nhận NGAY khi hộp vừa mở: bị bỏ qua",
+        imm.opened && imm.open && imm.n === 0,
+        `bấm xác nhận NGAY khi hộp vừa mở: bị bỏ qua (${JSON.stringify(imm)})`,
       );
       await sleep(560);
-      await tap(yes.x, yes.y);
+      const yes2 = await center("#act-btn-yes");
+      await tap(yes2.x, yes2.y);
       await sleep(250);
       m = await vaultMsgs();
       check(

@@ -72,6 +72,7 @@ export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
   "e2e:text-size": 480,
   "e2e:sect-hall": 500,
   "e2e:sect-confirm": 540,
+  "e2e:sect-vault": 540,
 };
 
 /** Kịch bản có hạn chờ thực LỚN HƠN ngưỡng này KHÔNG được thử lại: một lần treo + thử lại sẽ ăn quá `timeout-minutes` của cả shard (A ở #1458). */
