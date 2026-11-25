@@ -1071,7 +1071,7 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
 
 describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn Vân <-> Lang Hoang <-> Uy Vân Kinh (Mục 75, #1470)", () => {
   it("đi hết một vòng khứ hồi mười chặng sáu bản đồ: tới đúng chỗ xuất hiện, khu an toàn, giữ tu vi / đồ, kiem-save 0 lỗi", async () => {
-    const name = `Bot Sau Ban Do ${++nameSeq}`;
+    const name = `Bot6M ${++nameSeq}`;
     let cur = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
     cur.room.send("chat", { text: "/give nanh_soi 5" });
     await waitFor(() => cur.invs.some((m) => m.gained));
@@ -1130,7 +1130,7 @@ describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn V
   }, 60_000);
 
   it("nhân vật lưu ở Lang Hoang: các phòng khác trả wrong_map:lang_hoang, phòng Lang Hoang nhận và không quái", async () => {
-    const name = `Bot LH Check ${++nameSeq}`;
+    const name = `BotLH ${++nameSeq}`;
     const to = getMap(HAN_VAN_ID)!.portal("han_van_bac")!;
     const spawn = getMap(to.toMap)!.portal(to.toPortal)!.spawn;
     await savePlayer({
@@ -1165,7 +1165,7 @@ describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn V
   }, 35_000);
 
   it("nhân vật lưu ở Uy Vân Kinh: các phòng khác trả wrong_map:uy_van, phòng Uy Vân Kinh nhận và không quái", async () => {
-    const name = `Bot UV Check ${++nameSeq}`;
+    const name = `BotUV ${++nameSeq}`;
     const to = getMap(LANG_HOANG_ID)!.portal("lang_hoang_bac")!;
     const spawn = getMap(to.toMap)!.portal(to.toPortal)!.spawn;
     await savePlayer({
