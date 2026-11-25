@@ -49,7 +49,7 @@ const MIMES = {
  * đều phải dỡ sạch khi rời đi (trước đây chỉ Lạc Hà). Phần tử đầu là bản đồ "gốc": hai lần đọc chỉ số (đầu / cuối) đều đọc khi đang ở đó,
  * nếu không số đối tượng khác nhau giữa các bản đồ bị tính nhầm là rò rỉ.
  */
-export const LEAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"];
+export const LEAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"];
 
 /** Biểu thức chạy trong trang: đổi `scene.map` sang bản đồ `id` (qua `window.__getMap`) và dựng lại hình ảnh; ném lỗi nếu id không tra được. */
 export function rebuildMapExpr(id) {
@@ -308,7 +308,7 @@ async function runLeakTest() {
             window.__ui.toggleMapModal(true);
             const sc = window.__scene;
             if (sc && sc.setMapView && sc.mapCtl) {
-              for (const mid of ["hac_phong", "am_suong", "han_van", null]) {
+              for (const mid of ["hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van", null]) {
                 sc.setMapView(mid, false);
                 sc.mapCtl.zoomBy(2);
                 sc.mapCtl.pan(-30, -30);

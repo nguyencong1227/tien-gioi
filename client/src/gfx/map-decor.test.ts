@@ -61,9 +61,8 @@ describe("map-style (dữ liệu kiểu theo bản đồ)", () => {
   it("kiểu KHÔNG mồ côi: mọi kiểu trong MAP_STYLES là của một bản đồ có thật (trừ danh sách chờ, và danh sách chờ không được để cũ)", () => {
     // `am_suong` (M6 #408) từng chờ ở đây trước bản đồ của nó; #404 (shared) đã đưa bản đồ vào nên danh sách chờ đã được dọn.
     // `han_van` (M7.8 #509) từng chờ ở đây: có kiểu TRƯỚC bản đồ; M7.5 (#506, `shared/src/map.ts`) đã thêm bản đồ nên danh sách chờ đã được dọn.
-    // `lang_hoang` / `uy_van` (#1467, mục 75): kiểu có TRƯỚC bản đồ (tệp Tiled đã vào `shared/maps`, chờ Dev A đăng ký ở `shared/src/map.ts`). PR ĐĂNG KÝ bản đồ PHẢI dọn hai id này khỏi danh
-    // sách chờ (đỏ ở dòng "đã có bản đồ: bỏ khỏi danh sách chờ" nếu quên).
-    const waiting: string[] = ["lang_hoang", "uy_van"];
+    // `lang_hoang` / `uy_van` (#1467) từng chờ ở đây trước bản đồ của chúng; PR đăng ký bản đồ (shared/src/map.ts) đã dọn danh sách chờ.
+    const waiting: string[] = [];
     for (const id of Object.keys(MAP_STYLES)) {
       if (waiting.includes(id)) continue;
       expect(getMap(id), `kiểu "${id}" không có bản đồ`).toBeDefined();
