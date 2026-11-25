@@ -2,7 +2,8 @@
 /**
  * Kiểm hộp xác nhận LẬP tông môn và NỘP Linh thạch vào kho (issue #779, docs/RA_SOAT_THAO_TAC.md hàng 13-14; `act-confirm.ts`: `sectCreatePlan` / `sectDepositPlan`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-sect-confirm.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-sect-confirm.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
+ *   (`--slow-frame <ms>` / `TG_SLOW_FRAME_MS`: mỗi khung hình trang bận `ms` ms (`slow-frame.mjs`) để thử khung chậm 25-50 ms, nhiều lõi VÀ một lõi `taskset -c 0`.)
  *
  * Dựng bảng Tông môn bằng `window.__ui.onSect` / `onWallet` (dữ liệu giả), bắt tin gửi đi bằng cách đè `window.__scene.room.send`:
  *   - Lập (ví đủ): hộp nêu tên + biệt hiệu + phí + số dư còn lại + "không hoàn lại"; focus ở "Chưa"; bấm "Lập" NGAY khi hộp vừa mở (click ma) bị bỏ qua; sau cửa sổ chống click ma: đúng MỘT tin `sectCreate`;
@@ -33,6 +34,7 @@ import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
 import { launchChrome } from "./chrome-launch.mjs";
 import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -127,7 +129,7 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
