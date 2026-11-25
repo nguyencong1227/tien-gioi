@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 _spec = importlib.util.spec_from_file_location("ma_co_dinh", os.path.join(HERE, "ma-co-dinh.py"))
 MA = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
+_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (T / VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
 MA_PATH = os.path.join(ROOT, "docs/art/huong-moi/ma-co-dinh.json")
 CODES = None  # bảng mã đã nạp (main() đặt; mã gọi trực tiếp thì `codes()` nạp từ MA_PATH)
 NEW_TAG = " · MỚI (sau 23/11)"  # đánh dấu hàng có mã vượt mốc đóng băng
@@ -472,14 +472,23 @@ T_MAP = {"mang": ("xf_mob_snake", "rắn thường PHÓNG LỚN + TÔ ĐỎ (gó
          "thien_han_vuong": ("xf_boss_fallenimmortal", "boss fallenimmortal (tiên sa ngã)"), "yeu_vuong": ("xf_boss_ninetail", "boss ninetail (cửu vĩ hồ)")}
 
 
+def boss_order(names):
+    """THỨ TỰ trùm của nhóm 13 (dùng chung cho `group_trum` và `--ghi-ma`): theo `MONSTERS`. Mã KHÔNG phụ thuộc thứ tự này (lấy từ bảng ỔN ĐỊNH); thứ tự chỉ quyết định số cấp cho trùm MỚI."""
+    return [m for m in names["mons"] if m["boss"]]
+
+
 def group_trum(L, names):
+    """Trùm (nhóm 13). Mã T lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (T-01..T-04 của tờ 23/11 giữ nguyên, trùm mới nhận số ở CUỐI, #1446): hàng cũ theo thứ tự mã trước, hàng MỚI (đánh dấu `NEW_TAG`) sau."""
+    t = codes()
+    bosses = boss_order(names)
+    num = MA.assign_codes(t["t"], [m["id"] for m in bosses])
     rows = []
-    bosses = [m for m in names["mons"] if m["boss"]]
-    for i, m in enumerate(bosses, 1):
+    for m in sorted(bosses, key=lambda m: num[m["id"]]):
+        n = num[m["id"]]
         xm, cap = T_MAP.get(m["id"], (None, ""))
         a = cell(L, "A", "xian", lambda x=xm: L.xian(x, "idle"), cap, 64) if xm else Cell("A", "xian", [], "", 64)
         rec = "A" if m["id"] in ("hac_giao", "yeu_vuong") else "A (cần xem kỹ) / ảnh AI"
-        rows.append(dict(code=f"T-{i:02d}", name=m["name"], rec=rec, cur=cell(L, "", "cur", lambda mid=m["id"]: L.cur(f"mon-{mid}"), "hiện tại (thân) + thẻ ảnh AI", 64),
+        rows.append(dict(code=MA.label("t", n), name=m["name"] + (NEW_TAG if MA.is_new(t, "t", n) else ""), rec=rec, cur=cell(L, "", "cur", lambda mid=m["id"]: L.cur(f"mon-{mid}"), "hiện tại (thân) + thẻ ảnh AI", 64),
                          opts=[a, Cell("B", "wuxia", [], "", 64), Cell("C", "ninja", [], "", 64)]))
     return "13-trum", "Nhóm 13 — Trùm (T): thẻ trùm bằng ảnh AI SDXL giữ nguyên, đây chỉ là THÂN trên bản đồ", rows
 
@@ -922,8 +931,8 @@ def main():
     ap.add_argument("--private", default="/mnt/data/assets-private/preview")
     ap.add_argument("--names", default=None, help="JSON {npcs:[{id,name,title}], mons:[{id,name,boss}]}; bỏ trống = tự chạy `npx tsx client/scripts/art/xuat-doi-tuong.ts`")
     ap.add_argument("--md", default=None, help="ghi các bảng markdown của các nhóm đã dựng vào tệp này (nối vào cuối)")
-    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
-    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
+    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 13 / 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
+    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 13 / 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
     a = ap.parse_args()
     import json
 
@@ -956,12 +965,14 @@ def main():
         upsert_md(a.md, built)
     if a.ghi_ma:
         t = CODES
+        if "13" in built:
+            t = MA.extended(t, "t", MA.assign_codes(t["t"], [m["id"] for m in boss_order(names)]))
         if "14" in built:
             t = MA.extended(t, "vp", MA.assign_codes(t["vp"], [it["id"] for it in vp_order(names)[1]]))
         if "15" in built:
             t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for sk in hu_order(names)[1]]))
         MA.save(a.ma, t)
-        print(f"ĐÃ GHI bảng mã: VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
+        print(f"ĐÃ GHI bảng mã: T {len(t['t'])}, VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
 
 
 if __name__ == "__main__":
