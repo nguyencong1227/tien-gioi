@@ -103,6 +103,10 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(retryAllowed("e2e:social-shell", 300)).toBe(false);
       expect(retryAllowed("e2e:ban-phim", 300)).toBe(true);
       expect(retryAllowed("e2e:sect-hall", 300)).toBe(true); // sàn 500 s <= 600 s
+      expect(timeoutSecFor("e2e:chuyen-canh", 300)).toBe(480);
+      expect(timeoutSecFor("e2e:inv-select", 300)).toBe(480);
+      expect(retryAllowed("e2e:chuyen-canh", 300)).toBe(true); // sàn 480 s <= 600 s (#1501)
+      expect(retryAllowed("e2e:inv-select", 300)).toBe(true); // sàn 480 s <= 600 s (#1501)
       // --timeout chung lớn hơn 600 s cũng làm mọi kịch bản không được thử lại (chống treo + thử lại ăn hết timeout-minutes)
       expect(retryAllowed("e2e:ban-phim", 900)).toBe(false);
     });
