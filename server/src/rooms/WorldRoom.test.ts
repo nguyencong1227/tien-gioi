@@ -300,6 +300,23 @@ describe("rớt mạng và nối lại (#116)", () => {
   const waitGhost = (a: { room: Room }, sid = a.room.sessionId) =>
     waitFor(() => (serverRoom(a.room) as any).ghosts.has(sid), 5000);
 
+  /**
+   * Làm `persist` của phòng CHẬM `ms`: `onLeave` còn kẹt ở `await this.persist(...)` (ghi tệp, trên runner CI đĩa tải có thể mất vài trăm ms) TRƯỚC khi tới
+   * `reconnected(...)`, trong khi client đã nhận Room mới. Khẳng định ngay sau `reconnectTo` về điều `reconnected` làm (gỡ hồn lìa xác, cấp hộ thể) là
+   * cuộc đua; ca nào khẳng định như vậy phải CHỜ THEO ĐIỀU KIỆN và dùng hàm này để bắt buộc cuộc đua xảy ra mọi lần (CI main d93ba929 đỏ ca #1292).
+   * Trả hàm khôi phục (xoá thuộc tính ghi đè trên thể hiện: phòng dùng chung giữa các ca nên KHÔNG để rò sang ca sau).
+   */
+  const slowPersist = (sr: any, ms: number) => {
+    const orig = sr.persist;
+    sr.persist = async function (this: unknown, ...args: unknown[]) {
+      await sleep(ms);
+      return orig.apply(this, args);
+    };
+    return () => {
+      delete sr.persist;
+    };
+  };
+
   it("nối lại trong thời gian chờ: cùng sessionId, nhân vật còn nguyên, nhận lại túi / ví, vùng nhìn đúng, điều khiển được", async () => {
     const a = await join("Noi Lai");
     const b = await join("Hang Xom");
@@ -480,11 +497,14 @@ describe("rớt mạng và nối lại (#116)", () => {
     const a = await join("Ho The Ro");
     const sr = serverRoom(a.room) as any;
     const sid = a.room.sessionId;
+    const restorePersist = slowPersist(sr, 400);
     dropConnection(a.room);
     await waitGhost(a);
     const r2 = await reconnectTo(a.room);
+    restorePersist();
     // Nối lại thì được hộ thể (`reconnected` -> `grantShield`). Kéo hạn dài để `tickNetGuard` KHÔNG kịp gỡ trước khi rời: ca này chỉ đo việc dọn khi rời phòng, không phụ thuộc tải máy
-    expect(sr.world.shielded.has(sid)).toBe(true);
+    // `reconnected` chạy SAU `await this.persist(...)` của `onLeave` nên có thể trễ hơn lúc client nhận Room mới (`slowPersist` bắt buộc cuộc đua): chờ theo điều kiện, không khẳng định ngay
+    await waitFor(() => sr.world.shielded.has(sid), 2000);
     sr.world.ctrl.get(sid).shieldUntil = sr.world.now + 600_000;
     await r2.room.leave(true);
     await waitFor(() => !sr.state.players.has(sid), 3000);
