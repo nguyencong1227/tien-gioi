@@ -19,6 +19,8 @@ import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   QUESTS,
   SKILLS_M7,
   TRAVEL_COOLDOWN_MS,
@@ -1065,4 +1067,135 @@ describe("Bốn bản đồ: dữ liệu nguyên vẹn sau MỖI lần qua cổn
       await expectIntact(next, name, `${label}: sau khi qua cổng`, null);
     }
   }, 30_000);
+});
+
+describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn Vân <-> Lang Hoang <-> Uy Vân Kinh (Mục 75, #1470)", () => {
+  it("đi hết một vòng khứ hồi mười chặng sáu bản đồ: tới đúng chỗ xuất hiện, khu an toàn, giữ tu vi / đồ, kiem-save 0 lỗi", async () => {
+    const name = `Bot Sau Ban Do ${++nameSeq}`;
+    let cur = await joinRoom(name, secretOf(name), DEFAULT_MAP_ID);
+    cur.room.send("chat", { text: "/give nanh_soi 5" });
+    await waitFor(() => cur.invs.some((m) => m.gained));
+    serverRoom(cur.room).state.players.get(cur.room.sessionId)!.exp = 42;
+
+    const route: [string, string][] = [
+      [DEFAULT_MAP_ID, "lac_ha_bac"],
+      [HAC_PHONG_ID, "hac_phong_bac"],
+      [AM_SUONG_ID, "am_suong_bac"],
+      [HAN_VAN_ID, "han_van_bac"],
+      [LANG_HOANG_ID, "lang_hoang_bac"],
+      [UY_VAN_ID, "uy_van_nam"],
+      [LANG_HOANG_ID, "lang_hoang_nam"],
+      [HAN_VAN_ID, "han_van_nam"],
+      [AM_SUONG_ID, "am_suong_nam"],
+      [HAC_PHONG_ID, "hac_phong_nam"],
+    ];
+    const visited: string[] = [DEFAULT_MAP_ID];
+    for (const [fromMapId, portalId] of route) {
+      cur = await hop(cur, name, fromMapId, portalId);
+      const portal = getMap(fromMapId)!.portal(portalId)!;
+      const dest = getMap(portal.toMap)!;
+      const spawn = dest.portal(portal.toPortal)!.spawn;
+      const me = cur.me();
+      expect(Math.hypot(me.x - spawn.x, me.y - spawn.y), `tới ${portal.toMap}`).toBeLessThan(2);
+      expect(dest.inSafe(me.x, me.y), `${portal.toMap}: chỗ xuất hiện nằm trong khu an toàn`).toBe(
+        true,
+      );
+      expect(dest.isBlockedPx(me.x, me.y), `${portal.toMap}: không đứng trong ô chặn`).toBe(false);
+      visited.push(portal.toMap);
+    }
+    expect(visited).toEqual([
+      DEFAULT_MAP_ID,
+      HAC_PHONG_ID,
+      AM_SUONG_ID,
+      HAN_VAN_ID,
+      LANG_HOANG_ID,
+      UY_VAN_ID,
+      LANG_HOANG_ID,
+      HAN_VAN_ID,
+      AM_SUONG_ID,
+      HAC_PHONG_ID,
+      DEFAULT_MAP_ID,
+    ]);
+
+    const saved = fileOf(name);
+    expect(saved.mapId).toBe(DEFAULT_MAP_ID);
+    expect(saved.exp).toBe(42);
+    expect(saved.inventory?.find((s: any) => s?.itemId === "nanh_soi")?.qty).toBe(5);
+    expect(cur.me().exp).toBe(42);
+
+    const auditRes = auditSavesDirectory(dataDir);
+    expect(auditRes.errorFiles, `kiem-save 6 bản đồ: ${JSON.stringify(auditRes.failedFiles)}`).toBe(
+      0,
+    );
+  }, 60_000);
+
+  it("nhân vật lưu ở Lang Hoang: các phòng khác trả wrong_map:lang_hoang, phòng Lang Hoang nhận và không quái", async () => {
+    const name = `Bot LH Check ${++nameSeq}`;
+    const to = getMap(HAN_VAN_ID)!.portal("han_van_bac")!;
+    const spawn = getMap(to.toMap)!.portal(to.toPortal)!.spawn;
+    await savePlayer({
+      name,
+      secretHash: hashSecret(secretOf(name)),
+      realm: 5,
+      tier: 0,
+      exp: 0,
+      mapId: LANG_HOANG_ID,
+      x: spawn.x,
+      y: spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    for (const wrong of [DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID, UY_VAN_ID]) {
+      const client = new Client(`ws://localhost:${PORT}`);
+      let err: any = null;
+      try {
+        rooms.push(await client.joinOrCreate(roomNameOf(wrong), { name, secret: secretOf(name) }));
+      } catch (e: any) {
+        err = e;
+      }
+      expect(err, `vào nhầm ${wrong}`).not.toBeNull();
+      expect(parseWrongMap(err.code, err.message)).toBe(LANG_HOANG_ID);
+    }
+    const ok = await joinRoom(name, secretOf(name), LANG_HOANG_ID);
+    const sr = serverRoom(ok.room);
+    expect(sr.mapId).toBe(LANG_HOANG_ID);
+    expect(sr.state.monsters.size).toBe(0); // monsterCap rỗng
+    expect(ok.me().x).toBeCloseTo(spawn.x, 0);
+    expect(ok.me().y).toBeCloseTo(spawn.y, 0);
+  }, 35_000);
+
+  it("nhân vật lưu ở Uy Vân Kinh: các phòng khác trả wrong_map:uy_van, phòng Uy Vân Kinh nhận và không quái", async () => {
+    const name = `Bot UV Check ${++nameSeq}`;
+    const to = getMap(LANG_HOANG_ID)!.portal("lang_hoang_bac")!;
+    const spawn = getMap(to.toMap)!.portal(to.toPortal)!.spawn;
+    await savePlayer({
+      name,
+      secretHash: hashSecret(secretOf(name)),
+      realm: 5,
+      tier: 0,
+      exp: 0,
+      mapId: UY_VAN_ID,
+      x: spawn.x,
+      y: spawn.y,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    for (const wrong of [DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID, LANG_HOANG_ID]) {
+      const client = new Client(`ws://localhost:${PORT}`);
+      let err: any = null;
+      try {
+        rooms.push(await client.joinOrCreate(roomNameOf(wrong), { name, secret: secretOf(name) }));
+      } catch (e: any) {
+        err = e;
+      }
+      expect(err, `vào nhầm ${wrong}`).not.toBeNull();
+      expect(parseWrongMap(err.code, err.message)).toBe(UY_VAN_ID);
+    }
+    const ok = await joinRoom(name, secretOf(name), UY_VAN_ID);
+    const sr = serverRoom(ok.room);
+    expect(sr.mapId).toBe(UY_VAN_ID);
+    expect(sr.state.monsters.size).toBe(0); // monsterCap rỗng
+    expect(ok.me().x).toBeCloseTo(spawn.x, 0);
+    expect(ok.me().y).toBeCloseTo(spawn.y, 0);
+  }, 35_000);
 });
