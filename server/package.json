@@ -71,6 +71,7 @@
     "e2e:map-zoom": "node ../client/scripts/check-map-zoom.mjs",
     "e2e:map-card": "node ../client/scripts/check-map-card.mjs",
     "e2e:map-style": "node ../client/scripts/check-map-style.mjs",
+    "e2e:map-visual": "node ../client/scripts/check-map-visual.mjs",
     "e2e:ban-do-trong": "tsx scripts/e2e-ban-do-trong.ts",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
