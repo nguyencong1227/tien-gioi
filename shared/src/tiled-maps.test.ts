@@ -74,7 +74,7 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
 
   it("MAPS cùng id, cùng thứ tự với PROCEDURAL_MAPS", () => {
     expect(MAPS.map((m) => m.id)).toEqual(PROCEDURAL_MAPS.map((m) => m.id));
-    expect(MAPS.length).toBe(5);
+    expect(MAPS.length).toBe(6);
   });
 
   for (const def of PROCEDURAL_MAPS) {

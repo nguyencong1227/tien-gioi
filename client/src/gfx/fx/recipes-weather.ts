@@ -1,5 +1,5 @@
 /**
- * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509), bụi gió (Lang Hoang, mục 75). CHỈ là dữ liệu.
+ * Công thức THỜI TIẾT (M5.3, #332): cánh hoa đào (Lạc Hà), tro (Hắc Phong), linh khí (bí cảnh), ma trơi (Âm Sương Trạch, M6 #408), tuyết (Hàn Vân Lĩnh, M7.8 #509), bụi gió (Lang Hoang), đốm lửa huyết trận (Uy Vân Kinh; mục 75). CHỈ là dữ liệu.
  *
  * Mỗi lần phát rải `count` (12) hạt ở điểm ngẫu nhiên trong `zone` (`opts.area` ghi đè theo khung nhìn), sống tới ~3,5 s; ưu tiên 0
  * (môi trường: tới 60 % trần, bị bỏ trước mọi hiệu ứng khác). Nhịp phát do `map-weather.ts` tính (số hạt / tốc độ) để một
@@ -115,6 +115,24 @@ export const WEATHER_RECIPES: readonly FxRecipe[] = [
       tint: 0xd9cfa8,
       blend: "normal",
       gravityY: 2,
+      zone: { w: 1200, h: 700 },
+    },
+  },
+  {
+    // Đốm lửa đỏ sẫm từ huyết trận trôi lên chậm rồi tắt (Uy Vân Kinh, mục 75 / A2 lát 2: công thức TẠM do A đặt, B chỉnh khi có ảnh thật; cộng sáng nhẹ): cùng chi phí (12 hạt, <= 3,4 s)
+    id: "weather-ember",
+    priority: 0,
+    particles: {
+      frames: ["spark", "dot"],
+      count: WEATHER_COUNT,
+      lifespan: { min: 2400, max: 3400 },
+      speed: { min: 12, max: 32 },
+      angle: { min: 255, max: 285 },
+      scale: { start: 0.4, end: 0.1 },
+      alpha: { start: 0.85, end: 0 },
+      tint: 0xd2453b,
+      blend: "add",
+      gravityY: -8,
       zone: { w: 1200, h: 700 },
     },
   },

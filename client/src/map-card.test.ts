@@ -80,6 +80,8 @@ describe("MAP_CARDS phủ MỌI bản đồ có kiểu riêng (bản đồ mới
   const EXEMPT: Record<string, string> = {
     lang_hoang:
       "bản đồ thứ năm (mục 75, #1467): thẻ minh hoạ AI (ComfyUI SDXL, docs/KE_HOACH_DO_HOA_AI.md) do B sinh ở lô thẻ tiếp theo; chưa có ảnh thì client không hiện thẻ (mapCardUrl trả null)",
+    uy_van:
+      "bản đồ thứ sáu (mục 75, #1467): như Lang Hoang, thẻ minh hoạ AI do B sinh ở lô thẻ tiếp theo",
   };
 
   it("mỗi mapId trong MAP_STYLES có dòng ở MAP_CARDS (trừ danh sách miễn)", () => {

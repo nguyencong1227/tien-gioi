@@ -37,6 +37,7 @@ import {
   AM_SUONG_ID,
   HAN_VAN_ID,
   LANG_HOANG_ID,
+  UY_VAN_ID,
   LINH_HU_MAP_ID,
   MAPS,
   BLOCKING,
@@ -266,6 +267,7 @@ describe("bản đồ và quái của bí cảnh", () => {
       AM_SUONG_ID,
       HAN_VAN_ID,
       LANG_HOANG_ID,
+      UY_VAN_ID,
     ]);
     expect(getMap(LINH_HU_MAP_ID)?.def.kind).toBe("dungeon");
     expect(isDungeonMap(LINH_HU_MAP_ID)).toBe(true);
@@ -275,6 +277,7 @@ describe("bản đồ và quái của bí cảnh", () => {
       AM_SUONG_ID,
       HAN_VAN_ID,
       LANG_HOANG_ID,
+      UY_VAN_ID,
       "constructor",
       "",
       undefined,

@@ -18,7 +18,7 @@ export const DECOR_VARIANTS = 2;
 export const DECOR_FRAMES = DECOR_KINDS.length * DECOR_VARIANTS;
 
 /** Thời tiết bằng hạt (chỉ khi hồ sơ chất lượng `weather != "off"`). */
-export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow" | "dust";
+export type WeatherKind = "none" | "petals" | "ash" | "spirit" | "wisp" | "snow" | "dust" | "ember";
 
 export interface MapStyle {
   /** Nhãn cho log / doc. */
@@ -201,6 +201,26 @@ export const MAP_STYLES: Readonly<Record<string, MapStyle>> = {
         pebble: [0x9a958a, 0x7a766d], // đá xám đất
         mushroom: [0xb98f6c, 0x8c6a4e], // nấm nâu đất
         bush: [0x6e6a3c, 0x575432], // bụi lang khô
+      },
+    },
+  },
+  // Uy Vân Kinh (mục 75, #1467 / A2 lát 2; bản đồ thứ sáu): kinh đô bị huyết trận bao quanh, ngả "ban đêm" (việc của lớp ánh sáng này, KHÔNG của bộ ô). KIỂU TẠM do A đặt (B chỉnh khi có ảnh thật): ánh đỏ gạch tối,
+  // vignette đậm, sương hồng xám dưới trần 0,4, đốm lửa đỏ bay lên (`ember`), nước đục nâu xám, hoa huyết / nấm đỏ sẫm thay hoa cỏ, bụi cháy sẫm.
+  uy_van: {
+    label: "Uy Vân Kinh (huyết trận)",
+    ambient: { color: 0xa8444a, alpha: 0.2 },
+    vignette: { color: 0x120708, strength: 0.55 },
+    fog: { color: 0xb98a86, alpha: 0.24, speed: 8 },
+    weather: { kind: "ember", rate: 8 },
+    water: { shimmer: 0xb89a96, alpha: 0.3, speed: 5 },
+    decor: {
+      density: { tuft: 0.035, flower: 0.02, pebble: 0.05, mushroom: 0.015, bush: 0.03 },
+      palette: {
+        tuft: [0x8a7a66, 0x6f6050], // cỏ úa thấm bụi
+        flower: [0xc9585a, 0x8c3a40], // hoa huyết
+        pebble: [0x8f6f68, 0x6e524d], // đá đỏ xám
+        mushroom: [0xb04a44, 0x7e302e], // nấm đỏ sẫm
+        bush: [0x4a3a30, 0x382b24], // bụi cháy sẫm
       },
     },
   },

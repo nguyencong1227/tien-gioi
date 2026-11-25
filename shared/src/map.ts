@@ -504,6 +504,8 @@ export const AM_SUONG_ID = "am_suong";
 export const HAN_VAN_ID = "han_van";
 /** Bản đồ thứ năm (mục 75, #1467 / A2): thảo nguyên khô + tuyết thưa cho Hóa Thần, sau cửa ải Tuyết Đao Quan; nối với Hàn Vân Lĩnh bằng cổng ở rìa nam (cổng bắc còn trống tới khi có Uy Vân Kinh). */
 export const LANG_HOANG_ID = "lang_hoang";
+/** Bản đồ thứ sáu (mục 75, #1467 / A2 lát 2): kinh đô Lương Quốc bị huyết trận bao quanh, sau Lang Hoang; nối với Lang Hoang bằng cổng ở rìa nam (cổng bắc còn trống tới khi có bản đồ sau). */
+export const UY_VAN_ID = "uy_van";
 
 /**
  * ĐỊNH NGHĨA SINH THEO `seed` của bốn bản đồ thường: nguồn gốc cũ, nay là "đồng hồ chuẩn" của test và đầu vào của công cụ `npm run map:bake -w server`
@@ -683,8 +685,49 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toMap: HAN_VAN_ID,
         toPortal: "han_van_bac",
       },
+      // Cổng bắc (mục 75, #1467 / A2 lát 2): đầu mút đường đất phía bắc (ô 65-66, hàng 2-3), tâm ở giữa hai ô đường; chỗ xuất hiện lệch sang ô 65 vì hàng 7 chỉ có đường ở ô 64-65 (ô 66 bị chặn).
+      {
+        id: "lang_hoang_bac",
+        name: "Vọng Kinh Quan",
+        x: 2112,
+        y: 112,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2096, y: 240 },
+        toMap: UY_VAN_ID,
+        toPortal: "uy_van_nam",
+      },
     ],
-    // CHƯA có quái: loài Hóa Thần (Thiên Lang Vương và đàn) do D1 (#1466) thêm sau A1. CHƯA có cổng bắc: `lang_hoang_bac` -> `uy_van` / `uy_van_nam` (B đã soạn ở a370601f, đường đất ô 65-66 hàng 2-3) vào cùng PR đăng ký Uy Vân Kinh (A2 lát 2), vì cổng trỏ tới bản đồ chưa có thì `portalLinkViolations` đỏ.
+    // CHƯA có quái: loài Hóa Thần (Thiên Lang Vương và đàn) do D1 (#1466) thêm sau A1. Cổng bắc tới Uy Vân Kinh đã có từ A2 lát 2. Không có `monsterCap` thì không sinh quái tự nhiên.
+    monsterCap: {},
+  },
+  {
+    id: UY_VAN_ID,
+    name: "Uy Vân Kinh",
+    // Bản đồ SỬA TAY ngay từ đầu (như Lang Hoang): `seed` chỉ là hạt giống B quét ra bố cục (4000 seed: nước + cát 6,1 %, liên thông 96,3 % từ trạm); tệp Tiled là nguồn duy nhất. Mục này là SỔ ĐĂNG KÝ và phải khớp tệp
+    // (ca "sổ đăng ký khớp tệp" ở `tiled-maps.test.ts`).
+    seed: 20267448,
+    w: 128,
+    h: 112,
+    // Trạm an toàn ở phía nam (khu an toàn do huyết trận giữ), cách cổng ~10 ô
+    town: { cx: 64, cy: 98, r: 5 },
+    townName: "Uy Vân Kinh",
+    wildName: "Huyết Trận Uy Vân",
+    portals: [
+      {
+        id: "uy_van_nam",
+        name: "Hồi Lang Quan",
+        // Đầu mút đường đất phía nam (ô 63-64, hàng 108), tâm ở giữa hai ô đường
+        x: 2048,
+        y: 3472,
+        r: 64,
+        safeR: 192,
+        spawn: { x: 2048, y: 3344 },
+        toMap: LANG_HOANG_ID,
+        toPortal: "lang_hoang_bac",
+      },
+    ],
+    // CHƯA có quái: loài Hóa Thần của Uy Vân Kinh do D1 (#1466) thêm. CHƯA có cổng bắc (đường bắc ở ô 76-77 hàng 2-4 sẵn cho bản đồ sau).
     monsterCap: {},
   },
 ];

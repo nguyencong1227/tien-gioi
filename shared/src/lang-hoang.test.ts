@@ -50,6 +50,7 @@ describe("Lang Hoang: đăng ký bản đồ thứ năm (mục 75 / A2)", () => 
     for (const [m, id] of [
       [hv, "han_van_bac"],
       [lh, "lang_hoang_nam"],
+      [lh, "lang_hoang_bac"],
     ] as const) {
       const p = m.portal(id)!;
       expect(m.circleBlocked(p.spawn.x, p.spawn.y, PLAYER_RADIUS), `${id}: chỗ xuất hiện`).toBe(
@@ -81,8 +82,8 @@ describe("Lang Hoang: đăng ký bản đồ thứ năm (mục 75 / A2)", () => 
     expect(d).toBeGreaterThan(8);
     expect(d).toBeLessThan(14);
     expect(lh.inSafe(lh.townPx.x, lh.townPx.y)).toBe(true);
-    // cổng bắc (tới Uy Vân Kinh) chưa có: bản đồ kia chưa vào game
-    expect(lh.portals.map((p) => p.id)).toEqual(["lang_hoang_nam"]);
+    // cổng bắc tới Uy Vân Kinh có từ A2 lát 2 (cặp cổng kiểm ở `uy-van.test.ts`)
+    expect(lh.portals.map((p) => p.id)).toEqual(["lang_hoang_nam", "lang_hoang_bac"]);
   });
 
   it("CHƯA có quái tự nhiên: `monsterCap` rỗng (không rơi về MONSTER_CAP mặc định của Lạc Hà); loài Hóa Thần do D1 (#1466) thêm rồi sửa ca này", () => {

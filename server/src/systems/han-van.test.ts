@@ -89,6 +89,7 @@ describe("Hàn Vân Lĩnh: phòng riêng và quái Nguyên Anh (M7.5)", () => {
       "world_am_suong",
       "world_han_van",
       "world_lang_hoang",
+      "world_uy_van",
     ]);
   });
 
