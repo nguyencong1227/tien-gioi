@@ -505,6 +505,11 @@ async function main() {
         !ghost.open && ghost.n === 0,
         `click ma ngay sau khi đóng hộp: bị bỏ qua (không mở lại hộp, không gửi) (${JSON.stringify(ghost)})`,
       );
+      // Đường LỖI: click ma mở lại hộp (chốt hỏng) thì đóng hộp đó đi (Esc không bị chốt chặn) để các kiểm sau chạy tiếp và đỏ ĐỘC LẬP, không ném lỗi 'không bấm được' che kiểm kế
+      if (ghost.open) {
+        await key("Escape", "Escape", 27);
+        await sleep(150);
+      }
       await sleep(560);
       await tapSel("#sect-vault-act");
       check((await box()).open, "sau cửa sổ chống click ma: bấm Rút mở lại hộp");
