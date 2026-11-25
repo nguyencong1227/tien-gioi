@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm lớp HÌNH Tiled của bản đồ (S3b, #1206 / #1330 mục 67.1) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite):
  *
@@ -21,10 +20,13 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import process from "node:process";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -130,36 +132,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-map-visual-chrome-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true },
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    launched = await launchChrome({ name: "map-visual" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -196,7 +177,8 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     /** Mở trang mock với `query`; chờ cảnh sẵn sàng và (nếu `waitVisual`) chờ ba lớp hình tối đa 8 giây. */
@@ -212,20 +194,23 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`, // ?debug mặc định TẮT lớp hình: ca cần lớp hình truyền &visual=1
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        60000,
+        200,
+      );
       if (!ready) return false;
-      for (let i = 0; i < 40; i++) {
-        const n = await evalJs("window.__scene.visualLayers.length");
-        if (waitVisual ? n === 3 : i >= 12) break; // không chờ lớp hình thì đợi ~2,4 s cho gói về / bị bỏ
-        await sleep(200);
+      if (waitVisual) {
+        // chờ ba lớp hình THEO ĐIỀU KIỆN (gói tải + ảnh nạp + dựng): tối đa 60 s (runner khung chậm), không cố định 8 s
+        await waitUntilTrue(() => evalJs("window.__scene.visualLayers.length === 3"), 60000, 200);
+      } else {
+        // KHÔNG mong có lớp hình: chờ thời gian để gói về / bị bỏ rồi mới kết luận (không có tín hiệu "bị bỏ" để chờ theo điều kiện); tỉ lệ theo khung chậm
+        await sleep(2400 + slowFrameMs() * 80);
       }
       await sleep(400);
       await evalJs(
@@ -317,7 +302,16 @@ async function main() {
           trees.frame === "tg-tree" && trees.size?.[0] === 32 && trees.size?.[1] === 32,
           `khung cây 32 x 32 "tg-tree": ${trees.frame} ${JSON.stringify(trees.size)}`,
         );
-        await sleep(900); // làm mờ chuyển (350 ms) đã xong: lớp hình đặc hẳn, nền cũ đã gỡ khỏi danh sách hiển thị
+        // làm mờ chuyển (350 ms) xong: lớp hình đặc hẳn, nền cũ đã gỡ khỏi danh sách hiển thị. Chờ THEO ĐIỀU KIỆN (ở khung chậm hoạt ảnh kéo dài hơn nhiều)
+        await waitUntilTrue(
+          () =>
+            evalJs(`(() => {
+              const s = window.__scene;
+              return s.visualLayers.length === 3 && s.visualLayers.every((l) => l.alpha === 1) && s.children.list.filter((o) => o.type === "TilemapLayer" && !s.visualLayers.includes(o)).length === 0;
+            })()`),
+          30000,
+          100,
+        );
         const done = await evalJs(`(() => {
           const s = window.__scene;
           const legacyAlive = s.children.list.filter((o) => o.type === "TilemapLayer" && !s.visualLayers.includes(o)).length;
@@ -359,7 +353,12 @@ async function main() {
           `?debug + lựa chọn '1' ở Cài đặt: lớp hình bật, ô được tick (${pref.layers} lớp, ô: ${chk0})`,
         );
         await evalJs(`document.getElementById("set-map-visual").click(); 1`);
-        await sleep(700);
+        await waitUntilTrue(
+          () =>
+            evalJs(`window.__scene.visualLayers.length === 0 && Boolean(window.__scene.mapLayer)`),
+          30000,
+          100,
+        );
         const offNow = await state();
         check(
           offNow.layers === 0 && offNow.legacy,
@@ -370,7 +369,14 @@ async function main() {
           "lựa chọn được lưu ('0') để lần sau vẫn tắt",
         );
         await evalJs(`document.getElementById("set-map-visual").click(); 1`);
-        await sleep(1500);
+        await waitUntilTrue(
+          () =>
+            evalJs(
+              `window.__scene.visualLayers.length === 3 && !window.__scene.mapLayer && window.__scene.visualFades >= 2`,
+            ),
+          30000,
+          100,
+        );
         const onAgain = await state();
         check(
           onAgain.layers === 3 && !onAgain.legacy,
@@ -419,23 +425,49 @@ async function main() {
         check(exceptions.length === 0, `không lỗi JS khi visual.json hỏng (${exceptions.length})`);
       }
     }
-  } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL");
-    } catch {
-      chrome.kill("SIGKILL");
-    }
-    server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    for (const d of [tmp, work]) {
-      try {
-        fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-      } catch {
-        // bỏ qua
+    // (5) CÁC BẢN ĐỒ KHÁC (gói `map:<id>` THẬT trong dist, không đổi): nạp được, dựng ba lớp hình, texture tileset rộng 396, lớp ô cũ không còn, không lỗi JS. Bắt gói thiếu / hỏng khi thêm bản đồ
+    // mới (Lang Hoang, Uy Vân Kinh của mục 75: ảnh `tileset_world.png` + `visual.json` riêng); thêm bản đồ mới thì thêm id vào danh sách này.
+    if (haveImage && !onlyVp) {
+      console.log("\n=== gói hình của các bản đồ khác ===");
+      for (const id of ["hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"]) {
+        if (!(await loadPage(VIEWPORTS[0], `&visual=1&map=${id}`, true))) {
+          console.log(`  ✗ ${id}: cảnh không sẵn sàng`);
+          failures++;
+          continue;
+        }
+        const o = await evalJs(`(() => {
+          const s = window.__scene;
+          const key = "map-visual:${id}";
+          return { map: s.map.def.id, layers: s.visualLayers.length, legacy: Boolean(s.mapLayer),
+            texW: s.textures.exists(key) ? s.textures.get(key).getSourceImage().width : 0,
+            vm: s.visualMap ? [s.visualMap.width, s.visualMap.height] : null, def: [s.map.def.w, s.map.def.h] };
+        })()`);
+        check(o.map === id, `${id}: đúng bản đồ (${o.map})`);
+        check(
+          o.layers === 3 && !o.legacy,
+          `${id}: gói hình nạp, ba lớp hình dựng, lớp ô cũ không còn (${o.layers} lớp)`,
+        );
+        check(o.texW === 396, `${id}: texture ảnh tileset nạp, rộng 396 (${o.texW})`);
+        check(
+          o.vm?.[0] === o.def[0] && o.vm?.[1] === o.def[1],
+          `${id}: visual.json cùng cỡ bản đồ (${JSON.stringify(o.vm)} / ${JSON.stringify(o.def)})`,
+        );
+        check(
+          exceptions.length === 0,
+          `${id}: không lỗi JS (${exceptions.length}): ${exceptions[0] ?? ""}`,
+        );
       }
+    }
+  } catch (e) {
+    console.log(`  ✗ lỗi không mong đợi: ${e && e.message ? e.message : e}`);
+    failures++;
+  } finally {
+    server.close();
+    if (launched) await launched.close();
+    try {
+      fs.rmSync(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // bỏ qua
     }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
