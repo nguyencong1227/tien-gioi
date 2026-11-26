@@ -52,10 +52,10 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       const scripts = getE2eScripts(realPkg);
       expect(scripts).toContain("e2e:inv-select");
       expect(scripts).toContain("e2e:move-keys");
-      expect(scripts.length).toBeGreaterThanOrEqual(57);
+      expect(scripts.length).toBeGreaterThanOrEqual(58);
     });
 
-    it("server/package.json thật nối đủ 26 check-* (lô đầu + act-confirm + sect-confirm + sect-vault nối lại ở #1477 + map-zoom + map-card + map-style + map-visual + minimap-zone + chat-title + quick-labels + bag-names + rarity + chuot-thap + newbie-guide + book-bag + status-speed + tap-hold) vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
+    it("server/package.json thật nối đủ 27 check-* (lô đầu + act-confirm + sect-confirm + sect-vault nối lại ở #1477 + map-zoom + map-card + map-style + map-visual + minimap-zone + chat-title + quick-labels + bag-names + rarity + chuot-thap + newbie-guide + book-bag + status-speed + tap-hold + skill-touch) vào nightly (#1458), mỗi dòng trỏ tới tệp check-<tên>.mjs có thật", () => {
       const realPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
       const batch = [
         "skills-panel",
@@ -80,6 +80,7 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
         "bag-names",
         "rarity",
         "chuot-thap",
+        "skill-touch",
         "newbie-guide",
         "book-bag",
         "status-speed",
