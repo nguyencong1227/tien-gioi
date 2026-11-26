@@ -1,6 +1,5 @@
-/* global console, setTimeout, process */
-// Kiểm NHÃN TÊN VÙNG dưới bản đồ nhỏ (`#minimap-zone`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ), ở bốn khung nhìn: MỌI tên vùng của `MAPS` (trấn + hoang của cả bốn bản
-// đồ) đặt vào nhãn rồi đo: KHÔNG bị cắt (scrollWidth <= clientWidth), tối đa HAI dòng, chân bản đồ không đè thanh menu HUD bên dưới; màn cảm ứng ẩn chữ gợi ý "M" (không có phím M),
+/* global console, process */
+// Kiểm NHÃN TÊN VÙNG dưới bản đồ nhỏ (`#minimap-zone`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ), ở bốn khung nhìn: MỌI tên vùng của `MAPS` (trấn + hoang của MỌI bản đồ: sáu bản đồ = 12 tên sau mục 75) đặt vào nhãn rồi đo: KHÔNG bị cắt (scrollWidth <= clientWidth), tối đa HAI dòng, chân bản đồ không đè thanh menu HUD bên dưới; màn cảm ứng ẩn chữ gợi ý "M" (không có phím M),
 // máy tính vẫn hiện. Trước đây `max-width: 85px` + một dòng + dấu chấm lửng cắt 7 / 8 tên ở màn cảm ứng ("Hàn Vân T…") và "Vọng Sương Trạm" ở máy tính.
 // Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
 //   node client/scripts/check-minimap-zone.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>]
@@ -11,7 +10,6 @@ import { launchChrome } from "./chrome-launch.mjs";
 import { waitUntilTrue } from "./chrome-wait.mjs";
 import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
@@ -89,7 +87,16 @@ try {
       300,
     );
     if (!ready) throw new Error(`${W}x${H}: cảnh mock không sẵn sàng sau 60 s`);
-    await sleep(600);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(600)`: phông Noto Serif đã tải xong (đo `scrollWidth` bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html> (CSS ẩn chữ "M" dựa vào nó)
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${W}x${H}: phông chưa tải xong / thiếu data-input sau 30 s`);
     const names = JSON.parse(
       await evalJs(
         `import(${JSON.stringify(MAP_TS)}).then((m) => JSON.stringify([...new Set(m.MAPS.flatMap((d) => [d.townName, d.wildName]))]))`,

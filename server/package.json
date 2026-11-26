@@ -73,6 +73,7 @@
     "e2e:map-style": "node ../client/scripts/check-map-style.mjs",
     "e2e:map-visual": "node ../client/scripts/check-map-visual.mjs",
     "e2e:minimap-zone": "node ../client/scripts/check-minimap-zone.mjs",
+    "e2e:chat-title": "node ../client/scripts/check-chat-title.mjs",
     "e2e:ban-do-trong": "tsx scripts/e2e-ban-do-trong.ts",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
