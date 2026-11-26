@@ -378,6 +378,7 @@ import { renderPrivateCredits } from "./private-credits";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
+import { createTapDedupe } from "./tap-dedupe";
 
 // `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
 export { fmt };
@@ -4967,15 +4968,16 @@ export const ui = {
     const bindTap = (id: string, fn: () => void) => {
       const el = $(id);
       if (!el) return;
-      // -Infinity (không phải 0): với 0, mọi `click` trong 300 ms đầu sau khi tải trang bị coi là trùng với một lần chạm và bỏ qua
-      let lastTap = -Infinity;
+      // `fn` chạy ở `pointerdown`; `click` đi kèm lần chạm đó bị bỏ qua. Mốc là `pointerdown` HOẶC `pointerup` gần nhất (xem tap-dedupe.ts): nhấn giữ lâu thì `click` vẫn tới ngay sau lần NHẢ
+      const tap = createTapDedupe();
       el.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        lastTap = performance.now();
+        tap.down(performance.now());
         fn();
       });
+      el.addEventListener("pointerup", () => tap.up(performance.now()));
       el.addEventListener("click", (e) => {
-        if (performance.now() - lastTap < 300) return;
+        if (tap.ignoreClick(performance.now())) return;
         e.preventDefault();
         fn();
       });

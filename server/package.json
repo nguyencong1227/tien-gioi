@@ -81,6 +81,7 @@
     "e2e:newbie-guide": "node ../client/scripts/check-newbie-guide.mjs",
     "e2e:book-bag": "node ../client/scripts/check-book-bag.mjs",
     "e2e:status-speed": "node ../client/scripts/check-status-speed.mjs",
+    "e2e:tap-hold": "node ../client/scripts/check-tap-hold.mjs",
     "e2e:ban-do-trong": "tsx scripts/e2e-ban-do-trong.ts",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
