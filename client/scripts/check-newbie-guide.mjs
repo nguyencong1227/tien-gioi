@@ -1,19 +1,18 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm CHỈ DẪN NGƯỜI MỚI (#673, #674) trong Chrome THẬT (`?skills=mock`, không cần máy chủ; KHÔNG đặt cờ bỏ qua nên hộp tự mở lần đầu như người mới thật):
 //  - hai nút ở chân hộp ("Xem tất cả phím tắt" / "Đã Hiểu") đều >= 44 px, KHÔNG vỡ chữ (một dòng: chiều cao nhỏ hơn 2 dòng chữ + đệm) và không tràn; nút phím tắt không bị ép hẹp hơn chữ của nó
 //    (trước đây `.auth-btn-primary` rộng 100 % ép nó còn 44 x 97 px, chữ xuống 5 dòng, nút "Đã Hiểu" cao 97 px); ở cảm ứng THẬT (`data-input="touch"`) nút phím tắt bị CSS ẩn và "Đã Hiểu" chiếm cả hàng; Chrome không đầu chỉ GIẢ khung (`mobile`) mà con trỏ vẫn là chuột nên ở bốn khung này nút phím tắt vẫn HIỆN và được đo như mọi khung;
 //  - có thẻ "Chiêu Thức" nói quyển học ở Túi đồ (nút Học), phím L U I O và bảng Công pháp, nhãn phím theo phím ĐANG GÁN (đổi phím thì chữ đổi theo);
 //  - Esc / Cách đóng hộp.
 // Ở bốn khung nhìn (1280x720 chuột; 844x390, 390x844, 360x640 CẢM ỨNG THẬT: `Emulation.setTouchEmulationEnabled`, `data-input="touch"`): ở cảm ứng hộp chỉ dẫn / dòng chào nêu NÚT thay vì phím (#690). Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-newbie-guide.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-newbie-guide.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -22,39 +21,15 @@ const argOf = (name, dflt) => {
 };
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-newbie-guide-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "newbie-guide" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -92,7 +67,8 @@ try {
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
     // KHÔNG đặt `tg_newbie_guide_dismissed`: người mới thật thấy hộp chỉ dẫn tự mở
-    source: `try{localStorage.removeItem('tg_newbie_guide_dismissed');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.removeItem('tg_newbie_guide_dismissed');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   // khung chuột TRƯỚC, khung cảm ứng SAU: một khi Chrome bật giả lập cảm ứng thì không tắt lại được trong cùng phiên (như capture-viewports)
   for (const [W, H, mobile, realTouch] of [
@@ -116,17 +92,28 @@ try {
         configuration: "mobile",
       });
     }
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
-        )
-      )
-        break;
-    }
-    await sleep(800);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${W}x${H}: cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(800)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${W}x${H}: phông chưa tải xong / thiếu data-input sau 30 s`);
     check(
       Boolean(await evalJs("window.__ui.isNewbieGuideOpen()")),
       "hộp chỉ dẫn tự mở khi vào game lần đầu (chưa có cờ đã đọc)",
@@ -247,14 +234,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);
