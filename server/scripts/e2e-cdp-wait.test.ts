@@ -60,11 +60,14 @@ describe("E2E: hạn chờ Chrome mở CDP đủ cho khởi động lạnh (#694
     expect(files.length).toBeGreaterThanOrEqual(31);
   });
 
-  it(`helper e2e-chrome.ts có hạn chờ mặc định >= ${HELPER_MIN_WAIT_MS} ms (#1432)`, () => {
+  it(`helper e2e-chrome.ts có hạn chờ mặc định >= ${HELPER_MIN_WAIT_MS} ms (60 s khi CI, #1432, #1506)`, () => {
     const helperSrc = readFileSync(path.join(here, "e2e-chrome.ts"), "utf8");
-    const match = helperSrc.match(/DEFAULT_CDP_TIMEOUT_MS\s*=\s*(\d+)/);
+    const match = helperSrc.match(
+      /DEFAULT_CDP_TIMEOUT_MS\s*=\s*(?:process\.env\.CI\s*\?\s*(\d+)\s*:\s*)?(\d+)/,
+    );
     expect(match).not.toBeNull();
-    expect(Number(match![1])).toBeGreaterThanOrEqual(HELPER_MIN_WAIT_MS);
+    const waitMs = Number(match![2] ?? match![1]);
+    expect(waitMs).toBeGreaterThanOrEqual(HELPER_MIN_WAIT_MS);
   });
 
   for (const f of files) {
