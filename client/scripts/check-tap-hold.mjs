@@ -238,6 +238,49 @@ try {
     );
   }
 
+  // `click` tới TRỄ sau `pointerup` (luồng chính bận: `click` cảm ứng là cử chỉ do trình duyệt phát, đo tới 226 ms sau `pointerup` ở khung chậm, có thể hơn): vẫn MỘT lần.
+  // Phát sự kiện TỔNG HỢP trong cùng một lượt JS nên không phụ thuộc tốc độ khung; cửa sổ thời gian cố định (300 ms) làm `fn` chạy lần hai ở mọi độ trễ >= 300 ms.
+  console.log("\n--- click tới trễ sau pointerup (tổng hợp, tất định) ---");
+  const lateClick = (delayMs) =>
+    evalJs(`(async () => {
+      const b = document.getElementById("qt-toggle");
+      const before = b.getAttribute("aria-expanded");
+      const o = { bubbles: true, cancelable: true, pointerId: 77, pointerType: "touch", isPrimary: true, button: 0 };
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      b.dispatchEvent(new PointerEvent("pointerdown", o));
+      await wait(120);
+      b.dispatchEvent(new PointerEvent("pointerup", o));
+      await wait(${delayMs});
+      b.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+      return JSON.stringify([before, b.getAttribute("aria-expanded")]);
+    })()`).then(JSON.parse);
+  for (const delay of [50, 350, 600, 1200]) {
+    const [before, after] = await lateClick(delay);
+    check(
+      before !== after,
+      `click trễ ${delay} ms sau pointerup: đổi MỘT lần (aria-expanded ${before} -> ${after})`,
+    );
+  }
+  {
+    // hai lần bấm CHỒNG nhau: click của lần một tới sau pointerdown của lần hai; tổng cộng đúng hai lần đổi (về chỗ cũ), không ba
+    const [before, after] = JSON.parse(
+      await evalJs(`(async () => {
+        const b = document.getElementById("qt-toggle");
+        const before = b.getAttribute("aria-expanded");
+        const o = { bubbles: true, cancelable: true, pointerId: 78, pointerType: "touch", isPrimary: true, button: 0 };
+        const click = () => b.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }));
+        b.dispatchEvent(new PointerEvent("pointerdown", o));
+        b.dispatchEvent(new PointerEvent("pointerup", o));
+        b.dispatchEvent(new PointerEvent("pointerdown", o));
+        click(); // click của lần một, tới muộn
+        b.dispatchEvent(new PointerEvent("pointerup", o));
+        click(); // click của lần hai
+        return JSON.stringify([before, b.getAttribute("aria-expanded")]);
+      })()`),
+    );
+    check(before === after, `hai lần bấm chồng nhau: đúng hai lần đổi (${before} -> ${after})`);
+  }
+
   check(pageErrors === 0, `không ngoại lệ trong trang (${pageErrors})`);
   ws.close();
 } finally {
