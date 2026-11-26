@@ -227,8 +227,16 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
 
         cast(t.w, "a", { slot: 2, angle: 0 });
 
-        // Cho đạn bay hết qua tickWorld (tối đa 200 tick)
+        // Chờ vận chiêu xong nếu có windupMs và cho đạn bay hết qua tickWorld (tối đa 200 tick)
         const pins = testMonsters.map((tm) => [tm.m, tm.m.x, tm.m.y] as const);
+        for (let step = 0; step < 200 && t.c.windup !== undefined; step++) {
+          t.w.now += 50;
+          tickWorld(t.w, 50);
+          for (const [m, x, y] of pins) {
+            m.x = x;
+            m.y = y;
+          }
+        }
         for (let step = 0; step < 200; step++) {
           if (t.w.pbolts.length === 0) break;
           t.w.now += 50;
@@ -285,10 +293,10 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
       }
 
       if (def.shape === "chain") {
-        // Sét lan (mục 51): đánh mục tiêu đầu trong tầm với, nảy sang các quái khác
+        // Sét lan (mục 51): đánh mục tiêu đầu trong tầm với, nảy sang các quái khác (dùng castAndSettle để windupMs không đỏ giả)
         const hit = bigMonster(t, z.in[0], z.in[1]);
         const miss = bigMonster(t, z.out[0], z.out[1]);
-        cast(t.w, "a", { slot: 2, angle: 0 });
+        castAndSettle(t, def, hit.id);
         expect(dmgOf(t.dmgs, hit.id).length, `${def.id}: quái trong tầm bị đánh`).toBeGreaterThan(
           0,
         );
@@ -528,8 +536,16 @@ describe("skill-kit: ca riêng cho bolt (đạn hẹn giờ)", () => {
 
       cast(t.w, "a", { slot: 2, angle: 0 });
 
-      // Trôi w.now + tickPBolts qua tickWorld
+      // Trôi w.now + tickPBolts qua tickWorld (chờ windupMs xong nếu có)
       const pins = [q1, q2, q3, q_miss].map((tm) => [tm.m, tm.m.x, tm.m.y] as const);
+      for (let i = 0; i < 200 && t.c.windup !== undefined; i++) {
+        t.w.now += 50;
+        tickWorld(t.w, 50);
+        for (const [m, x, y] of pins) {
+          m.x = x;
+          m.y = y;
+        }
+      }
       for (let i = 0; i < 200; i++) {
         if (t.w.pbolts.length === 0) break;
         t.w.now += 50;
