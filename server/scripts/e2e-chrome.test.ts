@@ -4,7 +4,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { launchChrome, cdpWaitMs } from "./e2e-chrome";
+import { launchChrome, cdpWaitMs, DEFAULT_CDP_TIMEOUT_MS } from "./e2e-chrome";
 
 /** Tìm một cổng TCP rảnh cục bộ. */
 async function freePort(): Promise<number> {
@@ -416,16 +416,64 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     expect(logs).not.toContain("đã dựng lại Chrome lần 2");
   });
 
-  it("Ca 8: cdpWaitMs trả 60000 ms khi CI, 30000 ms ở máy dev (#1506)", () => {
+  it("Ca 8: cdpWaitMs và DEFAULT_CDP_TIMEOUT_MS trả 60000 ms khi CI, 30000 ms ở máy dev (#1506)", () => {
     const oldCi = process.env.CI;
     try {
       process.env.CI = "true";
       expect(cdpWaitMs()).toBe(60000);
       delete process.env.CI;
       expect(cdpWaitMs()).toBe(30000);
+      expect(DEFAULT_CDP_TIMEOUT_MS).toBeGreaterThanOrEqual(30000);
     } finally {
       if (oldCi !== undefined) process.env.CI = oldCi;
       else delete process.env.CI;
     }
+  });
+
+  it("Ca 9: Chrome giả trả mảng rỗng [] hoặc target chưa phải page trong vài trăm ms -> đợi đúng page target và thành công ở LẦN 1 (#1506)", async () => {
+    const port = await freePort();
+    const fakeScript = path.join(tmpDir, "fake-chrome-empty-targets.js");
+
+    // Fake Chrome: 300 ms đầu trả [], sau 300 ms trả page target có WebSocket url
+    writeFileSync(
+      fakeScript,
+      `
+      const http = require("node:http");
+      const port = Number(process.argv[2]);
+      const start = Date.now();
+      const server = http.createServer((req, res) => {
+        if (req.url === "/json") {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          if (Date.now() - start < 300) {
+            res.end(JSON.stringify([]));
+          } else {
+            res.end(JSON.stringify([{ type: "page", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/page/1" }]));
+          }
+        } else {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+      server.listen(port, "127.0.0.1");
+      setInterval(() => {}, 1000);
+      `,
+    );
+
+    const logs: string[] = [];
+    const launched = await launchChrome({
+      cdpPort: port,
+      userDataDir: path.join(tmpDir, "user-data"),
+      executable: process.execPath,
+      customArgs: (p) => [fakeScript, String(p)],
+      timeoutMs: 4000,
+      pollIntervalMs: 50,
+      log: (m) => logs.push(m),
+    });
+
+    expect(launched.diag.attempts).toBe(1);
+    expect(launched.webSocketDebuggerUrl).toBe(`ws://127.0.0.1:${port}/devtools/page/1`);
+    expect(logs).not.toContain("đã dựng lại Chrome lần 2");
+
+    launched.kill();
   });
 });
