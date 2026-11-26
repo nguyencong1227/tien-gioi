@@ -1,4 +1,4 @@
-/* global console, setTimeout, process */
+/* global console, process */
 // Kiểm DANH HIỆU TRONG CHAT (M9, #1027) trong Chrome THẬT qua CDP, chế độ `?skills=mock&n=2`, KHÔNG cần máy chủ: tin `chat` mẫu đổ vào `__ui.chat` (đường vào của `reg("chat")`).
 // Mặc định BẬT (`?social=1` vẫn nhận): tin có `titleId` hiện «Danh hiệu» trước tên ở chat chung / đội / tông môn, trong thẻ `<i class="chat-title">`; id lạ KHÔNG hiện và không lộ id; tin không có
 // `titleId` y hệt cũ. Có `?social=0`: không hiện danh hiệu nào (công tắc khẩn). Chữ đi vào DOM bằng textContent (tên chứa thẻ HTML không thành thẻ).
@@ -9,7 +9,6 @@ import { launchChrome } from "./chrome-launch.mjs";
 import { waitUntilTrue } from "./chrome-wait.mjs";
 import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
