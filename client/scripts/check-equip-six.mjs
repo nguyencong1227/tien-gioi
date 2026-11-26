@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm BẢNG TRANG BỊ SÁU Ô (M7.4 #505, `client/src/equip-panel.ts` + `ui.ts`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ):
 // đặt `boots / jade / treasure / realm` thẳng lên `__scene.me()` (hud chạy mỗi khung nên ghi đè được ngay) và nhập `ITEM_BY_ID` của chính trang để thêm món thử
 // (các ca A-H dùng món thử `zz_*` để ép trần / dữ liệu lạ; ca I dùng MỌI món THẬT của ba ô riêng có trong `ITEMS`, M7.4 #590 / #594 / #624). Đo DOM + kiểu tính toán + toạ độ thật:
@@ -11,14 +10,14 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
 //  - ĐỒ THẬT (ca I): mỗi món hài / ngọc bội / pháp bảo trong `ITEMS` mặc vào thẻ đúng ô: tên thẻ = tên món, thẻ "filled" (pháp bảo mở từ Kim Đan), gợi ý chứa ĐỦ từng chỉ số
 //    (số + nhãn), ba dòng % khớp chỉ số của món, pháp bảo mang NGUYÊN VĂN câu nội tại của `TREASURES` ở title + aria, không chữ undefined / NaN, tên không bị cắt, chữ nằm trong thẻ.
 // Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-equip-six.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-equip-six.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -28,39 +27,15 @@ const argOf = (name, dflt) => {
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const SHARED = `/@fs/${path.resolve(import.meta.dirname, "../../shared/src/items.ts").replace(/^\//, "")}`;
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-equip6-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "equip-six" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -110,7 +85,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
 
   // ---- tiện ích trong trang -----------------------------------------------------------------------------------
@@ -154,17 +130,28 @@ try {
       deviceScaleFactor: 1,
       mobile: W < 700,
     });
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
-        )
-      )
-        break;
-    }
-    await sleep(500);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${W}x${H}: cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(500)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${W}x${H}: phông chưa tải xong / thiếu data-input sau 30 s`);
 
     // Nhập module `shared` của trang rồi thêm món thử cho ba ô riêng
     const info = JSON.parse(
@@ -607,9 +594,7 @@ try {
   check(pageErrors === 0, `0 lỗi JS (có ${pageErrors})`);
   ws.close();
 } finally {
-  chrome.kill();
-  await sleep(500);
-  fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\n✓ TẤT CẢ ĐẠT" : `\n✗ ${failures} kiểm tra HỎNG`);
 process.exit(failures === 0 ? 0 : 1);
