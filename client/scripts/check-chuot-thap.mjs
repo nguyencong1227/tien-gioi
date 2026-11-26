@@ -1,21 +1,20 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm bộ giao diện của cửa sổ CHUỘT thấp (#676, A quyết ở issue): chuột + cạnh ngắn < 600 chỉ là điện thoại khi hẹp (< 900) HOẶC thấp hơn `DESKTOP_MIN_HEIGHT`. Script này:
 //  (a) ĐO ở các khung thấp xem bố cục MÁY TÍNH còn dùng được không, để CHỌN mốc `DESKTOP_MIN_HEIGHT` bằng số đo chứ không đoán. Mỗi khung: HUD không tràn trang / không ra ngoài khung / không chồng
 //      nhau (khung trái, nhiệm vụ, chat, bản đồ nhỏ, nút HUD, ô chiêu, nút Chém / Kiếm khí / Đả tọa / Đột phá, Nói, ô nhanh), nút HUD >= 44 px; rồi mở lần lượt túi, nhân vật, nhiệm vụ, công pháp,
 //      bản đồ lớn, cài đặt, hộp thoại NPC, chỉ dẫn: bảng nằm trong khung, không tràn ngang, nút Đóng trong khung và >= 44 px, nút >= 44 px; bảng phải tự cuộn thì ghi chú (không tính lỗi: tấm dài tự cuộn là thiết kế);
 //  (b) khẳng định phân loại (`data-form`) đúng quy tắc và KHÔNG có vấn đề bố cục ở mọi khung truyền vào.
 // Con trỏ CHUỘT (cờ Chrome như check-skills-panel), `?skills=mock&n=4&realm=4`. Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-chuot-thap.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots] [--measure] [--min-h <số>] [--ui-scale 1.15] [--frames '[[1280,577],[1366,625]]']
+//   node client/scripts/check-chuot-thap.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots] [--measure] [--min-h <số>] [--ui-scale 1.15] [--frames '[[1280,577],[1366,625]]']
 //   --measure: chỉ in số đo, không khẳng định (dùng để chọn `DESKTOP_MIN_HEIGHT`); --min-h: ghi đè `DESKTOP_MIN_HEIGHT` để kiểm `data-form` (mặc định: giá trị trong `client/src/gfx/display.ts`).
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -35,41 +34,18 @@ const SRC_MIN_H = Number(
   )?.[1],
 );
 if (!Number.isFinite(SRC_MIN_H)) throw new Error("Không đọc được DESKTOP_MIN_HEIGHT từ display.ts");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-chuot-thap-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    // Chrome không đầu không có chuột: `pointer: fine` = false thì thanh chiêu (CSS chỉ cho máy tính) bị ẩn; giả lập chuột (4 = fine, 2 = hover)
-    "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+const POINTER_FLAGS = [
+  "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
+];
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "chuot-thap", extraArgs: POINTER_FLAGS });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -107,7 +83,8 @@ try {
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
     // `--ui-scale 1.15`: cỡ chữ "Lớn" (Cài đặt) làm nội dung cao thêm; mốc `DESKTOP_MIN_HEIGHT` phải đủ cho cả cỡ này
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.setItem('tg_ui_scale',${JSON.stringify(argOf("--ui-scale", "1"))});localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.setItem('tg_ui_scale',${JSON.stringify(argOf("--ui-scale", "1"))});localStorage.removeItem('tg_reduced_motion')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
 
   // khung CHUỘT (không bật `mobile`): [rộng, cao]
@@ -215,17 +192,28 @@ try {
       deviceScaleFactor: 1,
       mobile: false,
     });
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=4&realm=4&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
-        )
-      )
-        break;
-    }
-    await sleep(1200);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${w}x${h}: cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(1200)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${w}x${h}: phông chưa tải xong / thiếu data-input sau 30 s`);
     const hud = await J(probeJs(null));
     const row = { w, h, form: hud.form, hud: hud.problems, panels: {} };
     console.log(
@@ -292,14 +280,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);

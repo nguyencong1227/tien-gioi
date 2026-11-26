@@ -1,18 +1,17 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm TÊN Ô TÚI ở các khung nhìn (nit của B, M7.8 #509) trong Chrome THẬT (`?skills=mock`, không cần máy chủ): bơm túi 24 món tên dài qua đúng đường tin `inv` (`__ui.onInv`) rồi đo DOM.
 // Ở điện thoại ô túi chỉ ~42-68 px mà chữ nội dung >= 14 px, nên tên chỉ còn 2-3 chữ ("Hồi…", "Th…") và nhiều món cắt giống hệt nhau (đo cả 69 món: 68 / 69 tên bị cắt ở 390 x 844):
 //  - điện thoại DỌC (`data-form="phone"` + `data-orient="portrait"`): tên ô BỊ ẨN (không phải cắt dở), biểu tượng >= 32 px, ô >= 44 px, `aria-label` vẫn mở đầu bằng tên ĐẦY ĐỦ, chạm ô thì bảng chi tiết ghi tên đầy đủ;
 //  - máy tính, máy tính bảng và điện thoại NGANG (ô 80 px, bảng chi tiết nằm dưới màn hình): tên vẫn hiện, `aria-label` đủ tên, chọn ô thì bảng chi tiết ghi tên đầy đủ.
 // Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-bag-names.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-bag-names.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -21,39 +20,15 @@ const argOf = (name, dflt) => {
 };
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-bag-names-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "bag-names" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -90,7 +65,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   /** 24 món tên dài thật (id của `ITEMS`): đan ba cấp, đồ ba ô riêng + trang bị, kinh quyển, nguyên liệu */
   const IDS = [
@@ -133,17 +109,28 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
-        )
-      )
-        break;
-    }
-    await sleep(500);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${W}x${H}: cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(500)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${W}x${H}: phông chưa tải xong / thiếu data-input sau 30 s`);
     await evalJs(
       `window.__ui.onInv({ slots: ${JSON.stringify(IDS.map((itemId) => ({ itemId, qty: 2 })))}, cd: {} }); window.__ui.toggleInventory(true); 0`,
     );
@@ -217,14 +204,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);
