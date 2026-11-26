@@ -418,12 +418,12 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
 
   it("Ca 8: cdpWaitMs và DEFAULT_CDP_TIMEOUT_MS trả 60000 ms khi CI, 30000 ms ở máy dev (#1506)", () => {
     const oldCi = process.env.CI;
+    expect(DEFAULT_CDP_TIMEOUT_MS).toBe(oldCi ? 60000 : 30000);
     try {
       process.env.CI = "true";
       expect(cdpWaitMs()).toBe(60000);
       delete process.env.CI;
       expect(cdpWaitMs()).toBe(30000);
-      expect(DEFAULT_CDP_TIMEOUT_MS).toBe(cdpWaitMs());
     } finally {
       if (oldCi !== undefined) process.env.CI = oldCi;
       else delete process.env.CI;

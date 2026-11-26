@@ -7,7 +7,7 @@ import { getChromeGpuFlags, killChrome, sleep } from "./e2e-kit";
 
 /** Chờ page target mỗi lần thử: 60 s khi CI (khởi động nguội chậm), 30 s ở máy dev (#694, #1432, #1506). */
 export const cdpWaitMs = () => (process.env.CI ? 60000 : 30000);
-export const DEFAULT_CDP_TIMEOUT_MS = cdpWaitMs();
+export const DEFAULT_CDP_TIMEOUT_MS = process.env.CI ? 60000 : 30000;
 /** Khoảng thời gian giữa các lần thăm dò /json. */
 export const DEFAULT_POLL_INTERVAL_MS = 150;
 /** Số dòng stderr cuối cùng giữ trong bộ đệm vòng. */
