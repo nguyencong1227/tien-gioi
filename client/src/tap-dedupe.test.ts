@@ -91,8 +91,9 @@ describe("createTapDedupe (bindTap: ghép cặp pointerdown <-> click)", () => {
   it("bấm liên tục không có click (chuột phải...) không tích nợ vô hạn", () => {
     const d = createTapDedupe();
     for (let i = 0; i < 100; i++) d.down(i);
+    // vòng CHẶN (1000 lần): một bản `ignoreClick` không bao giờ trả nợ sẽ không làm test treo
     let swallowed = 0;
-    while (d.ignoreClick(200)) swallowed++;
+    for (let i = 0; i < 1000 && d.ignoreClick(200); i++) swallowed++;
     expect(swallowed).toBeLessThanOrEqual(8);
   });
 
