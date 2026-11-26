@@ -107,7 +107,8 @@ describe("thành tựu qua phòng thật", () => {
   it("MẶC ĐỊNH TẮT: bộ đếm vẫn ghi vào chân linh nhưng không cấp thành tựu / Duyên / tin; BẬT thì thành tựu đến hạn được CẤP BÙ ở lần ghi kế", async () => {
     const h = await spawn();
     expect(WorldRoomCls.achievements).toBe(false);
-    await sleep(400); // vào phòng khi TẮT: không ghi theo dõi (bản đồ / kiếp / cảnh giới) nên chân linh không có phần xã hội
+    // Chờ âm: vào phòng khi TẮT achievements, khẳng định không ghi theo dõi nên chân linh không có phần xã hội
+    await sleep(200);
     expect((await soulOf(h))?.social).toBeUndefined();
     trackSocial(serverRoom(h.room).world, h.room.sessionId, ["boss:mang", 1]);
     const s1 = await until(
@@ -119,6 +120,7 @@ describe("thành tựu qua phòng thật", () => {
       "bộ đếm được ghi",
     );
     expect(s1.social!.ach).toEqual({}); // không cấp
+    // Chờ âm: khẳng định không có tin achievementNew nào được gửi tới client khi tắt tính năng
     await sleep(150);
     expect(h.news).toEqual([]);
     // bật: lần ghi kế cấp bù thành tựu đã đến hạn (trum_mang_1)
@@ -143,8 +145,8 @@ describe("thành tựu qua phòng thật", () => {
     expect(s.social!.ach.kiep_2).toBeTruthy();
     expect(s.duyen).toBe(duyenBefore + 2); // thưởng Duyên của kiep_2
     expect(s.duyenTotal).toBeGreaterThanOrEqual(s.duyen);
-    await sleep(200);
-    // người khác không nhận thành tựu của A; B chỉ có thể nhận thành tựu CỦA CHÍNH MÌNH lúc vào Lạc Hà (`den_lac_ha`, M9.9: ai nhập thế cũng có)
+    // Chờ âm: khẳng định người khác (B) không nhận thành tựu của A; B chỉ có thể nhận thành tựu CỦA CHÍNH MÌNH lúc vào Lạc Hà (`den_lac_ha`, M9.9)
+    await sleep(150);
     expect(b.news.filter((id) => id !== "den_lac_ha")).toEqual([]);
     // idempotent: ghi lại cùng mốc không cấp / cộng Duyên lần nữa
     // (dùng `pk_lost`: `pk_won` 1 mở `pk_thang_1` có thưởng Duyên từ M9.9, sẽ làm lệch phép so Duyên của ca này)
@@ -180,14 +182,18 @@ describe("thành tựu qua phòng thật", () => {
     const n1 = h.ach.length;
     for (const bad of [{ id: 5 }, { id: "TOO-LONG-ID" }, "tr1", null, {}])
       h.room.send(SOCIAL_MSG.titleSet, bad as never);
-    await sleep(500);
+    // Chờ âm: khẳng định tin rác bị bỏ qua, không có phản hồi nào được gửi về
+    await sleep(250);
     expect(h.ach.length).toBe(n1);
     expect(me(h).title).toBe("tr1");
     // vào lại: nhận danh hiệu đang đeo
     const name = h.name;
+    const oldServer = serverRoom(h.room);
+    const oldSid = h.room.sessionId;
     await h.room.leave(true);
     rooms.splice(rooms.indexOf(h.room), 1);
-    await sleep(300);
+    // Chờ dương: người chơi cũ hoàn tất rời phòng trước khi tạo lại người chơi cùng tên
+    await waitFor(() => !oldServer.state.players.has(oldSid), 3000, "người chơi cũ rời phòng");
     const again = await spawn(name);
     await waitFor(() => me(again).title === "tr1", 3000, "danh hiệu sau khi vào lại");
     again.room.send(SOCIAL_MSG.titleSet, { id: null });
@@ -211,7 +217,8 @@ describe("thành tựu qua phòng thật", () => {
       titleId: "tr1",
     });
     me(a).title = "";
-    await sleep(900); // hồi chiêu chat 800 ms
+    // Chờ đồng hồ: hồi chiêu chat máy chủ (800 ms) trôi qua trước khi gửi tin thứ hai
+    await sleep(900);
     a.room.send("chat", { text: "het danh hieu" });
     await waitFor(() => heard.find((m) => m.text === "het danh hieu"), 3000, "nhận chat 2");
     expect(heard.find((m) => m.text === "het danh hieu")).toEqual({
@@ -225,9 +232,12 @@ describe("thành tựu qua phòng thật", () => {
     const name = `Kiep Cu ${++seq}`;
     const first = await spawn(name);
     await serverRoom(first.room).souls.update(soulIdOf(name), (s) => ({ ...s, kiep: 3 }));
+    const firstServer = serverRoom(first.room);
+    const firstSid = first.room.sessionId;
     await first.room.leave(true);
     rooms.splice(rooms.indexOf(first.room), 1);
-    await sleep(300);
+    // Chờ dương: người chơi cũ hoàn tất rời phòng trước khi tạo lại người chơi cùng tên
+    await waitFor(() => !firstServer.state.players.has(firstSid), 3000, "người chơi cũ rời phòng");
     const h = await spawn(name);
     await waitFor(() => h.news.includes("kiep_2"), 4000, "cấp bù khi vào");
     h.ach.length = 0; // bỏ các tin do cấp bù đã gửi: tin dưới đây PHẢI là trả lời của achievementsGet
@@ -241,14 +251,22 @@ describe("thành tựu qua phòng thật", () => {
     WorldRoomCls.achievements = true;
     const a = await spawn();
     const b = await spawn();
-    await sleep(300); // tin lúc VÀO phòng của cả hai đã đến nơi
+    // Chờ dương: cả 2 người chơi đã nhận tin achievements ban đầu lúc vào phòng
+    await waitFor(
+      () => a.ach.length >= 1 && b.ach.length >= 1,
+      3000,
+      "nhận tin achievements ban đầu của cả hai",
+    );
     const baseline = b.ach.length;
     trackSocial(serverRoom(a.room).world, a.room.sessionId, ["boss:mang", 1]);
     await waitFor(() => a.news.includes("trum_mang_1"), 4000, "A mở tr1");
     a.room.send(SOCIAL_MSG.achievementsGet, {});
     a.room.send(SOCIAL_MSG.titleSet, { id: "tr1" });
     await waitFor(() => me(a).title === "tr1", 3000, "A đeo tr1");
-    await sleep(400);
+    // Chờ dương: A nhận đủ các tin phản hồi từ achievementsGet và titleSet
+    await waitFor(() => a.ach.length > 2, 3000, "A nhận đủ các tin achievements");
+    // Chờ âm: khẳng định B không nhận thêm tin achievements nào từ thao tác của A
+    await sleep(150);
     expect(a.ach.length).toBeGreaterThan(2); // A thật sự nhận các tin (ca dương: không phải thử nhầm một hướng không có tin nào)
     expect(b.ach.length).toBe(baseline); // B không nhận thêm tin achievements nào
     expect(b.news.filter((id) => id !== "den_lac_ha")).toEqual([]); // cũng không nhận achievementNew của A (chỉ `den_lac_ha` của chính B lúc nhập thế)
@@ -259,7 +277,12 @@ describe("thành tựu qua phòng thật", () => {
     const h = await spawn();
     trackSocial(serverRoom(h.room).world, h.room.sessionId, ["boss:mang", 1]);
     await waitFor(() => h.news.includes("trum_mang_1"), 4000, "mở tr1");
-    await sleep(300);
+    // Chờ dương: đợt ghi chân linh của trum_mang_1 hoàn tất hoàn toàn trước khi bắt đầu đếm writes
+    await until(
+      async () => ((await soulOf(h))?.social?.ach.trum_mang_1 ? true : undefined),
+      3000,
+      "chân linh đã ghi trum_mang_1",
+    );
     const store = serverRoom(h.room).souls;
     const orig = store.update.bind(store);
     let writes = 0;
@@ -294,12 +317,14 @@ describe("thành tựu qua phòng thật", () => {
   it("giới hạn tần suất: dồn 15 titleSet / achievementsGet trong một nhịp chỉ được trả lời chừng burst (3) + vài lượt hồi, không bị ngắt kết nối", async () => {
     WorldRoomCls.achievements = true;
     const h = await spawn();
-    await sleep(300);
+    // Chờ dương: nhận tin achievements ban đầu lúc vào phòng trước khi lấy mốc n
+    await waitFor(() => h.ach.length >= 1, 3000, "nhận tin achievements ban đầu");
     const n = h.ach.length;
     for (let i = 0; i < 15; i++) {
       h.room.send(SOCIAL_MSG.titleSet, { id: "tr1" });
       h.room.send(SOCIAL_MSG.achievementsGet, {});
     }
+    // Chờ đồng hồ: đo số tin được xử lý trong cửa sổ 700 ms (burst 3 + hồi token), không vượt quá giới hạn
     await sleep(700);
     const got = h.ach.length - n;
     expect(got).toBeGreaterThanOrEqual(3);

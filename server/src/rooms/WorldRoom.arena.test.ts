@@ -195,6 +195,7 @@ async function enterArena(
   expect(rollAmbush(env.w, env.sid, env.p, env.c)).toBe(true);
   const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
   h.room.send(AMBUSH_MSG.seen, { id: offer.id });
+  // Chờ đồng hồ: thời gian kích hoạt chống bấm nhầm (AMBUSH_ARM_MS) trôi qua trước khi chọn Chiến
   await sleep(AMBUSH_ARM_MS + 80);
   h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "fight" });
   const go = await waitFor(() => h.travel[0], 5000, "nhận travelTo vào đấu trường");
@@ -247,8 +248,10 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(back.mapId).toBe(DEFAULT_MAP_ID);
     expect(back.roomId).toBeUndefined();
     await waitFor(() => hub.ambushes.ofKey(h.name.toLowerCase()) === undefined, 3000, "dọn vé");
+    // Chờ dương: kết nối của phòng đấu trường cũ đóng lại hoàn toàn sau khi nhận travelTo
+    await waitFor(() => !h.room.connection.isOpen, 3000, "kết nối đấu trường cũ đóng lại");
+    rooms.splice(rooms.indexOf(h.room), 1);
     // vào lại phòng thường: đúng chỗ cũ, tiền đã trừ
-    await sleep(300);
     const again: Hero = {
       name: h.name,
       room: undefined as never,
@@ -290,8 +293,10 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(saved?.limbo).toBeDefined();
     expect(saved?.limbo?.coinAtDeath).toBe(5000);
     await waitFor(() => hub.ambushes.ofKey(h.name.toLowerCase()) === undefined, 3000, "dọn vé");
+    // Chờ dương: kết nối của phòng đấu trường cũ đóng lại hoàn toàn sau khi nhận travelTo về phòng gốc
+    await waitFor(() => !h.room.connection.isOpen, 3000, "kết nối đấu trường cũ đóng lại");
+    rooms.splice(rooms.indexOf(h.room), 1);
     // vào lại phòng gốc: vẫn ở trạng thái Hoàng Tuyền (chưa đầu thai)
-    await sleep(300);
     const again: Hero = {
       name: h.name,
       room: undefined as never,
@@ -315,7 +320,8 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     const c = w.ctrl.get(sid);
     await waitFor(() => h.states[0], 3000, "nhận ambushState");
     p.x += 100; // có hành động (không bị tính vắng mặt)
-    await sleep(120);
+    // Chờ dương: tickArena ghi nhận người chơi đã hành động (acted = true)
+    await waitFor(() => w.arena.acted, 3000, "người chơi đã được ghi nhận có hành động");
     const exp0 = p.exp;
     const coin0 = c.coin;
     for (const id of [...w.mctrl.keys()]) {
@@ -343,7 +349,8 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     const p = serverState(h.room).players.get(sid)!;
     await waitFor(() => h.states[0], 3000, "nhận ambushState");
     p.x += 100;
-    await sleep(1200); // qua một lần làm mới giá
+    // Chờ dương: qua một lần làm mới giá giữa trận (client nhận ambushState thứ hai)
+    await waitFor(() => h.states.length >= 2, 4000, "nhận ambushState lần hai sau làm mới giá");
     const chot = w.arena.price.exp;
     expect(chot).toBeGreaterThan(0);
     await h.room.leave(true);
@@ -413,11 +420,13 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     expect(rollAmbush(env.w, env.sid, env.p, env.c)).toBe(true);
     const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
     h.room.send(AMBUSH_MSG.seen, { id: offer.id });
+    // Chờ đồng hồ: thời gian kích hoạt chống bấm nhầm (AMBUSH_ARM_MS) trôi qua trước khi chọn Chiến
     await sleep(AMBUSH_ARM_MS + 80);
     // Làm `persist` (lần lưu lúc chuyển phòng) chậm 400 ms để có cửa sổ chắc chắn: vé đã lập, người chơi rớt TRƯỚC khi `handOff` kiểm client
     const room = serverRoom(h.room) as any;
     const persist = room.persist.bind(room);
     room.persist = async (...args: unknown[]) => {
+      // Tiêm độ trễ giả để tạo điều kiện đua xác định: vé lập xong trước khi rớt socket
       await sleep(400);
       return persist(...args);
     };
@@ -446,6 +455,7 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     w.arena.ticket.expiresAt = 0; // hạn VÀO phòng đã qua từ lâu: phòng đã có người nên KHÔNG được đóng chỉ vì hạn đó khi người chơi rớt mạng
     (h.room.connection.transport as any).ws.close();
     await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
+    // Chờ đồng hồ & chờ âm: đợi 1,5 giây để kiểm tra đồng hồ dời tiến theo thời gian rớt mạng và khẳng định phòng không bị đóng giữa trận
     await sleep(1500);
     expect(w.arena.phase).toBe("fighting");
     expect(matchMaker.getLocalRoomById(h.room.roomId)).toBeDefined(); // phòng còn sống (không bị `watchArena` đóng giữa trận)
@@ -473,7 +483,8 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     const p = serverState(h.room).players.get(sid)!;
     await waitFor(() => h.states[0], 3000, "nhận ambushState");
     p.x += 100; // đã hành động: giá giữa trận
-    await sleep(1200);
+    // Chờ dương: qua một lần làm mới giá giữa trận (client nhận ambushState thứ hai)
+    await waitFor(() => h.states.length >= 2, 4000, "nhận ambushState lần hai sau làm mới giá");
     const chot = w.arena.price.exp;
     (h.room.connection.transport as any).ws.close();
     await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
@@ -551,7 +562,8 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
     const p = serverState(h.room).players.get(sid)!;
     await waitFor(() => h.states[0], 3000, "nhận ambushState");
     p.x += 100;
-    await sleep(1200);
+    // Chờ dương: qua một lần làm mới giá giữa trận (client nhận ambushState thứ hai)
+    await waitFor(() => h.states.length >= 2, 4000, "nhận ambushState lần hai sau làm mới giá");
     const chot = w.arena.price.exp;
     expect(chot).toBeGreaterThan(0);
     const room = serverRoom(h.room) as any;
@@ -582,6 +594,7 @@ describe("Đấu trường chặn đường qua mạng (máy chủ Colyseus th�
       expect(rollAmbush(env.w, env.sid, env.p, env.c)).toBe(true);
       const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
       h.room.send(AMBUSH_MSG.seen, { id: offer.id });
+      // Chờ đồng hồ: thời gian kích hoạt chống bấm nhầm (AMBUSH_ARM_MS) trôi qua trước khi chọn Chiến
       await sleep(AMBUSH_ARM_MS + 80);
       h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "fight" });
       const end = await waitFor(() => h.ends[0], 3000, "nhận ambushEnd canceled");

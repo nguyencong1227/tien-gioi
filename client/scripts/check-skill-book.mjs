@@ -1,17 +1,16 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm SỔ CHIÊU cho 48-80 chiêu (CT11a, #1056) trong Chrome THẬT qua CDP, chế độ `?skills=mock&n=2`, KHÔNG cần máy chủ: 60 chiêu (12 thật + 48 giả đủ hệ / phẩm, tên có dấu) ->
 // thanh tìm hiện (và KHÔNG hiện khi chỉ có 5 chiêu); gõ tên không dấu ra đúng chiêu, "Hiện X / 60 chiêu", "Bỏ lọc"; gõ chữ KHÔNG kích phím tắt của thế giới (Shift+K gõ trong ô tìm không đóng bảng);
 // Esc xoá chữ trước, Esc lần hai mới đóng bảng; nút Lọc gập / mở các lựa chọn hệ / phẩm / ô / xếp / chỉ chiêu dùng được; lọc ra rỗng báo "Không có chiêu nào khớp"; đóng rồi mở lại về đủ chiêu;
 // bấm hàng sau khi lọc mở đúng chi tiết và gắn ô gửi đúng `skillId`; ở 5 khung mọi điều khiển >= 44 px, không tràn ngang, không cắt chip phẩm. Có thể chụp ảnh: `--shots <thư mục>`.
-//   node client/scripts/check-skill-book.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-skill-book.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -20,41 +19,18 @@ const argOf = (name, dflt) => {
 };
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-skill-book-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    // Chrome không đầu không có chuột: `pointer: fine` = false thì thanh chiêu (CSS chỉ cho máy tính) bị ẩn; giả lập chuột (4 = fine, 2 = hover)
-    "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+const POINTER_FLAGS = [
+  "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
+];
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "skill-book", extraArgs: POINTER_FLAGS });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -92,8 +68,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source:
-      "try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high')}catch(e){}",
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
 
   const open = async (query, w, h, mobile = false) => {
@@ -103,13 +79,28 @@ try {
       deviceScaleFactor: 1,
       mobile,
     });
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?${query}&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"))
-        break;
-    }
-    await sleep(1000);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(1000)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`phông chưa tải xong / thiếu data-input sau 30 s`);
     await evalJs(`(() => { const sc = window.__scene; window.__sent = [];
       const orig = sc.room.send.bind(sc.room);
       sc.room.send = (t, d) => { if (t === "cast" || t === "skillSlot") window.__sent.push({ t, d }); return orig(t, d); };
@@ -230,6 +221,9 @@ try {
   /** Dựng 60 chiêu: 12 thật + 48 giả (hệ xoay vòng, phẩm xoay vòng, tên có dấu), bọc `ui.setSkillsModel` rồi mở bảng */
   const openMany = async (w, h, mobile, total = 60) => {
     await open("skills=mock&n=2", w, h, mobile);
+    // Máy chủ giả (`main.ts`) PHÁT LẠI tin `skills` sau 400 ms (hẹn giờ theo đồng hồ thật, chờ cảnh đăng ký xong handler): bơm mô hình TRƯỚC mốc đó thì tin mock ghi đè ô đã gắn
+    // (đo ở khung chậm: hai hàng đầu ra hoa_van_kiem + bon_thach_quyen thay vì + ung_trao). Hẹn giờ 450 ms đặt SAU hẹn giờ 400 ms của mock nên luôn chạy sau nó, dù khung chậm.
+    await evalJs("new Promise((r) => setTimeout(r, 450))");
     await evalJs(`(() => { const ui = window.__ui, sc = window.__scene;
       const orig = ui.setSkillsModel.bind(ui), EL = ${JSON.stringify(EL)}, GN = ${JSON.stringify(GN)}, NAMES = ${JSON.stringify(NAMES)}, TOTAL = ${total};
       ui.setSkillsModel = (m) => {
@@ -545,14 +539,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);
