@@ -75,12 +75,16 @@ try {
       deviceScaleFactor: 1,
       mobile: false,
     });
+    // Hai điều kiện, mỗi cái chặn một cuộc đua THẬT trong kịch bản (A chỉ ra cái thứ nhất ở #1510; B đo cái thứ hai):
+    //  (1) `open()` được gọi nhiều lần liên tiếp: đánh dấu tài liệu CŨ trước khi điều hướng để điều kiện sẵn sàng không đúng trên tài liệu cũ;
+    //  (2) lời chào đầu (`ui.chat` sys ở `setupNetwork`) vào khung chat ~300 ms SAU khi cảnh sẵn sàng (đo ở `--slow-frame 36`: khung chat RỖNG lúc `me()` có, lời chào hiện sau ~300 ms):
+    //      tin đổ trước nó thì lời chào thành dòng cuối (dòng sys không có <b>) và `last()` ném lỗi. Client KHÔNG mất tin (`ui.chat` thêm dòng đồng bộ); `sleep(600)` cũ che cuộc đua này.
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1${query}` });
-    // Chờ THEO ĐIỀU KIỆN (cảnh có mình + giao diện + lời chào đầu đã vào khung chat: tin đổ vào TRƯỚC lời chào có thể bị xoá / chèn lại, nên `sleep(600)` cũ che một cuộc đua) tới 60 s thay vòng 50 x 300 ms + sleep(600): runner khung chậm vào cảnh lâu hơn 15 s
     const ready = await waitUntilTrue(
       () =>
         evalJs(
-          "Boolean(window.__scene && window.__scene.me && window.__scene.me() && window.__ui && document.querySelectorAll('#chat-log p').length >= 1)",
+          "Boolean(!window.__isOldPage && window.__scene && window.__scene.me && window.__scene.me() && window.__ui && document.querySelectorAll('#chat-log p').length >= 1)",
         ),
       60000,
       300,
