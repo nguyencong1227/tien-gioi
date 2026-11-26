@@ -365,31 +365,34 @@ async function main() {
       }
     }, 20);
 
-    // 2. Chờ client nhận tin `fx cast`
-    await T.waitFor(
-      `window.__fxLog.filter((e) => e.kind === 'cast' && e.skill === ${JSON.stringify(WINDUP)}).length >= 1`,
-      "client nhận `fx cast` của Huyết Ảnh Xuyên Tâm",
-      5000,
-    );
-    const w0 = (await fxCasts(WINDUP))[0]!;
-    must(
-      w0.windup.length === 1 && w0.windup[0]!.mine,
-      `chiêu vận trên tia: vòng tụ khí hiện NGAY khi nhận tin (${JSON.stringify(w0.windup)})`,
-    );
+    try {
+      // 2. Chờ client nhận tin `fx cast`
+      await T.waitFor(
+        `window.__fxLog.filter((e) => e.kind === 'cast' && e.skill === ${JSON.stringify(WINDUP)}).length >= 1`,
+        "client nhận `fx cast` của Huyết Ảnh Xuyên Tâm",
+        5000,
+      );
+      const w0 = (await fxCasts(WINDUP))[0]!;
+      must(
+        w0.windup.length === 1 && w0.windup[0]!.mine,
+        `chiêu vận trên tia: vòng tụ khí hiện NGAY khi nhận tin (${JSON.stringify(w0.windup)})`,
+      );
 
-    // Chờ vòng tụ khí đạt ít nhất 30 % tiến độ (p >= 0.3) để chụp ảnh rõ cho người xem (Dev A review)
-    await T.waitFor(
-      `Array.isArray(window.__windupSamples) && window.__windupSamples.some((s) => s.p >= 0.3)`,
-      "vòng tụ khí tiến tới mốc p >= 0.3",
-      4000,
-    );
-    await T.shot("chieu-vo-sac-1-van-tia");
+      // Chờ vòng tụ khí đạt ít nhất 30 % tiến độ (p >= 0.3) để chụp ảnh rõ cho người xem (Dev A review)
+      await T.waitFor(
+        `Array.isArray(window.__windupSamples) && window.__windupSamples.some((s) => s.p >= 0.3)`,
+        "vòng tụ khí tiến tới mốc p >= 0.3",
+        4000,
+      );
+      await T.shot("chieu-vo-sac-1-van-tia");
 
-    // 3. Chờ máy chủ hết vận và đòn đáp: vòng tắt, quái mất máu
-    await waitCond(() => (world.ctrl.get(sid) as any)?.windup === undefined, 5000);
-    clearInterval(sampler);
-    await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 5000);
-    await waitCond(() => hpDrop() > 0, 5000);
+      // 3. Chờ máy chủ hết vận và đòn đáp: vòng tắt, quái mất máu
+      await waitCond(() => (world.ctrl.get(sid) as any)?.windup === undefined, 5000);
+      await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 5000);
+      await waitCond(() => hpDrop() > 0, 5000);
+    } finally {
+      clearInterval(sampler);
+    }
 
     must(
       windupSamplesCount >= 5,

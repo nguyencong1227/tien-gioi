@@ -423,7 +423,7 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
       expect(cdpWaitMs()).toBe(60000);
       delete process.env.CI;
       expect(cdpWaitMs()).toBe(30000);
-      expect(DEFAULT_CDP_TIMEOUT_MS).toBeGreaterThanOrEqual(30000);
+      expect(DEFAULT_CDP_TIMEOUT_MS).toBe(cdpWaitMs());
     } finally {
       if (oldCi !== undefined) process.env.CI = oldCi;
       else delete process.env.CI;
