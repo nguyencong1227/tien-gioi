@@ -78,6 +78,7 @@
     "e2e:bag-names": "node ../client/scripts/check-bag-names.mjs",
     "e2e:rarity": "node ../client/scripts/check-rarity.mjs",
     "e2e:chuot-thap": "node ../client/scripts/check-chuot-thap.mjs",
+    "e2e:tap-hold": "node ../client/scripts/check-tap-hold.mjs",
     "e2e:ban-do-trong": "tsx scripts/e2e-ban-do-trong.ts",
     "kiem-mat-ket-noi": "tsx scripts/kiem-mat-ket-noi.ts",
     "tai-khoan": "tsx scripts/tai-khoan.ts",
