@@ -1,35 +1,42 @@
-// Chống chạy `fn` HAI lần cho MỘT lần bấm ở nút nối `bindTap` (ui.ts): `fn` chạy ở `pointerdown` (nhạy với chạm), còn `click` đến sau lần nhả đó phải bị bỏ qua.
+// Chống chạy `fn` HAI lần cho MỘT lần bấm ở nút nối `bindTap` (ui.ts): `fn` chạy ở `pointerdown` (nhạy với chạm), còn `click` của CHÍNH lần bấm đó phải bị bỏ qua.
 // Lớp THUẦN: không biết DOM, đồng hồ do người gọi truyền vào nên test được trong Node.
 //
-// Mốc chống trùng là lần chạm GẦN NHẤT của con trỏ lên nút, tức `pointerdown` (`down`) HOẶC `pointerup` (`up`), cái nào muộn hơn: `click` luôn tới ngay sau lần NHẢ, dù người chơi nhấn giữ bao lâu.
-// Bản cũ chỉ ghi mốc ở `pointerdown` nên nhấn giữ >= ~400 ms (chạm lâu một chút, hoặc máy chậm: Chrome chờ ~200 ms ack cảm ứng) làm `click` tới sau cửa sổ 300 ms, `fn` chạy LẦN HAI
-// và nút bật / tắt mở rồi đóng ngay (đo bằng chuột thật trên nút Nhiệm vụ: giữ 100 / 250 ms đổi một lần, 400 / 700 / 1200 ms đổi hai lần). Vẫn giữ mốc `pointerdown`: `click` tổng hợp
-// ngay sau `pointerdown` mà KHÔNG có `pointerup` (kịch bản kiểm, một số công cụ trợ năng, `pointerup` rơi ra ngoài nút vì `fn` vừa ẩn nút) vẫn bị coi là cùng một lần bấm như trước.
+// GHÉP CẶP, không dùng cửa sổ thời gian cố định: mỗi `pointerdown` đã chạy `fn` "nợ" đúng MỘT `click`, và `click` kế tiếp trả nợ đó (bị bỏ qua) dù tới trễ bao lâu
+// (trong hạn `TAP_CLICK_MAX_WAIT_MS`). Hai bản trước đều tính cửa sổ 300 ms: bản đầu từ `pointerdown` (nhấn giữ >= ~400 ms làm `click` tới sau cửa sổ, #1515), bản hai từ
+// `pointerup` (vẫn hở khi luồng chính bận: đo `click` tới 226 ms sau `pointerup` ở khung chậm, mà `click` cảm ứng là cử chỉ do trình duyệt phát nên có thể trễ hơn nữa,
+// khi đó `fn` chạy lần hai và nút bật / tắt mở rồi đóng ngay). Hạn chờ chỉ để lần bấm BỊ HUỶ (kéo ngón ra khỏi nút, không có `click`) không nuốt nhầm một `click` độc lập về sau.
+// Mốc của mỗi khoản nợ được làm mới ở `pointerup` để hạn tính từ lúc NHẢ, không từ lúc nhấn: nhấn giữ lâu vẫn được trả nợ.
 
-/** Khoảng (ms) sau lần chạm cuối mà `click` còn bị coi là cùng một lần bấm. Đủ rộng cho khung chậm (đo được ~160 ms giữa `pointerup` và `click`). */
-export const TAP_CLICK_DEDUPE_MS = 300;
+/** Hạn chờ tối đa (ms) từ lần chạm cuối (`pointerdown` / `pointerup`) tới `click` đi kèm. Quá hạn coi là lần bấm bị huỷ, `click` sau đó là click độc lập (chạy `fn`). */
+export const TAP_CLICK_MAX_WAIT_MS = 1500;
+
+/** Số khoản nợ tối đa giữ lại (bấm liên tục mà không có `click` nào, ví dụ chuột phải): bỏ khoản cũ nhất. */
+const MAX_PENDING = 8;
 
 export interface TapDedupe {
-  /** `pointerdown` tới nút (`fn` vừa chạy ở đây). */
+  /** `pointerdown` tới nút (`fn` vừa chạy ở đây): ghi một khoản nợ `click`. */
   down(now: number): void;
-  /** `pointerup` tới nút: `click` đi kèm lần nhả này tới ngay sau đó, dù đã nhấn giữ bao lâu. */
+  /** `pointerup` tới nút: làm mới mốc của khoản nợ gần nhất (hạn tính từ lúc nhả). */
   up(now: number): void;
-  /** `click` tại `now` đi kèm lần chạm vừa rồi (bỏ qua) hay là click độc lập (chạy `fn`)? */
+  /** `click` tại `now`: là cái trả nợ cho một lần bấm đã chạy `fn` (bỏ qua, trả `true`) hay click độc lập (chạy `fn`, trả `false`)? */
   ignoreClick(now: number): boolean;
 }
 
-export function createTapDedupe(windowMs: number = TAP_CLICK_DEDUPE_MS): TapDedupe {
-  // -Infinity (không phải 0): với 0, mọi `click` trong `windowMs` đầu sau khi tải trang bị coi là trùng với một lần chạm và bỏ qua (hồi quy cũ, #409)
-  let lastTouch = -Infinity;
+export function createTapDedupe(maxWaitMs: number = TAP_CLICK_MAX_WAIT_MS): TapDedupe {
+  /** mốc (lần chạm cuối) của từng lần bấm đã chạy `fn` mà chưa thấy `click`, cũ nhất ở đầu */
+  const pending: number[] = [];
   return {
     down(now) {
-      lastTouch = now;
+      pending.push(now);
+      if (pending.length > MAX_PENDING) pending.shift();
     },
     up(now) {
-      lastTouch = now;
+      if (pending.length > 0) pending[pending.length - 1] = now;
     },
     ignoreClick(now) {
-      return now - lastTouch < windowMs;
+      // bỏ các khoản quá hạn (lần bấm bị huỷ), rồi trả khoản cũ nhất còn lại
+      while (pending.length > 0 && now - pending[0]! >= maxWaitMs) pending.shift();
+      return pending.shift() !== undefined;
     },
   };
 }

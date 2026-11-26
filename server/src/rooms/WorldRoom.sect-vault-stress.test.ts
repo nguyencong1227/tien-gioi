@@ -276,21 +276,37 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     const targetSlot = vSlots[0];
 
     // Cả 4 bot cùng lao vào rút ở targetSlot và các slot khác
+    const toastsBefore = [Chu, Lao, De1, De2].map((h) => h.toasts.length);
     Chu.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
     Lao.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
     De1.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
     De2.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
 
-    await sleep(400);
-
-    // Tổng số lượng tuyệt đối không vượt quá INITIAL_TOTAL
+    // Chờ cả 4 bot nhận được phản hồi cho yêu cầu rút của mình (thay vì sleep(400) cố định, #1397)
+    await waitFor(
+      () => [Chu, Lao, De1, De2].every((h, idx) => h.toasts.length > toastsBefore[idx]!),
+      5000,
+      "cả 4 bot nhận phản hồi rút đồ",
+    );
+    // Chờ bản chụp kho mới tới client Chu và tổng đồ bảo toàn (không bao giờ nhân đôi, #1397)
+    await waitFor(
+      () => countTotal() === INITIAL_TOTAL,
+      5000,
+      `tổng đồ bảo toàn và về đủ ${INITIAL_TOTAL} sau đợt 4 bot đua rút`,
+    );
     expect(countTotal()).toBe(INITIAL_TOTAL);
 
     // 5. Thử nghiệm khi đang qua cổng (travelling): thao tác kho bị từ chối
+    const de1ToastsBefore = De1.toasts.length;
     ctrlOf(De1).travelling = true;
     De1.room.send(SECT_MSG.vaultDeposit, { slot: 0, qty: 1 });
     De1.room.send(SECT_MSG.vaultWithdraw, { slot: 0, itemId: MAT.id, qty: 1 });
-    await sleep(150);
+    // Chờ De1 nhận đủ 2 toast phản hồi từ chối khi đang qua cổng (thay vì sleep(150) cố định, #1397)
+    await waitFor(
+      () => De1.toasts.length >= de1ToastsBefore + 2,
+      4000,
+      "De1 nhận phản hồi từ chối thao tác kho khi đang qua cổng",
+    );
     ctrlOf(De1).travelling = false;
 
     expect(countTotal()).toBe(INITIAL_TOTAL);
