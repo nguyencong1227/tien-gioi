@@ -74,7 +74,6 @@ async function main() {
   const { defineRooms } = await import("../src/rooms/WorldRoom.js");
   const { savePlayer, hashSecret } = await import("../src/store.js");
   const { syncPublicPos } = await import("../src/systems/movement.js");
-  const { applyMonsterStatus } = await import("../src/systems/status.js");
   const { hasStatus } = await import("../src/systems/status-rules.js");
   const { hurtPlayerDot } = await import("../src/systems/combat.js");
 
