@@ -107,6 +107,11 @@ async function main() {
   const must = (cond: boolean, msg: string) => {
     if (!cond) throw new Error(msg);
   };
+  /** Chờ điều kiện ở máy chủ (cùng tiến trình) tới `ms`; hết giờ thì thôi (câu `must` sau đó báo lỗi cụ thể, #1514). */
+  const waitCond = async (cond: () => boolean, ms: number) => {
+    const end = Date.now() + ms;
+    while (!cond() && Date.now() < end) await sleep(50);
+  };
   const SECRET = "e2e_secret_chieu_moi_1111111";
   /**
    * Bậc chất lượng đồ hoạ GHIM cho kịch bản (mặc định "high"; `E2E_QUALITY=low` để tái hiện lỗi CI). Bậc "Tự động" chọn theo phần cứng: máy nhà có GPU thật -> high, còn runner CI
@@ -235,6 +240,13 @@ async function main() {
       applyMonsterStatus(world, monId, { status: "stun", ms: 30_000, ratio: 0, chance: 1 }, 0, "");
       me.mp = me.maxMp;
       me.hp = me.maxHp;
+      await ev(`(() => {
+        const s = window.__scene;
+        s.cursorPos = null;
+        s.facing = 0;
+        window.__windupSamples = [];
+        return 1;
+      })()`);
       await sleep(250);
     };
     serverDiag = () => {
@@ -253,8 +265,9 @@ async function main() {
       15000,
     );
     // Ghi lại MỌI tin `fx` thật client nhận (bọc `onFx`: tin đi đúng đường mạng -> `reg("fx")` -> `onFx`) kèm ảnh chụp lớp vẽ NGAY lúc nhận
+    // và hook cập nhật vòng tụ khí để ghi nhận tiến độ render qua từng khung hình (tránh evaluate CDP nghẽn IPC, #1514)
     await ev(`(() => {
-      const sc = window.__scene; window.__fxLog = []; window.__pts = [];
+      const sc = window.__scene; window.__fxLog = []; window.__pts = []; window.__windupSamples = [];
       // mọi điểm phát hạt playFxPoints (chỗ chung của tia sét, vòng nổ bẫy, bụi cuối đạn): ghi số điểm để biết MỖI tin fx thật sự vẽ gì (không lẫn hạt của tin khác)
       const origPts = sc.playFxPoints.bind(sc);
       sc.playFxPoints = (pts) => { window.__pts.push(Array.isArray(pts) ? pts.length : -1); return origPts(pts); };
@@ -267,6 +280,14 @@ async function main() {
           drawn: window.__pts.slice(before).reduce((a, b) => a + b, 0),
           persist: sc.persists.snapshot(sc.time.now), windup: sc.windups.snapshot(sc.time.now) });
         return r;
+      };
+      const origWindupsUpdate = sc.windups.update.bind(sc.windups);
+      sc.windups.update = function(now) {
+        origWindupsUpdate(now);
+        const s = this.snapshot(now);
+        if (s.length > 0 && s[0].mine) {
+          window.__windupSamples.push({ t: now, p: s[0].progress });
+        }
       };
       return 1;
     })()`);
@@ -407,9 +428,9 @@ async function main() {
     );
     putMon(zone.x!, zone.y!);
     await T.shot("chieu-moi-3-vung");
-    await sleep(2200);
+    await waitCond(() => hpDrop() > 0, 4000);
     const h1 = hpDrop();
-    await sleep(1200);
+    await waitCond(() => hpDrop() > h1, 3000);
     const h2 = hpDrop();
     must(h1 > 0 && h2 > h1, `quái trong vòng mất máu NHIỀU lần theo nhịp (${h1} -> ${h2})`);
     await T.waitFor(`window.__scene.persists.stats().alive === 0`, "vùng TỰ TẮT khi hết 4 s", 4000);
@@ -456,9 +477,9 @@ async function main() {
     );
     putMon(totem.x!, totem.y!);
     await T.shot("chieu-moi-5-tuong");
-    await sleep(2500);
+    await waitCond(() => hpDrop() > 0, 4000);
     const g1 = hpDrop();
-    await sleep(1500);
+    await waitCond(() => hpDrop() > g1, 3000);
     const g2 = hpDrop();
     must(g1 > 0 && g2 > g1, `quái trong tầm tượng mất máu theo nhịp 1 s (${g1} -> ${g2})`);
     await T.waitFor(
@@ -478,46 +499,77 @@ async function main() {
     }
     mon.hp = BIG_HP;
     await cast(3);
-    const tCast = Date.now(); // mốc đồng hồ THẬT sau khi gửi phím: máy chủ bắt đầu vận SAU mốc này, nên thời gian máy chủ đã vận <= (bây giờ - tCast)
-    await waitLog("cast", WINDUP, 1, "client nhận `fx cast` của Phá Sơn Nhất Kích");
-    const w0 = (await fxLog("cast", WINDUP))[0]!;
+
+    // 1. Chờ máy chủ bắt đầu vận (ctrl.windup !== undefined, #1514)
+    await waitCond(() => (world.ctrl.get(sid) as any)?.windup !== undefined, 4000);
     must(
-      w0.windup.length === 1 && w0.windup[0]!.mine,
-      `chiêu vận: vòng tụ khí hiện NGAY khi nhận tin (${JSON.stringify(w0.windup)})`,
+      (world.ctrl.get(sid) as any)?.windup !== undefined,
+      "máy chủ: bắt đầu vận Phá Sơn Nhất Kích",
     );
-    must(hpDrop() === 0, "đang vận: CHƯA có sát thương");
-    await sleep(350);
-    const p1 = (await ev(
-      `JSON.stringify(window.__scene.windups.snapshot(window.__scene.time.now))`,
-    ).then((v) => JSON.parse(v as string))) as Array<{ progress: number }>;
-    await sleep(350);
-    const p2 = (await ev(
-      `JSON.stringify(window.__scene.windups.snapshot(window.__scene.time.now))`,
-    ).then((v) => JSON.parse(v as string))) as Array<{ progress: number }>;
-    // ĐỌC máu quái NGAY sau lần đo thứ hai (máy chủ ở cùng tiến trình): chụp ảnh ở runner CI phần mềm mất hàng trăm ms nên KHÔNG được nằm giữa phép đo và
-    // phép kiểm (cửa sổ chỉ 1,2 s: nightly thủ công 18/11 đòn đáp đã xuống trước khi kiểm). Máy quá chậm (đã >= 1100 ms đồng hồ thật) thì không còn khẳng định được.
-    const dropAtP2 = hpDrop();
-    const sinceCast = Date.now() - tCast;
-    await T.shot("chieu-moi-6-van");
-    must(
-      p1.length === 1 &&
-        p2.length === 1 &&
-        p1[0]!.progress > 0 &&
-        p2[0]!.progress > p1[0]!.progress,
-      `vòng tụ khí TIẾN DẦN (${p1[0]?.progress.toFixed(2)} -> ${p2[0]?.progress.toFixed(2)})`,
-    );
-    if (sinceCast < 1100)
-      must(dropAtP2 === 0, `vận được ${sinceCast} ms trên 1200 ms: vẫn CHƯA có sát thương`);
-    else
-      out(
-        `  (máy chậm: đo xong sau ${sinceCast} ms >= 1100 ms nên bỏ qua kiểm 'chưa có sát thương lúc vận')`,
+    must(hpDrop() === 0, "máy chủ vừa bắt đầu vận: CHƯA có sát thương");
+
+    // Bộ lấy mẫu trong tiến trình test: kiểm tra liên tục trong suốt lúc vận CHƯA có sát thương (mẫu #1512)
+    let windupSamplesCount = 0;
+    let damageDuringWindupViolations = 0;
+    const sampler = setInterval(() => {
+      const c: any = world.ctrl.get(sid);
+      if (c?.windup !== undefined) {
+        windupSamplesCount++;
+        if (hpDrop() > 0) damageDuringWindupViolations++;
+      }
+    }, 20);
+
+    try {
+      // 2. Chờ client nhận tin `fx cast`
+      await waitLog("cast", WINDUP, 1, "client nhận `fx cast` của Phá Sơn Nhất Kích");
+      const w0 = (await fxLog("cast", WINDUP))[0]!;
+      must(
+        w0.windup.length === 1 && w0.windup[0]!.mine,
+        `chiêu vận: vòng tụ khí hiện NGAY khi nhận tin (${JSON.stringify(w0.windup)})`,
       );
-    await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 3000);
-    const t6 = Date.now();
-    while (hpDrop() === 0 && Date.now() - t6 < 3000) await sleep(100);
+
+      // Chờ vòng tụ khí đạt ít nhất 30 % tiến độ (p >= 0.3) để chụp ảnh rõ cho người xem (mẫu #1512)
+      await T.waitFor(
+        `Array.isArray(window.__windupSamples) && window.__windupSamples.some((s) => s.p >= 0.3)`,
+        "vòng tụ khí tiến tới mốc p >= 0.3",
+        4000,
+      );
+      await T.shot("chieu-moi-6-van");
+
+      // 3. Chờ máy chủ hết vận và đòn đáp: vòng tắt, quái mất máu
+      await waitCond(() => (world.ctrl.get(sid) as any)?.windup === undefined, 5000);
+      await T.waitFor(`window.__scene.windups.stats().alive === 0`, "hết vận: vòng tắt", 3000);
+      await waitCond(() => hpDrop() > 0, 5000);
+    } finally {
+      clearInterval(sampler);
+    }
+
+    must(
+      windupSamplesCount >= 5,
+      `máy chủ lấy được ${windupSamplesCount} mẫu trong lúc vận (chống pass rỗng)`,
+    );
+    must(
+      damageDuringWindupViolations === 0,
+      `trong suốt thời gian vận: CHƯA có sát thương (vi phạm: ${damageDuringWindupViolations})`,
+    );
     must(hpDrop() > 0, "hết vận: đòn ĐÁP xuống, quái mất máu");
+
+    // 4. Khẳng định vòng tụ khí đã tiến dần qua các khung hình render của client (#1514)
+    const samples = (await ev(`JSON.stringify(window.__windupSamples)`).then((v) =>
+      JSON.parse(v as string),
+    )) as Array<{ t: number; p: number }>;
+    must(
+      samples.length >= 2,
+      `client ghi nhận vòng tụ khí qua các khung hình (đo được ${samples.length} frame)`,
+    );
+    const pFirst = samples[0]!.p;
+    const pLast = samples[samples.length - 1]!.p;
+    must(
+      pLast > pFirst,
+      `vòng tụ khí TIẾN DẦN (${pFirst.toFixed(2)} -> ${pLast.toFixed(2)}) qua ${samples.length} frame`,
+    );
     ok(
-      `chiêu vận: vòng tụ khí hiện ngay, tiến dần (${p1[0]!.progress.toFixed(2)} -> ${p2[0]!.progress.toFixed(2)}), chưa sát thương lúc vận; hết vận đòn đáp (-${hpDrop()} máu), vòng tắt`,
+      `chiêu vận: vòng tụ khí hiện ngay khi nhận tin, tiến dần (${pFirst.toFixed(2)} -> ${pLast.toFixed(2)} qua ${samples.length} frame), chưa sát thương lúc vận; hết vận đòn đáp (-${hpDrop()} máu), vòng tắt`,
     );
 
     must(T.errors.length === 0, `lỗi console: ${JSON.stringify(T.errors)}`);
