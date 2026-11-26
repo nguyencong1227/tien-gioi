@@ -434,7 +434,7 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     const port = await freePort();
     const fakeScript = path.join(tmpDir, "fake-chrome-empty-targets.js");
 
-    // Fake Chrome: 300 ms đầu trả [], sau 300 ms trả page target có WebSocket url
+    // Fake Chrome: 300 ms đầu trả target không phải 'page' (ví dụ service_worker / browser), sau 300 ms trả page target
     writeFileSync(
       fakeScript,
       `
@@ -445,9 +445,14 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
         if (req.url === "/json") {
           res.writeHead(200, { "Content-Type": "application/json" });
           if (Date.now() - start < 300) {
-            res.end(JSON.stringify([]));
+            res.end(JSON.stringify([
+              { type: "service_worker", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/sw/1" }
+            ]));
           } else {
-            res.end(JSON.stringify([{ type: "page", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/page/1" }]));
+            res.end(JSON.stringify([
+              { type: "service_worker", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/sw/1" },
+              { type: "page", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/page/1" }
+            ]));
           }
         } else {
           res.writeHead(404);
