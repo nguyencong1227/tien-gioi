@@ -1,19 +1,17 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
+/* global console, process, fetch */
 // Script kiểm tra PWA hoàn chỉnh theo Issue #251:
 // 1. Manifest đầy đủ trường (name, short_name, start_url, display: standalone, theme_color, background_color, icons 192/512 + maskable).
 // 2. Mọi URL trong PRECACHE_URLS (do stamp-sw.mjs điền) thực sự tồn tại trong client/dist/.
-// 3. Chrome CDP kiểm tra Page.getInstallabilityErrors và Page.getAppManifest báo 0 lỗi cài đặt.
+// 3. Chrome CDP kiểm tra Page.getInstallabilityErrors và Page.getAppManifest báo 0 lỗi cài đặt (Chrome dựng bằng `launchChrome`; chờ THEO ĐIỀU KIỆN lỗi cài đặt hết, không ngủ cố định: trang nạp + Service Worker đăng ký mất vài giây ở máy chậm).
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import os from "node:os";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -224,40 +222,15 @@ const server = http.createServer((req, res) => {
 const HTTP_PORT = await freePort();
 await new Promise((resolve) => server.listen(HTTP_PORT, "127.0.0.1", resolve));
 
-const CDP_PORT = await freePort();
-const tmpChromeDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-pwa-"));
-
-const chromeProcess = spawn("google-chrome", [
-  "--headless=new",
-  `--remote-debugging-port=${CDP_PORT}`,
-  `--user-data-dir=${tmpChromeDir}`,
-  "--no-sandbox",
-  ...getChromeGpuFlags(),
-  "--disable-dev-shm-usage",
-  "about:blank",
-]);
+let launched = null;
 
 let cdpSuccess = false;
 
 try {
-  let versionData = null;
-  for (let i = 0; i < 40; i++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/version`);
-      if (res.ok) {
-        versionData = await res.json();
-        break;
-      }
-    } catch {
-      // Chrome chưa mở cổng, thử lại ở vòng lặp sau
-    }
-    await sleep(100);
-  }
-
-  if (!versionData) throw new Error("Chrome headless không khởi động kịp sau 4 giây.");
+  launched = await launchChrome({ name: "pwa", extraArgs: ["--disable-dev-shm-usage"] });
 
   const newTabRes = await fetch(
-    `http://127.0.0.1:${CDP_PORT}/json/new?http://127.0.0.1:${HTTP_PORT}/`,
+    `http://127.0.0.1:${launched.cdpPort}/json/new?http://127.0.0.1:${HTTP_PORT}/`,
     {
       method: "PUT",
     },
@@ -286,8 +259,39 @@ try {
   await cdpSend("Page.enable");
   await cdpSend("ServiceWorker.enable");
 
-  // Đợi trang nạp và Service Worker đăng ký xong
-  await sleep(1800);
+  // Chờ THEO ĐIỀU KIỆN (thay `sleep(1800)`), KHÔNG để điều kiện đúng khi trang chưa nạp (trang trắng cũng báo 0 lỗi): (1) tài liệu đã `complete`, (2) Service Worker đã KÍCH HOẠT,
+  // (3) lỗi cài đặt hết. Điều kiện (2) quá 30 s vẫn không có thì đi tiếp: lần đọc cuối bên dưới báo đúng lỗi cài đặt còn tồn tại (vd thiếu Service Worker).
+  const evalBool = async (expression) => {
+    const r = await cdpSend("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    });
+    return r?.result?.result?.value === true;
+  };
+  await cdpSend("Runtime.enable");
+  const loaded = await waitUntilTrue(
+    () => evalBool(`document.readyState === "complete"`),
+    60000,
+    200,
+  );
+  if (!loaded) throw new Error("Trang không nạp xong sau 60 s.");
+  await waitUntilTrue(
+    () =>
+      evalBool(
+        `"serviceWorker" in navigator && navigator.serviceWorker.getRegistration().then((r) => Boolean(r && r.active))`,
+      ),
+    30000,
+    300,
+  );
+  await waitUntilTrue(
+    async () => {
+      const r = await cdpSend("Page.getInstallabilityErrors");
+      return (r?.result?.installabilityErrors || []).length === 0;
+    },
+    30000,
+    300,
+  );
 
   const errorsRes = await cdpSend("Page.getInstallabilityErrors");
   const installErrors = errorsRes?.result?.installabilityErrors || [];
@@ -316,13 +320,8 @@ try {
   console.error(`  ✗ ${msg}`);
   errors.push(msg);
 } finally {
-  chromeProcess.kill("SIGKILL");
+  if (launched) await launched.close();
   server.close();
-  try {
-    fs.rmSync(tmpChromeDir, { recursive: true, force: true });
-  } catch {
-    // Bỏ qua lỗi dọn thư mục tạm nếu đã xoá
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,9 +1,8 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm chip "Mạng chậm" (QUYET_DINH_M3 mục 25, `client/src/net-slow.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-net-slow.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-net-slow.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
  *
  * Chip hiện / ẩn đúng theo `ui.setNetSlow`; KHÔNG chặn chạm (pointer-events none, phần tử tại tâm chip là thứ nằm DƯỚI); nằm trọn trong màn hình; không đè lên
  * nút HUD nào bấm được (trừ dòng gợi ý mờ `#help`: chip không nhận chạm nên chạm xuyên qua); chữ có trong cây truy cập (role=status); banner nối lại đè lên chip (chip ẩn khi `body.reconnecting`). `--shots`: lưu ảnh mỗi khung.
@@ -11,13 +10,14 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -68,36 +68,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-net-slow-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    launched = await launchChrome({ name: "net-slow" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -131,7 +110,8 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
@@ -149,21 +129,33 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        60000,
+        200,
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
         continue;
       }
-      await sleep(600);
+      // Chờ THEO ĐIỀU KIỆN thay `sleep(600)`: phông đã tải xong và `data-input` đã đặt lên <html>
+      const settled = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+            ),
+          ),
+        30000,
+        100,
+      );
+      if (!settled) throw new Error(`${vp.name}: phông chưa tải xong / thiếu data-input sau 30 s`);
       await evalJs(
         `["dungeon-mock-badge", "duel-mock-badge"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; })`,
       );
@@ -198,13 +190,30 @@ async function main() {
           };
         })()`);
 
+      /** Chờ trạng thái chip ĐỨNG YÊN (4 mẫu liên tiếp cách 100 ms giống hệt nhau) thay `sleep` cố định: ở khung chậm lớp hiện / ẩn và bố cục áp dụng muộn */
+      const calmChip = async () => {
+        let last = "";
+        let same = 0;
+        const ok = await waitUntilTrue(
+          async () => {
+            const cur = JSON.stringify(await chip());
+            same = cur === last ? same + 1 : 0;
+            last = cur;
+            return same >= 4;
+          },
+          30000,
+          100,
+        );
+        if (!ok) throw new Error(`${vp.name}: chip không đứng yên sau 30 s: ${last}`);
+      };
+
       console.log("  [1] mặc định: ẩn");
       let c = await chip();
       check(c && (c.hidden || c.display === "none"), "chip ẩn lúc bình thường");
 
       console.log("  [2] ui.setNetSlow(true): hiện, không chắn chạm");
       await evalJs(`window.__ui.setNetSlow(true)`);
-      await sleep(120);
+      await calmChip();
       c = await chip();
       check(
         c.hidden === false && c.w > 0 && c.h > 0,
@@ -228,34 +237,21 @@ async function main() {
 
       console.log("  [3] ui.setNetSlow(false): ẩn; banner nối lại đè lên chip");
       await evalJs(`window.__ui.setNetSlow(false)`);
-      await sleep(100);
+      await calmChip();
       c = await chip();
       check(c.hidden === true, "setNetSlow(false): chip ẩn");
       await evalJs(
         `window.__ui.setNetSlow(true); window.__ui.showReconnectNotice("Mất kết nối, đang nối lại... (còn 20 giây)")`,
       );
-      await sleep(150);
+      await calmChip();
       c = await chip();
       check(c.display === "none", "đang nối lại: chip KHÔNG hiện chồng lên banner đỏ");
       await shot("net-slow-reconnecting");
       await evalJs(`window.__ui.hideReconnectNotice(); window.__ui.setNetSlow(false)`);
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
+    if (launched) await launched.close();
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);
