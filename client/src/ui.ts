@@ -103,6 +103,7 @@ import {
   type AmbushChooseMsg,
   type AmbushFleeMsg,
   type AmbushSeenMsg,
+  limboDreamOf,
 } from "@tien-gioi/shared";
 import {
   arenaHudView,
@@ -4196,6 +4197,13 @@ function renderLimboAll() {
 
   const sub = $("limbo-kiep-sub");
   if (sub) sub.textContent = `Kiếp thứ ${summary.kiep} khép lại`;
+  // Giấc mơ bến sông (#1464): chỉ lần chết đầu (kiếp 1); kiếp sau ẩn và xoá chữ (màn dùng lại giữa các lần vào)
+  const dreamEl = document.getElementById("limbo-dream");
+  if (dreamEl) {
+    const dream = limboDreamOf(summary.kiep); // `undefined` khi kiếp đó chưa có lời (shared/src/limbo-dream.ts)
+    dreamEl.textContent = dream ?? "";
+    dreamEl.hidden = dream === undefined;
+  }
 
   const realmEl = $("limbo-sum-realm");
   if (realmEl) realmEl.textContent = realmLabel(summary.realm, summary.tier);
