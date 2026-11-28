@@ -1,6 +1,8 @@
 // In Sổ tay chiêu thức ra docs/SO_TAY_CHIEU_THUC.md (hoặc stdout với --stdout, --out <đường dẫn>).
 // Công cụ DỮ LIỆU thuần (KHÔNG mô phỏng): đọc dữ liệu thật ở `shared/` (`LEARNABLE_SKILLS`, `DROP_TABLES`, `SHOPS`, `MONSTER_BY_ID`, ...)
-// và in ba mục — (1) bảng chiêu theo hệ, (2) ma trận độ phủ hệ × cảnh giới, (3) chiêu "mồ côi" (không bán, không rơi).
+// và in ba mục — (1) bảng chiêu theo hệ, (2) ma trận độ phủ hệ × cảnh giới, (3) chiêu "mồ côi" (không có nơi nào để có được).
+// "Cách có được" gom BỐN nguồn thật: cửa hàng NPC (`SHOPS`), rơi từ quái (`DROP_TABLES`), Tàng Kinh Các / Bảo khố tông môn (`SECT_SHOP`), thưởng nhiệm vụ (`QUESTS`).
+// `NGUON_MAC_DINH` là dữ liệu thật; test truyền nguồn giả để kiểm từng nhánh (xem `so-tay-chieu.test.ts`, độc lập với tệp tài liệu đã commit).
 // Cùng dữ liệu => cùng byte: KHÔNG ghi giờ, sắp xếp chiêu theo (reqRealm, reqTier, id); test `so-tay-chieu-sync.test.ts` bắt tài liệu lệch bản sinh.
 import { writeFileSync } from "node:fs";
 import path from "node:path";
@@ -14,11 +16,16 @@ import {
   SHOPS,
   NPCS,
   DROP_TABLES,
+  QUESTS,
+  SECT_SHOP,
+  SECT_TERMS,
   buyPrice,
   bookIdOf,
   skillGradeOf,
   SKILL_GRADE_NAMES,
   type SkillDef,
+  type SkillShape,
+  type StatusKind,
 } from "@tien-gioi/shared";
 
 /** Cảnh giới hiển thị ở cột ma trận: 0 Phàm Nhân .. 4 Nguyên Anh (`skillViolations` chặn reqRealm > 4). */
@@ -43,37 +50,99 @@ function gradeName(def: SkillDef): string {
   return SKILL_GRADE_NAMES[skillGradeOf(def)];
 }
 
-/** Tóm tắt hiệu ứng trạng thái của chiêu: "Bỏng 2s 12% (40%)"; chiêu không hiệu ứng -> "—". */
-function effectsSummary(def: SkillDef): string {
+/**
+ * Nhãn hình đòn bằng tiếng Việt (chép từ `SHAPE_LABEL` ở `client/src/skills-panel.ts`: server không import được client). `Record<SkillShape, ...>` buộc thêm hình mới
+ * là phải thêm nhãn ở đây (tsc đỏ), test `so-tay-chieu.test.ts` kiểm thêm không nhãn nào trống / trùng id.
+ */
+export const SHAPE_NHAN: Readonly<Record<SkillShape, string>> = {
+  cone: "Quạt trước mặt",
+  line: "Tia thẳng",
+  fan: "Toả nhiều tia",
+  nova: "Vòng nổ quanh mình",
+  ground: "Vùng đặt xuống đất",
+  dash: "Lao tới, né đòn",
+  self: "Hộ thể quanh mình",
+  chain: "Sét lan sang mục tiêu gần",
+  bolt: "Đạn bay",
+  zone: "Vùng duy trì",
+  trap: "Bẫy",
+  aura: "Hào quang quanh thân",
+  totem: "Tượng triệu hồi",
+};
+
+/**
+ * Cường độ (`SkillEffect.ratio`) NGHĨA THEO LOẠI trạng thái (`StatusKind`, `shared/src/skills.ts`), cùng cách nói với `effectText` ở `client/src/skills-panel.ts`.
+ * `r` là số phần trăm đã định dạng ("20"); loại không dùng `ratio` (choáng, dấu) trả chuỗi cố định.
+ */
+const CUONG_DO: Readonly<Record<StatusKind, (r: string) => string>> = {
+  dot: (r) => `${r}% sát thương gốc mỗi giây`,
+  slow: (r) => `giảm tốc ${r}%`,
+  vuln: (r) => `nhận thêm ${r}% sát thương`,
+  shield: (r) => `chắn ${r}% khí huyết tối đa`,
+  haste: (r) => `tăng tốc ${r}%`,
+  regen: (r) => `hồi ${r}% khí huyết tối đa mỗi giây`,
+  breakAid: (r) => `cộng ${r}% xác suất đột phá lần kế`,
+  amp: (r) => `tăng ${r}% sát thương chiêu cùng hệ`,
+  cdr: (r) => `giảm ${r}% hồi chiêu`,
+  stun: () => "",
+  empower: (r) => `tăng ${r}% sát thương mọi chiêu`,
+  weaken: (r) => `gây ít hơn ${r}% sát thương, trùm chỉ chịu một nửa`,
+  mark: () => "chiêu cùng hệ đánh vào sẽ ăn combo",
+};
+
+/**
+ * Tóm tắt hiệu ứng trạng thái của chiêu: `Chảy máu 3s (20% sát thương gốc mỗi giây), xác suất 50%`; hiệu ứng có lợi thêm `, cho bản thân`; chiêu không hiệu ứng -> "—".
+ * Xác suất chỉ in khi dưới 100%.
+ */
+export function effectsSummary(def: SkillDef): string {
   if (def.effects.length === 0) return "—";
   return def.effects
     .map((e) => {
       const st = STATUS_BY_ID[e.status];
       const name = st?.name ?? e.status;
-      const ratio = e.ratio !== 0 ? ` ${pct(e.ratio)}` : "";
-      const chance = e.chance < 1 ? ` (${pct(e.chance)})` : "";
-      return `${name} ${secs(e.ms)}s${ratio}${chance}`;
+      const detail = st ? CUONG_DO[st.kind](pct(e.ratio)) : "";
+      const who = st && !st.harmful ? ", cho bản thân" : "";
+      const chance = e.chance < 1 ? `, xác suất ${pct(e.chance)}%` : "";
+      return `${name} ${secs(e.ms)}s${detail ? ` (${detail})` : ""}${who}${chance}`;
     })
     .join("; ");
 }
 
+/** Các nguồn dữ liệu của "Cách có được" (mặc định là dữ liệu thật; test truyền nguồn giả để kiểm từng nhánh mà không đụng `shared/`). */
+export interface NguonCoDuoc {
+  shops: typeof SHOPS;
+  drops: typeof DROP_TABLES;
+  sectShop: typeof SECT_SHOP;
+  quests: typeof QUESTS;
+}
+export const NGUON_MAC_DINH: NguonCoDuoc = {
+  shops: SHOPS,
+  drops: DROP_TABLES,
+  sectShop: SECT_SHOP,
+  quests: QUESTS,
+};
+
 /**
- * Cách có được của chiêu: bán ở cửa hàng nào (giá) và / hoặc rơi từ quái nào (tỉ lệ). Trả `orphan = true` khi KHÔNG bán và KHÔNG rơi —
- * kỳ vọng rỗng (mọi chiêu cơ bản bán ở trấn, mọi chiêu cao cấp rơi từ ít nhất một quái).
+ * Cách có được của chiêu, theo thứ tự: bán ở cửa hàng NPC (giá Linh thạch) / rơi từ quái (tỉ lệ) / đổi ở tông môn (cống hiến, cấp tông) / thưởng nhiệm vụ.
+ * Trả `orphan = true` khi KHÔNG có nguồn nào — kỳ vọng rỗng (mọi chiêu cơ bản bán ở trấn, mọi chiêu cao cấp rơi từ ít nhất một quái).
  */
-function howToGet(def: SkillDef): { text: string; orphan: boolean } {
+export function howToGet(
+  def: SkillDef,
+  nguon: NguonCoDuoc = NGUON_MAC_DINH,
+): { text: string; orphan: boolean } {
   const bookId = bookIdOf(def.id);
   const parts: string[] = [];
   const shopNames: string[] = [];
-  for (const shop of SHOPS) {
+  for (const shop of nguon.shops) {
     if (shop.itemIds.includes(bookId)) {
       const npc = NPC_BY_ID[shop.npcId];
       if (npc) shopNames.push(npc.name);
     }
   }
-  if (shopNames.length > 0) parts.push(`Bán ở ${shopNames.join(", ")} (${buyPrice(bookId)} LT)`);
+  if (shopNames.length > 0)
+    parts.push(`Bán ở ${shopNames.join(", ")} (${buyPrice(bookId)} Linh thạch)`);
   const drops: string[] = [];
-  for (const [monsterId, table] of Object.entries(DROP_TABLES)) {
+  for (const [monsterId, table] of Object.entries(nguon.drops)) {
     for (const e of table) {
       if (e.itemId === bookId) {
         const m = MONSTER_BY_ID[monsterId];
@@ -82,6 +151,14 @@ function howToGet(def: SkillDef): { text: string; orphan: boolean } {
     }
   }
   if (drops.length > 0) parts.push(`Rơi từ ${drops.join(", ")}`);
+  const sect = nguon.sectShop
+    .filter((e) => e.itemId === bookId)
+    .map((e) => `${SECT_TERMS[e.hall]} tông môn (${e.cost} cống hiến, từ cấp tông ${e.minLevel})`);
+  if (sect.length > 0) parts.push(`Đổi ở ${sect.join(", ")}`);
+  const quests = nguon.quests
+    .filter((q) => q.rewards.items?.some((it) => it.itemId === bookId))
+    .map((q) => `"${q.title}"`);
+  if (quests.length > 0) parts.push(`Thưởng nhiệm vụ ${quests.join(", ")}`);
   return { text: parts.length > 0 ? parts.join("; ") : "—", orphan: parts.length === 0 };
 }
 
@@ -111,7 +188,7 @@ function renderCoverageMatrix(defs: readonly SkillDef[]): string[] {
     "",
     "## Mục 2 — Ma trận độ phủ: hệ × cảnh giới",
     "",
-    "> Số chiêu của mỗi hệ ở mỗi cảnh giới yêu cầu (`reqRealm`). Ô trống (–) là hệ chưa có chiêu nào đòi cảnh giới đó — dùng để chọn lô chiêu kế tiếp.",
+    "> Số chiêu của mỗi hệ ở mỗi cảnh giới yêu cầu. Ô trống (–) là hệ chưa có chiêu nào đòi cảnh giới đó — dùng để chọn lô chiêu kế tiếp.",
     "",
     `| Hệ \\ Cảnh giới |${MATRIX_REALMS.map((r) => ` ${REALMS[r].name} |`).join("")} Tổng |`,
     "|---" + MATRIX_REALMS.map(() => "|---:").join("") + "|---:|",
@@ -122,16 +199,23 @@ function renderCoverageMatrix(defs: readonly SkillDef[]): string[] {
     L.push(`| ${el.name} |${cells.join("")} ${total} |`);
   }
   L.push(`| **Tổng** |${colTotals.map((n) => ` ${n} |`).join("")} ${grand} |`);
+  const empty = MATRIX_REALMS.filter((r) => colTotals[r] === 0).map((r) => REALMS[r].name);
+  if (empty.length > 0)
+    L.push("", `> Cột ${empty.join(", ")}: chưa có chiêu nào đòi cảnh giới này.`);
   return L;
 }
 
-/** Mục 3: chiêu "mồ côi" (không bán, không rơi từ quái nào). */
-function renderOrphans(defs: readonly SkillDef[]): string[] {
-  const orphans = defs.filter((s) => howToGet(s).orphan);
-  const L = ["", '## Mục 3 — Chiêu "mồ côi" (không bán, không rơi từ quái nào)', ""];
+/** Mục 3: chiêu "mồ côi" (không có nguồn nào trong bốn nguồn của "Cách có được"). */
+function renderOrphans(defs: readonly SkillDef[], nguon: NguonCoDuoc): string[] {
+  const orphans = defs.filter((s) => howToGet(s, nguon).orphan);
+  const L = [
+    "",
+    '## Mục 3 — Chiêu "mồ côi" (không bán, không rơi, không đổi ở tông môn, không là thưởng nhiệm vụ)',
+    "",
+  ];
   if (orphans.length === 0) {
     L.push(
-      "Hiện **KHÔNG có**: mọi chiêu đều bán ở cửa hàng (độ hiếm <= 1) hoặc rơi từ ít nhất một quái. Thêm chiêu mà không gắn nơi có được thì dòng sẽ hiện ở đây.",
+      "Hiện **KHÔNG có**: mọi chiêu đều có ít nhất một nguồn (cửa hàng, quái rơi, tông môn hoặc thưởng nhiệm vụ). Thêm chiêu mà không gắn nơi có được thì dòng sẽ hiện ở đây.",
     );
     return L;
   }
@@ -147,20 +231,26 @@ function renderIntro(total: number): string[] {
     "# Sổ tay chiêu thức",
     "",
     "> File này **SINH TỰ ĐỘNG** từ `server/src/balance/so-tay-chieu.ts`, đọc dữ liệu thật ở `shared/` (`LEARNABLE_SKILLS`, `DROP_TABLES`,",
-    "> `SHOPS`, `MONSTER_BY_ID`, ...). Sau khi sửa số liệu chiêu / rơi đồ / cửa hàng, chạy `npm run so-tay-chieu -w server` để cập nhật;",
+    "> `SHOPS`, `SECT_SHOP`, `QUESTS`, ...). Sau khi sửa số liệu chiêu / rơi đồ / cửa hàng / tông môn / nhiệm vụ, chạy `npm run so-tay-chieu -w server` để cập nhật;",
     `> test \`server/src/balance/so-tay-chieu-sync.test.ts\` bắt tài liệu lệch bản sinh. Trạng thái: **${total} chiêu** trên ${ELEMENTS.length} hệ.`,
     "",
     "---",
     "",
     "## Mục 1 — Bảng chiêu theo hệ",
     "",
-    "> Mỗi chiêu một dòng: tên, id, cảnh giới yêu cầu (`reqRealm`), phẩm, hình, hồi chiêu, hiệu ứng tóm tắt, và cách có được (bán ở cửa hàng / rơi từ quái).",
+    "> Mỗi chiêu một dòng: tên, id, cảnh giới yêu cầu, phẩm, hình đòn, hồi chiêu, hiệu ứng tóm tắt, và cách có được.",
+    ">",
+    "> - **Hiệu ứng** = tên trạng thái, thời gian, (cường độ: nghĩa ghi ngay trong ngoặc theo loại trạng thái), rồi xác suất gắn khi dưới 100%.",
+    "> - **Cách có được** gồm bốn nguồn: _Bán ở_ (cửa hàng NPC, giá bằng Linh thạch), _Rơi từ_ (quái, tỉ lệ %), _Đổi ở_ (Tàng Kinh Các / Bảo khố tông môn, giá bằng cống hiến và cấp tông tối thiểu), _Thưởng nhiệm vụ_.",
     "",
   ];
 }
 
 /** Toàn bộ nội dung Sổ tay chiêu thức (ba mục). */
-export function renderSoTayChieuMarkdown(defs: readonly SkillDef[] = LEARNABLE_SKILLS): string {
+export function renderSoTayChieuMarkdown(
+  defs: readonly SkillDef[] = LEARNABLE_SKILLS,
+  nguon: NguonCoDuoc = NGUON_MAC_DINH,
+): string {
   const byElement: Record<string, SkillDef[]> = {};
   for (const el of ELEMENTS) byElement[el.id] = [];
   for (const s of defs) if (byElement[s.element]) byElement[s.element].push(s);
@@ -180,14 +270,14 @@ export function renderSoTayChieuMarkdown(defs: readonly SkillDef[] = LEARNABLE_S
     );
     for (const s of rows) {
       L.push(
-        `| **${s.name}** | \`${s.id}\` | ${REALMS[s.reqRealm].name} | ${gradeName(s)} | ${s.shape} | ${secs(s.cooldown)}s | ${effectsSummary(s)} | ${howToGet(s).text} |`,
+        `| **${s.name}** | \`${s.id}\` | ${REALMS[s.reqRealm].name} | ${gradeName(s)} | ${SHAPE_NHAN[s.shape]} | ${secs(s.cooldown)}s | ${effectsSummary(s)} | ${howToGet(s, nguon).text} |`,
       );
     }
     L.push("");
   }
 
   L.push(...renderCoverageMatrix(defs));
-  L.push(...renderOrphans(defs));
+  L.push(...renderOrphans(defs, nguon));
   L.push("");
   return L.join("\n");
 }
