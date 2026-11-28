@@ -9,6 +9,7 @@
     "start": "tsx src/index.ts",
     "can-bang": "tsx src/balance/can-bang.ts",
     "so-tay-chieu": "tsx src/balance/so-tay-chieu.ts",
+    "so-tay-quai": "tsx src/balance/so-tay-quai.ts",
     "can-bang:kim-dan-truoc": "tsx src/balance/kim-dan-truoc.ts",
     "bench": "tsx src/perf/bench.ts",
     "bots": "tsx scripts/bots.ts",

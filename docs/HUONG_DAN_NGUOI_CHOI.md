@@ -415,6 +415,8 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 
 ## Phụ lục: quái theo bậc và bản đồ
 
+> **Sổ tay quái và bảng rơi đồ:** đầy đủ mọi quái (bậc, máu, công, tu vi, Linh thạch rơi, xuất hiện ở bản đồ nào), bảng "vật phẩm rơi từ quái nào" và nơi rơi của từng sách chiêu: xem [`docs/SO_TAY_QUAI_VA_ROI.md`](SO_TAY_QUAI_VA_ROI.md).
+
 ### Quái tiêu biểu theo vùng (sắp theo độ mạnh tăng dần)
 
 | Quái | Vùng | Đặc điểm |
