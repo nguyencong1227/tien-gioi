@@ -78,6 +78,10 @@
 | Hoàng Tuyền | Hoang Tuyen, hoang tuyen | Chết thật (mất kiếp); KHÔNG thiếu dấu ("hoang tuyen") hay dính chữ "Hoànguyền". |
 | Tam Sinh Thạch | Tam Sinh Thach, tam sinh thach | Bảng mở khóa lợi ích vĩnh viễn của luân hồi. |
 | chân linh | chan linh | Linh hồn đầu thai qua kiếp; viết thường, KHÔNG thiếu dấu. (Chưa thêm "Duyên": "cơ duyên" dễ báo oan — để khi có cơ chế khử nhập nhằng.) |
+| Thiên Môn | Thien Mon, thien mon | Cửa trời ngăn Nhân giới và Linh giới (mục 75, `docs/COT_TRUYEN.md`). |
+| Đoạn Thiên | Doan Thien, doan thien | Ngày Ngũ Tổ chém Yêu Hoàng rồi phong Thiên Môn; chiến trường Kiếm Trạch. |
+| Tầm Thiên Hội | Tam Thien Hoi, tam thien hoi | Hội kín muốn mở lại Thiên Môn (phe phản diện). |
+| Vong Xuyên | Vong Xuyen, vong xuyen | Bến đò Hoàng Tuyền (nơi Lão Đò chở hồn). |
 
 ---
 
@@ -89,19 +93,37 @@
 | Hắc Phong Cốc | Hac Phong Coc, hac phong coc | |
 | Âm Sương Trạch | Am Suong Trach, am suong trach | |
 | Hàn Vân Lĩnh | Han Van Linh, han van linh | |
+| Vĩnh Triều Hải | Vinh Trieu Hai, vinh trieu hai | Biển có triều rút lộ Triều Khư (chương 7). |
+| Lang Hoang |  | Bản đồ chương 5 (Hóa Thần), lãnh địa Lang tộc; không dấu nên không có biến thể sai. |
+| Uy Vân Kinh | Uy Van Kinh, uy van kinh | Kinh đô Lương Quốc, bản đồ chương 6. |
+| Tuyết Đao Quan | Tuyet Dao Quan, tuyet dao quan | Cửa ải trước Lang Hoang (Lương Quốc). |
+| Triều Khư | Trieu Khu, trieu khu | Đáy Vĩnh Triều Hải lộ ra khi triều rút, bản đồ chương 7. |
+| U Hồn Điện | U Hon Dien, u hon dien | Di tích sa mạc Hạt tộc, bản đồ chương 8. |
+| Vọng Quan | Vong Quan, vong quan | Trạm ở U Hồn Điện (chương 8); KHÔNG lẫn bến 'Vong Xuyên'. |
+| Kiếm Trạch | Kiem Trach, kiem trach | Chiến trường Đoạn Thiên, bản đồ chương 9. |
+| Tiểu Phong Quan | Tieu Phong Quan, tieu phong quan | Trạm ở Kiếm Trạch (chương 9). |
+| Thiên Môn Hạ | Thien Mon Ha, thien mon ha | Dưới chân cửa trời, bản đồ chương 10. |
+| Đại Ung | Dai Ung, dai ung | Nước trung nguyên, phía nam (quốc gia, mục 75). |
+| Bắc Minh | Bac Minh, bac minh | Nước phía bắc và giữa (quốc gia, mục 75); KHÔNG lẫn chữ 'minh' riêng lẻ. |
+| Lương Quốc | Luong Quoc, luong quoc | Nước phía tây, vùng biên ải (quốc gia, mục 75). |
+| Viêm Quốc | Viem Quoc, viem quoc | Nước đông nam (quốc gia, mục 75). |
+| Thịnh Quốc | Thinh Quoc, thinh quoc | Nước buôn phía đông (quốc gia, mục 75). |
 
 ---
 
 ## Tên chính
 
-Tên trùm (boss-level, có chữ "Vương") — hiện chỉ phủ các trùm chính; quái thường và
-NPC để bổ sung sau.
+Tên trùm (boss-level, có chữ "Vương") và nhân vật / nhóm nhân vật của mạch truyện mục 75
+(Ngũ Tổ, Yêu Hoàng, Lão Đò) — hiện chỉ phủ các tên chính; quái thường và NPC để bổ sung sau.
 
 | Thuật ngữ chuẩn | Biến thể sai | Ghi chú |
 |---|---|---|
 | Thiên Hàn Vương | Thien Han Vuong, thien han vuong | Trùm Nguyên Anh, rơi Thiên Hàn châu. |
 | Linh Hư Yêu Vương | Linh Hu Yeu Vuong, linh hu yeu vuong | Trùm bí cảnh Linh Hư. |
 | Phân Thân Yêu Vương | Phan Than Yeu Vuong, phan than yeu vuong | |
+| Ngũ Tổ | Ngu To | Năm vị tổ sư nhân tộc; CHỈ biến thể 'Ngu To' hoa chữ đầu (thường 'ngu to' có thể là 'ngu' + 'to' hợp lệ). |
+| Yêu Hoàng | Yeu Hoang, yeu hoang | Vua yêu bị Ngũ Tổ chém ngày Đoạn Thiên. |
+| Lão Đò | Lao Do | Người dẫn hồn ở bến Vong Xuyên; CHỈ biến thể 'Lao Do' hoa chữ đầu (thường 'lao do' dễ trùng chữ hợp lệ). |
 
 ---
 
@@ -246,26 +268,24 @@ Dev F nối `bannedViolations` vào `npm run check:content` (Phần 3 #1200) ch�
 
 ### Tên riêng của truyện / game khác (cấm)
 
-> Thế giới Tiên Giới giữ nguyên; KHÔNG mượn nhân vật, tông phái, môn phái, tự viện, quốc gia của game /
-> truyện khác làm của Tiên Giới (AGENTS.md "Asset nguồn 3"). Danh sách từ những chỗ đã xác nhận rò rỉ:
-> AGENTS.md, `skills-kim-tho.test.ts` (`VKTT_PROPER`), và ví dụ người dùng trong issue #1199.
+> Thế giới Tiên Giới giữ nguyên; KHÔNG mượn nhân vật, tông phái, quốc gia của truyện / game KHÁC làm của
+> Tiên Giới (AGENTS.md "Asset nguồn 3"). **Từ 25/11/2026 (QUYET_DINH_M3 mục 75, #1462) tên của Vạn Kiếp Tu Tiên
+> (Thanh Vân Môn, Bắc Minh, Huyền Vũ Môn, Kim Đạo Tự, Đan Hà Cốc... cùng cốt truyện, địa danh, nhân vật, quốc gia)
+> ĐƯỢC dùng và KHÔNG còn nằm trong bảng cấm**; chúng có mặt ở các bảng thuật ngữ chuẩn phía trên khi đã vào mạch
+> truyện (`docs/COT_TRUYEN.md`). Vẫn cấm tên của game / truyện KHÁC: ví dụ người dùng trong issue #1199 và danh sách
+> `FOREIGN_NAMES` ở `client/src/no-foreign-names.test.ts`.
 
 | Chữ cấm | Lý do |
 |---|---|
-| Thanh Vân Môn / Thanh Vân Kiếm Tông | tông phái của Vạn Kiếp Tu Tiên |
-| Bắc Minh | môn phái của Vạn Kiếp Tu Tiên |
-| Huyền Vũ Môn | môn phái của Vạn Kiếp Tu Tiên |
-| Kim Đạo Tự | tự viện của Vạn Kiếp Tu Tiên |
-| Đan Hà Cốc | cốc (địa danh tông phái) của Vạn Kiếp Tu Tiên |
 | Hàn Lập | nhân vật của tiên hiệp khác (Phàm Nhân Tu Tiên) |
 
 > CHƯA phủ hết — gặp rò rỉ mới (tên nhân vật / tông phái truyện khác) thì THÊM dòng vào `BANNED_TERMS`,
 > đừng bịa danh sách rộng không có bằng chứng. Matcher KHÔNG phân biệt hoa / thường nên mọi cách viết đều bị bắt.
 
-> **Ngoại lệ ĐÃ CHỐT (Dev A, PR #1408):** `Thanh Vân Kiếm Khí` / `Thanh Vân Kiếm Quyết` / `Thanh Vân Vạn Kiếm Quyết`
-> (id `thanh_van_kiem_khi`, đã vào hồ sơ lưu) KHÔNG bị cấm — `BANNED_TERMS` chỉ cấm `Thanh Vân Môn` / `Thanh Vân Kiếm
-> Tông` (tông phái cụ thể), KHÔNG cấm chữ "Thanh Vân" đứng riêng. Đổi tên hiển thị của chiêu này chỉ khi người dùng
-> yêu cầu; agent sau KHÔNG cần hỏi lại.
+> **Chiêu thức giữ lối nói trung tính:** bộ chiêu ở `skills-*.ts` không dùng tên riêng của Vạn Kiếp (test
+> `skills-kim-tho.test.ts` canh bằng `VKTT_PROPER`, KHÔNG sửa theo mục 75). Chiêu `thanh_van_kiem_khi` (`Thanh Vân Kiếm Khí` /
+> `Thanh Vân Kiếm Quyết` / `Thanh Vân Vạn Kiếm Quyết`, đã vào hồ sơ lưu) giữ nguyên tên hiển thị; đổi chỉ khi người
+> dùng yêu cầu (Dev A, PR #1408).
 
 ### Từ hiện đại lạc văn phong (cấm, nhất là trong lời thoại)
 
@@ -276,7 +296,7 @@ Dev F nối `bannedViolations` vào `npm run check:content` (Phần 3 #1200) ch�
 | boss | trùm |
 
 > Matcher khớp ranh giới từ nên KHÔNG báo oan chữ hợp lệ chứa chuỗi con (vd "ok" KHÔNG bám "book";
-> "minh" riêng lẻ KHÔNG bám "Bắc Minh").
+> "hàn" / "lập" riêng lẻ KHÔNG bám "Hàn Lập").
 
 **Chữ Hán / CJK KHÔNG liệt kê ở đây:** đã bị `ngon-ngu.test.ts` (quy tắc a) chặn trên TẤT CẢ chữ hiển thị
 game — nối trùng chỉ dư thừa. Bộ từ cấm này chỉ lo tên riêng Latinh + từ hiện đại.

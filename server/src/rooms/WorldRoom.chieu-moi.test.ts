@@ -50,6 +50,7 @@ afterEach(async () => {
     if (i >= 0) (LEARNABLE_SKILLS as SkillDef[]).splice(i, 1);
   }
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(150);
 });
 
@@ -60,13 +61,13 @@ afterAll(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function waitFor<T>(
-  fn: () => T | undefined | false,
+  fn: () => T | Promise<T | undefined | false> | undefined | false,
   ms = 6000,
   what = "điều kiện",
 ): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
     if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
@@ -238,6 +239,7 @@ describe("chiêu thức đợt mới qua máy chủ thật (CT2-CT5)", () => {
     );
     expect(st.list.find((e) => e[0] === "windup")![2]).toBeCloseTo(0.5, 5);
     expect(c.windup?.skill).toBe("van_khi_thu");
+    // Chờ âm: trong suốt thời gian vận chiêu (windup 900ms), quái chưa nhận sát thương
     await sleep(500);
     expect(a.dmg.filter((d) => d.target === m.id)).toEqual([]); // còn đang vận
     const hit = await waitFor(
@@ -326,9 +328,20 @@ describe("chiêu thức đợt mới qua máy chủ thật (CT2-CT5)", () => {
     expect(withMastery.learned["luyen_thu"]).toBe(1);
     // rời phòng: hồ sơ lưu `skills` (kèm điểm luyện)
     await a.room.leave(true);
-    await sleep(300);
-    const rec = await loadPlayer(name);
-    expect(rec?.skills?.mastery?.["luyen_thu"]).toBe(1);
+    // Chờ dương: máy chủ hoàn tất lưu hồ sơ nhân vật xuống đĩa kèm điểm luyện mastery
+    const rec = await waitFor(
+      async () => {
+        try {
+          const r = await loadPlayer(name);
+          return r?.skills?.mastery?.["luyen_thu"] === 1 ? r : undefined;
+        } catch {
+          return undefined;
+        }
+      },
+      4000,
+      "hồ sơ nhân vật được lưu kèm điểm luyện mastery",
+    );
+    expect(rec.skills?.mastery?.["luyen_thu"]).toBe(1);
     // vào lại: sổ nạp lại GIỮ điểm luyện và tầng (máy chủ đọc `skills` đã lưu qua `sanitizeSkillBook`)
     const a2 = await spawn("", name);
     const c2 = worldOf(a2.room).ctrl.get(a2.room.sessionId);

@@ -166,7 +166,7 @@ try {
         collapsed: t.classList.contains("collapsed"), aria: b.getAttribute("aria-expanded"),
         listShown: getComputedStyle(list).display !== "none", btnH: Math.round(r.height), btnW: Math.round(r.width),
         colPct: Math.round((col.height / innerHeight) * 100), colH: Math.round(col.height), ih: innerHeight,
-        pref: localStorage.getItem("tg_qt_open"), form: document.documentElement.dataset.form, orient: document.documentElement.dataset.orient,
+        pref: localStorage.getItem("tg_qt_open"), form: document.documentElement.dataset.form, orient: document.documentElement.dataset.orient, input: document.documentElement.dataset.input,
         topIsBtn: (() => { const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return Boolean(e && e.closest("button") === b); })(),
       });
     })()`).then((v) => JSON.parse(v));
@@ -196,8 +196,31 @@ try {
     return state();
   };
 
+  // 0) Cửa sổ MÁY TÍNH hẹp (CHUỘT, không phải điện thoại): `isCompactHud` coi cửa sổ rộng DƯỚI `COMPACT_MAX_WIDTH` (700 px) là gọn nên bảng Nhiệm vụ thu gọn mặc định, từ 700 px thì mở.
+  // PHẢI chạy TRƯỚC mọi ca cảm ứng: Chrome không tắt lại giả lập cảm ứng trong cùng phiên (sau đó `data-input="touch"` và mọi khung thành điện thoại). Không có ca này thì đổi
+  // `COMPACT_MAX_WIDTH` 700 -> 300 hay -> 1000 vẫn XANH (A đo ở #1522; test đơn vị `hud-compact.test.ts` mới bắt được).
+  let s = await fresh(600, 900, false);
+  check(
+    s.input === "mouse" && s.form !== "phone",
+    `600x900 chuột: không phải điện thoại (form ${s.form}, input ${s.input})`,
+  );
+  check(
+    s.collapsed && s.aria === "false" && !s.listShown,
+    `cửa sổ máy tính hẹp 600x900 (< 700 px): bảng Nhiệm vụ THU GỌN mặc định (aria-expanded=${s.aria})`,
+  );
+  s = await fresh(699, 900, false);
+  check(
+    s.collapsed && s.aria === "false",
+    `699x900 chuột (sát biên, < 700): THU GỌN (aria-expanded=${s.aria})`,
+  );
+  s = await fresh(700, 900, false);
+  check(
+    !s.collapsed && s.aria === "true",
+    `700x900 chuột (đúng biên, >= 700): MỞ (aria-expanded=${s.aria})`,
+  );
+
   // 1) Mặc định theo máy
-  let s = await fresh(844, 390, true);
+  s = await fresh(844, 390, true);
   check(
     s.form === "phone" && s.orient === "landscape",
     `844x390 là điện thoại ngang (${s.form}/${s.orient})`,

@@ -122,6 +122,113 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     wrong: ["Han Van Linh", "han van linh"],
   },
 
+  // --- Địa danh + quốc gia của mạch truyện mục 75 (`docs/COT_TRUYEN.md`; nguồn Vạn Kiếp Tu Tiên theo AGENTS.md Asset nguồn 3) ---
+  {
+    id: "dia-danh.vinh-trieu-hai",
+    group: "dia-danh",
+    canonical: "Vĩnh Triều Hải",
+    wrong: ["Vinh Trieu Hai", "vinh trieu hai"],
+    note: "Biển có triều rút lộ Triều Khư (chương 7).",
+  },
+  {
+    id: "dia-danh.lang-hoang",
+    group: "dia-danh",
+    canonical: "Lang Hoang",
+    wrong: [],
+    note: "Bản đồ chương 5 (Hóa Thần), lãnh địa Lang tộc; không dấu nên không có biến thể sai.",
+  },
+  {
+    id: "dia-danh.uy-van-kinh",
+    group: "dia-danh",
+    canonical: "Uy Vân Kinh",
+    wrong: ["Uy Van Kinh", "uy van kinh"],
+    note: "Kinh đô Lương Quốc, bản đồ chương 6.",
+  },
+  {
+    id: "dia-danh.tuyet-dao-quan",
+    group: "dia-danh",
+    canonical: "Tuyết Đao Quan",
+    wrong: ["Tuyet Dao Quan", "tuyet dao quan"],
+    note: "Cửa ải trước Lang Hoang (Lương Quốc).",
+  },
+  {
+    id: "dia-danh.trieu-khu",
+    group: "dia-danh",
+    canonical: "Triều Khư",
+    wrong: ["Trieu Khu", "trieu khu"],
+    note: "Đáy Vĩnh Triều Hải lộ ra khi triều rút, bản đồ chương 7.",
+  },
+  {
+    id: "dia-danh.u-hon-dien",
+    group: "dia-danh",
+    canonical: "U Hồn Điện",
+    wrong: ["U Hon Dien", "u hon dien"],
+    note: "Di tích sa mạc Hạt tộc, bản đồ chương 8.",
+  },
+  {
+    id: "dia-danh.vong-quan",
+    group: "dia-danh",
+    canonical: "Vọng Quan",
+    wrong: ["Vong Quan", "vong quan"],
+    note: "Trạm ở U Hồn Điện (chương 8); KHÔNG lẫn bến 'Vong Xuyên'.",
+  },
+  {
+    id: "dia-danh.kiem-trach",
+    group: "dia-danh",
+    canonical: "Kiếm Trạch",
+    wrong: ["Kiem Trach", "kiem trach"],
+    note: "Chiến trường Đoạn Thiên, bản đồ chương 9.",
+  },
+  {
+    id: "dia-danh.tieu-phong-quan",
+    group: "dia-danh",
+    canonical: "Tiểu Phong Quan",
+    wrong: ["Tieu Phong Quan", "tieu phong quan"],
+    note: "Trạm ở Kiếm Trạch (chương 9).",
+  },
+  {
+    id: "dia-danh.thien-mon-ha",
+    group: "dia-danh",
+    canonical: "Thiên Môn Hạ",
+    wrong: ["Thien Mon Ha", "thien mon ha"],
+    note: "Dưới chân cửa trời, bản đồ chương 10.",
+  },
+  {
+    id: "dia-danh.dai-ung",
+    group: "dia-danh",
+    canonical: "Đại Ung",
+    wrong: ["Dai Ung", "dai ung"],
+    note: "Nước trung nguyên, phía nam (quốc gia, mục 75).",
+  },
+  {
+    id: "dia-danh.bac-minh",
+    group: "dia-danh",
+    canonical: "Bắc Minh",
+    wrong: ["Bac Minh", "bac minh"],
+    note: "Nước phía bắc và giữa (quốc gia, mục 75); KHÔNG lẫn chữ 'minh' riêng lẻ.",
+  },
+  {
+    id: "dia-danh.luong-quoc",
+    group: "dia-danh",
+    canonical: "Lương Quốc",
+    wrong: ["Luong Quoc", "luong quoc"],
+    note: "Nước phía tây, vùng biên ải (quốc gia, mục 75).",
+  },
+  {
+    id: "dia-danh.viem-quoc",
+    group: "dia-danh",
+    canonical: "Viêm Quốc",
+    wrong: ["Viem Quoc", "viem quoc"],
+    note: "Nước đông nam (quốc gia, mục 75).",
+  },
+  {
+    id: "dia-danh.thinh-quoc",
+    group: "dia-danh",
+    canonical: "Thịnh Quốc",
+    wrong: ["Thinh Quoc", "thinh quoc"],
+    note: "Nước buôn phía đông (quốc gia, mục 75).",
+  },
+
   // --- Hệ (skills.ts: ELEMENTS — 10 hệ) ---
   // matcher KHớp CHÍNH XÁC (không bóc dấu) => hết nhập nhằng do THĂNG SẮC: "Lối" (con đường) ≠ "Loi", "Móc" ≠ "Moc" — KHÔNG còn báo oan chữ đúng.
   // NHƯNG biến thể thiếu dấu của hệ vẫn là CHUỖI TRẦN, nên nếu thêm sẽ Bám chữ trần hợp lệ đang có trong chữ hiển thị (vd wrong "Hoa" của Hỏa bám "Hoa"
@@ -178,6 +285,36 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     note: "Linh hồn đầu thai qua kiếp (reincarnation.ts); viết thường, KHÔNG thiếu dấu. KHÔNG lẫn 'Duyên' (để sau — 'cơ duyên' dễ báo oan).",
   },
 
+  // --- Khái niệm của mạch truyện mục 75 ---
+  {
+    id: "khai-niem.thien-mon",
+    group: "khai-niem",
+    canonical: "Thiên Môn",
+    wrong: ["Thien Mon", "thien mon"],
+    note: "Cửa trời ngăn Nhân giới và Linh giới (mục 75, `docs/COT_TRUYEN.md`).",
+  },
+  {
+    id: "khai-niem.doan-thien",
+    group: "khai-niem",
+    canonical: "Đoạn Thiên",
+    wrong: ["Doan Thien", "doan thien"],
+    note: "Ngày Ngũ Tổ chém Yêu Hoàng rồi phong Thiên Môn; chiến trường Kiếm Trạch.",
+  },
+  {
+    id: "khai-niem.tam-thien-hoi",
+    group: "khai-niem",
+    canonical: "Tầm Thiên Hội",
+    wrong: ["Tam Thien Hoi", "tam thien hoi"],
+    note: "Hội kín muốn mở lại Thiên Môn (phe phản diện).",
+  },
+  {
+    id: "khai-niem.vong-xuyen",
+    group: "khai-niem",
+    canonical: "Vong Xuyên",
+    wrong: ["Vong Xuyen", "vong xuyen"],
+    note: "Bến đò Hoàng Tuyền (nơi Lão Đò chở hồn).",
+  },
+
   // --- Tên chính: trùm (boss-level, có chữ "Vương") — quái thường để lượt sau ---
   {
     id: "nhan-vat.thien-han-vuong",
@@ -198,6 +335,29 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     group: "nhan-vat",
     canonical: "Phân Thân Yêu Vương",
     wrong: ["Phan Than Yeu Vuong", "phan than yeu vuong"],
+  },
+
+  // --- Nhân vật / nhóm nhân vật của mạch truyện mục 75 ---
+  {
+    id: "nhan-vat.ngu-to",
+    group: "nhan-vat",
+    canonical: "Ngũ Tổ",
+    wrong: ["Ngu To"],
+    note: "Năm vị tổ sư nhân tộc; CHỈ biến thể 'Ngu To' hoa chữ đầu (thường 'ngu to' có thể là 'ngu' + 'to' hợp lệ).",
+  },
+  {
+    id: "nhan-vat.yeu-hoang",
+    group: "nhan-vat",
+    canonical: "Yêu Hoàng",
+    wrong: ["Yeu Hoang", "yeu hoang"],
+    note: "Vua yêu bị Ngũ Tổ chém ngày Đoạn Thiên.",
+  },
+  {
+    id: "nhan-vat.lao-do",
+    group: "nhan-vat",
+    canonical: "Lão Đò",
+    wrong: ["Lao Do"],
+    note: "Người dẫn hồn ở bến Vong Xuyên; CHỈ biến thể 'Lao Do' hoa chữ đầu (thường 'lao do' dễ trùng chữ hợp lệ).",
   },
 ];
 

@@ -52,6 +52,7 @@ beforeAll(async () => {
 afterEach(async () => {
   restoreSaves();
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ socket Colyseus dọn dẹp giữa các ca kiểm (harness cleanup)
   await sleep(150);
 });
 
@@ -63,15 +64,15 @@ afterAll(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function waitFor<T>(
-  fn: () => T | undefined | false,
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
   ms = 5000,
   what = "điều kiện",
 ): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error(`Hết thời gian chờ ${what}`);
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
@@ -369,17 +370,32 @@ describe("Cửa hàng tông môn (sectShopBuy handler trên Colyseus thật)", (
     // Nhả cổng lưu cho cả lượt lưu của shopBuy và lượt lưu khi leave
     nha();
     await leaving;
-    await sleep(200);
 
-    // Khoá busy trong hub phải được dọn sạch
+    // Chờ dương: khoá busy trong hub được giải phóng và tệp tông môn trên đĩa lưu xong trừ 5 cống hiến
     const hub = worldOf(H.room).hub;
     const soulKey = leaderName.toLowerCase().trim();
+    const sectFilePath = path.join(dataDir, "sects", `${sectId}.json`);
+
+    const sectData = await waitFor(
+      () => {
+        if (hub.sects.busy.has(soulKey)) return undefined;
+        try {
+          const raw = JSON.parse(readFileSync(sectFilePath, "utf8"));
+          const m = raw.members?.find((x: any) => x.name === leaderName);
+          if (m?.contrib === 195) return raw;
+        } catch {
+          return undefined;
+        }
+        return undefined;
+      },
+      4000,
+      "khoá busy đã giải phóng và tông môn lưu cống hiến 195",
+    );
+
+    // Khoá busy trong hub phải được dọn sạch
     expect(hub.sects.busy.has(soulKey)).toBe(false);
 
     // Tông môn lưu đúng trừ 5 cống hiến
-    const sectData = JSON.parse(
-      readFileSync(path.join(dataDir, "sects", `${sectId}.json`), "utf8"),
-    );
     const m = sectData.members.find((x: any) => x.name === leaderName);
     expect(m.contrib).toBe(195);
   });
