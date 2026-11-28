@@ -135,6 +135,8 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
       expect(retryAllowed("e2e:shop-qty", 300)).toBe(true); // sàn 540 s <= 600 s
       expect(timeoutSecFor("e2e:skills-panel", 300)).toBe(360); // CI đo tới 106,7 s: 3 x = 320 s > 300 (#1532)
       expect(retryAllowed("e2e:skills-panel", 300)).toBe(true); // sàn 360 s <= 600 s
+      expect(timeoutSecFor("e2e:sell-confirm", 300)).toBe(420); // CI đo tới 125,7 s: 3 x = 377 s > 300 (#1541)
+      expect(retryAllowed("e2e:sell-confirm", 300)).toBe(true); // sàn 420 s <= 600 s
       // --timeout chung lớn hơn 600 s cũng làm mọi kịch bản không được thử lại (chống treo + thử lại ăn hết timeout-minutes)
       expect(retryAllowed("e2e:ban-phim", 900)).toBe(false);
     });

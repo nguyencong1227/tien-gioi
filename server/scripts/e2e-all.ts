@@ -73,6 +73,7 @@ export interface ScriptResult {
  * skill-touch (lô 7, #1524) đo 130,2-138,3 s trên CI (runs 45765623259, 45766212473, 45766891291 ngày 26/11): 3 x 138,3 = 415 s > 300 -> sàn 420 s (<= 600 s nên vẫn được thử lại).
  * shop-qty (nit #1530, `settle()` thay `sleep`) đo 100,3-162,6 s trên CI (runs 46127581294 ... 46128986171 và 46129592639 ... 46132055585 ngày 28/11): 3 x 162,6 = 488 s > 300 -> sàn 540 s (<= 600 s nên vẫn được thử lại).
  * skills-panel đo 62,5-106,7 s trên CI (cùng 5 lượt 46129592639 ... 46132055585): 3 x 106,7 = 320 s > 300 -> sàn 360 s.
+ * sell-confirm (lô 9, #1541) đo 89,7-125,7 s trên CI (5 lượt `only=pwa,net-slow,sell-confirm,craft-ui`, runs 46132670788 ... 46133771831 ngày 28/11): 3 x 125,7 = 377 s > 300 -> sàn 420 s (<= 600 s nên vẫn được thử lại).
  * Kịch bản có 3 x thời gian CI <= 300 s không cần dòng ở đây. Thêm kịch bản chậm mới thì thêm vào đây theo số đo CI, đừng nâng `--timeout` chung.
  */
 export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
@@ -87,6 +88,7 @@ export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
   "e2e:skill-touch": 420,
   "e2e:shop-qty": 540,
   "e2e:skills-panel": 360,
+  "e2e:sell-confirm": 420,
 };
 
 /** Kịch bản có hạn chờ thực LỚN HƠN ngưỡng này KHÔNG được thử lại: một lần treo + thử lại sẽ ăn quá `timeout-minutes` của cả shard (A ở #1458). */
