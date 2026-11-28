@@ -92,6 +92,8 @@ Tờ ảnh: `11-npc.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-
 | NPC-17 | Ngô Cự — Quan úy Tuyết Đao · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
 | NPC-18 | Chu Bách Lượng — Lái buôn qua ải · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
 | NPC-19 | Đỗ Thập Tam Nương — Tán tu · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
+| NPC-20 | Đoan Mộc Thu — Người xem cờ · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
+| NPC-21 | Lạc Thanh Sơn — Lão tiều phu · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
 
 <!-- /NHOM 11 -->
 
@@ -120,6 +122,12 @@ Tờ ảnh: `12-quai.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | Q-16 | Xích Diễm Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
 | Q-17 | Thương Nguyệt Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
 | Q-18 | Ngân Nguyệt Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-19 | Luyện Huyết Đệ Tử · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-20 | Ngạ Quỷ · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-21 | Cương Thi · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-22 | Huyết Mị · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-23 | Huyết Ảnh · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-24 | Huyết Sát Chân Truyền · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
 
 <!-- /NHOM 12 -->
 
@@ -137,6 +145,8 @@ Tờ ảnh: `13-trum.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | T-05 | Thanh Xà · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
 | T-06 | Lang Vương · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
 | T-07 | Thiên Lang Vương · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
+| T-08 | Huyết Hải Lão Ma · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
+| T-09 | Huyết Ma Hộ Pháp · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
 
 <!-- /NHOM 13 -->
 
@@ -366,7 +376,7 @@ Tờ ảnh: `14-vat-pham-nguyen-lieu.png` (công khai: hiện tại + CC0) và `
 | VP-127 | Độc tước nang | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 | VP-128 | Thiên Hàn châu | hiện tại (Thần phẩm) | — | — | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Blood-Veined Dragon Jade [LS-MIN-071] | C (hình hợp nghĩa) |
 
-## Nhóm 14 — Vật phẩm (VP), nguyên liệu — MỚI sau 23/11: VP-160 .. VP-163
+## Nhóm 14 — Vật phẩm (VP), nguyên liệu — MỚI sau 23/11: VP-160 .. VP-167
 
 Tờ ảnh: `14-vat-pham-nguyen-lieu-moi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-nguyen-lieu-moi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
@@ -376,6 +386,7 @@ Tờ ảnh: `14-vat-pham-nguyen-lieu-moi.png` (công khai: hiện tại + CC0) v
 | VP-161 | Nanh Trăng · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 | VP-162 | Cốt Lang Vương · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 | VP-163 | Hồn Tinh Thiên Lang · MỚI (sau 23/11) | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-167 | Mảnh áo Liệt Dương · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 
 <!-- /NHOM 14 -->
 

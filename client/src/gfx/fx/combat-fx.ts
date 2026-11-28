@@ -76,6 +76,8 @@ export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
   huyet_mi: 0xe85a9a, // hồng máu (bóng thiếu nữ)
   huyet_anh: 0xb03a52, // đỏ sẫm (bóng đỏ)
   huyet_sat_chan_truyen: 0xff6a3a, // đỏ cam (huyết sát)
+  huyet_hai_lao_ma: 0xb86ae0, // tím huyết hải (trùm nhỏ hệ âm)
+  huyet_ma_ho_phap: 0xe04a5a, // đỏ máu thẫm (trùm chương 6)
   lang_vuong: 0xff9a5a, // cam lửa sáng (trùm nhỏ Lang Hoang, D1 lát B)
   thien_lang_vuong: 0xf0f6ff, // bạc trắng phát sáng (trùm Lang Hoang)
 };

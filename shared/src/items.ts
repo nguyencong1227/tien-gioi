@@ -1246,6 +1246,15 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
   ],
+  // Trùm Uy Vân Kinh (D1 #1466 lát E chương 6): bảng rơi TẠM chỉ có đan cấp 3 (nguyên liệu riêng, mảnh sổ huyết trận, sách chiêu Hóa Thần của Uy Vân thêm ở các lát sau); rơi chắc, đội chia nhau.
+  huyet_hai_lao_ma: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.6, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.5, min: 1, max: 1 },
+  ],
+  huyet_ma_ho_phap: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 1, min: 1, max: 2 },
+    { itemId: "thuong_hoi_linh_dan", chance: 1, min: 1, max: 2 },
+  ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
   yeu_vuong: [

@@ -32,7 +32,7 @@ Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi
 - Mỗi bậc, người chơi chọn nguồn tu vi nhanh nhất mà an toàn: săn một loại quái, hoặc chỉ đả tọa.
 - Săn quái: chỉ dùng Kiếm chém (có tính bạo kích trung bình ×1.08), quái đánh trúng 80% số đòn,
   bỏ qua loại quái mà mỗi trận mất quá 50% khí huyết. Sau mỗi trận đả tọa hồi khí huyết (vẫn được tu vi đả tọa).
-- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s, han_lang 10s, phong_nha 10s, cot_tuong 12s, doc_tuoc 14s, thien_han_vuong 90s, da_lang 10s, hac_phong_lang 10s, huyet_nguyet_lang 12s, xich_diem_lang 12s, thuong_nguyet_lang 14s, ngan_nguyet_lang 14s, luyen_huyet_de_tu 10s, nga_quy 10s, cuong_thi 12s, huyet_mi 12s, huyet_anh 14s, huyet_sat_chan_truyen 14s, lang_vuong 90s, thien_lang_vuong 90s.
+- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s, han_lang 10s, phong_nha 10s, cot_tuong 12s, doc_tuoc 14s, thien_han_vuong 90s, da_lang 10s, hac_phong_lang 10s, huyet_nguyet_lang 12s, xich_diem_lang 12s, thuong_nguyet_lang 14s, ngan_nguyet_lang 14s, luyen_huyet_de_tu 10s, nga_quy 10s, cuong_thi 12s, huyet_mi 12s, huyet_anh 14s, huyet_sat_chan_truyen 14s, huyet_hai_lao_ma 90s, huyet_ma_ho_phap 90s, lang_vuong 90s, thien_lang_vuong 90s.
 - Thưởng tu vi của chuỗi nhiệm vụ chính chia đều cho các bậc của cảnh giới tương ứng; đi lại + nói chuyện cả chuỗi: 8 phút.
 - Đột phá thất bại mất 30% thanh tu vi, tính theo số lần thất bại kỳ vọng.
 - Trang bị: mặc món tốt nhất đủ cảnh giới ở mỗi ô (giả định đã rèn kịp; nguyên liệu rơi trong lúc săn, không tính thời gian đi rèn). Không mặc gì thì chậm hơn khoảng 10%.
@@ -998,6 +998,8 @@ Thời gian thật = giây mô phỏng / 0.6 (né làm đánh chậm đi; `ASSUM
 | Thanh Xà | bậc 7 (khí huyết 476) | 0,6 phút, 3 chiêu (100% thắng, 0 chết) | 0,3 phút, 2 chiêu (100% thắng, 0 chết) | 0,2 phút, 1 chiêu (100% thắng, 0 chết) | 0,1 phút, 1 chiêu (100% thắng, 0 chết) |
 | Lang Vương | bậc 22 (khí huyết 8.415) | 1,5 phút, 11 chiêu (100% thắng, 0 chết) | 0,7 phút, 6 chiêu (100% thắng, 0 chết) | 0,5 phút, 4 chiêu (100% thắng, 0 chết) | 0,4 phút, 3 chiêu (100% thắng, 0 chết) |
 | Thiên Lang Vương | bậc 24 (khí huyết 11.259) | không hạ nổi | 1,3 phút, 12,4 chiêu (100% thắng, 0 chết) | 0,9 phút, 9,3 chiêu (100% thắng, 0 chết) | 0,7 phút, 6,3 chiêu (100% thắng, 0 chết) |
+| Huyết Hải Lão Ma | bậc 22 (khí huyết 8.415) | 1,5 phút, 8 chiêu (100% thắng, 0 chết) | 0,7 phút, 4 chiêu (100% thắng, 0 chết) | 0,5 phút, 3 chiêu (100% thắng, 0 chết) | 0,4 phút, 2 chiêu (100% thắng, 0 chết) |
+| Huyết Ma Hộ Pháp | bậc 24 (khí huyết 11.259) | 2,6 phút, 25 chiêu (13% thắng, 0,9 chết) | 1,3 phút, 11,9 chiêu (100% thắng, 0 chết) | 0,9 phút, 8,1 chiêu (100% thắng, 0 chết) | 0,7 phút, 7 chiêu (100% thắng, 0 chết) |
 
 ### 2. Sát thương mỗi đòn và cuồng nộ
 
@@ -1012,6 +1014,8 @@ Mỗi đòn / khí huyết tối đa của người đúng bậc, hệ số côn
 | Thanh Xà | 2 chiêu / 1 giai đoạn | 2 | xau_xa 11% (52) | không có | 0% / 0% / 0% / 0% |
 | Lang Vương | 3 chiêu / 1 giai đoạn | 3 | lao_toi 12% (1.026) | 5 phút (công x1.5) | 0% / 0% / 0% / 0% |
 | Thiên Lang Vương | 6 chiêu / 3 giai đoạn | 5 | phe_nguyet 26% (2.886) | 5 phút (công x1.5) | 0% / 0% / 0% / 0% |
+| Huyết Hải Lão Ma | 3 chiêu / 1 giai đoạn | 3 | doat_menh 13% (1.055) | 5 phút (công x1.5) | 0% / 0% / 0% / 0% |
+| Huyết Ma Hộ Pháp | 6 chiêu / 3 giai đoạn | 5 | lao_toi 26% (2.886) | 5 phút (công x1.5) | 0% / 0% / 0% / 0% |
 
 ### 3. Tỉ lệ trúng: bot né hoàn hảo vs bot đứng yên
 
@@ -1026,6 +1030,8 @@ Bot né: phản xạ 400 ms rồi chạy 150 px/giây (`boss-dodge-bot.ts`, lờ
 | Thanh Xà | 19 | 0 | 19 | 19 (100%) |
 | Lang Vương | 27 | 0 | 27 | 27 (100%) |
 | Thiên Lang Vương | 141 | 0 | 152 | 152 (100%) |
+| Huyết Hải Lão Ma | 25 | 0 | 26 | 26 (100%) |
+| Huyết Ma Hộ Pháp | 149 | 0 | 154 | 154 (100%) |
 
 **Không vi phạm bất biến nào** (mọi đòn <= ngưỡng, bot né hoàn hảo không bị trúng, bot đứng yên bị trúng).
 

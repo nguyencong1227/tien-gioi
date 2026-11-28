@@ -43,6 +43,9 @@ export const MONSTER_REALM: Readonly<Record<string, number>> = {
   huyet_mi: 5,
   huyet_anh: 5,
   huyet_sat_chan_truyen: 5,
+  // Trùm Uy Vân Kinh (D1 lát E chương 6): bậc 5 (sách chiêu Hóa Thần của Uy Vân thêm ở lát sau)
+  huyet_hai_lao_ma: 5,
+  huyet_ma_ho_phap: 5,
 };
 
 /** Bậc khai của quái `id` (id đến từ client / file lưu thì không tin `MONSTER_REALM["constructor"]`); `undefined` nếu chưa khai. */

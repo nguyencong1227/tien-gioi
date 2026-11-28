@@ -643,6 +643,48 @@ export const MONSTERS: MonsterKind[] = [
     boltRange: 280,
     boltElement: "am",
   },
+  // Trùm Uy Vân Kinh (D1 #1466 lát E chương 6; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 4): bãi của đội 3-4 người như Thiên Lang Vương. Số theo hàng "Trùm" của KHUNG mục 4.1 (221.030 / 422 / 230.400 / cấp 24);
+  // Huyết Hải Lão Ma (trùm nhỏ, ma tu đổi ba thân xác) ~ 45 %, hệ âm, cùng số với Lang Vương. Bộ chiêu ở `bosses.ts`; khi `BOSS_MOVES` tắt trùm chạy như cũ (gồng rồi lao thẳng, không đập đất: chiêu vùng là của bộ chiêu).
+  {
+    id: "huyet_hai_lao_ma",
+    name: "Huyết Hải Lão Ma",
+    minDanger: 0.78,
+    hp: 99500,
+    atk: 190,
+    speed: 125,
+    radius: 28,
+    aggro: 300,
+    attackRange: 56,
+    attackCd: 1500,
+    exp: 103680,
+    level: 22,
+    color: 0x8a3aa8,
+    boss: true,
+    element: "am",
+    // Ma tu đổi ba thân xác, giữ huyết hải dưới chân trận: lao thẳng (gồng 800 ms)
+    behavior: "charger",
+    windupMs: 800,
+  },
+  {
+    id: "huyet_ma_ho_phap",
+    name: "Huyết Ma Hộ Pháp",
+    minDanger: 0.9,
+    hp: 221030,
+    atk: 422,
+    speed: 120,
+    radius: 32,
+    aggro: 320,
+    attackRange: 62,
+    attackCd: 1600,
+    exp: 230400,
+    level: 24,
+    color: 0xa82a3a,
+    boss: true,
+    element: "hoa",
+    // Hộ Pháp ngồi sau tông chủ, giữ điện trận: lao thẳng (gồng 900 ms); khi `BOSS_MOVES` bật thì dùng bộ chiêu ở `bosses.ts`
+    behavior: "charger",
+    windupMs: 900,
+  },
   // Trùm của bí cảnh Linh Hư (docs/THIET_KE_BI_CANH.md). Không sinh ngoài hoang: `MONSTER_CAP.yeu_vuong = 0` và các bản đồ
   // thường không khai báo loại này. Số liệu cân bằng ở 4c-2 (`server/src/balance/dungeon.ts`, docs/CAN_BANG.md mục "Bí cảnh"):
   // đội 3 người ở ngưỡng `minStep` hạ trùm trong ~6 phút (không ai chết ở ca mô phỏng khó: đứng yên, không né), đội 2 người
@@ -760,6 +802,8 @@ export const MONSTER_CAP: Record<string, number> = {
   huyet_mi: 0,
   huyet_anh: 0,
   huyet_sat_chan_truyen: 0,
+  huyet_hai_lao_ma: 0,
+  huyet_ma_ho_phap: 0,
 };
 /**
  * Loài quái CHỈ do trùm triệu hồi (#887): không sinh ngoài hoang, `exp` 0, không bảng rơi đồ / Linh thạch (`DROP_TABLES` / `COIN_DROPS` KHÔNG có mục), không nhiệm vụ / kiếp

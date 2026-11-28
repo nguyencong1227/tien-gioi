@@ -1197,7 +1197,7 @@ describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn V
     const ok = await joinRoom(name, secretOf(name), UY_VAN_ID);
     const sr = serverRoom(ok.room);
     expect(sr.mapId).toBe(UY_VAN_ID);
-    expect(sr.state.monsters.size).toBe(62); // `monsterCap` Uy Vân Kinh: sáu loài Hóa Thần, tổng 62 (D1 #1466 lát A3 chương 6)
+    expect(sr.state.monsters.size).toBe(64); // `monsterCap` Uy Vân Kinh: sáu loài Hóa Thần (62) + hai trùm (D1 #1466 lát A3 / E chương 6)
     expect(ok.me().x).toBeCloseTo(spawn.x, 0);
     expect(ok.me().y).toBeCloseTo(spawn.y, 0);
   }, 35_000);

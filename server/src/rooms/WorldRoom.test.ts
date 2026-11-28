@@ -2553,7 +2553,7 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     expect(Math.hypot(c.me().x - uvNam.spawn.x, c.me().y - uvNam.spawn.y)).toBeLessThan(2);
     expect(uyVan.inSafe(c.me().x, c.me().y)).toBe(true);
     expect(c.me().exp).toBe(250);
-    expect(serverState(c.room).monsters.size).toBe(62); // `monsterCap` Uy Vân Kinh (D1 #1466 lát A3 chương 6)
+    expect(serverState(c.room).monsters.size).toBe(64); // `monsterCap` Uy Vân Kinh: 62 quái + hai trùm (D1 #1466 lát A3 / E chương 6)
     expect(fileOf(name).mapId).toBe(UY_VAN_ID);
 
     // Vào nhầm phòng Lang Hoang từ Uy Vân Kinh: bị từ chối và chỉ sang UY_VAN_ID

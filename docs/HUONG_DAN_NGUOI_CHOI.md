@@ -291,7 +291,7 @@ Chi tiết thiết kế: [docs/THIET_KE_BI_CANH.md](THIET_KE_BI_CANH.md).
 
 ## Trùm nhiều chiêu: học né
 
-Hiện có bảy con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0: **Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh; thêm **Thanh Xà**, kẻ cầm đầu bầy chặn đường ở Lạc Hà; và hai trùm Lang Hoang: **Lang Vương** (trùm nhỏ) và **Thiên Lang Vương**): không còn chỉ đứng đánh, mỗi con ra chiêu có báo trước và nhiều con đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
+Hiện có chín con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0: **Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh; thêm **Thanh Xà**, kẻ cầm đầu bầy chặn đường ở Lạc Hà; hai trùm Lang Hoang: **Lang Vương** (trùm nhỏ) và **Thiên Lang Vương**; và hai trùm Uy Vân Kinh: **Huyết Hải Lão Ma** (trùm nhỏ) và **Huyết Ma Hộ Pháp**): không còn chỉ đứng đánh, mỗi con ra chiêu có báo trước và nhiều con đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
 
 ### Đọc vùng cảnh báo
 
@@ -307,7 +307,7 @@ Hiện có bảy con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.
 - Trên thanh máu trùm (đầu màn hình) có **tên chiêu đang vận**, **vạch giai đoạn** và, khi có, **chỉ báo cuồng nộ**. Đang vận chiêu thì trùm đứng yên một nhịp: đó là lúc đánh trả.
 - Mạng chậm không sao: màn hình tự rút ngắn vòng đếm theo độ trễ của bạn để vòng đầy đúng lúc bạn còn né kịp (mạng quá chậm trên khoảng 190 ms vẫn thiệt thòi, hãy chơi gần đường truyền tốt).
 
-### Bảy trùm
+### Chín trùm
 
 | Trùm | Chiêu chính | Khi máu xuống thấp |
 | --- | --- | --- |
@@ -318,6 +318,8 @@ Hiện có bảy con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.
 | **Thanh Xà** (Luyện Khí, chỉ gặp khi cầm đầu bầy chặn đường ở Lạc Hà) | Quật đuôi (nón), Xà xung lao tới (đường) | Chỉ một giai đoạn: không triệu hồi, không cuồng nộ; hai chiêu đều có báo trước đủ để né |
 | **Lang Vương** (Hóa Thần, trùm nhỏ ở Lang Hoang, đội 2–4 người) | Xé nát (nón), Lang Vương lao tới (đường), Tiếng hú (vành khuyên) | Chỉ một giai đoạn; sau **5 phút**: cuồng nộ |
 | **Thiên Lang Vương** (Hóa Thần, trùm chương 5, đội 3–4 người) | Xé nát (nón), Phệ nguyệt (đường, chảy máu), Thiên Lang Khiếu (vành khuyên, choáng ngắn), Vũng huyết nguyệt | Dưới 60%: **Mưa vuốt trăng**; dưới 35%: gọi hai **Ngân Nguyệt Lang**, nhanh và mạnh hơn; sau **5 phút**: cuồng nộ |
+| **Huyết Hải Lão Ma** (Hóa Thần, trùm nhỏ ở Uy Vân Kinh, đội 2–4 người) | Huyết ảnh đoạt mệnh (đường), Thần thức trấn áp (vành khuyên, choáng ngắn), Huyết tế (vũng chảy máu) | Chỉ một giai đoạn; sau **5 phút**: cuồng nộ |
+| **Huyết Ma Hộ Pháp** (Hóa Thần, trùm chương 6, đội 3–4 người) | Phế huyết trảo (nón, chảy máu), Hộ Pháp lao tới (đường), Huyết ảnh đoạt mệnh (vành khuyên nặng), Huyết trì (vũng chảy máu) | Dưới 60%: **Huyết vũ phiêu linh**; dưới 35%: gọi hai **Ngạ Quỷ**, nhanh và mạnh hơn; sau **5 phút**: cuồng nộ |
 
 - **Quái con** do trùm gọi (Rắn Con, Hàn Lang, phân thân) **không rơi đồ, không cho tu vi**: hạ chúng để bớt sát thương, đừng cày chúng.
 - **Linh Hư Yêu Vương** đánh nhẹ nhưng trận dài: đội 4 người vẫn hạ được khi trúng vài đòn; đội 3 người nên **né** gần như mọi đòn. Mang đủ đan hồi máu.
@@ -452,6 +454,8 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Huyết Sát Chân Truyền | Huyết Trận Uy Vân (sâu nhất) | Nhổ đạn độc, công cao nhất bãi |
 | Lang Vương (trùm nhỏ) | Thảo nguyên Lang Hoang (sâu) | Trùm nhỏ Hóa Thần, đội 2–4 người |
 | Thiên Lang Vương (trùm) | Sâu nhất Lang Hoang | Trùm Hóa Thần, đội 3–4 người |
+| Huyết Hải Lão Ma (trùm nhỏ) | Huyết Trận Uy Vân (sâu) | Trùm nhỏ Hóa Thần, đội 2–4 người |
+| Huyết Ma Hộ Pháp (trùm) | Sâu nhất Uy Vân Kinh | Trùm Hóa Thần, đội 3–4 người |
 
 ### Bản đồ
 
@@ -462,7 +466,7 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Âm Sương Trạch | 128 × 112 | Vọng Sương Trạm |
 | Hàn Vân Lĩnh | 128 × 128 | Hàn Vân Trạm |
 | Lang Hoang | 128 × 112 | Tuyết Đao Quan (nam), thợ rèn đồ Hóa Thần, nhiệm vụ chương 5 |
-| Uy Vân Kinh | 128 × 112 | Uy Vân Kinh (nam), quái Hóa Thần (chưa có NPC) |
+| Uy Vân Kinh | 128 × 112 | Uy Vân Kinh (nam), quái và trùm Hóa Thần (chưa có NPC) |
 | Linh Hư Bí Cảnh | 64 × 64 | Bí cảnh (vào qua Thủ môn) |
 
 Khu an toàn là trong trấn hoặc trong bán kính quanh cổng. Càng ra xa trấn, yêu thú càng mạnh và càng nguy hiểm.
@@ -476,7 +480,7 @@ Các bản đồ ngoài hoang được kết nối liên tục thành một chu�
 4. **Hàn Vân Lĩnh** (Vọng Lang Quan) ↔ **Lang Hoang** (Hồi Tuyết Quan)
 5. **Lang Hoang** (Vọng Kinh Quan) ↔ **Uy Vân Kinh** (Hồi Lang Quan)
 
-> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói và hai trùm), thợ rèn và NPC nhiệm vụ ở Tuyết Đao Quan. **Uy Vân Kinh** đã có sáu loài quái Hóa Thần nhưng chưa có trùm, NPC và nhiệm vụ: trạm Uy Vân Kinh chỉ là chỗ nghỉ an toàn. Lang Hoang và Uy Vân Kinh nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
+> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói và hai trùm), thợ rèn và NPC nhiệm vụ ở Tuyết Đao Quan. **Uy Vân Kinh** đã có sáu loài quái Hóa Thần và hai trùm nhưng chưa có NPC và nhiệm vụ: trạm Uy Vân Kinh chỉ là chỗ nghỉ an toàn. Lang Hoang và Uy Vân Kinh nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
 
 ---
 
