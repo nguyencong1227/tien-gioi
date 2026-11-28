@@ -61,13 +61,13 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const WAIT_FLOOR_MS = 15_000;
 async function waitFor<T>(
-  fn: () => T | undefined | false,
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
   ms = 8000,
   what = "điều kiện",
 ): Promise<T> {
   const end = Date.now() + Math.max(ms, WAIT_FLOOR_MS);
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
     if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(25);
@@ -217,6 +217,7 @@ describe("WorldRoom ambush rush (CD10b, Issue #1281)", () => {
     for (const h of heroes) {
       h.room.send(AMBUSH_MSG.seen, { id: h.offers[0].id });
     }
+    // Chờ đồng hồ: thời gian kích hoạt chống bấm nhầm (AMBUSH_ARM_MS) trôi qua trước khi chọn Chiến
     await sleep(AMBUSH_ARM_MS + 80);
 
     for (const h of heroes) {
@@ -299,6 +300,7 @@ describe("WorldRoom ambush rush (CD10b, Issue #1281)", () => {
     }
 
     // 7. Đo tick p95 lúc cả 20 phòng đấu trường cùng chạy
+    // Chờ đồng hồ / ổn định đo đạc: 1,5 giây cho 20 phòng đấu trường chạy song song để mẫu tick ổn định trước khi lấy p95
     await sleep(1500);
     const p95List = arenaTargets.map((t) => {
       const aw = worldOf(t.h.room);
@@ -339,15 +341,14 @@ describe("WorldRoom ambush rush (CD10b, Issue #1281)", () => {
     // Khẳng định toàn bộ phòng Colyseus đấu trường đã đóng hoàn toàn (matchMaker.query). KHÔNG khẳng định NGAY: vé được dọn trước khi
     // người chơi kịp rời phòng và Colyseus gỡ phòng khỏi danh sách (CI chạy chồng nhiều lần: một lần đỏ với 8 phòng còn `clients: 1`),
     // nên chờ THEO ĐIỀU KIỆN (có trần `WAIT_FLOOR_MS`); phòng rò thật thì hết hạn chờ vẫn đỏ.
-    const queryArenaRooms = () =>
-      matchMaker.query({ name: roomNameOf(arenaMapIdOf(DEFAULT_MAP_ID)) });
-    let activeRoomsAfter = await queryArenaRooms();
-    const roomsDeadline = Date.now() + WAIT_FLOOR_MS;
-    while (activeRoomsAfter.length > 0 && Date.now() < roomsDeadline) {
-      await sleep(50);
-      activeRoomsAfter = await queryArenaRooms();
-    }
-    expect(activeRoomsAfter).toHaveLength(0);
+    await waitFor(
+      async () => {
+        const active = await matchMaker.query({ name: roomNameOf(arenaMapIdOf(DEFAULT_MAP_ID)) });
+        return active.length === 0 ? true : undefined;
+      },
+      WAIT_FLOOR_MS,
+      "toàn bộ phòng Colyseus đấu trường đã đóng hoàn toàn",
+    );
 
     // 9. Kiểm tra hồ sơ lưu trên đĩa của cả 24 người
     // 4 người canceled: lưu hồ sơ và khẳng định ở nguyên bản đồ gốc, tiền/tu vi bảo toàn
