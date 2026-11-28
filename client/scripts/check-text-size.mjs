@@ -1,55 +1,25 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
+/* global console, setTimeout, process */
 // Cổng kiểm cỡ chữ (M5.1 #326, docs/THIET_KE_GIAO_DIEN_DO_HOA.md mục 4.2 điều 2) trong Chrome thật: trên điện thoại chữ NỘI DUNG (bảng, hộp thoại)
 // >= 14 px và nhãn HUD >= 12 px, kể cả khi chọn cỡ chữ Nhỏ; trên máy tính cỡ chữ gốc giữ nguyên ở Vừa và co giãn theo Nhỏ / Lớn; không tràn
 // ngang ở cỡ Lớn. Đo `font-size` TÍNH RA của mọi nút văn bản đang hiện. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
 // Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
 //   node client/scripts/check-text-size.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
 const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-text-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
+let launched = null;
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
-  if (!page) throw new Error("Không tìm thấy Chrome page target.");
+  launched = await launchChrome({ name: "text-size" });
+  const page = launched.page;
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
     ws.onopen = res;
@@ -455,9 +425,7 @@ try {
   check(pageErrors === 0, `không ngoại lệ trong trang (${pageErrors})`);
   ws.close();
 } finally {
-  chrome.kill();
-  await sleep(500);
-  fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  if (launched) await launched.close();
 }
 console.log(failures ? `\n${failures} khẳng định SAI` : "\nTất cả khẳng định đúng");
 process.exit(failures ? 1 : 0);

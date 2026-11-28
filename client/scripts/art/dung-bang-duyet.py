@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 _spec = importlib.util.spec_from_file_location("ma_co_dinh", os.path.join(HERE, "ma-co-dinh.py"))
 MA = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
+_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (T / VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
 MA_PATH = os.path.join(ROOT, "docs/art/huong-moi/ma-co-dinh.json")
 CODES = None  # bảng mã đã nạp (main() đặt; mã gọi trực tiếp thì `codes()` nạp từ MA_PATH)
 NEW_TAG = " · MỚI (sau 23/11)"  # đánh dấu hàng có mã vượt mốc đóng băng
@@ -472,14 +472,23 @@ T_MAP = {"mang": ("xf_mob_snake", "rắn thường PHÓNG LỚN + TÔ ĐỎ (gó
          "thien_han_vuong": ("xf_boss_fallenimmortal", "boss fallenimmortal (tiên sa ngã)"), "yeu_vuong": ("xf_boss_ninetail", "boss ninetail (cửu vĩ hồ)")}
 
 
+def boss_order(names):
+    """THỨ TỰ trùm của nhóm 13 (dùng chung cho `group_trum` và `--ghi-ma`): theo `MONSTERS`. Mã KHÔNG phụ thuộc thứ tự này (lấy từ bảng ỔN ĐỊNH); thứ tự chỉ quyết định số cấp cho trùm MỚI."""
+    return [m for m in names["mons"] if m["boss"]]
+
+
 def group_trum(L, names):
+    """Trùm (nhóm 13). Mã T lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (T-01..T-04 của tờ 23/11 giữ nguyên, trùm mới nhận số ở CUỐI, #1446): hàng cũ theo thứ tự mã trước, hàng MỚI (đánh dấu `NEW_TAG`) sau."""
+    t = codes()
+    bosses = boss_order(names)
+    num = MA.assign_codes(t["t"], [m["id"] for m in bosses])
     rows = []
-    bosses = [m for m in names["mons"] if m["boss"]]
-    for i, m in enumerate(bosses, 1):
+    for m in sorted(bosses, key=lambda m: num[m["id"]]):
+        n = num[m["id"]]
         xm, cap = T_MAP.get(m["id"], (None, ""))
         a = cell(L, "A", "xian", lambda x=xm: L.xian(x, "idle"), cap, 64) if xm else Cell("A", "xian", [], "", 64)
         rec = "A" if m["id"] in ("hac_giao", "yeu_vuong") else "A (cần xem kỹ) / ảnh AI"
-        rows.append(dict(code=f"T-{i:02d}", name=m["name"], rec=rec, cur=cell(L, "", "cur", lambda mid=m["id"]: L.cur(f"mon-{mid}"), "hiện tại (thân) + thẻ ảnh AI", 64),
+        rows.append(dict(code=MA.label("t", n), name=m["name"] + (NEW_TAG if MA.is_new(t, "t", n) else ""), rec=rec, cur=cell(L, "", "cur", lambda mid=m["id"]: L.cur(f"mon-{mid}"), "hiện tại (thân) + thẻ ảnh AI", 64),
                          opts=[a, Cell("B", "wuxia", [], "", 64), Cell("C", "ninja", [], "", 64)]))
     return "13-trum", "Nhóm 13 — Trùm (T): thẻ trùm bằng ảnh AI SDXL giữ nguyên, đây chỉ là THÂN trên bản đồ", rows
 
@@ -915,6 +924,106 @@ def upsert_md(path, built):
     open(path, "w", encoding="utf8").write(out)
 
 
+GROUP_KIND = {"10": "NV", "11": "NPC", "12": "Q", "13": "T", "14": "VP", "15": "HU", "16": "UI", "17": "NEN"}
+DUYET_JSON_VERSION = 1
+
+
+def _cell_info(c, rel_path):
+    """Mô tả MỘT ô (hiện tại hoặc một phương án) cho `duyet.json`. `rel_path` = đường dẫn ảnh cắt riêng (tương đối thư mục preview) nếu ô CÓ hình, không thì None."""
+    name, lic, private, view = SRC[c.src]
+    has = bool(c.frames)
+    return {
+        "nguon": c.src,
+        "ten_nguon": name,
+        "giay_phep": lic,
+        "rieng": private,
+        "goc_nhin": view if c.game_h is not None else None,  # giao diện (game_h None) không có "góc nhìn"
+        "chu_thich": c.cap or (c.note or ""),
+        "co_hinh": has,
+        "anh": rel_path if has else None,
+        "co_goc": list(c.frames[0].size) if has else None,  # (rộng, cao) điểm ảnh của khung đầu trong gói gốc
+        "so_khung": len(c.frames),  # hoạt ảnh / số hình có sẵn trong ô (dải khung ngang)
+    }
+
+
+def export_duyet(built, json_path, img_root, img_rel="duyet"):
+    """Xuất `duyet.json` (QUYET_DINH_M3 mục 74: dữ liệu cho trang web duyệt đồ hoạ của Dev G) + ảnh CẮT RIÊNG từng ô.
+    `built` = list[(nhóm, code_group, tiêu đề, rows)] đã dựng. Ảnh (CẢ hình hiện tại và gói CC0 lẫn gói RIÊNG) ghi vào `<img_root>/<img_rel>/<mã>/<hien-tai|A|B|C>.png`: thư mục preview RIÊNG ngoài repo
+    (chỉ phục vụ qua Tailscale, mục 74), KHÔNG vào git; `duyet.json` (vào repo) chỉ chứa siêu dữ liệu + đường dẫn tương đối thư mục preview, không chứa điểm ảnh nào của gói riêng."""
+    import datetime
+    import json
+    import re
+
+    groups = []
+    n_img = 0
+    for g, code_group, title, rows in built:
+        items = []
+        for r in rows:
+            ma = r["code"]
+            assert re.fullmatch(r"[A-Z]+-\d+", ma), f"mã không hợp lệ: {ma!r}"
+            d = os.path.join(img_root, img_rel, ma)
+            os.makedirs(d, exist_ok=True)
+
+            def save(c, tag):
+                nonlocal n_img
+                if not c.frames:
+                    return None
+                im, _k = cell_image(c, public=False)  # ảnh ĐẦY ĐỦ (kể cả gói riêng): chỉ ghi vào thư mục preview riêng
+                rel = f"{img_rel}/{ma}/{tag}.png"
+                im.save(os.path.join(img_root, rel), optimize=True)
+                n_img += 1
+                return rel
+
+            cur = _cell_info(r["cur"], save(r["cur"], "hien-tai"))
+            opts = []
+            for c in r["opts"]:
+                info = _cell_info(c, save(c, c.letter))
+                info["chu"] = c.letter
+                opts.append(info)
+            items.append(
+                {
+                    "ma": ma,
+                    "doi_tuong": r["name"].replace(NEW_TAG, "").strip(),
+                    "moi": NEW_TAG in r["name"],  # mã cấp SAU mốc đóng băng 23/11: số có thể đổi cho tới khi dựng lại có chủ ý bằng --ghi-ma
+                    "khuyen_nghi": r.get("rec", ""),
+                    "hien_tai": cur,
+                    "phuong_an": opts,
+                }
+            )
+        groups.append(
+            {
+                "id": g,
+                "kieu": GROUP_KIND[g],
+                "tieu_de": title,
+                "to_cong_khai": f"docs/art/huong-moi/{code_group}.png",
+                "to_day_du": f"{code_group}-day-du.png",
+                "ma": items,
+            }
+        )
+    out = {
+        "phien_ban": DUYET_JSON_VERSION,
+        "tao_luc": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "ghi_chu": "Dữ liệu cho trang web duyệt đồ hoạ (QUYET_DINH_M3 mục 74), sinh bằng `python3 -I client/scripts/art/dung-bang-duyet.py --groups ... --json docs/art/huong-moi/duyet.json`. Mỗi mã một thẻ: hình HIỆN TẠI + phương án A / B / C. Đường dẫn `anh` là TƯƠNG ĐỐI thư mục preview riêng (/mnt/data/assets-private/preview), ảnh KHÔNG nằm trong repo (có hình gói riêng). `rieng: true` = gói cấm phân phối lại: chỉ phục vụ qua Tailscale. Quyết định của người dùng ghi ở ~/TT/orchestra/DUYET_DO_HOA.json (mã + phương án), file này KHÔNG phải quyết định.",
+        "nguon": {k: {"ten": v[0], "giay_phep": v[1], "rieng": v[2], "goc_nhin": v[3]} for k, v in SRC.items()},
+        "nhom": groups,
+    }
+    os.makedirs(os.path.dirname(os.path.abspath(json_path)), exist_ok=True)
+    # Mỗi MÃ một dòng gọn (diff của git dễ đọc: đổi một mã chỉ đổi một dòng); vẫn là JSON hợp lệ
+    dumps = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+    lines = ["{", f'"phien_ban":{out["phien_ban"]},', f'"tao_luc":{dumps(out["tao_luc"])},', f'"ghi_chu":{dumps(out["ghi_chu"])},', f'"nguon":{dumps(out["nguon"])},', '"nhom":[']
+    for gi, g in enumerate(groups):
+        head = {k: v for k, v in g.items() if k != "ma"}
+        lines.append(dumps(head)[:-1] + ',"ma":[')
+        for i, it in enumerate(g["ma"]):
+            lines.append(dumps(it) + ("," if i < len(g["ma"]) - 1 else ""))
+        lines.append("]}" + ("," if gi < len(groups) - 1 else ""))
+    lines += ["]", "}"]
+    with open(json_path, "w", encoding="utf8") as f:
+        f.write("\n".join(lines) + "\n")
+    json.loads(open(json_path, encoding="utf8").read())  # tự kiểm: ghi ra phải là JSON hợp lệ
+    return sum(len(x["ma"]) for x in groups), n_img
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--groups", default="10,11,12,13")
@@ -922,8 +1031,10 @@ def main():
     ap.add_argument("--private", default="/mnt/data/assets-private/preview")
     ap.add_argument("--names", default=None, help="JSON {npcs:[{id,name,title}], mons:[{id,name,boss}]}; bỏ trống = tự chạy `npx tsx client/scripts/art/xuat-doi-tuong.ts`")
     ap.add_argument("--md", default=None, help="ghi các bảng markdown của các nhóm đã dựng vào tệp này (nối vào cuối)")
-    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
-    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
+    ap.add_argument("--json", default=None, help="xuất duyet.json (mục 74: dữ liệu cho trang web duyệt) cho các nhóm đã dựng, vd docs/art/huong-moi/duyet.json; kèm ảnh cắt riêng từng ô vào --anh-dir")
+    ap.add_argument("--anh-dir", default="/mnt/data/assets-private/preview", help="thư mục preview RIÊNG chứa ảnh cắt riêng (duyet/<mã>/<hien-tai|A|B|C>.png) khi có --json; ngoài repo")
+    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 13 / 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
+    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 13 / 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
     a = ap.parse_args()
     import json
 
@@ -944,9 +1055,11 @@ def main():
         "13": lambda: one(group_trum(L, names)), "14": lambda: group_vp(L, names), "15": lambda: group_hu(L, names), "16": lambda: group_ui(L, names), "17": lambda: group_nen(L, names),
     }
     built = {}
+    all_sheets = []
     for g in a.groups.split(","):
         sheets = builders[g]()
         for code_group, title, rows in sheets:
+            all_sheets.append((g, code_group, title, rows))
             render_sheet(title, rows, os.path.join(a.public, f"{code_group}.png"), public=True)
             render_sheet(title, rows, os.path.join(a.private, f"{code_group}-day-du.png"), public=False)
             priv_cells = sum(1 for r in rows for c in r["opts"] if c.frames and SRC[c.src][2])
@@ -954,14 +1067,19 @@ def main():
         built[g] = "\n".join(md_for(cg, t, r) for cg, t, r in sheets)
     if a.md:
         upsert_md(a.md, built)
+    if a.json:
+        n_ma, n_img = export_duyet(all_sheets, a.json, a.anh_dir)
+        print(f"ĐÃ XUẤT {a.json}: {n_ma} mã, {n_img} ảnh cắt riêng -> {os.path.join(a.anh_dir, 'duyet')}")
     if a.ghi_ma:
         t = CODES
+        if "13" in built:
+            t = MA.extended(t, "t", MA.assign_codes(t["t"], [m["id"] for m in boss_order(names)]))
         if "14" in built:
             t = MA.extended(t, "vp", MA.assign_codes(t["vp"], [it["id"] for it in vp_order(names)[1]]))
         if "15" in built:
             t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for sk in hu_order(names)[1]]))
         MA.save(a.ma, t)
-        print(f"ĐÃ GHI bảng mã: VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
+        print(f"ĐÃ GHI bảng mã: T {len(t['t'])}, VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
 
 
 if __name__ == "__main__":

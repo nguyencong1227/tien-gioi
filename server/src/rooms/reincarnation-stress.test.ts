@@ -51,12 +51,16 @@ afterAll(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function waitFor<T>(fn: () => T | undefined | false, ms = 4000): Promise<T> {
+async function waitFor<T>(
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
+  ms = 4000,
+  what = "điều kiện",
+): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error("Hết thời gian chờ điều kiện");
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
@@ -145,13 +149,18 @@ describe("Thử tải luân hồi (Issue #151)", () => {
 
     // Đợi server xử lý xong các tin trong hàng đợi nguyên tử: chờ tới khi tệp chân linh THẬT SỰ phản ánh lần mua hợp lệ duy nhất (không ngủ cố định 400 ms:
     // máy tải cao ghi tệp trễ hơn nên đỏ chập chờn), rồi chờ thêm một nhịp để mọi tin soulBuy còn lại (đáng lẽ bị từ chối) kịp hạ cánh trước khi kiểm.
-    await waitFor(() => {
-      try {
-        return soulOf(name).unlocks?.du_am === 1;
-      } catch {
-        return false; // tệp đang được thay
-      }
-    }, 8000);
+    await waitFor(
+      () => {
+        try {
+          return soulOf(name).unlocks?.du_am === 1;
+        } catch {
+          return false; // tệp đang được thay
+        }
+      },
+      8000,
+      "chân linh lưu nấc mở du_am === 1",
+    );
+    // Chờ âm: một nhịp để đảm bảo mọi tin soulBuy còn lại (đáng lẽ bị từ chối) không làm thay đổi số dư Duyên
     await sleep(300);
 
     const soulData = soulOf(name);
@@ -229,8 +238,17 @@ describe("Thử tải luân hồi (Issue #151)", () => {
     expect(soulBefore.duyen).toBe(firstGain);
 
     // Rớt mạng ngay lập tức tại Hoàng Tuyền (chưa bấm đầu thai)
+    const rId = c.room.roomId;
+    const sid = c.room.sessionId;
     await c.room.leave(true);
-    await sleep(200);
+    const idx = activeRooms.indexOf(c.room);
+    if (idx >= 0) activeRooms.splice(idx, 1);
+    // Chờ dương / điều kiện tiên quyết: người chơi dọn sạch khỏi state của phòng trước khi vào lại
+    await waitFor(
+      () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+      3000,
+      "người chơi đã dọn khỏi phòng",
+    );
 
     // Đăng nhập lại vào phòng
     const c2 = await joinClient(name);

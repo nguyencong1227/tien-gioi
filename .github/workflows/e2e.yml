@@ -33,18 +33,18 @@ permissions:
 
 jobs:
   e2e:
-    # Ghi chú khi thay đổi số shard (hiện là 2 shard): cần cập nhật đồng thời ở 4 vị trí:
-    # 1. matrix.shard: [1, 2]
-    # 2. name: E2E Shard ${{ matrix.shard }}/2
-    # 3. args+=(--shard "${{ matrix.shard }}/2")
-    # 4. Job Summary: Kết quả E2E - Shard ${{ matrix.shard }}/2
-    name: E2E Shard ${{ matrix.shard }}/2
+    # Ghi chú khi thay đổi số shard (hiện là 4 shard, từ khi nối 9 check-* vào nightly, #1458): cần cập nhật đồng thời ở 4 vị trí:
+    # 1. matrix.shard: [1, 2, 3, 4]
+    # 2. name: E2E Shard ${{ matrix.shard }}/4
+    # 3. args+=(--shard "${{ matrix.shard }}/4")
+    # 4. Job Summary: Kết quả E2E - Shard ${{ matrix.shard }}/4
+    name: E2E Shard ${{ matrix.shard }}/4
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
 
     steps:
       - name: Checkout mã nguồn
@@ -62,7 +62,7 @@ jobs:
       - name: Build client (harness phục vụ client/dist)
         run: npm run build
 
-      - name: Chạy kịch bản E2E Shard ${{ matrix.shard }}/2 (e2e:all)
+      - name: Chạy kịch bản E2E Shard ${{ matrix.shard }}/4 (e2e:all)
         id: e2e
         # Ghi chú về GPU:
         # Toàn bộ các kịch bản E2E của Tiên Giới đều dùng getChromeGpuFlags() (server/scripts/e2e-kit.ts).
@@ -72,13 +72,16 @@ jobs:
         # Nếu trong tương lai có kịch bản đòi hỏi GPU phần cứng chuyên dụng, hãy cấu hình --skip
         # kèm lý do kỹ thuật rõ ràng ngay tại đây.
         env:
+          # Kịch bản CHẬP CHỜN đã đo hai lượt (cùng đầu main) thì tạm bỏ ở ĐÂY kèm lý do, dạng "tên1,tên2" (tên không có tiền tố e2e:): đừng để đỏ kéo dài che lỗi thật,
+          # và mở issue dev-b nói rõ khi nào gỡ (docs/VAN_HANH.md mục 10.3). Hiện: rỗng. Gộp với đầu vào `skip` khi chạy tay.
+          NIGHTLY_SKIP: ""
           IN_ONLY: ${{ inputs.only }}
           IN_SKIP: ${{ inputs.skip }}
           IN_TIMEOUT: ${{ inputs.timeout }}
           IN_NO_RETRY: ${{ inputs.no_retry }}
         run: |
           mkdir -p "$GITHUB_WORKSPACE/e2e-logs"
-          args=(--logs "$GITHUB_WORKSPACE/e2e-logs" --shard "${{ matrix.shard }}/2")
+          args=(--logs "$GITHUB_WORKSPACE/e2e-logs" --shard "${{ matrix.shard }}/4")
 
           if [ -n "$IN_ONLY" ]; then
             if [[ ! "$IN_ONLY" =~ ^[a-z0-9:,_-]*$ ]]; then
@@ -88,12 +91,16 @@ jobs:
             args+=(--only "$IN_ONLY")
           fi
 
+          skip_all="$NIGHTLY_SKIP"
           if [ -n "$IN_SKIP" ]; then
-            if [[ ! "$IN_SKIP" =~ ^[a-z0-9:,_-]*$ ]]; then
-              echo "Lỗi: input 'skip' chứa ký tự không hợp lệ: $IN_SKIP" >&2
+            skip_all="${skip_all:+$skip_all,}$IN_SKIP"
+          fi
+          if [ -n "$skip_all" ]; then
+            if [[ ! "$skip_all" =~ ^[a-z0-9:,_-]*$ ]]; then
+              echo "Lỗi: danh sách skip chứa ký tự không hợp lệ: $skip_all" >&2
               exit 1
             fi
-            args+=(--skip "$IN_SKIP")
+            args+=(--skip "$skip_all")
           fi
 
           if [ -n "$IN_TIMEOUT" ]; then
@@ -114,7 +121,7 @@ jobs:
         if: always()
         run: |
           if [ -f "$GITHUB_WORKSPACE/e2e-logs/REPORT.md" ]; then
-            echo "## 📊 Kết quả E2E - Shard ${{ matrix.shard }}/2" >> $GITHUB_STEP_SUMMARY
+            echo "## 📊 Kết quả E2E - Shard ${{ matrix.shard }}/4" >> $GITHUB_STEP_SUMMARY
             cat "$GITHUB_WORKSPACE/e2e-logs/REPORT.md" >> $GITHUB_STEP_SUMMARY
           fi
 

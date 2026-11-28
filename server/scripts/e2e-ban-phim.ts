@@ -817,6 +817,46 @@ async function main() {
       Number(await ev(`window.__ui.getCurrentCoin()`)) < 500,
       `Linh thạch=${await ev(`window.__ui.getCurrentCoin()`)}`,
     );
+    // Ô số lượng KHÔNG là bẫy mũi tên (rà giao diện 25/11): từ nút Mua bấm Trái tới ô số lượng của ĐÚNG thẻ, rồi rời ô bằng Trái (ở đầu chữ) / Phải (ở cuối chữ),
+    // không cần Tab / Esc (Esc làm mất chỗ đứng trong danh sách 22 món). Trước khi ownsArrowKeys nhả mũi tên ở mép chữ, ô giữ mọi phím và focus kẹt tại đó.
+    const qtyInputSel = '[data-nav="buy:hoi_huyet_dan:input"]';
+    const activeIsQtyInput = () =>
+      ev(`document.activeElement === document.querySelector('#shop-modal ${qtyInputSel}')`);
+    const leaveQtyInput = async (key: typeof K.left, max = 3) => {
+      let n = 0;
+      while (n < max && (await activeIsQtyInput())) {
+        await press(t, key);
+        n++;
+      }
+      return { left: !(await activeIsQtyInput()), presses: n };
+    };
+    const sameCardActive = () =>
+      ev(
+        `(() => { const a = document.activeElement; const i = document.querySelector('#shop-modal ${qtyInputSel}'); const c = i && i.closest('.shop-card'); return !!(a && c && c.contains(a) && a.tagName === 'BUTTON'); })()`,
+      );
+    await arrowTo(
+      t,
+      '#shop-modal .shop-card:has([data-nav="buy:hoi_huyet_dan:plus"]) .shop-act-btn.buy',
+    );
+    await arrowTo(t, `#shop-modal ${qtyInputSel}`);
+    check(
+      "Mũi tên đưa focus vào ô số lượng của Hồi Huyết Đan",
+      !!(await activeIsQtyInput()),
+      String(await ev(`document.activeElement && document.activeElement.className`)),
+    );
+    const outRight = await leaveQtyInput(K.right);
+    check(
+      "Ô số lượng: Phải (con trỏ ở cuối chữ) rời được ô sang nút cùng thẻ, không kẹt",
+      outRight.left && !!(await sameCardActive()),
+      `rời=${outRight.left} sau ${outRight.presses} phím, nút cùng thẻ=${await sameCardActive()}`,
+    );
+    await arrowTo(t, `#shop-modal ${qtyInputSel}`);
+    const outLeft = await leaveQtyInput(K.left);
+    check(
+      "Ô số lượng: Trái (sau khi con trỏ về đầu chữ) rời được ô sang nút cùng thẻ, không kẹt",
+      outLeft.left && !!(await sameCardActive()),
+      `rời=${outLeft.left} sau ${outLeft.presses} phím, nút cùng thẻ=${await sameCardActive()}`,
+    );
     await press(t, K.esc);
     check("Esc đóng cửa hàng", !(await ev(shown("shop-modal"))), "shop-modal vẫn mở");
 

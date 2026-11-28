@@ -1,19 +1,18 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
-// Kiểm KIỂU THỊ GIÁC "Hàn Vân Lĩnh" (băng nguyên, M7.8 #509) trong Chrome THẬT, khi bản đồ thứ tư chưa có phòng: dùng xem trước `?debug&style=han_van` trên cảnh Lạc Hà (mock,
+/* global console, setTimeout, process, Buffer */
+// Kiểm KIỂU THỊ GIÁC theo bản đồ (Hàn Vân Lĩnh = băng nguyên, M7.8 #509; Lang Hoang = bụi gió và Uy Vân Kinh = đốm lửa huyết trận, mục 75 / #1467; trước đây tên `check-han-van-style.mjs`) trong Chrome THẬT, khi bản đồ thứ tư chưa có phòng: dùng xem trước `?debug&style=han_van` trên cảnh Lạc Hà (mock,
 // không cần máy chủ) và so với cùng cảnh KHÔNG ép kiểu. Đo thật chứ không chỉ đọc dữ liệu:
 //  - có hạt TUYẾT sống (hạt tint trắng ngà 0xf2f8ff, rơi xuống) mà cảnh mặc định không có; không có hạt cánh hoa (kiểu của Lạc Hà) khi đã ép kiểu băng nguyên;
 //  - màu trung bình vùng giữa cảnh LẠNH hơn hẳn bản mặc định (xanh - đỏ cao hơn >= 8 mức);
 //  - bỏ `?debug`, `?style=` không đổi được diện mạo (bản phát hành); id lạ (`constructor`) bị bỏ qua, 0 lỗi JS.
 // Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-han-van-style.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-map-style.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots] [--slow-frame <ms>]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -24,39 +23,18 @@ const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
 const SNOW_TINT = 0xf2f8ff;
 const PETAL_TINT = 0xf6c5d4;
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-han-van-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+// Hai kiểu của mục 75 (#1467): bụi gió Lang Hoang (`weather-dust`) và đốm lửa huyết trận Uy Vân Kinh (`weather-ember`); khớp `recipes-weather.ts`
+const DUST_TINT = 0xd9cfa8;
+const EMBER_TINT = 0xd2453b;
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "map-style" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -92,7 +70,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   await send("Emulation.setDeviceMetricsOverride", {
     width: 1280,
@@ -102,26 +81,30 @@ try {
   });
 
   /** Mở cảnh với `query`, đặt người chơi giữa trấn, chờ thời tiết chạy rồi đo: màu trung bình vùng giữa + các loại hạt thời tiết đã thấy (theo tint) */
-  const measure = async (name, query) => {
+  const measure = async (name, query, wantTint = null) => {
     await send("Page.navigate", {
       url: `${BASE_URL}/?skills=mock&n=2&debug=1&weather=1&fog=1${query}`,
     });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"))
-        break;
-    }
+    const ready = await waitUntilTrue(
+      () => evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${name}: cảnh mock không sẵn sàng sau 60 s`);
     await sleep(800);
     await evalJs(`(() => { const sc = window.__scene, me = sc.me(), t = sc.map.townPx;
       me.x = t.x + 700; me.y = t.y; sc.predX = me.x; sc.predY = me.y; sc.hasMe = true; sc.pending.length = 0;
       sc.cameras.main.stopFollow(); sc.cameras.main.centerOn(me.x, me.y); return 1; })()`);
-    // lấy mẫu hạt sống mỗi 250 ms trong 5 giây: gom các tint đã thấy ở hạt đang sống
+    // lấy mẫu hạt sống mỗi 250 ms (>= 20 mẫu = 5 s): gom các tint đã thấy ở hạt đang sống. Có `wantTint` thì lấy mẫu TIẾP tới khi thấy tint đó (tối đa 80 mẫu = 20 s): ở khung chậm
+    // (runner không GPU, `--slow-frame`) hạt đầu tiên hiện muộn, và số khung có hạt ít hơn nhiều so với máy dev
     const seen = JSON.parse(
-      await evalJs(`new Promise((res) => { const sc = window.__scene; const tints = {}; let n = 0;
+      await evalJs(`new Promise((res) => { const sc = window.__scene; const tints = {}; let n = 0; const want = ${wantTint === null ? "null" : wantTint};
+        const hit = () => want === null || Object.entries(tints).some(([t, c]) => c > 0 && Math.abs(Number(t) - want) < 0x020202);
         const iv = setInterval(() => {
           for (const e of sc.children.list) if (e.type === "ParticleEmitter") for (const p of e.alive ?? []) {
             const t = p.tint ?? p.tintTopLeft; if (t !== undefined) tints[t] = (tints[t] || 0) + 1; }
-          if (++n >= 20) { clearInterval(iv); res(JSON.stringify(tints)); }
+          n++;
+          if ((n >= 20 && hit()) || n >= 80) { clearInterval(iv); res(JSON.stringify(tints)); }
         }, 250); })`),
     );
     const shot = await evalJs(`new Promise((resolve) => {
@@ -162,7 +145,7 @@ try {
     );
 
   console.log("--- cảnh Lạc Hà mặc định (không ép kiểu) ---");
-  const base = await measure("mac-dinh", "");
+  const base = await measure("mac-dinh", "", PETAL_TINT);
   check(
     count(base.seen, PETAL_TINT) > 0,
     `có hạt cánh hoa đào của Lạc Hà (${count(base.seen, PETAL_TINT)} lần thấy)`,
@@ -170,7 +153,7 @@ try {
   check(count(base.seen, SNOW_TINT) === 0, "không có hạt tuyết");
 
   console.log("--- xem trước kiểu Hàn Vân Lĩnh: ?debug&style=han_van ---");
-  const hv = await measure("han-van", "&style=han_van");
+  const hv = await measure("han-van", "&style=han_van", SNOW_TINT);
   check(
     count(hv.seen, SNOW_TINT) > 0,
     `có hạt TUYẾT sống (${count(hv.seen, SNOW_TINT)} lần thấy, tint #f2f8ff)`,
@@ -212,20 +195,46 @@ try {
     `màu trung bình vùng giữa LẠNH hơn: xanh - đỏ ${coldBase.toFixed(1)} (mặc định) -> ${coldHv.toFixed(1)} (băng nguyên)`,
   );
 
-  console.log("--- bản phát hành / id lạ: không đổi được diện mạo ---");
-  const noDebug = await (async () => {
-    await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&weather=1&style=han_van` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"))
-        break;
-    }
-    await sleep(1500);
-    return evalJs("Boolean(window.__scene)");
-  })();
-  // Không `?debug` thì `window.__scene` không lộ ra ở bản phát hành nhưng ở Vite dev vẫn có (`import.meta.env.DEV`): kiểm bằng hạt qua đường dev
-  void noDebug;
-  const proto = await measure("constructor", "&style=constructor");
+  console.log("--- xem trước kiểu Lang Hoang: ?debug&style=lang_hoang ---");
+  const lh = await measure("lang-hoang", "&style=lang_hoang", DUST_TINT);
+  check(
+    count(lh.seen, DUST_TINT) > 0,
+    `có hạt BỤI GIÓ sống (${count(lh.seen, DUST_TINT)} lần thấy, tint #d9cfa8)`,
+  );
+  check(
+    count(lh.seen, PETAL_TINT) === 0 &&
+      count(lh.seen, SNOW_TINT) === 0 &&
+      count(lh.seen, EMBER_TINT) === 0,
+    "không có hạt cánh hoa / tuyết / đốm lửa của bản đồ khác",
+  );
+  check(lh.wash === null, "Lang Hoang không khai báo màu phủ nền (chỉ Hàn Vân có)");
+
+  console.log("--- xem trước kiểu Uy Vân Kinh: ?debug&style=uy_van ---");
+  const uv = await measure("uy-van", "&style=uy_van", EMBER_TINT);
+  check(
+    count(uv.seen, EMBER_TINT) > 0,
+    `có hạt ĐỐM LỬA huyết sống (${count(uv.seen, EMBER_TINT)} lần thấy, tint #d2453b)`,
+  );
+  check(
+    count(uv.seen, PETAL_TINT) === 0 &&
+      count(uv.seen, SNOW_TINT) === 0 &&
+      count(uv.seen, DUST_TINT) === 0,
+    "không có hạt cánh hoa / tuyết / bụi của bản đồ khác",
+  );
+  check(uv.wash === null, "Uy Vân Kinh không khai báo màu phủ nền (chỉ Hàn Vân có)");
+  // 'ban đêm' + phủ đỏ: cảnh TỐI hơn hẳn và ngả ĐỎ hơn bản mặc định (đo ở Lạc Hà: độ sáng ~ -45, đỏ - lục ~ +20)
+  check(
+    lumOf(base.color) - lumOf(uv.color) >= 20,
+    `cảnh TỐI hơn bản mặc định ('ban đêm'): độ sáng trung bình ${lumOf(base.color).toFixed(1)} -> ${lumOf(uv.color).toFixed(1)}`,
+  );
+  check(
+    uv.color.r - uv.color.g - (base.color.r - base.color.g) >= 8,
+    `màu trung bình vùng giữa ngả ĐỎ hơn: đỏ - lục ${(base.color.r - base.color.g).toFixed(1)} (mặc định) -> ${(uv.color.r - uv.color.g).toFixed(1)} (huyết trận)`,
+  );
+
+  // Bản phát hành (không `?debug`) không đổi được diện mạo bằng `?style=`: đã có test đơn vị (`styleIdFor`, map-decor.test.ts); ở đây chỉ kiểm id lạ ở đường `?debug`.
+  console.log("--- id lạ: ?debug&style=constructor bị bỏ qua ---");
+  const proto = await measure("constructor", "&style=constructor", PETAL_TINT);
   check(
     count(proto.seen, SNOW_TINT) === 0 && count(proto.seen, PETAL_TINT) > 0 && proto.wash === null,
     "?style=constructor bị bỏ qua: vẫn là cảnh Lạc Hà (cánh hoa, không tuyết)",
@@ -236,14 +245,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);

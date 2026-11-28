@@ -45,6 +45,10 @@ SRC_COBBLE_TILE = (6, 13)  # tileset_interior_floor.png: ô đá cuội vàng gi
 SRC_ROCK_TILE = (3, 5)  # tileset_village_abandoned.png: tảng đá phủ rêu
 SRC_BUSH_TILE = (4, 5)  # tileset_village_abandoned.png: bụi lá
 SRC_TREE_BASE_BOX = (72, 112, 88, 128)  # tileset_village_abandoned.png (điểm ảnh): đáy cây nhỏ = đáy tán + rễ, giữa hai ô (4, 7) và (5, 7)
+SRC_TREE_BOX = (64, 96, 96, 128)  # tileset_village_abandoned.png (điểm ảnh): CÂY NHỎ NGUYÊN KHỐI 2 x 2 ô = tán tròn 32 x 31 + rễ ở đáy (gói KHÔNG có thân riêng), ô (4..5, 6..7)
+# Sprite cây nguyên khối trong ảnh ĐÃ ĐÙN MÉP (mục 73): vùng TRỐNG ở ô (12..13, 0..1), x = MARGIN + 12 * (TILE + SPACING). Không nằm trên lưới ô (đùn mép cắt ô cách nhau 2 px nên
+# sprite 32 x 32 không thể là bốn ô liền): client cắt đúng khung này thành MỘT hình cây (`VISUAL_TREE_FRAME` ở client/src/gfx/map-visual.ts; test đối chiếu hai nơi).
+TREE_FRAME = (217, 1, 32, 32)  # (x, y, rộng, cao); điểm neo ở GỐC = giữa đáy khung
 SRC_OUTLINE = "#141b1b"
 # Ô cỏ trơn dùng làm nền (toạ độ cục bộ trong khối).
 GRASS_LOCAL = (2, 4)
@@ -95,6 +99,26 @@ PALETTES = {
         "sand": ["#cfd6dc", "#bac3cb", "#e4e9ed", "#9aa4ad"],
         "water": ["#9fcfe3", "#eaf5fa"],
         "stone": {"mortar": "#8d9aa7", "stone": "#aebbc7", "deep": "#6e7b88", "hi": "#cfd9e2"},
+    },
+    # Lang Hoang (QUYET_DINH_M3 mục 75, #1467; docs/COT_TRUYEN.md 6.1: "thảo nguyên khô, đá tảng, tuyết thưa; sương lạnh"): cỏ úa vàng ô-liu (khác hẳn cỏ xanh của Lạc Hà và
+    # tuyết trắng của Hàn Vân), đất nâu nhạt gió thổi, "bụi" cam của gói đổi thành mảng trắng ngà, bờ cát -> TUYẾT THƯA đọng quanh nước lạnh xám xanh (xem `--map-view`), đá lát xám phiến.
+    "lang_hoang": {
+        "grass": ["#b4a66f", "#9f9260", "#857a4f", "#5f5a3b"],
+        "dirt": ["#a08a6c", "#8a7358", "#b9a68a", "#6b5942"],
+        "tuft": ["#e4e6df", "#c3c8c2"],
+        "sand": ["#dadedb", "#c3c9c7", "#eceeeb", "#a6adab"],
+        "water": ["#7f9fae", "#d5e2e8"],
+        "stone": {"mortar": "#7f7c76", "stone": "#a5a29a", "deep": "#615e59", "hi": "#c7c4bb"},
+    },
+    # Uy Vân Kinh (#1467; docs/COT_TRUYEN.md 6.2: "đá đỏ, cờ huyết, dòng nước đục; ban đêm"): CHỈ qua bảng màu (bố cục chỉ có 4 ô vật thể, không thêm ô "cờ"): cỏ xám nâu úa dưới trời chạng vạng,
+    # đất / đường thành đất thấm máu (đỏ gỉ), "bụi" thành vệt đỏ sẫm (cờ huyết rải trên cỏ), đá lát + tảng đá đỏ gạch, nước đục nâu xám, bờ cát bùn.
+    "uy_van": {
+        "grass": ["#8e8068", "#786b57", "#5f5346", "#42392f"],
+        "dirt": ["#a4564b", "#8b463d", "#bc6e60", "#6c332d"],
+        "tuft": ["#b8403a", "#8f2f2d"],
+        "sand": ["#b9a08c", "#a48b78", "#cdb8a6", "#85705f"],
+        "water": ["#8c7068", "#cdb9b1"],
+        "stone": {"mortar": "#6f3b36", "stone": "#a8564b", "deep": "#4f2623", "hi": "#c97d6f"},
     },
 }
 
@@ -221,11 +245,30 @@ def leaf_map(pal, tone):
     return {SRC_LEAF["main"]: g[2], SRC_LEAF["mid"]: g[3], SRC_LEAF["dark"]: dark, SRC_LEAF["olive"]: g[3]}
 
 
-def trunk_tile(src, pal):
-    """Thân cây (lớp decor, dưới chân nhân vật): đáy cây nhỏ của gói (đáy tán + rễ), lá theo vùng, rễ theo màu đất của vùng."""
+def wood_map(pal):
+    """Bảng đổi màu rễ / gỗ theo vùng: rễ theo màu đất của vùng."""
     d, g = pal["dirt"], pal["grass"]
-    wood = {SRC_WOOD["orange"]: d[1], SRC_WOOD["brown"]: d[3], SRC_WOOD["red"]: "#%02x%02x%02x" % shade(hex2rgb(d[3]), 0.82), SRC_WOOD["olive"]: g[3]}
-    return recolor(src["village"].crop(SRC_TREE_BASE_BOX), {**leaf_map(pal, "canopy"), **wood})
+    return {SRC_WOOD["orange"]: d[1], SRC_WOOD["brown"]: d[3], SRC_WOOD["red"]: "#%02x%02x%02x" % shade(hex2rgb(d[3]), 0.82), SRC_WOOD["olive"]: g[3]}
+
+
+def trunk_tile(src, pal):
+    """Thân cây (lớp decor, dưới chân nhân vật): đáy cây nhỏ của gói (đáy tán + rễ), lá theo vùng, rễ theo màu đất của vùng.
+    (Ô này giữ chỗ GID 620 trong dữ liệu bản đồ; từ mục 73 client KHÔNG vẽ nó nữa mà vẽ `tree_sprite` nguyên khối thay cho cả cặp thân + tán.)"""
+    return recolor(src["village"].crop(SRC_TREE_BASE_BOX), {**leaf_map(pal, "canopy"), **wood_map(pal)})
+
+
+def tree_sprite(src, pal):
+    """CÂY NGUYÊN KHỐI (mục 73): cây nhỏ 32 x 32 của gói (tán tròn + rễ ở đáy, đúng khuôn gốc), lá và rễ theo bảng màu vùng; neo ở gốc = giữa đáy."""
+    return recolor(src["village"].crop(SRC_TREE_BOX), {**leaf_map(pal, "canopy"), **wood_map(pal)})
+
+
+def with_trees(extruded, src, pal):
+    """Ảnh tileset ĐÃ đùn mép + sprite cây nguyên khối dán vào `TREE_FRAME` (vùng trống). Trả ảnh mới."""
+    out = extruded.copy()
+    x, y, w, h = TREE_FRAME
+    assert out.crop((x - 1, y - 1, x + w + 1, y + h + 1)).getchannel("A").getextrema() == (0, 0), "vùng sprite cây không trống"
+    out.paste(tree_sprite(src, pal), (x, y))
+    return out
 
 
 def canopy_tile(pal):
@@ -388,6 +431,19 @@ def verify(sheets, src):
         assert outside.getextrema() == (0, 0), f"{mid}: có điểm ảnh ngoài các khối và ô vật thể đã định"
         mains.add(sh.getpixel((GRASS_LOCAL[0] * TILE + 8, (BLOCK_DIRT[1] + GRASS_LOCAL[1]) * TILE + 8)))
         ex = extrude(sh)
+        # cây nguyên khối (mục 73): sau đùn mép dán vào TREE_FRAME; giữ bbox của gói (rễ chạm đáy khung), góc trong suốt, giữa đặc, không sót màu gốc, quanh khung trống
+        wt = with_trees(ex, src, PALETTES[mid])
+        tx, ty, tw, th = TREE_FRAME
+        assert tx + tw <= wt.width and ty + th <= wt.height, f"{mid}: TREE_FRAME ngoài ảnh"
+        tree = wt.crop((tx, ty, tx + tw, ty + th))
+        assert tree.getbbox() == (0, 1, tw, th), f"{mid}: sprite cây lệch khuôn gói: bbox {tree.getbbox()}"
+        assert tree.getpixel((0, 0))[3] == 0 and tree.getpixel((tw - 1, 0))[3] == 0, f"{mid}: sprite cây phải có góc trên trong suốt"
+        assert tree.getpixel((tw // 2, 12))[3] == 255, f"{mid}: giữa tán cây phải đặc"
+        assert any(tree.getpixel((x, th - 1))[3] == 255 for x in range(tw // 2 - 4, tw // 2 + 4)), f"{mid}: rễ phải chạm đáy khung (điểm neo ở gốc)"
+        assert not (colors_of(tree) & obj_src_colors), f"{mid}: sprite cây còn màu gốc {sorted(colors_of(tree) & obj_src_colors)}"
+        ring = wt.crop((tx - 1, ty - 1, tx + tw + 1, ty + th + 1)).copy()
+        ring.paste((0, 0, 0, 0), (1, 1, 1 + tw, 1 + th))
+        assert ring.getchannel("A").getextrema() == (0, 0), f"{mid}: quanh sprite cây phải trống (không đè lên ô nào)"
         assert ex.size == (MARGIN * 2 + COLS * TILE + (COLS - 1) * SPACING, MARGIN * 2 + ROWS * TILE + (ROWS - 1) * SPACING), f"{mid}: cỡ ảnh đùn mép {ex.size}"
         # đùn mép của ô đặc (0, 0): 1 px mỗi phía bằng đúng điểm ảnh mép của ô
         x, y = MARGIN, MARGIN
@@ -416,7 +472,16 @@ def preview(images, path):
 
 
 # Vùng xem trước (x0, y0, x1, y1 theo ô) của từng bản đồ: chọn chỗ có đủ đất, cát, nước, đá lát, cây, đá, bụi
-MAP_PREVIEW_BOX = {"lac_ha": (24, 44, 48, 60), "hac_phong": (64, 66, 88, 82), "am_suong": (44, 84, 68, 100), "han_van": (48, 26, 72, 42)}
+MAP_PREVIEW_BOX = {
+    "lac_ha": (24, 44, 48, 60),
+    "hac_phong": (64, 66, 88, 82),
+    "am_suong": (44, 84, 68, 100),
+    "han_van": (48, 26, 72, 42),
+    "lang_hoang": (52, 86, 76, 102),
+    "uy_van": (56, 82, 80, 98),
+}
+# Bốn bản đồ ĐẦU của ảnh xem trước 05 / 06 (docs/art/huong-moi; test so từng byte): bản đồ thêm sau KHÔNG làm đổi hai ảnh đó, xem bằng `--map-view <id> <ảnh.png>`.
+PREVIEW_IDS = ("lac_ha", "hac_phong", "am_suong", "han_van")
 
 
 def render_map(sheet, map_id, box, k=2):
@@ -450,12 +515,24 @@ def map_preview(sheets, path, k=2):
     canvas.save(path, optimize=True)
 
 
+def map_view(sheets, map_id, path, k=3):
+    """Ảnh TRƯỚC / SAU của MỘT bản đồ (#1467): trái = vùng bản đồ vẽ bằng tileset Lạc Hà (bảng màu chung, "trước": bản đồ mới chưa có bảng riêng), phải = bằng tileset của chính nó."""
+    box = MAP_PREVIEW_BOX[map_id]
+    left, right = render_map(sheets["lac_ha"], map_id, box, k), render_map(sheets[map_id], map_id, box, k)
+    w, h = left.size
+    canvas = Image.new("RGB", (w * 2 + 36, h + 24), (36, 33, 44))
+    canvas.paste(left.convert("RGB"), (12, 12))
+    canvas.paste(right.convert("RGB"), (24 + w, 12))
+    canvas.save(path, optimize=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=SRC_DEFAULT)
     ap.add_argument("--out", default=None, help="thư mục ghi tileset_world_<id>.png (không có thì chỉ kiểm, không ghi)")
     ap.add_argument("--preview", default=None)
     ap.add_argument("--map-preview", default=None, help="ghi ảnh 2 x 2: bốn bản đồ thật vẽ bằng tileset vừa dựng (xem trước, không phải bản chạy)")
+    ap.add_argument("--map-view", nargs=2, metavar=("ID", "ẢNH"), default=None, help="ghi ảnh xem trước MỘT bản đồ thật (vùng MAP_PREVIEW_BOX): trái = bảng màu Lạc Hà (nền chung), phải = bảng màu riêng của nó")
     a = ap.parse_args()
     src = load_sources(a.src)
     sheets = {mid: build_world(src, pal) for mid, pal in PALETTES.items()}
@@ -464,12 +541,17 @@ def main():
         os.makedirs(a.out, exist_ok=True)
         for mid, sh in sheets.items():
             p = os.path.join(a.out, f"tileset_world_{mid}.png")
-            extrude(sh).save(p, optimize=True)
+            with_trees(extrude(sh), src, PALETTES[mid]).save(p, optimize=True)
             print(p, os.path.getsize(p), "byte")
+    old4 = {mid: sheets[mid] for mid in PREVIEW_IDS}
     if a.preview:
-        preview(sheets, a.preview)
+        preview(old4, a.preview)
     if a.map_preview:
-        map_preview(sheets, a.map_preview)
+        map_preview(old4, a.map_preview)
+    if a.map_view:
+        mid, path = a.map_view
+        assert mid in sheets, f"--map-view: chưa có bảng màu '{mid}' (có: {', '.join(sheets)})"
+        map_view(sheets, mid, path)
     for line in map_builder_report():
         print("CẦN SỬA ở server/src/systems/map-builder.ts:", line)
     print("ĐÃ DỰNG", ", ".join(sheets))

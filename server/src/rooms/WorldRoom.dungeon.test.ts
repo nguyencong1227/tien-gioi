@@ -59,6 +59,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(150);
   WorldRoomClass.hub.runs.clear(); // mỗi test một sổ run sạch (run sót của test trước không ảnh hưởng)
   // phòng bí cảnh còn sót (chưa ai vào) tự đóng khi thấy run biến mất (<= 1 giây): chờ xong rồi mới sang test sau
@@ -168,9 +169,12 @@ async function spawn(
 async function spawnIn(mapId: string): Promise<Hero> {
   const name = `Lu Khach ${++seq}`;
   const first = await spawn(name);
+  const srv = serverRoom(first.room);
+  const sid = first.room.sessionId;
   await first.room.leave(true);
   rooms.splice(rooms.indexOf(first.room), 1);
-  await sleep(200);
+  // Chờ dương: nhân vật hoàn tất rời phòng và lưu hồ sơ trước khi đọc file save
+  await waitFor(() => !srv.state.players.has(sid), 3000, "rời phòng và lưu hồ sơ");
   const f = readdirSync(dataDir)
     .filter((x) => x.endsWith(".json"))
     .map((x) => path.join(dataDir, x))
@@ -537,14 +541,18 @@ describe("không bao giờ kẹt trong bí cảnh", () => {
     expect(serverRoom(again).mapId).toBe(DEFAULT_MAP_ID);
     const live = serverState(again).players.get(again.sessionId)!;
     live.exp = 4242; // tiến triển mới trong Lạc Hà
-    await sleep(600);
+    // Chờ dương: lưu toàn bộ hồ sơ rồi chờ file save trên đĩa ghi nhận exp mới
     await (serverRoom(again) as any).saveAll();
+    await waitFor(() => saveOf(a.name)?.exp === 4242, 3000, "lưu exp mới");
     expect(saveOf(a.name)).toMatchObject({ mapId: DEFAULT_MAP_ID, exp: 4242 });
     // "giết tiến trình": B cũng bị ngắt, run và phòng bị xoá như khi server chết -> B đăng nhập lại về Lạc Hà
     runs().clear();
+    const srvRb = serverRoom(rb);
+    const sidRb = rb.sessionId;
     (rb.connection.transport as any).ws.close();
     rooms.splice(rooms.indexOf(rb), 1);
-    await sleep(300);
+    // Chờ dương: phòng bí cảnh hoàn tất dọn người chơi cũ sau khi ngắt socket
+    await waitFor(() => !srvRb.state.players.has(sidRb), 3000, "B dọn khỏi phòng bí cảnh");
     const backB = await new Client(`ws://localhost:${PORT}`).joinOrCreate(
       roomNameOf(DEFAULT_MAP_ID),
       {
@@ -554,16 +562,19 @@ describe("không bao giờ kẹt trong bí cảnh", () => {
     );
     rooms.push(backB);
     expect(serverRoom(backB).mapId).toBe(DEFAULT_MAP_ID);
-    // hồ sơ của A không bị ghi đè lại sau đó (không có hồn lìa xác ở phòng bí cảnh)
+    // Chờ âm: hồ sơ của A không bị ghi đè lại sau đó (không có hồn lìa xác ở phòng bí cảnh)
     await sleep(500);
     expect(saveOf(a.name).exp).toBe(4242);
   });
 
   it("file lưu mang mapId bí cảnh (lỗi / sửa tay): đăng nhập vào Lạc Hà, không bị đưa tới phòng bí cảnh không tồn tại", async () => {
     const a = await spawn();
+    const srvA = serverRoom(a.room);
+    const sidA = a.room.sessionId;
     await a.room.leave(true);
     rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(200);
+    // Chờ dương: nhân vật hoàn tất rời phòng và lưu hồ sơ trước khi đọc file save
+    await waitFor(() => !srvA.state.players.has(sidA), 3000, "A hoàn tất rời phòng");
     const f = readdirSync(dataDir)
       .filter((x) => x.endsWith(".json"))
       .map((x) => path.join(dataDir, x))

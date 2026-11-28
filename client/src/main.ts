@@ -49,7 +49,7 @@ import {
   mockSkillCount,
   mockSkillsMsg,
 } from "./skill-bar";
-import { mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
+import { MOCK_SESSION_ID, mockSpawnOf, mockStartMapId, mockSyncsState } from "./mock-map";
 import { parseMockStatus } from "./status-badges";
 import { questKind } from "./quest-log";
 import { captureEarlyMessages } from "./early-messages";
@@ -136,7 +136,7 @@ function createMockDungeonRoom(
 ): any {
   const handlers = new Map<string, ((msg: any) => void)[]>();
   return {
-    sessionId: "mock-session-01",
+    sessionId: MOCK_SESSION_ID,
     reconnectionToken: "mock-token-01",
     onMessage: (type: string, fn: (msg: any) => void) => {
       if (!handlers.has(type)) handlers.set(type, []);
@@ -164,7 +164,7 @@ function createMockDungeonRoom(
       players: (() => {
         const pMap = new Map<string, any>([
           [
-            "mock-session-01",
+            MOCK_SESSION_ID,
             {
               name: "Tô Vân Hạc",
               realm,

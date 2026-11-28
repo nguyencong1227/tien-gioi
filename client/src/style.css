@@ -1272,8 +1272,9 @@ html[data-input="touch"] .mm-foot small {
   opacity: 0.85;
   color: #a8ff78;
 }
-/* Điện thoại ngang / cửa sổ thấp: sơ đồ thành MỘT HÀNG nút (Bắc -> Nam theo thứ tự), bỏ nhãn cổng (có trong chú giải của nút) để không chiếm chiều cao */
-@media (max-height: 520px) {
+/* Sơ đồ GỌN (điện thoại, máy tính bảng cảm ứng, cửa sổ hẹp / thấp): sáu bản đồ (mục 75) xếp DỌC kèm nhãn cổng cao ~390 px đẩy bản đồ lớn xuống dưới màn hình (đo 26/11: ở 390 x 844 khung vẽ bắt đầu y 580, ở 1280 x 720
+   cảm ứng gần ra ngoài màn), nên ở các khung này sơ đồ thành các HÀNG nút (Bắc -> Nam theo thứ tự), bỏ nhãn cổng (có trên bản đồ và trong chú giải); máy có chuột + rộng >= 900 px giữ cột trái bên dưới. */
+@media (max-height: 520px), (max-width: 899px), (pointer: coarse) {
   .map-graph {
     display: flex;
     flex-wrap: wrap;
@@ -1282,10 +1283,31 @@ html[data-input="touch"] .mm-foot small {
   .mg-edge {
     display: none;
   }
-  /* Bốn bản đồ (M7.5): nút bỏ bề rộng tối thiểu 120 px + lề bớt để cả hàng vẫn nằm trên MỘT dòng ở 844 x 390 (trước đó dòng hai chiếm thêm ~50 px chiều cao quý của bản đồ) */
   .map-graph .mg-node {
+    flex: 1 1 28%;
     min-width: 0;
-    padding: 4px 8px;
+    padding: 4px 6px;
+    overflow-wrap: anywhere;
+    line-height: 1.15;
+  }
+  /* Nhãn 'đang đứng' làm nút cao hơn nút khác (hàng lệch): ở sơ đồ gọn ẩn chữ, thay bằng gạch xanh dưới nút (cùng màu nhãn); aria-current='location' vẫn báo cho trình đọc màn hình */
+  .map-graph .mg-node small {
+    display: none;
+  }
+  .map-graph .mg-node[aria-current="location"] {
+    border-bottom: 3px solid #9ae59a;
+  }
+}
+/* Điện thoại ngang / cửa sổ thấp: cả sáu nút trên MỘT hàng (không xuống dòng; không chiếm thêm chiều cao của bản đồ) */
+@media (max-height: 520px) {
+  .map-graph {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .map-graph .mg-node {
+    flex: 1 1 0;
+    padding: 4px 4px;
+    font-size: var(--fs-11);
   }
 }
 .map-legend[hidden] {
@@ -2137,6 +2159,11 @@ html[data-input="touch"] #skill-slots .sk.slot .keycap {
 @media (max-height: 520px) {
   #skills-modal.sk-has-filter .skills-hint {
     display: none;
+  }
+  /* Màn ngang thấp (844x390): tiêu đề tấm không còn co (flex-shrink 0, 23/11) lấy mất 7 px của danh sách (174 -> 167 px) nên 4 nút ô của chiêu vừa mở bị cắt mép dưới
+     (check-skills-panel đỏ ở khung mobile-l từ 1808279d). Bỏ khoảng cách dưới thanh lọc trả lại 8 px. */
+  #skills-modal.sk-has-filter .sk-filter {
+    margin-bottom: 0;
   }
 }
 /* Phẩm (Hoàng / Huyền / Địa / Thiên): nhãn nhỏ cạnh tên; màu CHỈ là phụ, chữ vẫn nói phẩm gì (không dựa vào màu) */

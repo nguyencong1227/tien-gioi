@@ -1,58 +1,32 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
+/* global console, process */
 // Kiểm DANH HIỆU TRONG CHAT (M9, #1027) trong Chrome THẬT qua CDP, chế độ `?skills=mock&n=2`, KHÔNG cần máy chủ: tin `chat` mẫu đổ vào `__ui.chat` (đường vào của `reg("chat")`).
 // Mặc định BẬT (`?social=1` vẫn nhận): tin có `titleId` hiện «Danh hiệu» trước tên ở chat chung / đội / tông môn, trong thẻ `<i class="chat-title">`; id lạ KHÔNG hiện và không lộ id; tin không có
 // `titleId` y hệt cũ. Có `?social=0`: không hiện danh hiệu nào (công tắc khẩn). Chữ đi vào DOM bằng textContent (tên chứa thẻ HTML không thành thẻ).
-//   node client/scripts/check-chat-title.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { spawn } from "node:child_process";
+//   node client/scripts/check-chat-title.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>]
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-chat-title-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    // Chrome không đầu không có chuột: giả lập chuột (4 = fine, 2 = hover) như các script khác
-    "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+// Chrome không đầu không có chuột: giả lập chuột (4 = fine, 2 = hover) như các script khác
+const POINTER_FLAGS = [
+  "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
+];
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "chat-title", extraArgs: POINTER_FLAGS });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -90,8 +64,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source:
-      "try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high')}catch(e){}",
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
 
   const open = async (query) => {
@@ -101,19 +75,35 @@ try {
       deviceScaleFactor: 1,
       mobile: false,
     });
+    // Hai điều kiện, mỗi cái chặn một cuộc đua THẬT trong kịch bản (A chỉ ra cái thứ nhất ở #1510; B đo cái thứ hai):
+    //  (1) `open()` được gọi nhiều lần liên tiếp: đánh dấu tài liệu CŨ trước khi điều hướng để điều kiện sẵn sàng không đúng trên tài liệu cũ;
+    //  (2) lời chào đầu (`ui.chat` sys ở `setupNetwork`) vào khung chat ~300 ms SAU khi cảnh sẵn sàng (đo ở `--slow-frame 36`: khung chat RỖNG lúc `me()` có, lời chào hiện sau ~300 ms):
+    //      tin đổ trước nó thì lời chào thành dòng cuối (dòng sys không có <b>) và `last()` ném lỗi. Client KHÔNG mất tin (`ui.chat` thêm dòng đồng bộ); `sleep(600)` cũ che cuộc đua này.
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1${query}` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__scene && window.__scene.me && window.__scene.me() && window.__ui)",
-        )
-      )
-        break;
-    }
-    await sleep(600);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__scene && window.__scene.me && window.__scene.me() && window.__ui && document.querySelectorAll('#chat-log p').length >= 1)",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error("cảnh mock không sẵn sàng sau 60 s");
   };
-  const say = (m) => evalJs(`window.__ui.chat(${JSON.stringify(m)}); 1`);
+  // Đổ tin vào chat rồi chờ THEO ĐIỀU KIỆN dòng cuối có chữ của tin (khung chậm: dòng chat dựng muộn, đọc ngay thì `p:last-child` còn là null / dòng cũ)
+  const say = async (m) => {
+    await evalJs(`window.__ui.chat(${JSON.stringify(m)}); 1`);
+    const shown = await waitUntilTrue(
+      () =>
+        evalJs(
+          `(document.querySelector("#chat-log p:last-child")?.textContent ?? "").includes(${JSON.stringify(String(m.text))})`,
+        ),
+      15000,
+      50,
+    );
+    if (!shown) throw new Error(`dòng chat '${m.text}' chưa hiện sau 15 s`);
+  };
   /** Dòng chat cuối: lớp, chữ nhãn (<b>), chữ danh hiệu (<i.chat-title>) nếu có, toàn dòng, số thẻ lạ trong nhãn. */
   const last = () =>
     J(`(() => { const p = document.querySelector('#chat-log p:last-child'); const b = p.querySelector('b'); const t = b.querySelector('i.chat-title');
@@ -187,16 +177,11 @@ try {
   check(r.label === "[Đội] Vân Hạc: ", `cờ tắt, chat đội y hệt cũ ('${r.label}')`);
 
   check(pageErrors === 0, `không có lỗi JS trên trang (${pageErrors})`);
+} catch (err) {
+  console.error(err);
+  failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  // Chrome có thể còn ghi vào thư mục hồ sơ lúc thoát (ENOTEMPTY): thử lại, thôi thì để /tmp dọn
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
-  } catch {
-    /* không quan trọng */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} KIỂM TRA THẤT BẠI`);
 process.exit(failures === 0 ? 0 : 1);

@@ -1,53 +1,31 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
+/* global console, setTimeout, process */
 // Kiểm phóng to / kéo bản đồ lớn (QUYET_DINH_M3 mục 17.2, #496 bước 3) bằng sự kiện THẬT qua CDP (`Input.dispatch*`): lăn chuột, kéo chuột,
 // nút +/-/"Về chỗ mình", phím +/-/mũi tên/Home, chụm hai ngón (cảm ứng), mở lại thì về mặc định, mũi tên không làm nhân vật đi. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn. Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-map-zoom.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { spawn } from "node:child_process";
+//   node client/scripts/check-map-zoom.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>]
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
+// Bản đồ ngoài của game (thêm bản đồ mới: thêm id ở đây; test `client/scripts/*.test.ts` canh các danh sách khác). Sáu bản đồ từ mục 75 (Lang Hoang, Uy Vân Kinh).
+const OUTDOOR_MAPS = ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
 const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-map-zoom-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
+// Chuột / cảm ứng GIẢ LẬP kiểu máy tính (con trỏ tinh, hover) để bố cục cột trái (`(pointer: fine) and (min-width: 900px)`) áp dụng ở khung 1280 x 720
+const POINTER_FLAGS = [
+  "--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4",
+];
+let launched = null;
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "map-zoom", extraArgs: POINTER_FLAGS });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -84,7 +62,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: "try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}",
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm (luồng chính bận `ms` mỗi khung), xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   await send("Emulation.setDeviceMetricsOverride", {
     width: 1280,
@@ -93,10 +72,12 @@ try {
     mobile: false,
   });
   await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
-  for (let k = 0; k < 40; k++) {
-    await sleep(300);
-    if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
-  }
+  const sceneReady = await waitUntilTrue(
+    () => evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"),
+    60000,
+    300,
+  );
+  if (!sceneReady) throw new Error("Cảnh mock không sẵn sàng sau 60 s.");
   await sleep(600);
   await evalJs(`(() => {
     const sc = window.__scene, me = sc.me();
@@ -145,15 +126,36 @@ try {
     });
     await sleep(160);
   };
+  const shown = () => evalJs("window.__ui.isMapModalOpen()");
+  // Mở / đóng chờ THEO ĐIỀU KIỆN (hộp mở và khung bản đồ có kích thước thật / hộp đã đóng), không ngủ cố định: runner khung chậm vẽ hộp lâu hơn 700 ms
   const open = async () => {
     await evalJs("window.__ui.toggleMapModal(true); 1");
-    await sleep(700);
+    const ok = await waitUntilTrue(
+      () =>
+        evalJs(
+          `window.__ui.isMapModalOpen() && (() => { const r = document.getElementById("worldmap").getBoundingClientRect(); return r.width > 50 && r.height > 50; })()`,
+        ),
+      20000,
+      100,
+    );
+    if (!ok) throw new Error("Bản đồ lớn không mở / khung vẽ không có kích thước sau 20 s.");
+    // Hộp mở bằng hoạt ảnh CSS (trượt / phóng): `getBoundingClientRect` đo CẢ phép biến hình giữa chừng, nên ở khung chậm (`--slow-frame 25-36`) cạnh phải của nút vượt màn hình.
+    // Chờ mọi hoạt ảnh HỮU HẠN trong hộp xong rồi mới đo (hoạt ảnh vô hạn, vd nhịp sáng, bị bỏ qua).
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `(() => { const m = document.getElementById("map-modal"); return m.getAnimations({ subtree: true }).every((a) => !(a.effect && Number.isFinite(a.effect.getComputedTiming().endTime)) || a.playState === "finished" || a.playState === "idle"); })()`,
+        ),
+      20000,
+      100,
+    );
+    if (!settled) throw new Error("Hoạt ảnh mở bản đồ lớn chưa xong sau 20 s.");
+    await sleep(100);
   };
   const close = async () => {
     await key("Escape", "Escape", 27);
-    await sleep(250);
+    await waitUntilTrue(async () => !(await shown()), 10000, 100);
   };
-  const shown = () => evalJs("window.__ui.isMapModalOpen()");
 
   console.log("\n--- Mở bản đồ lớn ---");
   await open();
@@ -274,16 +276,16 @@ try {
   await key("Home", "Home", 36);
   check((await cam()).follow, "phím Home: về chỗ mình");
 
-  console.log("\n--- Sơ đồ nối bốn bản đồ, chú giải, xem bản đồ khác ---");
+  console.log("\n--- Sơ đồ nối các bản đồ ngoài, chú giải, xem bản đồ khác ---");
   const nodes = JSON.parse(
     await evalJs(
       `JSON.stringify([...document.querySelectorAll("#map-graph .mg-node")].map((b) => ({ id: b.dataset.mapId, cur: b.getAttribute("aria-current"), pressed: b.getAttribute("aria-pressed"), h: Math.round(b.getBoundingClientRect().height) })))`,
     ),
   );
   check(
-    nodes.length === 4 &&
-      ["lac_ha", "hac_phong", "am_suong", "han_van"].every((id) => nodes.some((n) => n.id === id)),
-    `sơ đồ nối có 4 nút bản đồ, kể cả Hàn Vân (M7.5) (${nodes.map((n) => n.id).join(", ")})`,
+    nodes.length === OUTDOOR_MAPS.length &&
+      OUTDOOR_MAPS.every((id) => nodes.some((n) => n.id === id)),
+    `sơ đồ nối có ${OUTDOOR_MAPS.length} nút bản đồ, kể cả Hàn Vân (M7.5), Lang Hoang và Uy Vân Kinh (mục 75) (${nodes.map((n) => n.id).join(", ")})`,
   );
   const hereNode = nodes.find((n) => n.id === "lac_ha");
   check(
@@ -492,7 +494,7 @@ try {
   );
 
   console.log(
-    "\n--- Điện thoại ngang 844 x 390: bốn nút sơ đồ nằm trên MỘT hàng (không chiếm thêm chiều cao của bản đồ) ---",
+    "\n--- Điện thoại ngang 844 x 390: mọi nút sơ đồ nằm trên MỘT hàng (không chiếm thêm chiều cao của bản đồ) ---",
   );
   await close();
   await send("Emulation.setDeviceMetricsOverride", {
@@ -501,7 +503,7 @@ try {
     deviceScaleFactor: 1,
     mobile: true,
   });
-  await sleep(400);
+  await waitUntilTrue(() => evalJs("innerWidth === 844 && innerHeight === 390"), 10000, 100);
   await open();
   const row = JSON.parse(
     await evalJs(`JSON.stringify((() => {
@@ -512,25 +514,24 @@ try {
     })())`),
   );
   check(
-    row.ns.length === 4 && new Set(row.ns.map((n) => n.y)).size <= 2 && row.gh <= 52,
-    `bốn nút cùng một hàng (cao ${row.gh} px; y ${row.ns.map((n) => n.y).join(", ")})`,
+    row.ns.length === OUTDOOR_MAPS.length &&
+      new Set(row.ns.map((n) => n.y)).size === 1 &&
+      row.gh <= 52,
+    `${OUTDOOR_MAPS.length} nút cùng MỘT hàng (cao ${row.gh} px; y ${row.ns.map((n) => n.y).join(", ")})`,
   );
   check(
     row.ns.every((n) => n.h >= 44 && n.right <= row.vw),
-    "mọi nút >= 44 px cao và nằm trong màn hình",
+    `mọi nút >= 44 px cao và nằm trong màn hình (${row.ns.map((n) => `${n.id}: h ${n.h}, phải ${n.right}`).join("; ")}; vw ${row.vw})`,
   );
   await close();
 
   check(pageErrors === 0, `0 lỗi console / exception (${pageErrors})`);
   ws.close();
+} catch (e) {
+  console.log(`  ✗ lỗi không mong đợi: ${e && e.message ? e.message : e}`);
+  failures++;
 } finally {
-  chrome.kill("SIGKILL");
-  await sleep(600);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
-  } catch {
-    // dọn thư mục tạm không bắt buộc
-  }
+  if (launched) await launched.close();
 }
 if (failures > 0) {
   console.log(`\n✗ ${failures} kiểm tra ĐỎ`);

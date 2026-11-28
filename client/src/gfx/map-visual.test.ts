@@ -1,9 +1,14 @@
 // Lớp hình từ `visual.json` (client/src/gfx/map-visual.ts, Tiled S3b #1206): kiểm tệp KHÔNG TIN, kích thước ảnh, bộ nạp ảnh, tải JSON. Hàm thuần: không cần Phaser / trình duyệt.
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import {
+  VISUAL_GID_TREE_CANOPY,
+  VISUAL_GID_TREE_TRUNK,
+  VISUAL_TREE_BASE_INSET,
+  VISUAL_TREE_FRAME,
   VISUAL_LAYER_NAMES,
   VISUAL_MAX_CELLS,
   VISUAL_TILE,
@@ -23,6 +28,8 @@ import {
   visualPackPaths,
   visualRows,
   visualTextureKey,
+  visualTreeSpots,
+  visualWithoutTreeTiles,
   type VisualLoaderScene,
 } from "./map-visual";
 
@@ -482,4 +489,150 @@ describe("setMapVisualPref / onMapVisualPref (ô Cài đặt)", () => {
     offBad();
     offGood();
   });
+});
+
+// ---- CÂY NGUYÊN KHỐI (QUYET_DINH_M3 mục 73): thân + tán không còn là hai ô rời ----
+const hereDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(hereDir, "../../..");
+
+/** Giải mã PNG RGBA 8 bit mọi bộ lọc (Pillow lưu `optimize=True` dùng bộ lọc thích ứng, khác bộ mã hoá bộ lọc None của `gen-assets.mjs`). */
+function decodePng(b: Buffer) {
+  const idat: Buffer[] = [];
+  for (let off = 8; off < b.length;) {
+    const len = b.readUInt32BE(off);
+    if (b.toString("ascii", off + 4, off + 8) === "IDAT")
+      idat.push(b.subarray(off + 8, off + 8 + len));
+    off += 12 + len;
+  }
+  const w = b.readUInt32BE(16);
+  const h = b.readUInt32BE(20);
+  expect(b[24]).toBe(8); // độ sâu bit
+  expect(b[25]).toBe(6); // RGBA
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const bpp = 4;
+  const stride = w * bpp;
+  const px = new Uint8Array(h * stride);
+  for (let y = 0; y < h; y++) {
+    const ft = raw[y * (stride + 1)];
+    const src = y * (stride + 1) + 1;
+    for (let i = 0; i < stride; i++) {
+      const x = raw[src + i];
+      const a = i >= bpp ? px[y * stride + i - bpp] : 0;
+      const up = y > 0 ? px[(y - 1) * stride + i] : 0;
+      const c = y > 0 && i >= bpp ? px[(y - 1) * stride + i - bpp] : 0;
+      let v = x;
+      if (ft === 1) v = x + a;
+      else if (ft === 2) v = x + up;
+      else if (ft === 3) v = x + ((a + up) >> 1);
+      else if (ft === 4) {
+        const pp = a + up - c;
+        const pa = Math.abs(pp - a);
+        const pb = Math.abs(pp - up);
+        const pc = Math.abs(pp - c);
+        v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? up : c);
+      }
+      px[y * stride + i] = v & 255;
+    }
+  }
+  return { w, h, alpha: (x: number, y: number) => px[y * stride + x * bpp + 3] };
+}
+
+describe("cây nguyên khối: vị trí và bỏ ô thân / tán", () => {
+  it("gốc cây cách đáy ô logic ĐÚNG 3 px (số cứng, không theo hằng): rễ nằm trong ô bị chặn, không thò sang ô phía nam", () => {
+    expect(VISUAL_TREE_BASE_INSET).toBe(3);
+    const decor = new Uint16Array(2 * 2);
+    decor[1] = VISUAL_GID_TREE_TRUNK; // ô (1, 0)
+    expect(visualTreeSpots(decor, 2, 2, 32)).toEqual([{ x: 48, y: 29, flip: expect.any(Boolean) }]);
+  });
+
+  it("MỖI ô GID thân cây (620) là một cây: giữa gốc ở giữa ô, đáy rễ cách đáy ô VISUAL_TREE_BASE_INSET, độ sâu = y gốc", () => {
+    const w = 4;
+    const decor = new Uint16Array(w * 3);
+    decor[1 * w + 2] = VISUAL_GID_TREE_TRUNK; // ô (2, 1)
+    decor[2 * w + 0] = VISUAL_GID_TREE_TRUNK; // ô (0, 2)
+    decor[0 * w + 3] = 622; // đá: không phải cây
+    const spots = visualTreeSpots(decor, w, 3, 32);
+    expect(spots.map((s) => [s.x, s.y])).toEqual([
+      [2.5 * 32, 2 * 32 - VISUAL_TREE_BASE_INSET],
+      [0.5 * 32, 3 * 32 - VISUAL_TREE_BASE_INSET],
+    ]);
+  });
+
+  it("ô tán (621), đá, bụi và ô trống KHÔNG sinh cây; lớp ngắn hơn khai báo không ném lỗi", () => {
+    const decor = Uint16Array.from([0, VISUAL_GID_TREE_CANOPY, 622, 623, 10]);
+    expect(visualTreeSpots(decor, 5, 1, 32)).toEqual([]);
+    expect(visualTreeSpots(new Uint16Array(3).fill(VISUAL_GID_TREE_TRUNK), 4, 4, 32)).toHaveLength(
+      3,
+    );
+    expect(visualTreeSpots(new Uint16Array(0), 4, 4, 32)).toEqual([]);
+  });
+
+  it("lật ngang tất định theo ô (cùng đầu vào cùng kết quả) và có cả hai hướng trong một cánh rừng", () => {
+    const decor = new Uint16Array(10 * 10).fill(VISUAL_GID_TREE_TRUNK);
+    const a = visualTreeSpots(decor, 10, 10, 32);
+    const b = visualTreeSpots(decor, 10, 10, 32);
+    expect(a).toEqual(b);
+    const flips = a.filter((s) => s.flip).length;
+    expect(flips).toBeGreaterThan(20);
+    expect(flips).toBeLessThan(80);
+  });
+
+  it("visualWithoutTreeTiles bỏ ĐÚNG ô 620 / 621 (thành 0), giữ nguyên ô khác và không sửa mảng gốc", () => {
+    const layer = Uint16Array.from([VISUAL_GID_TREE_TRUNK, 5, VISUAL_GID_TREE_CANOPY, 622, 623, 0]);
+    const out = visualWithoutTreeTiles(layer);
+    expect([...out]).toEqual([0, 5, 0, 622, 623, 0]);
+    expect(layer[0]).toBe(VISUAL_GID_TREE_TRUNK); // bản gốc nguyên vẹn
+  });
+});
+
+describe("cây nguyên khối: đồng bộ với máy chủ, script dựng tileset và ảnh thật", () => {
+  it("GID thân / tán KHỚP GID_TREE_TRUNK / GID_TREE_CANOPY của server/src/systems/map-builder.ts", () => {
+    const text = fs.readFileSync(path.join(repoRoot, "server/src/systems/map-builder.ts"), "utf-8");
+    const num = (name: string) =>
+      Number(new RegExp(`export const ${name} = (\\d+);`).exec(text)?.[1]);
+    expect(num("GID_TREE_TRUNK")).toBe(VISUAL_GID_TREE_TRUNK);
+    expect(num("GID_TREE_CANOPY")).toBe(VISUAL_GID_TREE_CANOPY);
+  });
+
+  it("VISUAL_TREE_FRAME KHỚP TREE_FRAME của client/scripts/art/dung-tileset-world.py", () => {
+    const py = fs.readFileSync(
+      path.join(repoRoot, "client/scripts/art/dung-tileset-world.py"),
+      "utf-8",
+    );
+    const m = /^TREE_FRAME = \((\d+), (\d+), (\d+), (\d+)\)/m.exec(py);
+    expect(m, "thiếu TREE_FRAME trong script").not.toBeNull();
+    const [x, y, w, h] = (m as RegExpExecArray).slice(1).map(Number);
+    expect({ x, y, w, h }).toEqual(VISUAL_TREE_FRAME);
+  });
+
+  for (const id of ["lac_ha", "hac_phong", "am_suong", "han_van"]) {
+    it(`${id}: ảnh tileset_world.png CÓ sprite cây trong khung (góc trên trong suốt, giữa đặc, rễ chạm đáy) và quanh khung trống`, () => {
+      const png = decodePng(
+        fs.readFileSync(path.join(repoRoot, `client/public/packs/map-${id}/tileset_world.png`)),
+      );
+      const { x, y, w, h } = VISUAL_TREE_FRAME;
+      expect(x + w).toBeLessThanOrEqual(png.w);
+      expect(y + h).toBeLessThanOrEqual(png.h);
+      expect(png.alpha(x, y)).toBe(0);
+      expect(png.alpha(x + w - 1, y)).toBe(0);
+      expect(png.alpha(x + w / 2, y + 12)).toBe(255);
+      let rootOpaque = 0;
+      for (let dx = -4; dx < 4; dx++)
+        if (png.alpha(x + w / 2 + dx, y + h - 1) === 255) rootOpaque++;
+      expect(rootOpaque, "rễ phải chạm đáy khung (điểm neo ở gốc)").toBeGreaterThan(0);
+      let opaque = 0;
+      for (let j = 0; j < h; j++)
+        for (let i = 0; i < w; i++) if (png.alpha(x + i, y + j) === 255) opaque++;
+      expect(opaque).toBeGreaterThan(600); // một cây trọn vẹn 32 x 31, không phải ô lẻ
+      // quanh khung (1 px) trống: sprite không đè lên ô nào của lưới tileset
+      for (let i = -1; i <= w; i++) {
+        expect(png.alpha(x + i, y - 1)).toBe(0);
+        expect(png.alpha(x + i, y + h)).toBe(0);
+      }
+      for (let j = -1; j <= h; j++) {
+        expect(png.alpha(x - 1, y + j)).toBe(0);
+        expect(png.alpha(x + w, y + j)).toBe(0);
+      }
+    });
+  }
 });

@@ -15,13 +15,13 @@ import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Tab, sleep, shown, killChrome, removeTmpDirs, listenWithRetry } from "./e2e-kit";
 import { launchChrome } from "./e2e-chrome";
+import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
 const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
-const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 
 async function main() {
@@ -59,9 +59,11 @@ async function main() {
   };
 
   try {
+    const CDP = await freePort();
     const launched = await launchChrome({
       cdpPort: CDP,
       userDataDir: chromeDir,
+      allocPort: () => freePort(),
       log: out,
     });
     chrome = launched.chrome;

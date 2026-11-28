@@ -225,7 +225,7 @@ Theo kiến trúc M3 phương án A (mỗi bản đồ là một phòng Colyseus
 - **Cách chạy:**
   ```bash
   # Chạy mô phỏng đồng thời 2 bản đồ: Lạc Hà (50 bot) + Hắc Phong Cốc (50 bot)
-  # (từ M7.10, #666, `--multi` không kèm `--maps` chạy cả BỐN bản đồ: số của bốn bản đồ ở mục 25)
+  # (từ #1470, `--multi` không kèm `--maps` chạy cả SÁU bản đồ thường: số của bốn bản đồ ở mục 25)
   npm run bench -w server -- --multi --maps=lac_ha,hac_phong --seconds 20
 
   # Hoặc chạy mô phỏng riêng 1 bản đồ chỉ định
@@ -1058,7 +1058,7 @@ npx tsx --tsconfig server/tsconfig.json server/scripts/bot-kim-dan.ts --party
 
 ### 23.1. Bench ba bản đồ trong MỘT tiến trình
 
-`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (lúc viết mục này mặc định là hai bản đồ đầu; từ M7.10, #666, mặc định là cả bốn bản đồ, muốn lại số cũ thì thêm `--maps=lac_ha,hac_phong`) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
+`bench.ts --multi` chỉ có Lạc Hà + Hắc Phong; thêm `--maps=<id,id,...>` (lúc viết mục này mặc định là hai bản đồ đầu; từ #1470 mặc định là cả sáu bản đồ, muốn lại số cũ thì thêm `--maps=lac_ha,hac_phong`) và `--per-map N` (mặc định 50). Dựng một `World` mỗi bản đồ, tick lần lượt trong cùng tiến trình, ca săn quái, seed 1, 20 giây (400 tick):
 
 ```bash
 npm run bench -w server -- --multi --maps=lac_ha,hac_phong,am_suong --per-map 33 --seconds 20
@@ -2320,3 +2320,87 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=30 --m7 --bos
 Đối chứng 10 phút (cùng tham số, `575a3887`): PASS, 23 lượt, 4 / 4 (`quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1); nhóm săn trùm (Bot 001-015): 13 / 15 bot có lượt thi triển.
 
 Giới hạn: mỗi cấu hình chạy MỘT lần (n = 1) nên không ước được tỉ lệ chập chờn của `--boss`; thử bằng kho tệp (không qua PostgreSQL). Tải chồng lên hai lần chạy (theo Dev B, kiểm bằng `ps`): lần 10 phút (09:34:27-09:44:30) bị `npm test` đầy đủ của B (09:34:11-09:35:49, `nice 10`) chồng 82 giây đầu cộng build client ~10 giây (~09:36:45); lần 30 phút (09:46:07-10:16:28) bị soak 100 bot của C (PID 2451046, 09:42:16-09:52:33) chồng 6,5 phút đầu, B không chạy gì nặng trong 09:46-10:16. Cả hai lần có tải chồng đều ĐẠT 4/4 nên tải chồng không làm trượt tiêu chí `--boss` ở hai lần này; n = 1 nên chưa đủ để nói `--boss` nhạy hay không nhạy với tải. Số tick của lần 3 chỉ để kiểm 'vẫn trong ngưỡng xa', số tick sạch hơn là của lần 2.
+
+### 41.5. Thử tải 10 phút kiểm tra trên `main` mới `c6d1418c` (Dev C, 25/11/2026, Refs #1290, #1301)
+
+Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --boss --out=/tmp/c-soak-10m.json` (chạy trên commit `main` `c6d1418c` sau khi hoàn tất toàn bộ 3 đợt chuyển đổi E2E #1432; commit kế tiếp `009f6509` chỉ đổi `AGENTS.md` nên số đo đại diện trọn vẹn cho `main` hiện tại).
+
+| Chỉ số | Lần 3 (`575a3887`: số 30 phút của 41.4; riêng dòng `--boss` là đối chứng 10 phút) | Lần này (`c6d1418c`, 10 phút) | Ngưỡng / Tiêu chuẩn | Đánh giá |
+|---|---:|---:|---:|:---:|
+| Bot khởi tạo -> kết thúc | 100 -> 100 | **100 -> 100 (rớt 0)** | rớt <= 5% | **ĐẠT** |
+| VmRSS ban đầu / sau 5 phút / cuối | 190,48 / 224,38 / 224,89 MB | **166,26 / 195,59 / 196,71 MB** | — | — |
+| Tăng sau warmup (5.0m) | +0,51 MB (30m) | **+1,12 MB** | <= 50 MB | **ĐẠT** |
+| Dốc nửa sau (OLS) | +0,004 MB/phút (30m) | **+0,178 MB/phút** | <= 1,00 MB/phút | **ĐẠT** |
+| Tick p95 phòng tệ nhất (TB / max) | 1,61 / 2,00 ms | **1,30 / 1,98 ms** | <= 10 ms | **ĐẠT** |
+| Tick overrun (> 50 ms) | 0 | **0** | 0 | **ĐẠT** |
+| CPU luồng chính / tick | — | **TB 3,24 ms/tick** | — | — |
+| Hàng đợi ghi nhân vật | Inflight 0, Tuổi 0,0s, Lỗi 0 | **Inflight max 0, Tuổi max 0,0 s, Lỗi 0** | — | **ĐẠT** |
+| Độ trễ vòng lặp p99 | 30,1 ms | **22,8 ms** | <= 100 ms | **ĐẠT** |
+| Băng thông nhận TB (p95) | 148 B/tick | **145 B/tick (p95 219 B/tick)** | <= 600 B/tick | **ĐẠT** |
+| Băng thông nhận TB / bot | — | **2,82 KB/s** | — | **ĐẠT** |
+| Cảnh báo / lỗi log / lỗi `/metrics` | 0 / 0 / 0 | **0 / 0 / 0** | 0 | **ĐẠT** |
+| `kiem-save` (nhân vật / chân linh / tông môn) | 0 lỗi | **0 lỗi (100 / 100 / 4)** | 0 | **ĐẠT** |
+| Tệp hỏng `*.hong-*` | 0 | **0** | 0 | **ĐẠT** |
+| Bảo toàn Linh thạch | ĐẠT (lệch 0) | **ĐẠT (lệch ví 0)** | lệch ví bot = 0 | **ĐẠT** |
+| Nội dung M7 | 6 / 6 chiêu Nguyên Anh | **599 lượt thi triển, 6 / 6 chiêu Nguyên Anh** | đủ 6 / 6 | **ĐẠT** |
+| Chiêu trùm `--boss` | **4 / 4**, 23 lượt: `quat_duoi` 11, `phun_doc` 6, `cuon_minh` 5, `goi_ran_con` 1 | **4 / 4**, 16 lượt: `quat_duoi` 8, `phun_doc` 4, `cuon_minh` 2, `goi_ran_con` 2 | đủ 4 / 4 | **ĐẠT** |
+
+*Lưu ý so sánh:* Cột đối chiếu giữ nguyên các số đo của lần chạy 30 phút ở mục 41.4 để tham khảo biên độ dao động (riêng dòng `--boss` là số đo đối chứng 10 phút của A tại dòng 2320). Mức tăng sau warmup và dốc OLS giữa 10 phút và 30 phút không thể so sánh trực tiếp.
+
+**Nhận xét:**
+- Kết quả chạy trên commit `main` `c6d1418c` (commit `009f6509` #1442 kế tiếp chỉ cập nhật tài liệu `AGENTS.md` nên số đo vẫn đại diện trọn vẹn cho `main` hiện tại) đạt **PASS** ở tất cả các chỉ số vận hành, nằm sâu trong ngân sách an toàn.
+- Cơ chế `--boss` đạt **4/4 chiêu trùm Xích Mãng** trong 10 phút với 16 lượt thi triển (trong đó `cuon_minh` 2 lượt và `goi_ran_con` 2 lượt).
+- *Giới hạn thực nghiệm:* Đây là kết quả của một lần chạy đơn lẻ ($n = 1$) trong điều kiện máy yên tĩnh (`uptime load average ~0.23` lúc 05:25).
+
+---
+
+## 42. Thử tải dài sáu bản đồ trên `main` sau #1492 (Dev C, 26/11/2026, Refs #1470, #1496)
+
+### 42.1. Bối cảnh & Cấu hình thử nghiệm
+- **Commit thử nghiệm:** `b15fef93` (sau khi merge PR #1492 - đưa Lang Hoang & Uy Vân Kinh vào bot/thử tải và PR #1493 - cập nhật tài liệu).
+- **Mục tiêu:** Kiểm tra độ ổn định, rò rỉ bộ nhớ (RSS slope), tải CPU/tick, và khả năng lưu thông qua cổng khi chạy đồng thời sáu phòng bản đồ thường (`lac_ha`, `hac_phong`, `am_suong`, `han_van`, `lang_hoang`, `uy_van`) cùng phòng bí cảnh và đấu trường trong 10 phút với 100 bot kết hợp nội dung M7 (sổ chiêu, Nguyên Anh), bộ chiêu trùm (`--boss`) và tông môn (`--sect`).
+- **Lưu ý cấu hình đối chứng:** Lần chạy này có bật thêm tính năng tông môn `--sect` (12 bot tham gia 4 tông môn) trong khi mốc 41.5 (`c6d1418c`) không có cờ `--sect`. Phần chênh lệch VmRSS (~18 MB) đến từ việc chạy đồng thời sáu phòng bản đồ cộng với hoạt động của 4 tông môn (ví, kho, sổ thành viên), không phải hoàn toàn do hai bản đồ mới tạo ra.
+- **Lệnh thực thi:**
+  ```bash
+  nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --boss --sect --port=2587 --out=/tmp/c-soak-6map.json
+  ```
+- **Phân bổ 100 bot:** Săn quái 24 | Trấn/Shop 16 | Cổng 8 | Bí cảnh 12 | PK 8 | Tông môn 12 | Nguyên Anh (Hàn Vân) 20.
+
+### 42.2. Bảng kết quả tổng hợp
+
+| Chỉ số | Mốc đối chứng 4 bản đồ (41.5, `c6d1418c`, 10m) | Lần này: Sáu bản đồ (`b15fef93`, 10m) | Phân bố phòng / Bản đồ ghi nhận | Ngưỡng / Tiêu chuẩn | Đánh giá |
+|---|---:|---:|:---|---:|:---:|
+| Bot khởi tạo -> kết thúc | 100 -> 100 (rớt 0) | **100 -> 100 (rớt 0)** | Toàn bộ 6 phòng bản đồ thường + bí cảnh | rớt <= 5% | **ĐẠT** |
+| VmRSS ban đầu / sau 5m / cuối | 166,26 / 195,59 / 196,71 MB | **179,80 / 214,45 / 214,80 MB** | Tiến trình máy chủ duy nhất (6 phòng) | — | — |
+| Tăng sau warmup (5.0m) | +1,12 MB | **+0,35 MB** | Sau khi 6 phòng đã nạp tài nguyên | <= 50 MB | **ĐẠT** |
+| Dốc nửa sau (OLS) | +0,178 MB/phút | **+0,211 MB/phút** | Nửa sau ổn định, không rò bộ nhớ | <= 1,00 MB/phút | **ĐẠT** |
+| Tick p95 phòng tệ nhất (TB / max) | 1,30 / 1,98 ms | **1,53 / 1,89 ms** | Tệ nhất trong các phòng (soak lấy từ /metrics, không ghi id) | <= 10 ms | **ĐẠT** |
+| Tick overrun (> 50 ms) | 0 | **0** | Toàn bộ các phòng | 0 | **ĐẠT** |
+| CPU luồng chính / tick | TB 3,24 ms/tick | **TB 3,82 ms/tick** | 6 phòng + bí cảnh đồng thời | — | — |
+| Hàng đợi ghi nhân vật | Inflight max 0, Tuổi 0,0s, Lỗi 0 | **Inflight max 0, Tuổi max 0,0 s, Lỗi 0** | Lưu đĩa đồng bộ 6 bản đồ | — | **ĐẠT** |
+| Độ trễ vòng lặp p99 | 22,8 ms | **25,3 ms** | Event loop tiến trình chính | <= 100 ms | **ĐẠT** |
+| Băng thông nhận TB (p95) | 145 (219) B/tick | **158 (248) B/tick** | Trung bình tất cả các vai bot | <= 600 B/tick | **ĐẠT** |
+| Băng thông nhận TB / bot | 2,82 KB/s | **3,09 KB/s** | Mạng WebSocket nhận | — | **ĐẠT** |
+| Cảnh báo / lỗi log / lỗi `/metrics` | 0 / 0 / 0 | **0 / 0 / 0** | 0 lỗi `[lỗi]`, 0 cảnh báo | 0 | **ĐẠT** |
+| Số lỗi `wrong_map` ngoài ý muốn | 0 | **0** | Cổng chuyển cảnh chính xác 100% | 0 | **ĐẠT** |
+| `kiem-save` sau soak | 0 lỗi (100 / 100 / 4) | **0 lỗi (100 / 100 / 4)** | 100 nhân vật, 100 chân linh, 4 tông môn | 0 | **ĐẠT** |
+| Tệp hỏng `*.hong-*` | 0 | **0** | Thư mục dữ liệu tạm | 0 | **ĐẠT** |
+| Bảo toàn Linh thạch | ĐẠT (lệch 0) | **ĐẠT (lệch ví 0)** | Ban đầu 29.600 + Thả 8.613 - Tiêu 26.959 = Trần 38.213 \| Ví 11.254 + Kho 280 | lệch ví bot = 0 | **ĐẠT** |
+| Nội dung M7 | 6 / 6 chiêu Nguyên Anh | **903 lượt, 6 / 6 chiêu Nguyên Anh** | 20 bot Nguyên Anh ở Hàn Vân Lĩnh | đủ 6 / 6 | **ĐẠT** |
+| Chiêu trùm `--boss` | 4 / 4, 16 lượt | **4 / 4, 55 lượt** | `quat_duoi` 24, `phun_doc` 18, `cuon_minh` 6, `goi_ran_con` 7 | đủ 4 / 4 | **ĐẠT** |
+| Lưu thông qua cổng sáu bản đồ | — (4 bản đồ cũ) | **ĐẠT: Cả 6 bản đồ thường đều có bot qua lại** | `lang_hoang` 212 · `hac_phong` 166 · `uy_van` 159 · `lac_ha` 120 · `han_van` 106 · `am_suong` 106 · `bi_canh` 12 (881 lượt vào phòng đích) | Không thấy dấu hiệu kẹt | **ĐẠT** |
+
+### 42.3. Nhận xét & Kết luận
+1. **Lưu thông qua cổng trên sáu bản đồ:**
+   - 8 bot vai `travel` phân bổ trải đều đã di chuyển liên tục qua toàn bộ chuỗi 5 cặp cổng hai chiều kết nối sáu bản đồ.
+   - Tổng cộng ghi nhận **881 lượt vào phòng đích** thành công (869 lượt vào sáu bản đồ thường và 12 lượt vào bí cảnh), trong đó hai bản đồ mới tiếp nhận lưu lượng lớn: **Lang Hoang (212 lượt)** và **Uy Vân Kinh (159 lượt)**. Số liệu này lấy từ `mapVisits` của soak (chỉ đếm số lần vào phòng đích thành công sau khi `joinById` / `joinOrCreate` qua cổng, không đếm điểm xuất phát ban đầu).
+   - Không xuất hiện bất kỳ lỗi `wrong_map` ngoài ý muốn nào, không thấy dấu hiệu kẹt (mọi bản đồ đều có lượt vào qua cổng đều đặn).
+2. **Hiệu năng & Tài nguyên:**
+   - Chạy đồng thời sáu phòng bản đồ thường kết hợp tông môn làm VmRSS cuối dừng ở mức **214,80 MB**, mức tăng sau warmup chỉ **+0,35 MB** và dốc OLS nửa sau rất phẳng (**+0,211 MB/phút** $\ll 1,00$ MB/phút), khẳng định không có rò rỉ bộ nhớ.
+   - Tick p95 phòng tệ nhất đạt **1,53 ms** (max 1,89 ms $\ll 10,0$ ms), CPU luồng chính chỉ tốn **3,82 ms/tick**, loop lag p99 chỉ **25,3 ms**.
+3. **Tính toàn vẹn dữ liệu:**
+   - Hoàn tất 10 phút, `kiem-save` kiểm tra 100 nhân vật, 100 chân linh và 4 tông môn đạt **0 lỗi**, 0 tệp hỏng `*.hong-*`.
+   - Tính bảo toàn tiền tệ đạt chuẩn tuyệt đối (độ lệch ví bot = 0).
+
+
+

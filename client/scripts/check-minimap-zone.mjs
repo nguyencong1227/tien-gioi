@@ -1,58 +1,30 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
-// Kiểm NHÃN TÊN VÙNG dưới bản đồ nhỏ (`#minimap-zone`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ), ở bốn khung nhìn: MỌI tên vùng của `MAPS` (trấn + hoang của cả bốn bản
-// đồ) đặt vào nhãn rồi đo: KHÔNG bị cắt (scrollWidth <= clientWidth), tối đa HAI dòng, chân bản đồ không đè thanh menu HUD bên dưới; màn cảm ứng ẩn chữ gợi ý "M" (không có phím M),
+/* global console, process */
+// Kiểm NHÃN TÊN VÙNG dưới bản đồ nhỏ (`#minimap-zone`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ), ở bốn khung nhìn: MỌI tên vùng của `MAPS` (trấn + hoang của MỌI bản đồ: sáu bản đồ = 12 tên sau mục 75) đặt vào nhãn rồi đo: KHÔNG bị cắt (scrollWidth <= clientWidth), tối đa HAI dòng, chân bản đồ không đè thanh menu HUD bên dưới; màn cảm ứng ẩn chữ gợi ý "M" (không có phím M),
 // máy tính vẫn hiện. Trước đây `max-width: 85px` + một dòng + dấu chấm lửng cắt 7 / 8 tên ở màn cảm ứng ("Hàn Vân T…") và "Vọng Sương Trạm" ở máy tính.
 // Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-minimap-zone.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
-import fs from "node:fs";
-import os from "node:os";
+//   node client/scripts/check-minimap-zone.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>]
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
   const i = process.argv.indexOf(name);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : dflt;
 };
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const MAP_TS = `/@fs/${path.resolve(import.meta.dirname, "../../shared/src/map.ts").replace(/^\//, "")}`;
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-minimap-zone-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "minimap-zone" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -89,7 +61,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   for (const [W, H, mobile] of [
     [1280, 720, false],
@@ -107,22 +80,32 @@ try {
     // Cảm ứng thật: `(pointer: coarse)` đúng thì `display.ts` đặt data-input="touch" (CSS ẩn chữ "M" dựa vào đó)
     await send("Emulation.setTouchEmulationEnabled", { enabled: mobile, maxTouchPoints: 5 });
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__ui && window.__scene && document.getElementById('minimap-zone'))",
-        )
-      )
-        break;
-    }
-    await sleep(600);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs("Boolean(window.__ui && window.__scene && document.getElementById('minimap-zone'))"),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${W}x${H}: cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(600)`: phông Noto Serif đã tải xong (đo `scrollWidth` bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html> (CSS ẩn chữ "M" dựa vào nó)
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${W}x${H}: phông chưa tải xong / thiếu data-input sau 30 s`);
     const names = JSON.parse(
       await evalJs(
         `import(${JSON.stringify(MAP_TS)}).then((m) => JSON.stringify([...new Set(m.MAPS.flatMap((d) => [d.townName, d.wildName]))]))`,
       ),
     );
     check(names.length >= 8, `${names.length} tên vùng của MAPS để kiểm`);
+    // Hai bản đồ của mục 75 (#1467) phải nằm trong danh sách kiểm: tên trạm / vùng hoang MỚI (dài: "Huyết Trận Uy Vân", "Tuyết Đao Quan") là ca dễ bị cắt nhất
+    for (const must of ["Tuyết Đao Quan", "Lang Hoang", "Uy Vân Kinh", "Huyết Trận Uy Vân"])
+      check(names.includes(must), `tên vùng '${must}' có trong MAPS để kiểm`);
     const rows = [];
     for (const n of names) {
       rows.push(
@@ -162,14 +145,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);

@@ -44,6 +44,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(150);
 });
 
@@ -109,12 +110,24 @@ async function spawnInHacPhong(name: string, x?: number, y?: number): Promise<He
   const first = await spawn(name);
   await first.room.leave(true);
   rooms.splice(rooms.indexOf(first.room), 1);
-  await sleep(150);
-
-  const f = readdirSync(dataDir)
-    .filter((x) => x.endsWith(".json"))
-    .map((x) => path.join(dataDir, x))
-    .find((x) => JSON.parse(readFileSync(x, "utf8")).name === name)!;
+  // Chờ dương: máy chủ Colyseus hoàn tất onLeave và lưu hồ sơ nhân vật xuống đĩa (chỉ lần lưu lúc rời mới ghi trường life)
+  const f = await waitFor(
+    () => {
+      const list = readdirSync(dataDir)
+        .filter((x) => x.endsWith(".json"))
+        .map((x) => path.join(dataDir, x));
+      return list.find((p) => {
+        try {
+          const raw = JSON.parse(readFileSync(p, "utf8"));
+          return raw.name === name && raw.life !== undefined;
+        } catch {
+          return false;
+        }
+      });
+    },
+    4000,
+    "hồ sơ nhân vật được lưu xuống đĩa",
+  );
 
   const hpMap = getMap(HAC_PHONG_ID)!;
   const targetX = x ?? Math.round(hpMap.townPx.x);

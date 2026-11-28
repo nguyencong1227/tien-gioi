@@ -6,6 +6,7 @@ import {
   AMBUSH_CALM_MS,
   AMBUSH_COOLDOWN_MS,
   AMBUSH_DAY_CAP,
+  AMBUSH_FOE_LEVEL_CAP,
   AMBUSH_FLEE_MIN_COIN,
   AMBUSH_LOGIN_COOLDOWN_MS,
   AMBUSH_MIN_HP_PCT,
@@ -473,8 +474,20 @@ describe("chọn cảnh + bầy (pickAmbush)", () => {
     expect(pickAmbush(rt([], [wide("hac_giao")]), MAP_ID, step(3))).toBeNull();
     expect(pickAmbush(rt([], [wide("hac_giao")]), MAP_ID, step(4))).not.toBeNull();
     expect(pickAmbush(rt([], [wide("thien_han_vuong")]), MAP_ID, step(4))).toBeNull();
-    // cảnh giới chưa khai trần (Hóa Thần): không chọn gì; loài lạ trong bảng: không chọn (không ném lỗi)
-    expect(pickAmbush(rt([], [wide("lang")]), MAP_ID, step(5))).toBeNull();
+    // Hóa Thần đã khai trần 21 (A1 #1461): bầy yếu hợp lệ, Thiên Hàn Vương (cấp 21) cũng hợp lệ ở Hóa Thần (nhưng KHÔNG ở Nguyên Anh, đã kiểm ở trên)
+    expect(pickAmbush(rt([], [wide("lang")]), MAP_ID, step(5))).not.toBeNull();
+    expect(pickAmbush(rt([], [wide("thien_han_vuong")]), MAP_ID, step(5))).not.toBeNull();
+    // cảnh giới chưa khai trần: không chọn gì (gỡ tạm khoá 5 để thử nhánh phòng thủ, trả lại ngay)
+    const capTable = AMBUSH_FOE_LEVEL_CAP as Record<number, number>;
+    const saved5 = capTable[5];
+    delete capTable[5];
+    try {
+      expect(pickAmbush(rt([], [wide("lang")]), MAP_ID, step(5))).toBeNull();
+    } finally {
+      capTable[5] = saved5!;
+    }
+    expect(pickAmbush(rt([], [wide("lang")]), MAP_ID, step(5))).not.toBeNull();
+    // loài lạ trong bảng: không chọn (không ném lỗi)
     expect(pickAmbush(rt([], [wide("khong_co")]), MAP_ID, step(1))).toBeNull();
     // chỉ một loài quá sức trong bầy cũng loại cả bầy
     const mixed = {

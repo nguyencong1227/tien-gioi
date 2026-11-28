@@ -61,6 +61,7 @@ afterEach(async () => {
   (WorldRoomCls.hub.worldBoss as unknown as { lastTickMs: number | null }).lastTickMs = null;
   WorldRoomCls.hub.worldBoss.current = null;
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(100);
 });
 afterAll(async () => {
@@ -131,6 +132,7 @@ async function spawn(name = `Trum The Gioi ${++seq}`): Promise<Hero> {
 /** Đặt giờ giả cho `Date` rồi chờ vài nhịp tick của máy chủ (50 ms mỗi tick: `world.now` lấy từ `Date.now()` giả). */
 async function setClock(ms: number) {
   vi.setSystemTime(ms);
+  // Chờ đồng hồ: vài nhịp tick máy chủ (50 ms/tick) để world.now cập nhật theo giờ giả
   await sleep(160);
 }
 
@@ -139,6 +141,7 @@ async function advance(ms: number) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     vi.setSystemTime(Date.now() + 250);
+    // Chờ đồng hồ: nhịp nhích thời gian thật để bộ lập lịch phát hiện bước thời gian và gửi bảng
     await sleep(60);
   }
 }
@@ -155,7 +158,9 @@ describe("trùm thế giới qua phòng thật", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: at(11, 0) });
     fake = true;
     try {
-      await sleep(160); // để vài tick cập nhật `world.now` theo giờ giả
+      // Chờ dương: chờ tick máy chủ cập nhật world.now theo giờ giả (11:00)
+      const w = serverRoom(h.room).world;
+      await waitFor(() => w.now >= at(11, 0), 2000, "world.now cập nhật theo giờ giả");
       h.msgs.length = 0;
       h.room.send(SOCIAL_MSG.worldBossGet, {});
       budget = 200;
@@ -176,7 +181,12 @@ describe("trùm thế giới qua phòng thật", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: at(11, 58, 30) });
     fake = true;
     try {
-      await sleep(200); // bộ lập lịch ghi mốc đầu tiên (giờ giả 11:58:30)
+      // Chờ dương: bộ lập lịch ghi mốc làm việc đầu tiên (lastTickMs) theo giờ giả 11:58:30
+      await waitFor(
+        () => (WorldRoomCls.hub.worldBoss as any).lastTickMs !== null,
+        2000,
+        "bộ lập lịch ghi mốc đầu tiên",
+      );
       await setClock(at(11, 59, 5)); // lọt qua mốc báo trước 1 phút (11:59:00)
       budget = 100;
       await waitFor(
@@ -222,7 +232,12 @@ describe("trùm thế giới qua phòng thật", () => {
     vi.useFakeTimers({ toFake: ["Date"], now: at(11, 59, 50) });
     fake = true;
     try {
-      await sleep(200);
+      // Chờ dương: bộ lập lịch ghi mốc làm việc đầu tiên (lastTickMs) theo giờ giả 11:59:50
+      await waitFor(
+        () => (WorldRoomCls.hub.worldBoss as any).lastTickMs !== null,
+        2000,
+        "bộ lập lịch ghi mốc đầu tiên",
+      );
       // rớt mạng TRƯỚC giờ: sự kiện bắt đầu khi người chơi đang là hồn lìa xác
       (h.room.connection.transport as any).ws.close();
       budget = 200;

@@ -3,7 +3,7 @@
 > Người dùng duyệt theo MÃ, ví dụ: "duyệt NV-01 phương án B, Q-02 phương án A, giữ nguyên T-03, bỏ NPC-04". **Chỉ thay những mã đã duyệt**; mã không nhắc tới giữ nguyên hình hiện tại. Người soạn: Dev B (nhóm 10-13 đã xong; 14-16 đang làm cùng Dev G).
 > Phần CẢNH (đất, cỏ, cây, nước, bờ, vách) đã được duyệt riêng ở mục 67.1 và đang làm (PR #1332), không nằm trong bảng này.
 
-> **Mã VP / HU ĐÃ ĐÓNG BĂNG (25/11, theo A):** tờ người dùng nhận ngày 23/11 13:00 +0700 (commit `dd32ff1b`: **VP-001..128**, **HU-01..59**) giữ NGUYÊN mã. Vật phẩm / chiêu thêm sau đó nhận mã MỚI ở CUỐI (**VP-129.. / HU-60..**), hàng ghi "· MỚI (sau 23/11)"; kinh quyển mới ở tờ riêng `14-vat-pham-kinh-quyen-moi`, chiêu mới nối ở cuối tờ hệ của chúng. Các nhóm khác (NV, NPC, Q, T, UI, NEN) không bị nhích. Bảng id -> mã: `ma-co-dinh.json` (cạnh tệp này; generator `client/scripts/art/dung-bang-duyet.py` chỉ ĐỌC bảng, `--ghi-ma` mới ghi mã mới vào; PR nội dung KHÔNG dựng lại tờ).
+> **Mã T / VP / HU ĐÃ ĐÓNG BĂNG (25/11, theo A):** tờ người dùng nhận ngày 23/11 13:00 +0700 (commit `dd32ff1b`: **T-01..04**, **VP-001..128**, **HU-01..59**) giữ NGUYÊN mã. Trùm / vật phẩm / chiêu thêm sau đó nhận mã MỚI ở CUỐI (**T-05.. / VP-129.. / HU-60..**), hàng ghi "· MỚI (sau 23/11)"; kinh quyển mới ở tờ riêng `14-vat-pham-kinh-quyen-moi`, chiêu mới nối ở cuối tờ hệ của chúng, trùm mới nối cuối tờ nhóm 13. Các nhóm khác (NV, NPC, Q, UI, NEN) không bị nhích (Q vẫn gán theo thứ tự quái thường: đóng băng nốt khi người dùng duyệt nhóm 12). Bảng id -> mã: `ma-co-dinh.json` (cạnh tệp này; generator `client/scripts/art/dung-bang-duyet.py` chỉ ĐỌC bảng, `--ghi-ma` mới ghi mã mới vào; PR nội dung KHÔNG dựng lại tờ).
 
 ## Cách xem
 
@@ -29,6 +29,28 @@ Mỗi nhóm một **tờ ảnh ghép** (nền tối): mỗi hàng một mã; c�
 - Hiệu ứng của Xianxia là ĐƠN SẮC (trắng -> xám đậm) có chủ ý: README của gói khuyên nhân một màu lúc chạy để ra mọi hệ từ MỘT hiệu ứng. Màu trên tờ ảnh (theo hệ của chiêu) chỉ để XEM; màu thật do `FX` của game chốt.
 - Mỗi hiệu ứng có 8-24 khung và một `anchor` (`left`: tia bắn từ tay, `bottom`: đặt dưới chân, `center`); tờ ảnh chỉ hiện 3 khung quanh đỉnh (25 / 50 / 75 %).
 - Mười tờ, mỗi HỆ một tờ (Kim, Mộc, Thủy, Hỏa, Thổ, Băng, Phong, Lôi, Âm, Vô sắc). Cột A = hiệu ứng hợp HÌNH chiêu (tia, quạt, vòng, bay...), B = hiệu ứng đặc trưng của HỆ (sen cho Mộc, phượng hoàng cho Hỏa, lôi kiếp cho Lôi...), C = vệt chém Wuxia Lite (gói riêng, chỉ cho chiêu chém / tia / lao). Cột "hiện tại" là icon kinh quyển (hiệu ứng hiện tại vẽ bằng mã, không có tệp ảnh để so).
+
+## Dữ liệu cho trang web duyệt: `duyet.json` (QUYET_DINH_M3 mục 74)
+
+Trang web duyệt đồ hoạ (Dev G, `tools/duyet-do-hoa/`, chỉ nghe ở địa chỉ Tailscale của máy chủ) đọc `docs/art/huong-moi/duyet.json`: MỖI mã một thẻ gồm hình HIỆN TẠI và phương án A / B / C, cùng nguồn, giấy phép, cỡ, hoạt ảnh và khuyến nghị. Tệp do chính bộ dựng tờ ảnh sinh ra (cùng dữ liệu với các bảng dưới đây, nên không thể lệch nhau; test canh):
+
+```bash
+python3 -I client/scripts/art/dung-bang-duyet.py --groups 10,11,12,13,14,15,16,17 --json docs/art/huong-moi/duyet.json
+```
+
+(thêm `--public <thư mục tạm> --private <thư mục tạm>` nếu CHỈ muốn tệp JSON mà không ghi đè các tờ ảnh trong repo). Ảnh cắt riêng từng ô (đã thu / phóng về cỡ trong game, giống tờ ảnh) ghi vào `--anh-dir` (mặc định `/mnt/data/assets-private/preview`) dưới `duyet/<mã>/<hien-tai|A|B|C>.png`: thư mục preview RIÊNG ngoài repo, gồm cả hình gói riêng, chỉ phục vụ qua Tailscale. `duyet.json` (vào repo) chỉ chứa siêu dữ liệu và đường dẫn TƯƠNG ĐỐI thư mục preview, không chứa điểm ảnh nào của gói riêng.
+
+Cấu trúc (mỗi MÃ một dòng gọn trong tệp):
+
+| Khoá | Ý nghĩa |
+|---|---|
+| `phien_ban` | số nguyên, hiện là 1 (đổi cấu trúc thì tăng) |
+| `nguon` | bảng nguồn: `cur`, `ninja`, `xian`, `wuxia`, `sunny`, `hicon`, `bb` -> `ten`, `giay_phep`, `rieng`, `goc_nhin` (`rieng: true` = cấm phân phối lại, CHỈ phục vụ qua Tailscale) |
+| `nhom[]` | MỘT mục cho MỖI tờ ảnh (nhóm 14 có 7 tờ, nhóm 15 có 10 tờ nên `id` lặp lại): `id` ("10".."17"), `kieu` (NV / NPC / Q / T / VP / HU / UI / NEN), `tieu_de`, `to_cong_khai`, `to_day_du`, `ma[]` |
+| `ma[]` | `ma` (vd `NV-01`, `VP-001`, `HU-01`), `doi_tuong` (mô tả), `moi` (mã cấp SAU mốc đóng băng 23/11: số có thể đổi cho tới khi dựng lại có chủ ý bằng `--ghi-ma`), `khuyen_nghi`, `hien_tai`, `phuong_an[]` (đúng ba: A, B, C) |
+| `hien_tai` / mỗi `phuong_an` | `nguon` (khoá của bảng `nguon`), `ten_nguon`, `giay_phep`, `rieng`, `goc_nhin`, `chu_thich` (cỡ / mô tả hình), `co_hinh`, `anh` (`duyet/<mã>/<hien-tai\|A\|B\|C>.png` hoặc `null` khi KHÔNG có hình), `co_goc` (rộng, cao điểm ảnh của khung đầu trong gói gốc), `so_khung` (số hình / khung hoạt ảnh trong ô), riêng phương án có thêm `chu` |
+
+Quyết định của người dùng KHÔNG nằm ở đây mà ở `~/TT/orchestra/DUYET_DO_HOA.json` (mã + phương án; các dev chỉ đọc).
 
 <!-- NHOM 10 -->
 ## Nhóm 10 — Người chơi (NV)

@@ -31,6 +31,17 @@ export const PERSIST_POP_MS = 280;
 export const PERSIST_ARM_FLASH_MS = 220;
 /** Hào quang: người dùng chưa có trong state (tin `fx` có thể đến trước bản vá state) thì chờ chừng này (ms) rồi mới coi là đã rời; chết thì tắt ngay. */
 export const PERSIST_ANCHOR_GRACE_MS = 800;
+/**
+ * Vòng tầm đánh (nét đứt) quanh chân TƯỢNG: người chơi cần thấy tượng với tới đâu để dụ quái vào. Rà giao diện điện thoại 25/11 (390x844, Hồn Phiên Tượng tầm 220 px): bản cũ nét 1 / độ đậm 0,22
+ * (0,275 của tượng mình) gần như vô hình, dò điểm ảnh quanh bán kính tầm không thấy vòng nào (khác vùng / bẫy đã kích hoạt: nét 2, độ đậm 0,5-0,55, có nền). Nét 2 / độ đậm 0,5 ngang vòng của bẫy và vùng.
+ */
+export const PERSIST_TOTEM_RING_WIDTH = 2;
+export const PERSIST_TOTEM_RING_ALPHA = 0.5;
+/** Số cung nét đứt của vòng tầm tượng, và độ dài mỗi cung (rad). */
+export const PERSIST_TOTEM_RING_DASHES = 12;
+export const PERSIST_TOTEM_RING_ARC = 0.3;
+/** Nền nhạt phủ vùng tầm của tượng (chỉ khi bậc đồ hoạ có chi tiết): vừa đủ để vùng đọc được trên nền sáng, nhẹ hơn vùng (0,14) vì tượng không gây sát thương theo vùng đặc. */
+export const PERSIST_TOTEM_FILL_ALPHA = 0.06;
 /** Nhịp mặc định khi chiêu không khai `tickMs`, và khoảng kẹp (ms). */
 export const PERSIST_TICK_DEFAULT = 800;
 const TICK_MIN = 200;
