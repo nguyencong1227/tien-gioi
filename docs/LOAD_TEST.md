@@ -2402,5 +2402,61 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --bos
    - Hoàn tất 10 phút, `kiem-save` kiểm tra 100 nhân vật, 100 chân linh và 4 tông môn đạt **0 lỗi**, 0 tệp hỏng `*.hong-*`.
    - Tính bảo toàn tiền tệ đạt chuẩn tuyệt đối (độ lệch ví bot = 0).
 
+---
+
+## 43. Thử tải đa phòng (11 phòng) và đo lường chi tiết trên bản đồ mới Lang Hoang, Uy Vân Kinh (Dev C, 28/11/2026, Issue #1470 [75-C1])
+
+### 43.1. Bối cảnh & Phương pháp đo
+- **Mục tiêu (theo Issue #1470):**
+  1. Mở đồng thời 10+ phòng hoạt động (gồm 6 phòng thế giới thường `lac_ha`, `hac_phong`, `am_suong`, `han_van`, `lang_hoang`, `uy_van`, 1 phòng bí cảnh `bi_canh_linh_hu`, và 4 phòng đấu trường `arena_*` -> tổng cộng 11 phòng Colyseus thực).
+  2. Đo đạc mức chiếm dụng bộ nhớ (RAM VmRSS) theo số phòng mở: từ 0 phòng cơ sở -> 6 phòng world -> 11 phòng đầy đủ.
+  3. Đo lường chi tiết băng thông và lượng cập nhật trạng thái (patch byte/tick, RX KB/s) khi phân bổ bot ở trạm dịch chuyển an toàn vs ngoài dã ngoại (vùng quái) trên từng bản đồ, đặc biệt là hai bản đồ mới `lang_hoang` và `uy_van`.
+  4. Kiểm tra thời gian xử lý tick tổng thể của server khi chạy 11 phòng ở nhịp 20 Hz (`TICK_MS = 50 ms`).
+- **Kịch bản thực thi:**
+  - Kịch bản đo lường tự động: `npm run multi-room -w server` (`server/scripts/multi-room-load.ts`).
+  - Dùng Colyseus server thật và client `colyseus.js` thật kết nối qua WebSocket nội bộ.
+
+### 43.2. Bảng đo RAM (VmRSS) theo số phòng hoạt động
+
+| Mốc trạng thái phòng | Số phòng đồng thời | RAM VmRSS (MB) | Mức tăng so với cơ sở | Mức tăng trung bình / phòng |
+|---|---:|---:|---:|---:|
+| Cơ sở (server mới khởi động, 0 phòng) | 0 | **143 MB** | 0 MB | — |
+| 6 phòng thế giới thường (`MAPS`) | 6 | **178 MB** | +35 MB | ~5,8 MB / phòng |
+| 11 phòng đầy đủ (6 world + 1 bí cảnh + 4 đấu trường) | **11** | **182 MB** | **+39 MB** | **~3,5 MB / phòng** |
+
+> **Nhận xét về bộ nhớ:**
+> - 6 phòng thế giới thường nạp bản đồ dạng tile grid và các hệ thống state chiếm thêm ~35 MB (trung bình ~5,8 MB/phòng).
+> - Khi mở thêm 1 phòng bí cảnh (`bi_canh_linh_hu`) và 4 phòng đấu trường (`arena_*`), VmRSS chỉ tăng thêm 4 MB (từ 178 MB lên 182 MB). Các phòng tạm này có kích thước nhỏ và vòng đời ngắn, chi phí RAM cực kỳ nhẹ và không gây áp lực bộ nhớ.
+
+### 43.3. Thời gian xử lý tick tổng của máy chủ (11 phòng, 20 Hz)
+
+| Chỉ số thời gian tick | Kết quả đo lường | Ngân sách cho phép | Đánh giá |
+|---|---:|---:|:---:|
+| Trung bình (TB) | **3,85 ms** | < 10,0 ms | **ĐẠT** |
+| Phân vị 95 (p95) | **6,95 ms** | < 10,0 ms | **ĐẠT** |
+| Đỉnh cao nhất (Max) | **14,1 ms** | < 50,0 ms (không trễ nhịp) | **ĐẠT** |
+
+### 43.4. Bảng đo chi tiết lượng patch byte/tick và băng thông từng bản đồ
+
+| Bản đồ / Phòng | Loại | Số bot | Patch TB (byte/tick) | Ở trạm (byte/tick) | Vùng quái (byte/tick) | Băng thông (RX KB/s) |
+|---|---|---:|---:|---:|---:|---:|
+| Lạc Hà Trấn (`lac_ha`) | world | 4 | 82 | 100 | 63 | 1,59 |
+| Hắc Phong Cốc (`hac_phong`) | world | 4 | 21 | 14 | 28 | 0,41 |
+| Âm Sương Trạch (`am_suong`) | world | 4 | 7 | 5 | 10 | 0,15 |
+| Hàn Vân Lĩnh (`han_van`) | world | 4 | 5 | 7 | 3 | 0,09 |
+| **Lang Hoang** (`lang_hoang`) | world | 4 | **1** | **1** | **1** | **0,03** |
+| **Uy Vân Kinh** (`uy_van`) | world | 4 | **2** | **2** | **2** | **0,04** |
+| Linh Hư Bí Cảnh (`bi_canh_linh_hu`) | dungeon | 1 | 140 | — | — | 2,73 |
+| Đấu Trường (`arena_lac_ha`) | arena | 4 | 110 | — | — | 2,15 |
+
+### 43.5. Nhận xét & Kết luận
+1. **Bản đồ mới Lang Hoang và Uy Vân Kinh:**
+   - Cả hai bản đồ mới đều có patch byte/tick rất thấp (**1–2 byte/tick**, RX ~0,03–0,04 KB/s) do hiện chưa có bầy quái hay NPC hoạt động liên tục (đang ở giai đoạn xây dựng). Khi người chơi di chuyển qua lại, state truyền tải nhẹ và mượt mà.
+   - Khi ở trạm hay ngoài dã ngoại của Lang Hoang và Uy Vân Kinh, dữ liệu truyền đi đồng đều và ổn định.
+2. **Khả năng chịu tải đa phòng (11 phòng đồng thời):**
+   - Vòng lặp 20 Hz xử lý 11 phòng Colyseus chỉ tốn TB **3,85 ms/tick** (p95 **6,95 ms/tick** $\ll$ 10 ms), đảm bảo server còn dư hơn 80% thời gian rảnh trong mỗi khung 50 ms.
+   - VmRSS cho 11 phòng dừng ở mức **182 MB**, hoàn toàn nằm trong giới hạn tài nguyên của máy chủ.
+
+
 
 

@@ -105,6 +105,7 @@
     "soak": "tsx scripts/soak.ts",
     "thong-ke-tien-do": "tsx scripts/thong-ke-tien-do.ts",
     "do-test-chap-chon": "tsx scripts/do-test-chap-chon.ts",
+    "multi-room": "tsx scripts/multi-room-load.ts",
     "ai-playtest": "tsx scripts/ai-playtest/play.ts"
   },
   "dependencies": {
