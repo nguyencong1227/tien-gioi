@@ -34,11 +34,11 @@ const MIMES = {
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
 };
-/** Lời giấc mơ: đọc thẳng từ nguồn để script không chép chữ (đổi chữ ở một chỗ) */
+/** Lời giấc mơ kiếp 1: đọc thẳng từ `shared/src/limbo-dream.ts` để script không chép chữ (đổi chữ ở một chỗ) */
 const DREAM = fs
-  .readFileSync(path.join(REPO, "client/src/limbo-dream.ts"), "utf8")
-  .match(/LIMBO_DREAM_TEXT =\s*\n?\s*"([^"]+)"/)?.[1];
-if (!DREAM) throw new Error("Không đọc được LIMBO_DREAM_TEXT từ client/src/limbo-dream.ts");
+  .readFileSync(path.join(REPO, "shared/src/limbo-dream.ts"), "utf8")
+  .match(/kiep: 1,\s*\n\s*text: "([^"]+)"/)?.[1];
+if (!DREAM) throw new Error("Không đọc được lời kiếp 1 từ shared/src/limbo-dream.ts");
 
 /** Máy chủ tĩnh của `client/dist` (không dựng khi có `--url`) */
 let server = null;

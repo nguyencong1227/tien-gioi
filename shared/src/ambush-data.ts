@@ -323,7 +323,7 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
  * Bảng kẻ chặn đường thật (CD5b #1065; A nhập vì D / E / G chưa kịp, chọn từ THỰC ĐƠN do `server/src/balance/chan-duong.ts` đo: người chơi đúng bậc `minStep` mặc đồ tốt nhất chỉ đánh thường, thắng
  * >= 90% (thường) / 80% (tinh anh) / 60% (cầm đầu); thiết kế `docs/THIET_KE_CHAN_DUONG.md` mục 9). Mọi bầy đều YẾU hơn trần cấp `AMBUSH_FOE_LEVEL_CAP` (bị hạ = chết thật, mục 53) và khoảng `minStep..maxStep`
  * hẹp (`payRewards` chưa giảm tu vi theo chênh bậc). Tinh anh Kim Đan / Nguyên Anh dùng loài cấp THẤP (`lang`, `ho`) vì loài cùng cấp tinh anh không đạt 80% ở bậc nào (Thạch Quy tinh anh đạt từ bậc 16 nhưng một trận ~99 giây thật, sát hạn 120 giây: bỏ); kẻ cầm đầu là Xích Mãng (`mang`, trùm
- * duy nhất đạt 60% một mình, từ bậc 11); Thanh Xà (`thanh_xa`, trùm CẦM ĐƯỜNG nhỏ bậc Luyện Khí bậc 7, đo lại cân bằng CD5 #1065). CHỌN LOÀI THEO CẢNH: văn mẫu (bản đồ, mức) chọn theo `mapIds` + `tiers`, không ghép theo loài nên đôi chỗ loài
+ * duy nhất đạt 60% một mình, từ bậc 11); Thanh Xà (`thanh_xa`, trùm CẦM ĐƯỜNG nhỏ của bãi Luyện Khí, chặn người chơi bậc 7-9, đo lại cân bằng CD5 #1065). CHỌN LOÀI THEO CẢNH: văn mẫu (bản đồ, mức) chọn theo `mapIds` + `tiers`, không ghép theo loài nên đôi chỗ loài
  * không khớp chữ trong cảnh (B nhắc ở review #1240): D / E tinh chỉnh ghép loài - cảnh sau, miễn qua `ambushViolations` + `chan-duong.test.ts`.
  */
 export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [

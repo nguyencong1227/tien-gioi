@@ -103,6 +103,7 @@ import {
   type AmbushChooseMsg,
   type AmbushFleeMsg,
   type AmbushSeenMsg,
+  limboDreamOf,
 } from "@tien-gioi/shared";
 import {
   arenaHudView,
@@ -379,7 +380,6 @@ import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
 import { createTapDedupe } from "./tap-dedupe";
 import { createConfirmGuard } from "./confirm-guard";
-import { limboDreamLine } from "./limbo-dream";
 
 // `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
 export { fmt };
@@ -4200,9 +4200,9 @@ function renderLimboAll() {
   // Giấc mơ bến sông (#1464): chỉ lần chết đầu (kiếp 1); kiếp sau ẩn và xoá chữ (màn dùng lại giữa các lần vào)
   const dreamEl = document.getElementById("limbo-dream");
   if (dreamEl) {
-    const dream = limboDreamLine(summary.kiep);
+    const dream = limboDreamOf(summary.kiep); // `undefined` khi kiếp đó chưa có lời (shared/src/limbo-dream.ts)
     dreamEl.textContent = dream ?? "";
-    dreamEl.hidden = dream === null;
+    dreamEl.hidden = dream === undefined;
   }
 
   const realmEl = $("limbo-sum-realm");
