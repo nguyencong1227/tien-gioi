@@ -135,6 +135,10 @@ export const FX_CAST_SKILLS = [
   "huyet_mang_pha_giap",
   "quy_anh_me_tung",
   "am_phong_quyen_hon",
+  // Hóa Thần (D1 #1466 lát C): ba chiêu rơi từ sói Lang Hoang (cone chém hỏa, đường kiếm kim, vùng thổ)
+  "xich_luyen_doan_hon",
+  "tam_kiem_vo_hinh",
+  "thai_son_ap_dinh",
 ];
 
 /** Màu chữ (trùng `FX_COLOR` trong `recipes-combat.ts`; test đối chiếu). */
