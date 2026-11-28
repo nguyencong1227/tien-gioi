@@ -92,6 +92,7 @@
     "e2e:craft-ui": "node ../client/scripts/check-craft-ui.mjs",
     "e2e:npc-portrait": "node ../client/scripts/check-npc-portrait.mjs",
     "e2e:skill-bar": "node ../client/scripts/check-skill-bar.mjs",
+    "e2e:limbo-dream": "node ../client/scripts/check-limbo-dream.mjs",
     "e2e:equip-six": "node ../client/scripts/check-equip-six.mjs",
     "e2e:skill-book": "node ../client/scripts/check-skill-book.mjs",
     "e2e:ban-do-trong": "tsx scripts/e2e-ban-do-trong.ts",
