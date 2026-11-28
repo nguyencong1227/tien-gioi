@@ -69,6 +69,8 @@ export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
   xich_diem_lang: 0xff7a3d, // cam lửa
   thuong_nguyet_lang: 0x9fd8c8, // xanh ngọc nhạt (lông sói già)
   ngan_nguyet_lang: 0xe8eef8, // bạc trăng
+  lang_vuong: 0xff9a5a, // cam lửa sáng (trùm nhỏ Lang Hoang, D1 lát B)
+  thien_lang_vuong: 0xf0f6ff, // bạc trắng phát sáng (trùm Lang Hoang)
 };
 
 /** Quái `kind` trong sổ game; id lạ / độc ("constructor", "__proto__") là `undefined` (state do server gửi, không tin). */

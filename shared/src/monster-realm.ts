@@ -33,6 +33,9 @@ export const MONSTER_REALM: Readonly<Record<string, number>> = {
   xich_diem_lang: 5,
   thuong_nguyet_lang: 5,
   ngan_nguyet_lang: 5,
+  // Trùm Lang Hoang (D1 lát B): bậc 5 (sách chiêu Hóa Thần của lát C sẽ rơi từ Thiên Lang Vương)
+  lang_vuong: 5,
+  thien_lang_vuong: 5,
 };
 
 /** Bậc khai của quái `id` (id đến từ client / file lưu thì không tin `MONSTER_REALM["constructor"]`); `undefined` nếu chưa khai. */

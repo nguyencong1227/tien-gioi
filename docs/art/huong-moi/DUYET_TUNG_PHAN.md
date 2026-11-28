@@ -3,7 +3,7 @@
 > Người dùng duyệt theo MÃ, ví dụ: "duyệt NV-01 phương án B, Q-02 phương án A, giữ nguyên T-03, bỏ NPC-04". **Chỉ thay những mã đã duyệt**; mã không nhắc tới giữ nguyên hình hiện tại. Người soạn: Dev B (nhóm 10-13 đã xong; 14-16 đang làm cùng Dev G).
 > Phần CẢNH (đất, cỏ, cây, nước, bờ, vách) đã được duyệt riêng ở mục 67.1 và đang làm (PR #1332), không nằm trong bảng này.
 
-> **Mã T / VP / HU ĐÃ ĐÓNG BĂNG (25/11, theo A):** tờ người dùng nhận ngày 23/11 13:00 +0700 (commit `dd32ff1b`: **T-01..04**, **VP-001..128**, **HU-01..59**) giữ NGUYÊN mã. Trùm / vật phẩm / chiêu thêm sau đó nhận mã MỚI ở CUỐI (**T-05.. / VP-129.. / HU-60..**), hàng ghi "· MỚI (sau 23/11)"; kinh quyển mới ở tờ riêng `14-vat-pham-kinh-quyen-moi`, chiêu mới nối ở cuối tờ hệ của chúng, trùm mới nối cuối tờ nhóm 13. Các nhóm khác (NV, NPC, Q, UI, NEN) không bị nhích (Q vẫn gán theo thứ tự quái thường: đóng băng nốt khi người dùng duyệt nhóm 12). Bảng id -> mã: `ma-co-dinh.json` (cạnh tệp này; generator `client/scripts/art/dung-bang-duyet.py` chỉ ĐỌC bảng, `--ghi-ma` mới ghi mã mới vào; PR nội dung KHÔNG dựng lại tờ).
+> **Mã NPC / Q / T / VP / HU ĐÃ ĐÓNG BĂNG (25/11 theo A; Q và NPC thêm 28/11):** tờ người dùng nhận ngày 23/11 13:00 +0700 (commit `dd32ff1b`: **NPC-01..15**, **Q-01..12**, **T-01..04**, **VP-001..128**, **HU-01..59**) giữ NGUYÊN mã. Trùm / vật phẩm / chiêu thêm sau đó nhận mã MỚI ở CUỐI (**T-05.. / VP-129.. / HU-60..**), hàng ghi "· MỚI (sau 23/11)"; kinh quyển mới ở tờ riêng `14-vat-pham-kinh-quyen-moi`, chiêu mới nối ở cuối tờ hệ của chúng, trùm mới nối cuối tờ nhóm 13. Quái thường / NPC thêm sau đó cũng nhận mã MỚI ở CUỐI (**Q-13.. / NPC-16..**, sáu sói Hóa Thần của Lang Hoang và NPC Tuyết Đao Quan), không chèn giữa. Các nhóm khác (NV, UI, NEN) không bị nhích. Mã T / Q / NPC MỚI chưa ghi vào bảng (số ở cuối có thể đổi nếu còn thêm trùm / quái / NPC mới trước lần ghi `--ghi-ma` có chủ ý lúc duyệt); mã VP / HU mới đã ghi tới VP-166 / HU-90. Bảng id -> mã: `ma-co-dinh.json` (cạnh tệp này; generator `client/scripts/art/dung-bang-duyet.py` chỉ ĐỌC bảng, `--ghi-ma` mới ghi mã mới vào; PR nội dung KHÔNG dựng lại tờ).
 
 ## Cách xem
 
@@ -88,6 +88,10 @@ Tờ ảnh: `11-npc.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-
 | NPC-13 | Huyền Cơ — Thủ môn bí cảnh | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'taoist' (hộp thoại) | — | — | A cho chân dung |
 | NPC-14 | Mộc Diên — Lão đan sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'alchemist' (hộp thoại) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; thân Herbalist (bản đồ) | — | A cho chân dung + B cho thân |
 | NPC-15 | Tô Linh Ấn — Lão phù sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'fortune' (hộp thoại) | — | — | A cho chân dung |
+| NPC-16 | Đồng Lão Thiết — Thợ rèn Tuyết Đao · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
+| NPC-17 | Ngô Cự — Quan úy Tuyết Đao · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
+| NPC-18 | Chu Bách Lượng — Lái buôn qua ải · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
+| NPC-19 | Đỗ Thập Tam Nương — Tán tu · MỚI (sau 23/11) | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
 
 <!-- /NHOM 11 -->
 
@@ -110,6 +114,12 @@ Tờ ảnh: `12-quai.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | Q-10 | Độc Tước | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_thunderbird NHÌN NGANG | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); nhìn ngang, 16 px; Sunnyside, 16 px | — | A (tô màu theo hệ nếu cần) |
 | Q-11 | Rắn Con | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_snake NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
 | Q-12 | Phân Thân Yêu Vương | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_ghost NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
+| Q-13 | Dã Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-14 | Hắc Phong Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-15 | Huyết Nguyệt Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-16 | Xích Diễm Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-17 | Thương Nguyệt Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-18 | Ngân Nguyệt Lang · MỚI (sau 23/11) | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
 
 <!-- /NHOM 12 -->
 
@@ -125,6 +135,8 @@ Tờ ảnh: `13-trum.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | T-03 | Thiên Hàn Vương | hiện tại (thân) + thẻ ảnh AI | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); boss fallenimmortal (tiên sa ngã) | — | — | A (cần xem kỹ) / ảnh AI |
 | T-04 | Linh Hư Yêu Vương | hiện tại (thân) + thẻ ảnh AI | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); boss ninetail (cửu vĩ hồ) | — | — | A |
 | T-05 | Thanh Xà · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
+| T-06 | Lang Vương · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
+| T-07 | Thiên Lang Vương · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
 
 <!-- /NHOM 13 -->
 
@@ -228,9 +240,9 @@ Tờ ảnh: `14-vat-pham-kinh-quyen-2.png` (công khai: hiện tại + CC0) và 
 | VP-077 | Hồn Phiên Trận Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Sword-Intent Insights [MA-SWD-030] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-078 | Phá Sơn Quyền Kinh | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Sword-Intent Insights [MA-SWD-030] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 
-## Nhóm 14 — Vật phẩm (VP), kinh quyển — MỚI sau 23/11: VP-129 .. VP-156
+## Nhóm 14 — Vật phẩm (VP), kinh quyển — MỚI sau 23/11 (tờ 1/2): VP-129 .. VP-144
 
-Tờ ảnh: `14-vat-pham-kinh-quyen-moi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-kinh-quyen-moi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+Tờ ảnh: `14-vat-pham-kinh-quyen-moi-1.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-kinh-quyen-moi-1-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
 
 | Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
 |---|---|---|---|---|---|---|
@@ -250,6 +262,13 @@ Tờ ảnh: `14-vat-pham-kinh-quyen-moi.png` (công khai: hiện tại + CC0) v�
 | VP-142 | Khô Mạch Chỉ · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Nine-Palace Sword Collection [MA-SWD-026] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-143 | Giao Cân Cung · MỚI (sau 23/11) | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Heaven-Sundering Sword Manual [MA-SWD-029] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-144 | Hàn Sương Tỏa · MỚI (sau 23/11) | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Heaven-Sundering Sword Manual [MA-SWD-029] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
+
+## Nhóm 14 — Vật phẩm (VP), kinh quyển — MỚI sau 23/11 (tờ 2/2): VP-145 .. VP-166
+
+Tờ ảnh: `14-vat-pham-kinh-quyen-moi-2.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-kinh-quyen-moi-2-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
 | VP-145 | Băng Phách Thần Châm · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Sword-Qi Condensing Manual [MA-SWD-027] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-146 | Lôi Âm Ấn · MỚI (sau 23/11) | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Sword-Intent Insights [MA-SWD-030] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-147 | Tử Điện Thoa · MỚI (sau 23/11) | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Sword-Intent Insights [MA-SWD-030] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
@@ -262,6 +281,9 @@ Tờ ảnh: `14-vat-pham-kinh-quyen-moi.png` (công khai: hiện tại + CC0) v�
 | VP-154 | Huyết Mang Kinh · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Sword-Qi Condensing Manual [MA-SWD-027] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-155 | Quỷ Ảnh Bộ · MỚI (sau 23/11) | hiện tại (Linh phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Dream-Walking Primer [MA-SPR-017] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 | VP-156 | Quỷ Phong Quyết · MỚI (sau 23/11) | hiện tại (Bảo phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Spirit-Projection Scroll [MA-SPR-025] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
+| VP-164 | Xích Luyện Ma Đao · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Spirit-Sword Scroll [MA-SWD-028] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
+| VP-165 | Tâm Kiếm Quyết · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Spirit-Sword Scroll [MA-SWD-028] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
+| VP-166 | Thái Sơn Áp Đỉnh · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: ngọc giản (CC0) | Ninja Adventure (CC0); top-down 4 hướng, 16 px; Ninja: sách phép (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Heaven-Sundering Sword Manual [MA-SWD-029] | giữ hiện tại (ấn riêng mỗi quyển, #1303); A / B giống nhau cho mọi quyển nên chỉ hợp làm bìa chung; C có 100 bìa khác nhau |
 
 ## Nhóm 14 — Vật phẩm (VP), trang bị (tờ 1/2): VP-079 .. VP-097
 
@@ -314,6 +336,16 @@ Tờ ảnh: `14-vat-pham-trang-bi-2.png` (công khai: hiện tại + CC0) và `/
 | VP-114 | Tuyết Hành Ngoa | hiện tại (Thần phẩm) | — | — | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Crimson Lotus Dancer - Boots (Sect Heirloom) [WA24_T5_boots] | C (giày 5 bậc, 8 họ; gói công khai KHÔNG có giày) hoặc giữ hiện tại |
 | VP-115 | Định Tâm Chung | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Crimson Lotus Dancer - Ring (Sect Heirloom) [WR24_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
 
+## Nhóm 14 — Vật phẩm (VP), trang bị — MỚI sau 23/11: VP-157 .. VP-159
+
+Tờ ảnh: `14-vat-pham-trang-bi-moi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-trang-bi-moi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| VP-157 | Bào Huyết Nguyệt · MỚI (sau 23/11) | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Crimson Lotus Dancer - Ring (Sect Heirloom) [WR24_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
+| VP-158 | Kiếm Nanh Trăng · MỚI (sau 23/11) | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; White Crane Martial Sect - Ring (Sect Heirloom) [WR33_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
+| VP-159 | Phù Hồn Thiên Lang · MỚI (sau 23/11) | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; White Crane Martial Sect - Ring (Sect Heirloom) [WR33_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
+
 ## Nhóm 14 — Vật phẩm (VP), nguyên liệu: VP-116 .. VP-128
 
 Tờ ảnh: `14-vat-pham-nguyen-lieu.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-nguyen-lieu-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
@@ -334,6 +366,17 @@ Tờ ảnh: `14-vat-pham-nguyen-lieu.png` (công khai: hiện tại + CC0) và `
 | VP-127 | Độc tước nang | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 | VP-128 | Thiên Hàn châu | hiện tại (Thần phẩm) | — | — | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Blood-Veined Dragon Jade [LS-MIN-071] | C (hình hợp nghĩa) |
 
+## Nhóm 14 — Vật phẩm (VP), nguyên liệu — MỚI sau 23/11: VP-160 .. VP-163
+
+Tờ ảnh: `14-vat-pham-nguyen-lieu-moi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-nguyen-lieu-moi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| VP-160 | Da Lang Hoang · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-161 | Nanh Trăng · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-162 | Cốt Lang Vương · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-163 | Hồn Tinh Thiên Lang · MỚI (sau 23/11) | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+
 <!-- /NHOM 14 -->
 
 <!-- NHOM 15 -->
@@ -352,6 +395,7 @@ Tờ ảnh: `15-hieu-ung-chieu-kim.png` (công khai: hiện tại + CC0) và `/m
 | HU-07 | Kim Thoa Xuyên Tâm (Kim, bolt) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'bolt') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 | HU-08 | Thực Giáp Phi Tán (Kim, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 | HU-09 | Phi Kiếm Tam Liên (Kim, bolt) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'bolt') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-88 | Tâm Kiếm Vô Hình (Kim, line) · MỚI (sau 23/11) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); sword_qi (theo hình 'line') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); flying_sword (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 
 ## Nhóm 15 — Hiệu ứng chiêu, hệ Mộc (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
 
@@ -403,6 +447,7 @@ Tờ ảnh: `15-hieu-ung-chieu-hoa.png` (công khai: hiện tại + CC0) và `/m
 | HU-83 | Ma Trảo Phệ Huyết (Hỏa, cone) · MỚI (sau 23/11) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 | HU-84 | Phật Hỏa Hàng Ma (Hỏa, cone) · MỚI (sau 23/11) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 | HU-85 | Huyết Mang Phá Giáp (Hỏa, cone) · MỚI (sau 23/11) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-89 | Xích Luyện Đoạn Hồn (Hỏa, cone) · MỚI (sau 23/11) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); phoenix (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 
 ## Nhóm 15 — Hiệu ứng chiêu, hệ Thổ (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
 
@@ -420,6 +465,7 @@ Tờ ảnh: `15-hieu-ung-chieu-tho.png` (công khai: hiện tại + CC0) và `/m
 | HU-35 | Thiết Sa Chưởng (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 | HU-36 | Chướng Vụ Phong Lâm (Thổ, cone) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); moon_arc (theo hình 'cone') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; vệt chém Blade_Slash (64 px) | A (hợp hình); B nếu muốn nét riêng của hệ |
 | HU-37 | Phá Sơn Nhất Kích (Thổ, ground) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
+| HU-90 | Thái Sơn Áp Đỉnh (Thổ, ground) · MỚI (sau 23/11) | icon kinh quyển; hiệu ứng vẽ bằng mã | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); star_array (theo hình 'ground') | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); stone_spike (theo hệ) | — | A (hợp hình); B nếu muốn nét riêng của hệ |
 
 ## Nhóm 15 — Hiệu ứng chiêu, hệ Băng (HU) — hiệu ứng Xianxia ĐƠN SẮC đã tô màu hệ
 

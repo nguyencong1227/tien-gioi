@@ -190,6 +190,9 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   xich_diem_lang: { chance: 0.9, min: 410, max: 680 },
   thuong_nguyet_lang: { chance: 0.8, min: 600, max: 900 },
   ngan_nguyet_lang: { chance: 0.9, min: 640, max: 980 },
+  // Trùm Lang Hoang (D1 lát B): chia cho đội; giữ thứ tự theo `exp` (Lang Vương 103.680 < Thiên Lang Vương 230.400) và ~x2,8 Thiên Hàn Vương (900-1470)
+  lang_vuong: { chance: 1, min: 1100, max: 1800 },
+  thien_lang_vuong: { chance: 1, min: 2500, max: 4000 },
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */

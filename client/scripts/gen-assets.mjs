@@ -2216,6 +2216,11 @@ function drawNpcSprite(id) {
 function buildAtlas() {
   const entries = [];
   const push = (name, surf) => entries.push({ name, surf });
+  /**
+   * Khung BÍ DANH: `name` dùng CHÍNH khung của `target` (đã `push` trước đó) trong atlas.json, không thêm điểm ảnh nào (atlas có trần cao 2048 px, M5 mục 8).
+   * Dùng cho loài CHƯA có ảnh riêng (ảnh tạm tái dùng ảnh loài cùng họ, như Lang Hoang D1 #1466); B vẽ riêng thì đổi sang `push` thường.
+   */
+  const pushAlias = (name, target) => entries.push({ name, alias: target });
 
   const personas = [
     { key: "me", robe: 0xf0ece1, trim: 0x2b6e8f, hair: 0x1f1a17 },
@@ -2281,6 +2286,17 @@ function buildAtlas() {
     push(`mon-${mId}-1`, f1);
     for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
+
+  // Hai TRÙM Lang Hoang (D1 #1466 lát B): CHƯA có ảnh riêng; dùng BÍ DANH tới khung Hàn Lang (sói băng xanh, cùng họ, cùng cỡ; trùm nhỏ) và Thiên Hàn Vương (trùm cùng cỡ 88x80),
+  // KHÔNG thêm điểm ảnh (tiền lệ Thanh Xà ở #1559 chép khung nên atlas phình). Sáu sói thường đã có tranh riêng (`drawWolf`, B #1579) nên KHÔNG ở đây. B vẽ riêng từng trùm thì thêm block
+  // `if (id === "<loài>")` trong `drawMonsterFrame`, chuyển loài đó sang danh sách chính ở trên và GỠ khỏi khối bí danh này.
+  const monAliasSuffixes = ["", "-0", "-1", ...MONSTER_POSES.map((pose) => `-${pose}`)];
+  for (const [mId, target] of [
+    ["lang_vuong", "han_lang"],
+    ["thien_lang_vuong", "thien_han_vuong"],
+  ])
+    for (const suffix of monAliasSuffixes)
+      pushAlias(`mon-${mId}${suffix}`, `mon-${target}${suffix}`);
 
   for (const npcId of [
     "truong_tran",
@@ -2398,7 +2414,12 @@ function buildAtlas() {
   let cx = 2;
   let cy = 2;
   let rowH = 0;
-  for (const { name, surf } of entries) {
+  for (const { name, surf, alias } of entries) {
+    if (alias !== undefined) {
+      if (!frames[alias]) throw new Error(`Khung bí danh ${name}: chưa có khung đích ${alias}`);
+      frames[name] = JSON.parse(JSON.stringify(frames[alias]));
+      continue;
+    }
     if (cx + surf.w + pad > W) {
       cx = 2;
       cy += rowH + pad;

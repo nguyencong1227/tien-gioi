@@ -291,7 +291,7 @@ Chi tiết thiết kế: [docs/THIET_KE_BI_CANH.md](THIET_KE_BI_CANH.md).
 
 ## Trùm nhiều chiêu: học né
 
-Hiện có năm con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0: **Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh; thêm **Thanh Xà**, kẻ cầm đầu bầy chặn đường ở Lạc Hà): không còn chỉ đứng đánh, mỗi con ra chiêu có báo trước và nhiều con đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
+Hiện có bảy con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0: **Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh; thêm **Thanh Xà**, kẻ cầm đầu bầy chặn đường ở Lạc Hà; và hai trùm Lang Hoang: **Lang Vương** (trùm nhỏ) và **Thiên Lang Vương**): không còn chỉ đứng đánh, mỗi con ra chiêu có báo trước và nhiều con đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
 
 ### Đọc vùng cảnh báo
 
@@ -307,7 +307,7 @@ Hiện có năm con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0
 - Trên thanh máu trùm (đầu màn hình) có **tên chiêu đang vận**, **vạch giai đoạn** và, khi có, **chỉ báo cuồng nộ**. Đang vận chiêu thì trùm đứng yên một nhịp: đó là lúc đánh trả.
 - Mạng chậm không sao: màn hình tự rút ngắn vòng đếm theo độ trễ của bạn để vòng đầy đúng lúc bạn còn né kịp (mạng quá chậm trên khoảng 190 ms vẫn thiệt thòi, hãy chơi gần đường truyền tốt).
 
-### Năm trùm
+### Bảy trùm
 
 | Trùm | Chiêu chính | Khi máu xuống thấp |
 | --- | --- | --- |
@@ -316,6 +316,8 @@ Hiện có năm con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0
 | **Thiên Hàn Vương** (Nguyên Anh, đội 3-4) | Đập đất, Hàn long lao tới, **Mưa băng**, Vùng băng giá (làm chậm) | Dưới 50%: **hàn khí** quanh thân gây tê cóng; dưới 25%: triệu hai **Hàn Lang** |
 | **Linh Hư Yêu Vương** (bí cảnh) | Vòng nổ yêu khí, Truy kích kẻ đứng **xa nhất**, Dịch chuyển chớp | Dưới 70%: dịch chuyển chớp; dưới 35%: **phân thân**; sau **5 phút**: cuồng nộ (đòn nặng hơn, nhanh hơn) |
 | **Thanh Xà** (Luyện Khí, chỉ gặp khi cầm đầu bầy chặn đường ở Lạc Hà) | Quật đuôi (nón), Xà xung lao tới (đường) | Chỉ một giai đoạn: không triệu hồi, không cuồng nộ; hai chiêu đều có báo trước đủ để né |
+| **Lang Vương** (Hóa Thần, trùm nhỏ ở Lang Hoang, đội 2–4 người) | Xé nát (nón), Lang Vương lao tới (đường), Tiếng hú (vành khuyên) | Chỉ một giai đoạn; sau **5 phút**: cuồng nộ |
+| **Thiên Lang Vương** (Hóa Thần, trùm chương 5, đội 3–4 người) | Xé nát (nón), Phệ nguyệt (đường, chảy máu), Thiên Lang Khiếu (vành khuyên, choáng ngắn), Vũng huyết nguyệt | Dưới 60%: **Mưa vuốt trăng**; dưới 35%: gọi hai **Ngân Nguyệt Lang**, nhanh và mạnh hơn; sau **5 phút**: cuồng nộ |
 
 - **Quái con** do trùm gọi (Rắn Con, Hàn Lang, phân thân) **không rơi đồ, không cho tu vi**: hạ chúng để bớt sát thương, đừng cày chúng.
 - **Linh Hư Yêu Vương** đánh nhẹ nhưng trận dài: đội 4 người vẫn hạ được khi trúng vài đòn; đội 3 người nên **né** gần như mọi đòn. Mang đủ đan hồi máu.
@@ -442,6 +444,8 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Xích Diễm Lang | Thảo nguyên Lang Hoang (sâu) | Đòn nặng, công cao |
 | Thương Nguyệt Lang | Thảo nguyên Lang Hoang (sâu) | Máu rất dày, chậm, đập đất |
 | Ngân Nguyệt Lang | Thảo nguyên Lang Hoang (sâu nhất) | Đòn nặng, công cao nhất bãi |
+| Lang Vương (trùm nhỏ) | Thảo nguyên Lang Hoang (sâu) | Trùm nhỏ Hóa Thần, đội 2–4 người |
+| Thiên Lang Vương (trùm) | Sâu nhất Lang Hoang | Trùm Hóa Thần, đội 3–4 người |
 
 ### Bản đồ
 
@@ -466,7 +470,7 @@ Các bản đồ ngoài hoang được kết nối liên tục thành một chu�
 4. **Hàn Vân Lĩnh** (Vọng Lang Quan) ↔ **Lang Hoang** (Hồi Tuyết Quan)
 5. **Lang Hoang** (Vọng Kinh Quan) ↔ **Uy Vân Kinh** (Hồi Lang Quan)
 
-> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói, chưa có trùm) và thợ rèn ở Tuyết Đao Quan, nhưng chưa có NPC nhiệm vụ. **Uy Vân Kinh** vẫn đang trong giai đoạn xây dựng (chưa có quái vật và NPC nhiệm vụ): người chơi có thể tự do qua lại khám phá cảnh quan và trạm dịch chuyển an toàn. Lang Hoang nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
+> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói và hai trùm) và thợ rèn ở Tuyết Đao Quan, nhưng chưa có NPC nhiệm vụ. **Uy Vân Kinh** vẫn đang trong giai đoạn xây dựng (chưa có quái vật và NPC nhiệm vụ): người chơi có thể tự do qua lại khám phá cảnh quan và trạm dịch chuyển an toàn. Lang Hoang nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
 
 ---
 

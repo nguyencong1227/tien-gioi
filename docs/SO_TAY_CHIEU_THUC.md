@@ -26,7 +26,7 @@
 | **Thu Thủy Kiếm Ảnh** | `thu_thuy_kiem_anh` | Kim Đan | Huyền | Quạt trước mặt | 5s | Chảy máu 3s (25% sát thương gốc mỗi giây), xác suất 50% | Rơi từ Sương Hồ 1,2% |
 | **Bạch Kim Trảo** | `bach_kim_trao` | Nguyên Anh | Huyền | Quạt trước mặt | 3,2s | Chảy máu 4,5s (18% sát thương gốc mỗi giây), xác suất 55% | Rơi từ Hàn Lang 1,5%; Đổi ở Tàng Kinh Các tông môn (56 cống hiến, từ cấp tông 4); Thưởng nhiệm vụ "Rèn trảo bạch kim" |
 | **Vạn Kiếm Quy Tông** | `van_kiem_quy_tong` | Nguyên Anh | Địa | Toả nhiều tia | 5s | Vỡ giáp 3s (nhận thêm 10% sát thương), xác suất 40% | Rơi từ Phong Nha 0,8% |
-| **Tâm Kiếm Vô Hình** | `tam_kiem_vo_hinh` | Hóa Thần | Địa | Tia thẳng | 4,5s | Chảy máu 3s (15% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Thương Nguyệt Lang 0,6%, Ngân Nguyệt Lang 1% |
+| **Tâm Kiếm Vô Hình** | `tam_kiem_vo_hinh` | Hóa Thần | Địa | Tia thẳng | 4,5s | Chảy máu 3s (15% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Thương Nguyệt Lang 0,6%, Ngân Nguyệt Lang 1%, Thiên Lang Vương 20% |
 
 ### Mộc (9 chiêu)
 
@@ -72,7 +72,7 @@
 | **Huyết Mang Phá Giáp** | `huyet_mang_pha_giap` | Nguyên Anh | Địa | Quạt trước mặt | 5s | Chảy máu 3s (25% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Phong Nha 0,5% |
 | **Phượng Minh Cầu Hoàng** | `phuong_minh_cau_hoang` | Nguyên Anh | Địa | Quạt trước mặt | 7s | Choáng 0,9s, xác suất 70%; Bỏng 3s (20% sát thương gốc mỗi giây), xác suất 50% | Rơi từ Độc Tước 0,6% |
 | **Liệt Hỏa Kiếm** | `liet_hoa_kiem` | Nguyên Anh | Địa | Quạt trước mặt | 3,5s | Bỏng 4,5s (20% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Độc Tước 1,8%, Thiên Hàn Vương 25%; Đổi ở Tàng Kinh Các tông môn (92 cống hiến, từ cấp tông 5) |
-| **Xích Luyện Đoạn Hồn** | `xich_luyen_doan_hon` | Hóa Thần | Địa | Quạt trước mặt | 5,5s | Chảy máu 4,5s (20% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Huyết Nguyệt Lang 0,6%, Xích Diễm Lang 1% |
+| **Xích Luyện Đoạn Hồn** | `xich_luyen_doan_hon` | Hóa Thần | Địa | Quạt trước mặt | 5,5s | Chảy máu 4,5s (20% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Huyết Nguyệt Lang 0,6%, Xích Diễm Lang 1%, Lang Vương 5%, Thiên Lang Vương 20% |
 
 ### Thổ (11 chiêu)
 
@@ -88,7 +88,7 @@
 | **Chướng Vụ Phong Lâm** | `chuong_vu_phong_lam` | Nguyên Anh | Địa | Quạt trước mặt | 5,5s | Độc 4,5s (25% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Phong Nha 0,8% |
 | **Phá Sơn Nhất Kích** | `pha_son_nhat_kich` | Nguyên Anh | Địa | Vùng đặt xuống đất | 9s | Choáng 1,2s, xác suất 70%; Vỡ giáp 3s (nhận thêm 15% sát thương), xác suất 60% | Rơi từ Cốt Tượng 0,6% |
 | **Vân Thạch Trận** | `van_thach_tran` | Nguyên Anh | Địa | Vùng đặt xuống đất | 7s | Choáng 1,05s, xác suất 70%; Vỡ giáp 3s (nhận thêm 12% sát thương), xác suất 55% | Rơi từ Cốt Tượng 2%; Đổi ở Tàng Kinh Các tông môn (84 cống hiến, từ cấp tông 5) |
-| **Thái Sơn Áp Đỉnh** | `thai_son_ap_dinh` | Hóa Thần | Địa | Vùng đặt xuống đất | 7,5s | Choáng 1,05s, xác suất 80%; Vỡ giáp 3s (nhận thêm 12% sát thương), xác suất 50% | Rơi từ Thương Nguyệt Lang 1,2% |
+| **Thái Sơn Áp Đỉnh** | `thai_son_ap_dinh` | Hóa Thần | Địa | Vùng đặt xuống đất | 7,5s | Choáng 1,05s, xác suất 80%; Vỡ giáp 3s (nhận thêm 12% sát thương), xác suất 50% | Rơi từ Thương Nguyệt Lang 1,2%, Thiên Lang Vương 20% |
 
 ### Băng (8 chiêu)
 

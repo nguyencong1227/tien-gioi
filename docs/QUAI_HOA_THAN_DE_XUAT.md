@@ -115,7 +115,7 @@ Công thức đi qua `RECIPES` hiện có; giá bán theo `ITEM_VALUE` (không v
 ## 7. Checklist giai đoạn 2 (làm theo thứ tự; PR nhỏ, một PR một lát)
 
 1. **Lát A (quái thường + `monsterCap`; XONG: A1 #1573 khai báo, A2 #1576 nguyên liệu + bộ V + rèn, A3 cho sinh: 62 quái ở `lang_hoang`, báo cáo `hoa-than-kinh-te.ts`):** sáu loài Lang Hoang + `MONSTER_REALM` 5 + `monsterCap` + `DROP_TABLES` nguyên liệu; `can-bang` (`huntRate` / `huntFight` Hóa Thần), `so-tay-quai`, `check:content`, TOÀN BỘ `npm test`. **Phải có bộ V ở lát này** (mục 5.3) hoặc mô hình không săn nổi.
-2. **Lát B (trùm Thiên Lang Vương + Lang Vương):** `bosses.ts` (bộ chiêu qua ba cổng `bossViolations`, bot né hoàn hảo `boss-data-dodge.test.ts`, `bossBalanceViolations`), `monsterCap`, `DROP_TABLES` trùm; `chan-duong.ts` (cảnh chặn đường Hóa Thần).
+2. **Lát B (trùm Thiên Lang Vương + Lang Vương; XONG ở nhánh `a/1466-lat-b`: bộ chiêu qua `bossViolations` + bot né hoàn hảo, rơi chắc nguyên liệu bộ V, `monsterCap` +2; "Yêu huyết tái sinh" (hồi máu) chưa có hình trong khung chiêu trùm nên để dành):** `bosses.ts` (bộ chiêu qua ba cổng `bossViolations`, bot né hoàn hảo `boss-data-dodge.test.ts`, `bossBalanceViolations`), `monsterCap`, `DROP_TABLES` trùm; `chan-duong.ts` (cảnh chặn đường Hóa Thần).
 3. **Lát C (sách chiêu Lang Hoang):** 3 sách (mục 5.2), `skillViolations`, `skill-kit.test`, `skills-dps.test`, `book-drop-realm.test`, icon + atlas.
 4. **Lát D, E, F:** như A, B, C cho Uy Vân Kinh.
 5. **Đã có trước:** khung chiêu `SKILL_MULT_CAP` / `AMBUSH_FOE_LEVEL_CAP` tới bậc 9 (#1472); `expToNext` / `statsFor` tổng quát tới Độ Kiếp; không cần đổi công thức.
