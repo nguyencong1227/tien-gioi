@@ -1,9 +1,10 @@
 // Bản đồ thứ sáu Uy Vân Kinh (mục 75, #1467 bước A2 lát 2) và cổng bắc `lang_hoang_bac` của Lang Hoang. Cũng là bản đồ SỬA TAY: mọi ca đọc BẢN DỰNG TỪ TỆP (`adoptTiledMapFiles`).
 import { beforeAll, describe, expect, it } from "vitest";
-import { MONSTER_CAP, PLAYER_RADIUS } from "./game";
+import { MONSTER_BY_ID, MONSTER_CAP, PLAYER_RADIUS } from "./game";
 import { portalLinkViolations } from "./map-checks";
 import { adoptTiledMapFiles } from "./map-files";
 import {
+  BLOCKING,
   LANG_HOANG_ID,
   MAPS,
   PROCEDURAL_MAPS,
@@ -66,9 +67,49 @@ describe("Uy Vân Kinh: đăng ký bản đồ thứ sáu (mục 75 / A2 lát 2)
     expect(uv.portals.map((p) => p.id)).toEqual(["uy_van_nam"]);
   });
 
-  it("CHƯA có quái tự nhiên: `monsterCap` rỗng (không rơi về MONSTER_CAP mặc định của Lạc Hà); loài Hóa Thần do D1 (#1466) thêm rồi sửa ca này", () => {
-    expect(uv.def.monsterCap).toEqual({});
-    expect(uv.monsterCap).toEqual({});
-    for (const id of Object.keys(MONSTER_CAP)) expect(uv.monsterCapOf(id), id).toBe(0);
+  it("quái tự nhiên CHỈ là sáu loài Hóa Thần (D1 #1466 lát A3 chương 6): `monsterCap` tổng 62, không rơi về MONSTER_CAP mặc định của Lạc Hà; chưa có trùm", () => {
+    const QUAI: Record<string, number> = {
+      luyen_huyet_de_tu: 16,
+      nga_quy: 12,
+      cuong_thi: 10,
+      huyet_mi: 10,
+      huyet_anh: 8,
+      huyet_sat_chan_truyen: 6,
+    };
+    expect(uv.def.monsterCap).toEqual(QUAI);
+    expect(uv.monsterCap).toEqual(QUAI);
+    expect(Object.values(QUAI).reduce((a, b) => a + b, 0)).toBe(62);
+    for (const id of Object.keys(MONSTER_CAP)) expect(uv.monsterCapOf(id), id).toBe(QUAI[id] ?? 0);
+  });
+
+  it("đủ chỗ sinh cho từng loài: ô đi lại được, nối với trạm, ngoài khu an toàn, nguy hiểm >= minDanger, >= 100 ô mỗi quái (như Kim Đan)", () => {
+    const seen = new Set<number>([uv.def.town.cy * uv.def.w + uv.def.town.cx]);
+    const stack = [[uv.def.town.cx, uv.def.town.cy]];
+    while (stack.length) {
+      const [x, y] = stack.pop()!;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= uv.def.w || ny >= uv.def.h) continue;
+        const i = ny * uv.def.w + nx;
+        if (BLOCKING.has(uv.tileAt(nx, ny)) || seen.has(i)) continue;
+        seen.add(i);
+        stack.push([nx, ny]);
+      }
+    }
+    for (const [id, cap] of Object.entries(uv.monsterCap)) {
+      let n = 0;
+      for (const i of seen) {
+        const x = (i % uv.def.w) * TILE + TILE / 2;
+        const y = Math.floor(i / uv.def.w) * TILE + TILE / 2;
+        if (uv.dangerAt(x, y) >= MONSTER_BY_ID[id].minDanger && !uv.inSafe(x, y)) n++;
+      }
+      expect(n, id).toBeGreaterThanOrEqual(100 * cap);
+    }
   });
 });

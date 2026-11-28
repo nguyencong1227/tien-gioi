@@ -30,15 +30,15 @@
 | **Độc Tước** | `doc_tuoc` | Thường | Nguyên Anh | 18 | 7050 | 512 | 2760 | 90% × 230-430 | Hàn Vân Lĩnh |
 | **Thiên Hàn Vương** | `thien_han_vuong` | Trùm | Nguyên Anh | 21 | 123000 | 240 | 38400 | 100% × 900-1470 | Hàn Vân Lĩnh |
 | **Dã Lang** | `da_lang` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 250-540 | Lang Hoang |
-| **Luyện Huyết Đệ Tử** | `luyen_huyet_de_tu` | Thường | Hóa Thần | 19 | 7035 | 418 | 7128 | 80% × 340-740 | — |
-| **Ngạ Quỷ** | `nga_quy` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 330-720 | — |
-| **Cương Thi** | `cuong_thi` | Thường | Hóa Thần | 20 | 30217 | 205 | 14706 | 80% × 550-900 | — |
+| **Luyện Huyết Đệ Tử** | `luyen_huyet_de_tu` | Thường | Hóa Thần | 19 | 7035 | 418 | 7128 | 80% × 340-740 | Uy Vân Kinh |
+| **Ngạ Quỷ** | `nga_quy` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 330-720 | Uy Vân Kinh |
+| **Cương Thi** | `cuong_thi` | Thường | Hóa Thần | 20 | 30217 | 205 | 14706 | 80% × 550-900 | Uy Vân Kinh |
 | **Hắc Phong Lang** | `hac_phong_lang` | Thường | Hóa Thần | 20 | 7170 | 516 | 8664 | 80% × 270-570 | Lang Hoang |
-| **Huyết Ảnh** | `huyet_anh` | Thường | Hóa Thần | 20 | 7547 | 543 | 9120 | 80% × 380-780 | — |
+| **Huyết Ảnh** | `huyet_anh` | Thường | Hóa Thần | 20 | 7547 | 543 | 9120 | 80% × 380-780 | Uy Vân Kinh |
 | **Thương Nguyệt Lang** | `thuong_nguyet_lang` | Thường | Hóa Thần | 20 | 31807 | 216 | 15480 | 80% × 600-900 | Lang Hoang |
-| **Huyết Mị** | `huyet_mi` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 560-910 | — |
+| **Huyết Mị** | `huyet_mi` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 560-910 | Uy Vân Kinh |
 | **Huyết Nguyệt Lang** | `huyet_nguyet_lang` | Thường | Hóa Thần | 21 | 8599 | 510 | 8712 | 80% × 280-580 | Lang Hoang |
-| **Huyết Sát Chân Truyền** | `huyet_sat_chan_truyen` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 850-1300 | — |
+| **Huyết Sát Chân Truyền** | `huyet_sat_chan_truyen` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 850-1300 | Uy Vân Kinh |
 | **Ngân Nguyệt Lang** | `ngan_nguyet_lang` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 640-980 | Lang Hoang |
 | **Xích Diễm Lang** | `xich_diem_lang` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 410-680 | Lang Hoang |
 | **Lang Vương** | `lang_vuong` | Trùm | Hóa Thần | 22 | 99500 | 190 | 103680 | 100% × 1100-1800 | Lang Hoang |

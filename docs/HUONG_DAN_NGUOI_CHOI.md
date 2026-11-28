@@ -157,7 +157,7 @@ Thang cảnh giới (từ thấp đến cao):
 | Đại Thừa | Sơ – Trung – Hậu kỳ |
 | Độ Kiếp | Sơ – Trung – Hậu kỳ |
 
-Hiện tại nội dung chơi được đi tới **Hóa Thần**: bản đồ Lang Hoang có quái Hóa Thần và thợ rèn đồ Hóa Thần (nhiệm vụ và chiêu thức Hóa Thần chưa có). Các cảnh giới từ **Luyện Hư** trở đi đã có tên trong thang nhưng chưa có nội dung — đừng vội lo, đó là đường phía trước.
+Hiện tại nội dung chơi được đi tới **Hóa Thần**: bản đồ Lang Hoang có quái Hóa Thần, thợ rèn đồ Hóa Thần, việc phụ và chuỗi nhiệm vụ chính chương 5 (chiêu thức Hóa Thần mới có ba chiêu); bản đồ Uy Vân Kinh đã có quái Hóa Thần, nhiệm vụ chương 6 chưa có. Các cảnh giới từ **Luyện Hư** trở đi đã có tên trong thang nhưng chưa có nội dung — đừng vội lo, đó là đường phía trước.
 
 ### Thanh tu vi
 
@@ -444,6 +444,12 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Xích Diễm Lang | Thảo nguyên Lang Hoang (sâu) | Đòn nặng, công cao |
 | Thương Nguyệt Lang | Thảo nguyên Lang Hoang (sâu) | Máu rất dày, chậm, đập đất |
 | Ngân Nguyệt Lang | Thảo nguyên Lang Hoang (sâu nhất) | Đòn nặng, công cao nhất bãi |
+| Ngạ Quỷ | Huyết Trận Uy Vân | Lao nhanh, đi đàn, máu thấp |
+| Luyện Huyết Đệ Tử | Huyết Trận Uy Vân | Cận chiến, gồng rồi lao |
+| Huyết Ảnh | Huyết Trận Uy Vân (sâu) | Phóng đạn từ xa |
+| Cương Thi | Huyết Trận Uy Vân (sâu) | Máu rất dày, chậm |
+| Huyết Mị | Huyết Trận Uy Vân (sâu) | Nhổ đạn độc, công cao |
+| Huyết Sát Chân Truyền | Huyết Trận Uy Vân (sâu nhất) | Nhổ đạn độc, công cao nhất bãi |
 | Lang Vương (trùm nhỏ) | Thảo nguyên Lang Hoang (sâu) | Trùm nhỏ Hóa Thần, đội 2–4 người |
 | Thiên Lang Vương (trùm) | Sâu nhất Lang Hoang | Trùm Hóa Thần, đội 3–4 người |
 
@@ -455,8 +461,8 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Hắc Phong Cốc | 128 × 96 | Thanh Lộ Trạm (nam) |
 | Âm Sương Trạch | 128 × 112 | Vọng Sương Trạm |
 | Hàn Vân Lĩnh | 128 × 128 | Hàn Vân Trạm |
-| Lang Hoang | 128 × 112 | Tuyết Đao Quan (nam), thợ rèn đồ Hóa Thần |
-| Uy Vân Kinh | 128 × 112 | Uy Vân Kinh (nam) — *Đang xây dựng* |
+| Lang Hoang | 128 × 112 | Tuyết Đao Quan (nam), thợ rèn đồ Hóa Thần, nhiệm vụ chương 5 |
+| Uy Vân Kinh | 128 × 112 | Uy Vân Kinh (nam), quái Hóa Thần (chưa có NPC) |
 | Linh Hư Bí Cảnh | 64 × 64 | Bí cảnh (vào qua Thủ môn) |
 
 Khu an toàn là trong trấn hoặc trong bán kính quanh cổng. Càng ra xa trấn, yêu thú càng mạnh và càng nguy hiểm.
@@ -470,7 +476,7 @@ Các bản đồ ngoài hoang được kết nối liên tục thành một chu�
 4. **Hàn Vân Lĩnh** (Vọng Lang Quan) ↔ **Lang Hoang** (Hồi Tuyết Quan)
 5. **Lang Hoang** (Vọng Kinh Quan) ↔ **Uy Vân Kinh** (Hồi Lang Quan)
 
-> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói và hai trùm) và thợ rèn ở Tuyết Đao Quan, nhưng chưa có NPC nhiệm vụ. **Uy Vân Kinh** vẫn đang trong giai đoạn xây dựng (chưa có quái vật và NPC nhiệm vụ): người chơi có thể tự do qua lại khám phá cảnh quan và trạm dịch chuyển an toàn. Lang Hoang nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
+> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói và hai trùm), thợ rèn và NPC nhiệm vụ ở Tuyết Đao Quan. **Uy Vân Kinh** đã có sáu loài quái Hóa Thần nhưng chưa có trùm, NPC và nhiệm vụ: trạm Uy Vân Kinh chỉ là chỗ nghỉ an toàn. Lang Hoang và Uy Vân Kinh nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
 
 ---
 

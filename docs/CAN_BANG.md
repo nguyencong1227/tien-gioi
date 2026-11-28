@@ -32,7 +32,7 @@ Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi
 - Mỗi bậc, người chơi chọn nguồn tu vi nhanh nhất mà an toàn: săn một loại quái, hoặc chỉ đả tọa.
 - Săn quái: chỉ dùng Kiếm chém (có tính bạo kích trung bình ×1.08), quái đánh trúng 80% số đòn,
   bỏ qua loại quái mà mỗi trận mất quá 50% khí huyết. Sau mỗi trận đả tọa hồi khí huyết (vẫn được tu vi đả tọa).
-- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s, han_lang 10s, phong_nha 10s, cot_tuong 12s, doc_tuoc 14s, thien_han_vuong 90s, da_lang 10s, hac_phong_lang 10s, huyet_nguyet_lang 12s, xich_diem_lang 12s, thuong_nguyet_lang 14s, ngan_nguyet_lang 14s, lang_vuong 90s, thien_lang_vuong 90s.
+- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s, han_lang 10s, phong_nha 10s, cot_tuong 12s, doc_tuoc 14s, thien_han_vuong 90s, da_lang 10s, hac_phong_lang 10s, huyet_nguyet_lang 12s, xich_diem_lang 12s, thuong_nguyet_lang 14s, ngan_nguyet_lang 14s, luyen_huyet_de_tu 10s, nga_quy 10s, cuong_thi 12s, huyet_mi 12s, huyet_anh 14s, huyet_sat_chan_truyen 14s, lang_vuong 90s, thien_lang_vuong 90s.
 - Thưởng tu vi của chuỗi nhiệm vụ chính chia đều cho các bậc của cảnh giới tương ứng; đi lại + nói chuyện cả chuỗi: 8 phút.
 - Đột phá thất bại mất 30% thanh tu vi, tính theo số lần thất bại kỳ vọng.
 - Trang bị: mặc món tốt nhất đủ cảnh giới ở mỗi ô (giả định đã rèn kịp; nguyên liệu rơi trong lúc săn, không tính thời gian đi rèn). Không mặc gì thì chậm hơn khoảng 10%.
