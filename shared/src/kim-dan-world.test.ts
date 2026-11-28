@@ -257,7 +257,8 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
       sums.set(realm, (sums.get(realm) ?? 0) + q.rewards.exp);
     }
-    for (const realm of [1, 2, 3, 4]) {
+    // Hóa Thần (5): ba việc phụ Tuyết Đao Quan (#1465 giai đoạn 2 lát 1) 36.000 + 36.000 + 41.000 = 113.000 / 6.000.480 = 1,88 %; kế hoạch cả hai chương 201.000 (3,35 %).
+    for (const realm of [1, 2, 3, 4, 5]) {
       // Luyện Khí có 9 tầng (0-8); Trúc Cơ / Kim Đan / Nguyên Anh mỗi cảnh 3 tầng (0-2).
       const tiers = realm === 1 ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 2];
       const bars = tiers.reduce((a, t) => a + expToNext(realm, t), 0);
