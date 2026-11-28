@@ -13,9 +13,7 @@ import {
   AMBUSH_MSG,
   DEFAULT_MAP_ID,
   LINH_HU_ID,
-  MAPS,
   PROTOCOL_VERSION,
-  arenaMapIdOf,
   getMap,
   roomNameOf,
   type AmbushOfferMsg,
@@ -320,18 +318,6 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
     for (const b of botClients) b.receivedBytes = 0;
     const t0 = performance.now();
 
-    // Thu thập mẫu tick time từ các WorldRooms
-    const tickSamples: number[] = [];
-    const measureInterval = setInterval(() => {
-      let totalTickNow = 0;
-      (server as any).matchMaker?.rooms?.forEach((r: any) => {
-        if (r.world?.now) {
-          totalTickNow += 0.05; // giả định nhịp 20Hz
-        }
-      });
-      // Lấy từ V8 execution nếu có
-    }, 50);
-
     // Gửi input nhẹ nhàng để các phòng có hoạt động di chuyển
     for (let sec = 0; sec < durationSec; sec++) {
       for (const b of botClients) {
@@ -341,7 +327,6 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
       }
       await sleep(1000);
     }
-    clearInterval(measureInterval);
     const elapsedSec = (performance.now() - t0) / 1000;
 
     // Tính toán số liệu từng phòng
