@@ -147,8 +147,17 @@ describe("docs/HUONG_DAN_NGUOI_CHOI.md: số liệu khớp dữ liệu thật (#
       last = at;
     }
     co(`| Luyện Khí | Tầng 1 → Tầng ${REALMS[1].tiers.length} |`, "số tầng Luyện Khí");
-    const cao = Math.max(...Object.values(MONSTER_REALM));
-    co(`đi tới **${REALMS[cao].name}**`, "cảnh giới cao nhất có quái (MONSTER_REALM)");
+    // Chỉ tính loài ĐÃ SINH ở một bản đồ (`monsterCap` > 0): loài khai trước nhưng chưa cho sinh (D1 #1466 lát A1, Hóa Thần của Lang Hoang) chưa phải nội dung chơi được.
+    const sinh = (id: string) => MAPS.some((m) => getMap(m.id)!.monsterCapOf(id) > 0);
+    const cao = Math.max(
+      ...Object.entries(MONSTER_REALM)
+        .filter(([id]) => sinh(id))
+        .map(([, r]) => r),
+    );
+    co(
+      `đi tới **${REALMS[cao].name}**`,
+      "cảnh giới cao nhất có quái ĐÃ SINH (MONSTER_REALM x monsterCap)",
+    );
   });
 
   it("thanh tu vi: tu vi từng bậc và thời gian cày khớp expToNext và docs/CAN_BANG.md", () => {

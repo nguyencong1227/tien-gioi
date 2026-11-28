@@ -1971,6 +1971,22 @@ function buildAtlas() {
     for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
 
+  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): CHƯA có ảnh riêng; tái dùng ảnh Hàn Lang (sói băng xanh, cùng họ, cùng cỡ) làm ảnh TẠM như Thanh Xà ở #1559.
+  // B vẽ riêng từng loài thì thêm block `if (id === "<loài>")` trong `drawMonsterFrame` rồi chuyển loài đó sang danh sách chính ở trên và GỠ khỏi khối tái dùng này.
+  for (const mId of [
+    "da_lang",
+    "hac_phong_lang",
+    "huyet_nguyet_lang",
+    "xich_diem_lang",
+    "thuong_nguyet_lang",
+    "ngan_nguyet_lang",
+  ]) {
+    push(`mon-${mId}`, drawMonsterFrame("han_lang", 0));
+    push(`mon-${mId}-0`, drawMonsterFrame("han_lang", 0));
+    push(`mon-${mId}-1`, drawMonsterFrame("han_lang", 1));
+    for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose("han_lang", pose));
+  }
+
   for (const npcId of [
     "truong_tran",
     "duoc_su",

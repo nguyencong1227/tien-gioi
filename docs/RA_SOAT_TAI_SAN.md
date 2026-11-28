@@ -202,7 +202,7 @@
 >
 > **Ấn kinh quyển (#1303, B):** quyển KHÔNG có dấu vẽ tay trong bảng `BOOKS` (`gen-assets.mjs`) tự có "ấn" 7 x 7 đối xứng sinh tất định từ id (`client/scripts/book-marks.mjs`; luật chống chữ Hán: không nét liền dài từ 4 điểm trở lên), nên quyển mới của G / D / E không phải vẽ tay. `client/scripts/book-marks.test.ts` giữ bất biến cho mọi quyển học được: không hai icon giống hệt, không cùng (bìa, viền, dấu), và hai quyển bìa + viền gần nhau phải khác nhau từ 10 điểm ảnh ở vùng dấu (trùng thì thêm `salt` ở phần tử thứ tư của mục `BOOKS`). Số khung atlas không đổi (mỗi quyển đã có khung).
 
-<!-- AUTO-RA-SOAT-ATLAS-HEADER:START -->### 2b. Khung atlas (tệp 2-3) sau NPC `tran_uy` (D7 #755, E): 528 khung, toàn bộ sinh bằng `gen-assets.mjs`<!-- AUTO-RA-SOAT-ATLAS-HEADER:END -->
+<!-- AUTO-RA-SOAT-ATLAS-HEADER:START -->### 2b. Khung atlas (tệp 2-3) sau NPC `tran_uy` (D7 #755, E): 588 khung, toàn bộ sinh bằng `gen-assets.mjs`<!-- AUTO-RA-SOAT-ATLAS-HEADER:END -->
 
 | Nhóm khung | Số khung | Nội dung |
 |---|:---:|---|
