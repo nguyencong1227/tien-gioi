@@ -110,7 +110,7 @@ async function spawnInHacPhong(name: string, x?: number, y?: number): Promise<He
   const first = await spawn(name);
   await first.room.leave(true);
   rooms.splice(rooms.indexOf(first.room), 1);
-  // Chờ dương: máy chủ Colyseus hoàn tất onLeave và lưu tệp hồ sơ nhân vật xuống đĩa
+  // Chờ dương: máy chủ Colyseus hoàn tất onLeave và lưu hồ sơ nhân vật xuống đĩa (chỉ lần lưu lúc rời mới ghi trường life)
   const f = await waitFor(
     () => {
       const list = readdirSync(dataDir)
@@ -118,7 +118,8 @@ async function spawnInHacPhong(name: string, x?: number, y?: number): Promise<He
         .map((x) => path.join(dataDir, x));
       return list.find((p) => {
         try {
-          return JSON.parse(readFileSync(p, "utf8")).name === name;
+          const raw = JSON.parse(readFileSync(p, "utf8"));
+          return raw.name === name && raw.life !== undefined;
         } catch {
           return false;
         }
