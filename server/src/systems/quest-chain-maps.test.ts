@@ -6,6 +6,7 @@ import {
   DEFAULT_MAP_ID,
   HAC_PHONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
   MAIN_QUEST_START,
   NPC_BY_ID,
   QUESTS,
@@ -26,7 +27,7 @@ type Room = ReturnType<typeof makeWorld> & {
   c: ReturnType<typeof addPlayer>["c"];
 };
 
-/** Bốn phòng, MỘT nhân vật "a" dùng chung nhiệm vụ / túi / ví (như khi qua cổng: lưu rồi nạp ở phòng đích). */
+/** Các phòng (tên hàm giữ từ lúc có bốn bản đồ; từ #1465 thêm Lang Hoang), MỘT nhân vật "a" dùng chung nhiệm vụ / túi / ví (như khi qua cổng: lưu rồi nạp ở phòng đích). */
 function fourRooms() {
   const mk = (id: string): Room => {
     const t = makeWorld(getMap(id)!);
@@ -38,6 +39,8 @@ function fourRooms() {
     [HAC_PHONG_ID]: mk(HAC_PHONG_ID),
     [AM_SUONG_ID]: mk(AM_SUONG_ID),
     [HAN_VAN_ID]: mk(HAN_VAN_ID),
+    // Phòng thứ năm (#1465 giai đoạn 2 lát 1): NPC giao việc phụ Tuyết Đao Quan đứng ở Lang Hoang, nên "nhiệm vụ nào cũng được giao ở phòng có thật" cần phòng này
+    [LANG_HOANG_ID]: mk(LANG_HOANG_ID),
   };
   const all = Object.values(rooms);
   const base = all[0];

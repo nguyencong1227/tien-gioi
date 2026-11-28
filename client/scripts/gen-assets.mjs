@@ -1870,6 +1870,28 @@ function drawNpcSprite(id) {
       beard: true,
       prop: "hammer",
     },
+    // Tuyết Đao Quan (Lang Hoang, #1465 giai đoạn 2 lát 1): ba NPC giao việc phụ; ẢNH TẠM theo tông áo của `NpcDef.color` (B vẽ riêng sau)
+    quan_uy_tuyet_dao: {
+      robe: 0x4a5a7a,
+      trim: 0xdfe6f0,
+      hair: 0x3a3a42,
+      beard: true,
+      prop: "spear",
+    },
+    lai_buon_tuyet_dao: {
+      robe: 0x8a6a3a,
+      trim: 0xf0d27a,
+      hair: 0x4a3f38,
+      beard: false,
+      prop: "pack",
+    },
+    do_thap_tam_nuong: {
+      robe: 0x6a8a5a,
+      trim: 0xe6c365,
+      hair: 0x2b2623,
+      beard: false,
+      prop: "staff",
+    },
     tho_ren_han: { robe: 0x6a3f4a, trim: 0x9fd0ea, hair: 0x2c3a4a, beard: true, prop: "hammer" },
   }[id];
   if (!cfg) throw new Error(`Chưa có tranh NPC: ${id}`);
@@ -2056,6 +2078,9 @@ function buildAtlas() {
     "lai_buon_han",
     "tho_ren_han",
     "tho_ren_tuyet_dao",
+    "quan_uy_tuyet_dao",
+    "lai_buon_tuyet_dao",
+    "do_thap_tam_nuong",
     "lao_dan",
     "tran_uy",
     "lao_phu",
