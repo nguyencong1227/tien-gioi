@@ -77,7 +77,7 @@ Trò chơi có hai đòn mặc định và các ô chiêu thức bạn tự gắ
 - **Kiếm khí** (K): nhát kiếm tầm xa, mạnh hơn, tốn linh lực và có thời gian hồi chiêu. Dùng để đánh từ xa hoặc bổ sung sát thương.
 - **Ô chiêu thức 2–5** (L / U / I / O): bốn ô bạn gắn chiêu đã học. Mở bảng **Công pháp (Shift + K)** để gắn hoặc gỡ chiêu vào ô. Ô còn trống thì bấm sẽ báo lý do, không làm gì.
 
-> **Sổ tay chiêu thức:** danh sách đầy đủ mọi chiêu học được — hệ, cảnh giới yêu cầu, phẩm, hình đòn, hồi chiêu, hiệu ứng và **cách có được** (bán ở cửa hàng nào và giá Linh thạch; rơi từ quái nào, tỉ lệ %; đổi ở Tàng Kinh Các tông môn; hoặc thưởng nhiệm vụ nào), kèm ma trận độ phủ hệ × cảnh giới: xem [`docs/SO_TAY_CHIEU_THUC.md`](SO_TAY_CHIEU_THUC.md).
+> **Sổ tay chiêu thức:** danh sách đầy đủ **87 chiêu** học được — hệ, cảnh giới yêu cầu, phẩm, hình đòn, hồi chiêu, hiệu ứng và **cách có được** (bán ở cửa hàng nào và giá Linh thạch; rơi từ quái nào, tỉ lệ %; đổi ở Tàng Kinh Các tông môn; hoặc thưởng nhiệm vụ nào), kèm ma trận độ phủ hệ × cảnh giới: xem [`docs/SO_TAY_CHIEU_THUC.md`](SO_TAY_CHIEU_THUC.md).
 
 ### Hệ (ngũ hành) và tương khắc
 
@@ -165,9 +165,9 @@ Bạn tích **tu vi** để lên bậc. Thanh đầy thì tới bước **Đột
 
 | Cảnh giới | Tu vi bậc đầu | Thời gian cày ước tính (solo) |
 | --- | --- | --- |
-| Luyện Khí (đủ 9 tầng) | 280 / tầng | ~53 phút hết Luyện Khí |
-| Trúc Cơ | 4.400 – 5.819 | ~2 giờ 52 phút |
-| Kim Đan | 48.000 – 63.480 | ~5,7 giờ |
+| Luyện Khí (đủ 9 tầng) | 280 – 600 / tầng | ~51 phút hết Luyện Khí |
+| Trúc Cơ | 4.400 – 5.819 | ~2 giờ 47 phút |
+| Kim Đan | 48.000 – 63.480 | ~3,9 giờ |
 
 (Phàm Nhân chỉ cần 40 tu vi để vào Luyện Khí.) Số liệu cân bằng đầy đủ ở [docs/CAN_BANG.md](CAN_BANG.md).
 
@@ -358,6 +358,7 @@ Khi đầu thai:
 
 > **Mẹo bảo mạng (rất quan trọng):**
 > - **Giữ kết nối.** Rớt mạng bất thường, nhân vật vẫn được giữ lại khoảng **90 giây** để nối lại — đừng hoảng, hãy thử nối lại ngay. Thoát chủ động hoặc ngắt vì spam thì không được giữ.
+> - **Dải "Mất kết nối — nhân vật đang được bảo vệ" (chip Mạng chậm):** nếu máy chủ không phản hồi quá **2 giây**, dải này hiện lên, sớm hơn lúc game coi là rớt mạng (8 giây). Từ lúc đó máy chủ không để nhân vật chết vì mạng; có tin về lại thì dải tắt và game báo "Đã kết nối lại.".
 > - Đừng lao vào quái mạnh hơn cảnh giới của bạn. Quái càng xa trấn càng mạnh.
 > - Luôn mang đan hồi máu; uống trước khi máu xuống nửa.
 > - Với trùm, đi đội. Một người thường không hạ nổi.
@@ -414,6 +415,8 @@ Bấm nút **Xã hội** trên HUD (điện thoại: trong menu ☰) hoặc phí
 Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối địa chỉ trang để tắt tạm (nút, phím tắt, banner và danh hiệu cùng ẩn) rồi báo cho nhóm.
 
 ## Phụ lục: quái theo bậc và bản đồ
+
+> **Sổ tay quái và bảng rơi đồ:** đầy đủ mọi quái (bậc, máu, công, tu vi, Linh thạch rơi, xuất hiện ở bản đồ nào), bảng "vật phẩm rơi từ quái nào" và nơi rơi của từng sách chiêu: xem [`docs/SO_TAY_QUAI_VA_ROI.md`](SO_TAY_QUAI_VA_ROI.md).
 
 ### Quái tiêu biểu theo vùng (sắp theo độ mạnh tăng dần)
 
