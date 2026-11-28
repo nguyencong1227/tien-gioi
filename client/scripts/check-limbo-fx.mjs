@@ -202,6 +202,8 @@ try {
   const p = await anims("petal-fall");
   const b = await anims("reborn-bloom");
   check(p === 12 && b === 1, `đầu thai: ${p} cánh hoa rơi + ${b} vầng sáng đang chạy`);
+  // vầng sáng bắt đầu từ opacity 0 rồi nở dần: hoạt ảnh vừa CHẠY chưa có nghĩa là đã NỞ, nên chờ chính điều cần khẳng định (opacity > 0) thay vì `sleep(900)`
+  await until(`getComputedStyle(document.querySelector(".reborn-bloom")).opacity > 0`);
   check(
     (await evalJs(`getComputedStyle(document.querySelector(".reborn-bloom")).opacity`)) > 0,
     "vầng sáng mờ trắng đã nở (opacity > 0)",
