@@ -2939,24 +2939,26 @@ describe("kho nhân vật thay được (M3 bước 3b): WorldRoom chỉ biết 
       const name = "Kho Bo Nho";
       const a = await join(name);
       expect(memory.get(key(name))).toMatchObject({ name, realm: 0 }); // tạo mới -> ghi vào kho giả
+      const savesBeforeA = calls.filter((c) => c === `save:${key(name)}`).length;
       await a.room.leave(true); // lưu lúc rời phòng
       rooms.splice(rooms.indexOf(a.room), 1);
       // Chờ dương: lần lưu lúc rời phòng được ghi vào kho giả
       await waitFor(
-        () => calls.filter((c) => c === `save:${key(name)}`).length >= 2,
+        () => calls.filter((c) => c === `save:${key(name)}`).length > savesBeforeA,
         3000,
         "lưu lúc rời phòng vào kho giả",
       );
-      expect(calls.filter((c) => c === `save:${key(name)}`).length).toBeGreaterThanOrEqual(2);
+      expect(calls.filter((c) => c === `save:${key(name)}`).length).toBeGreaterThan(savesBeforeA);
       // vào lại: nạp từ kho giả (đúng mã), không tạo nhân vật mới
       const b = await join(name);
       expect(calls).toContain(`load:${key(name)}`);
       expect(b.me().name).toBe(name);
+      const savesBeforeB = calls.filter((c) => c === `save:${key(name)}`).length;
       await b.room.leave(true);
       rooms.splice(rooms.indexOf(b.room), 1);
       // Chờ dương: lần lưu lúc b rời phòng được ghi vào kho giả và dọn khỏi phòng
       await waitFor(
-        () => calls.filter((c) => c === `save:${key(name)}`).length >= 3,
+        () => calls.filter((c) => c === `save:${key(name)}`).length > savesBeforeB,
         3000,
         "lưu lúc b rời phòng vào kho giả",
       );
