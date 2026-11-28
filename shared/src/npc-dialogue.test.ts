@@ -36,6 +36,16 @@ const ORIG_INTROS: Record<string, string> = {
   // Trạm úy Thanh Lộ (D7 #755): NPC mới giao việc hằng ngày Hắc Phong, chốt chặn giữ dòng giới thiệu
   tran_uy:
     "Thanh Lộ Trạm là cửa ngõ duy nhất xuyên Hắc Phong Cốc, ta giữ con đường này bao năm bằng máu và nanh thú.",
+  // Thợ rèn Tuyết Đao (D1 #1466 lát A2): NPC mới bộ V Hóa Thần, chốt chặn giữ dòng giới thiệu khi mở rộng lời thoại
+  tho_ren_tuyet_dao:
+    "Lò Tuyết Đao Quan nhóm lửa giữa gió thảo nguyên. Da Lang Hoang, nanh trăng, cốt Lang Vương: mang tới đây, thêm chút Linh thạch tiền than, ta rèn đồ Hóa Thần.",
+  // Ba NPC giao việc phụ Tuyết Đao Quan (#1465 giai đoạn 2 lát 1): chốt chặn giữ dòng giới thiệu khi mở rộng lời thoại
+  quan_uy_tuyet_dao:
+    "Tuyết Đao Quan giữ cửa bắc Lang Hoang, sau lưng là đất thú. Ai qua ải cũng phải ghi tên, kể cả tu sĩ Hóa Thần.",
+  lai_buon_tuyet_dao:
+    "Ta buôn qua lại Hàn Vân và Kinh Đô nhiều năm rồi, năm nào phí qua ải cũng tăng.",
+  do_thap_tam_nuong:
+    "Đỗ Thập Tam Nương. Con thứ mười ba nhà thợ săn. Ngươi có rượu không? Không có thì ta mời.",
   // Bàn phù (nghề nhỏ lát 2, #817): chốt chặn giữ dòng giới thiệu của NPC mới không đổi khi mở rộng lời thoại
   lao_phu:
     "Bàn phù ta nhóm hương trầm cả ngày, vẽ phù trấn yêu cho kẻ qua lại. Mang nguyên liệu yêu thú tới, ta chế phù cho đạo hữu.",

@@ -8,7 +8,15 @@ import {
   roomNameOf,
   wrongMapMessage,
 } from "./travel";
-import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, MAPS, HAN_VAN_ID } from "./map";
+import {
+  AM_SUONG_ID,
+  DEFAULT_MAP_ID,
+  HAC_PHONG_ID,
+  MAPS,
+  HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
+} from "./map";
 import { ROOM_NAME } from "./game";
 import { NPCS, npcsOfMap } from "./npcs";
 
@@ -73,12 +81,21 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       "lai_buon_han",
       "tho_ren_han",
     ]);
+    // Lang Hoang: thợ rèn Tuyết Đao (bộ V Hóa Thần, D1 #1466 lát A2) + ba NPC giao việc phụ (#1465 giai đoạn 2 lát 1); Uy Vân Kinh chưa có NPC
+    expect(npcsOfMap(LANG_HOANG_ID).map((n) => n.id)).toEqual([
+      "tho_ren_tuyet_dao",
+      "quan_uy_tuyet_dao",
+      "lai_buon_tuyet_dao",
+      "do_thap_tam_nuong",
+    ]);
+    expect(npcsOfMap(UY_VAN_ID)).toEqual([]);
     // mọi NPC thuộc đúng một bản đồ có thật
     expect(
       npcsOfMap(DEFAULT_MAP_ID).length +
         npcsOfMap(HAC_PHONG_ID).length +
         npcsOfMap(AM_SUONG_ID).length +
-        npcsOfMap(HAN_VAN_ID).length,
+        npcsOfMap(HAN_VAN_ID).length +
+        npcsOfMap(LANG_HOANG_ID).length,
     ).toBe(NPCS.length);
     expect(npcsOfMap("constructor")).toEqual([]);
   });

@@ -1,5 +1,12 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
-import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, HAN_VAN_ID, TOWN_PX } from "./map";
+import {
+  AM_SUONG_ID,
+  DEFAULT_MAP_ID,
+  HAC_PHONG_ID,
+  HAN_VAN_ID,
+  LANG_HOANG_ID,
+  TOWN_PX,
+} from "./map";
 import type { CraftStation } from "./craft-station";
 
 export interface NpcDef {
@@ -229,6 +236,74 @@ export const NPCS: NpcDef[] = [
       "Một thanh niên tuấn tú phe phẩy quạt ghé lò xem kiếm, xưng Yến Bắc Quy, bảo kẻ có mắt tốt sớm muộn cũng cần một tri kỷ như hắn.",
     ],
     color: 0x5a3a6a,
+  },
+  // Tuyết Đao Quan (Lang Hoang, D1 #1466 lát A2): thợ rèn bộ V. Tâm trạm (2048, 3136), r 160 px; đứng bên phải tâm (+130, +30) như thợ rèn Lạc Hà (ô đi lại được, trong trạm: `data-integrity.test.ts` giữ).
+  // Nhân vật GỐC Tiên Giới (`docs/KICH_BAN_CHUONG_5_6.md` mục 3.1); ảnh TẠM tái dùng ảnh thợ rèn Hàn Vân (B vẽ riêng sau).
+  {
+    id: "tho_ren_tuyet_dao",
+    mapId: LANG_HOANG_ID,
+    name: "Đồng Lão Thiết",
+    title: "Thợ rèn Tuyết Đao",
+    x: 2178,
+    y: 3166,
+    dialog: [
+      "Lò Tuyết Đao Quan nhóm lửa giữa gió thảo nguyên. Da Lang Hoang, nanh trăng, cốt Lang Vương: mang tới đây, thêm chút Linh thạch tiền than, ta rèn đồ Hóa Thần.",
+      "Đồ tốt kén người: chưa tới Hóa Thần thì mặc vào cũng chẳng chịu nổi.",
+      "Hồn tinh Thiên Lang chỉ có ở sói già nhất bãi. Hạ được con ấy là có thứ ta cần nhất để rèn một thanh kiếm ra hồn.",
+      "Lửa lò ta phải nhóm gấp đôi dưới Hàn Vân mới chịu được gió bắc thảo nguyên này.",
+      "Sói ở đây không như sói dưới Hàn Vân: đòn nặng, chạy nhanh, hú một tiếng là cả bầy kéo tới. Mặc đủ đồ rồi hẵng đi sâu.",
+    ],
+    color: 0x6a4a3a,
+  },
+  // Tuyết Đao Quan (Lang Hoang, #1465 giai đoạn 2 lát 1; `docs/KICH_BAN_CHUONG_5_6.md` mục 3.1): ba NPC giao việc phụ. Tâm trạm (2048, 3136), r 160 px;
+  // nhân vật GỐC Tiên Giới (Ngô Cự, Chu Bách Lượng) và Đỗ Thập Tam Nương (nhân vật nguồn, dòng giới thiệu là lời gặp nguyên văn). Ảnh TẠM (B vẽ riêng sau).
+  {
+    id: "quan_uy_tuyet_dao",
+    mapId: LANG_HOANG_ID,
+    name: "Ngô Cự",
+    title: "Quan úy Tuyết Đao",
+    x: 2048,
+    y: 3016,
+    dialog: [
+      "Tuyết Đao Quan giữ cửa bắc Lang Hoang, sau lưng là đất thú. Ai qua ải cũng phải ghi tên, kể cả tu sĩ Hóa Thần.",
+      "Ba đêm nay lang mẹ kéo tới chân ải, đứng nhìn về phía nam rồi đào đất. Binh của ta không dám bắn.",
+      "Sử chép thú triều tràn khỏi Lang Lĩnh. Ta giữ ải mười năm, chưa thấy con lang nào đánh vào.",
+      "Cổng nam xuống Hàn Vân Lĩnh, cổng bắc lên Uy Vân Kinh. Qua cổng nào cũng mang đủ đan, ải này không phát đan.",
+      "Lính ải thiếu người mà thiếu cả lương. Ai hạ giúp ta mấy con sói đen quấy quanh ải thì ta nhớ ơn.",
+    ],
+    color: 0x4a5a7a,
+  },
+  {
+    id: "lai_buon_tuyet_dao",
+    mapId: LANG_HOANG_ID,
+    name: "Chu Bách Lượng",
+    title: "Lái buôn qua ải",
+    x: 1928,
+    y: 3156,
+    dialog: [
+      "Ta buôn qua lại Hàn Vân và Kinh Đô nhiều năm rồi, năm nào phí qua ải cũng tăng.",
+      "Phí qua ải tính theo tu vi: người càng mạnh, ải càng thu nhiều. Thế đạo bây giờ vậy.",
+      "Da sói, nanh trăng ngoài bãi, thợ rèn Tuyết Đao nhận hết. Ta chỉ thiếu tiền nộp cho đủ phí ải.",
+      "Xe lương chở thịt khô lên bắc năm nay nhiều hơn mọi năm. Chở cho ai thì không ai dám hỏi.",
+      "Đừng tin thương nhân nào nói đường bắc yên ổn. Kể cả ta.",
+    ],
+    color: 0x8a6a3a,
+  },
+  {
+    id: "do_thap_tam_nuong",
+    mapId: LANG_HOANG_ID,
+    name: "Đỗ Thập Tam Nương",
+    title: "Tán tu",
+    x: 1948,
+    y: 3066,
+    dialog: [
+      "Đỗ Thập Tam Nương. Con thứ mười ba nhà thợ săn. Ngươi có rượu không? Không có thì ta mời.",
+      "Cây cung này cao hơn ta, ba năm rồi vẫn chưa kéo đủ. Cứ nhìn đi, rồi sẽ có ngày nó nghe lời.",
+      "Tán tu như ta không có tông môn che lưng. Qua ải phải tự lo, hàng lậu cũng phải tự mang.",
+      "Thiên hạ cười tán tu chỉ đáng làm bia cho người ta. Ta muốn cho họ thấy tán tu cũng lên được.",
+      "Sói Lang Hoang không giống sói ở quê ta. Có con đứng yên nhìn ta giương cung, rồi quay đi như đã biết hết.",
+    ],
+    color: 0x6a8a5a,
   },
   {
     // Cổng vào bí cảnh (docs/THIET_KE_BI_CANH.md): chỉ đội trưởng mở được, nút do server dựng theo điều kiện của đội

@@ -1202,6 +1202,81 @@ export const QUESTS: QuestDef[] = [
       complete: ["Túi độc còn tươi, tốt lắm."],
     },
   },
+
+  // ---------- Việc phụ ở Tuyết Đao Quan (Lang Hoang, #1465 giai đoạn 2 lát 1; `docs/KICH_BAN_CHUONG_5_6.md` mục 3.3) ----------
+  // Ba việc phụ Hóa Thần, KHÔNG thuộc chuỗi chính (chuỗi chính chương 5 vào sau, cùng trùm Thiên Lang Vương ở D1 lát B). Thưởng tu vi một lần theo sàn 2 % thanh bậc nhận
+  // (`kim-dan-world.test.ts`); đan thưởng là loại hồi cao nhất hiện có (đan riêng Hóa Thần chưa có). Quái ở bãi Lang Hoang, vật thu từ chính quái đó.
+  {
+    id: "lh_phi_qua_ai",
+    title: "Phí qua ải",
+    giver: "lai_buon_tuyet_dao",
+    desc: "Việc phụ (không bắt buộc): hạ 15 Dã Lang và mang về 8 Da Lang Hoang để thương nhân nộp đủ phí qua ải.",
+    steps: [
+      { kind: "kill", monster: "da_lang", count: 15 },
+      { kind: "collect", itemId: "bi_lang_hoang", count: 8 },
+    ],
+    rewards: { exp: 36000, items: [{ itemId: "thuong_hoi_huyet_dan", qty: 4 }] },
+    minRealm: { realm: 5, tier: 0 },
+    talk: {
+      offer: [
+        "Phí qua ải năm nay đòi theo tu vi, ta nộp thiếu thì hàng bị giữ lại. Da sói thợ rèn nhận được, bán đi là đủ phí.",
+        "Hạ mười lăm con Dã Lang, gom tám tấm da mang về cho ta. Dã Lang gồng một nhịp rồi lao, thấy đất sáng thì bước ngang.",
+      ],
+      progress: [
+        "Dã Lang đi đàn, đừng đứng giữa bầy. Kéo từng con ra rìa mà đánh, da mới không rách.",
+      ],
+      complete: [
+        "Đủ da rồi. Ta nộp phí xong là qua ải ngay. Cầm lấy đan này, coi như tiền công khiêng giúp.",
+      ],
+    },
+  },
+  {
+    id: "lh_hang_lau",
+    title: "Hàng lậu qua ải",
+    giver: "do_thap_tam_nuong",
+    desc: "Việc phụ (không bắt buộc): hạ 12 Hắc Phong Lang, gom 8 Nanh Trăng rồi đưa hàng tới Quan úy Ngô Cự cho qua ải.",
+    steps: [
+      { kind: "kill", monster: "hac_phong_lang", count: 12 },
+      { kind: "collect", itemId: "nanh_nguyet", count: 8 },
+      { kind: "talk", npcId: "quan_uy_tuyet_dao" },
+    ],
+    rewards: { exp: 36000, items: [{ itemId: "thuong_hoi_linh_dan", qty: 4 }] },
+    minRealm: { realm: 5, tier: 0 },
+    talk: {
+      offer: [
+        "Có người nhờ ta mang một bọc nanh qua ải, bên kia trả công hậu. Lính ải không lục túi tu sĩ Hóa Thần, ta thì chưa đủ vai vế.",
+        "Ngươi hạ mười hai con Hắc Phong Lang, gom tám chiếc Nanh Trăng, đưa tới Quan úy Ngô Cự giúp ta. Công chia đôi.",
+      ],
+      progress: [
+        "Hắc Phong Lang bắn đạn gió từ xa, né ngang chứ đừng chạy thẳng. Nanh thì phải đủ tám mới có bọc để mang.",
+      ],
+      complete: ["Ngô Cự gật đầu cho qua là xong. Cầm lấy đan này, ta không nợ ngươi gì nữa."],
+    },
+  },
+  {
+    id: "lh_linh_ai_sach_nhieu",
+    title: "Lính ải sách nhiễu",
+    giver: "quan_uy_tuyet_dao",
+    desc: "Việc phụ (không bắt buộc): hạ 15 Huyết Nguyệt Lang quấy quanh ải và mang về 6 Nanh Trăng để đỡ tiền thuế cho lính.",
+    steps: [
+      { kind: "kill", monster: "huyet_nguyet_lang", count: 15 },
+      { kind: "collect", itemId: "nanh_nguyet", count: 6 },
+    ],
+    rewards: { exp: 41000, items: [{ itemId: "thuong_hoi_huyet_dan", qty: 5 }] },
+    minRealm: { realm: 5, tier: 1 },
+    talk: {
+      offer: [
+        "Đàn sói đỏ quanh ải làm lính ta không dám ra gác đêm, có kẻ còn nhân lúc đó đòi tiền qua ải gấp ba. Dẹp bớt sói thì ải đỡ loạn.",
+        "Hạ mười lăm con Huyết Nguyệt Lang, mang về sáu chiếc Nanh Trăng. Nanh đó ta đổi lương cho lính.",
+      ],
+      progress: [
+        "Huyết Nguyệt Lang gồng lâu hơn Dã Lang, đòn cũng nặng hơn. Đừng đánh lúc máu mình dưới nửa.",
+      ],
+      complete: [
+        "Lính ta có thịt khô qua mùa lạnh rồi. Ải này nhớ ơn ngươi. Đan này là phần của ta.",
+      ],
+    },
+  },
 ];
 
 export const QUEST_BY_ID: Record<string, QuestDef> = Object.fromEntries(

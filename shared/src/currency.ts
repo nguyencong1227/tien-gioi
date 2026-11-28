@@ -72,6 +72,15 @@ export const ITEM_VALUE: Record<string, number> = {
   han_vu_kiem: 15000,
   han_lang_bao: 12000,
   phong_nha_phu: 12000,
+  // Nguyên liệu Hóa Thần của Lang Hoang (D1 lát A2): ~x2,8 loài Nguyên Anh cùng vai (KHUNG mục 3); hồn tinh ~x2,8 Thiên Hàn châu
+  bi_lang_hoang: 380,
+  nanh_nguyet: 380,
+  cot_lang_vuong: 500,
+  hon_tinh_thien_lang: 5000,
+  // Bộ V Hóa Thần (D1 lát A2): ~x2,8 bộ IV, luôn thấp hơn phí rèn + nguyên liệu
+  kiem_nanh_nguyet: 42000,
+  bao_huyet_nguyet: 33600,
+  phu_hon_thien_lang: 33600,
   // Đồ ba ô riêng của chủ (M7.4, `owner-gear.ts`)
   ...OWNER_GEAR_VALUE,
   // Kinh quyển 12 chiêu (M7.4, `books.ts`)
@@ -173,14 +182,14 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   cot_tuong: { chance: 0.8, min: 200, max: 400 },
   doc_tuoc: { chance: 0.9, min: 230, max: 430 },
   thien_han_vuong: { chance: 1, min: 900, max: 1470 }, // trùm: chia cho đội
-  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): khoảng x2,8 thu nhập Nguyên Anh cùng vai (`docs/KHUNG_HOA_THAN.md` mục 3), giữ thứ tự theo `exp` (`currency.test.ts`: loài chưa sinh xếp chung nhóm
-  // "bi_canh" với trùm bí cảnh, nên trung bình phải >= Linh Hư Yêu Vương 400). Số khởi đầu, lát A3 hiệu chỉnh theo `docs/CAN_BANG.md`.
-  da_lang: { chance: 0.8, min: 330, max: 720 },
-  hac_phong_lang: { chance: 0.8, min: 360, max: 760 },
-  huyet_nguyet_lang: { chance: 0.8, min: 370, max: 770 },
-  xich_diem_lang: { chance: 0.9, min: 550, max: 900 },
-  thuong_nguyet_lang: { chance: 0.8, min: 800, max: 1200 },
-  ngan_nguyet_lang: { chance: 0.9, min: 850, max: 1300 },
+  // Sói Hóa Thần của Lang Hoang (D1 #1466 lát A1 / A3): thu nhập ~x2,8-3,6 Nguyên Anh cùng vai (`docs/KHUNG_HOA_THAN.md` mục 3; đo ở `docs/CAN_BANG.md` mục "Hóa Thần sau nội dung"), giữ thứ tự theo `exp`
+  // trong cùng bản đồ (`currency.test.ts`: bản đồ nhà = Lang Hoang từ lát A3).
+  da_lang: { chance: 0.8, min: 250, max: 540 },
+  hac_phong_lang: { chance: 0.8, min: 270, max: 570 },
+  huyet_nguyet_lang: { chance: 0.8, min: 280, max: 580 },
+  xich_diem_lang: { chance: 0.9, min: 410, max: 680 },
+  thuong_nguyet_lang: { chance: 0.8, min: 600, max: 900 },
+  ngan_nguyet_lang: { chance: 0.9, min: 640, max: 980 },
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */

@@ -2,7 +2,7 @@
 
 > File này **SINH TỰ ĐỘNG** từ `server/src/balance/so-tay-chieu.ts`, đọc dữ liệu thật ở `shared/` (`LEARNABLE_SKILLS`, `DROP_TABLES`,
 > `SHOPS`, `SECT_SHOP`, `QUESTS`, ...). Sau khi sửa số liệu chiêu / rơi đồ / cửa hàng / tông môn / nhiệm vụ, chạy `npm run so-tay-chieu -w server` để cập nhật;
-> test `server/src/balance/so-tay-chieu-sync.test.ts` bắt tài liệu lệch bản sinh. Trạng thái: **87 chiêu** trên 10 hệ.
+> test `server/src/balance/so-tay-chieu-sync.test.ts` bắt tài liệu lệch bản sinh. Trạng thái: **90 chiêu** trên 10 hệ.
 
 ---
 
@@ -13,7 +13,7 @@
 > - **Hiệu ứng** = tên trạng thái, thời gian, (cường độ: nghĩa ghi ngay trong ngoặc theo loại trạng thái), rồi xác suất gắn khi dưới 100%.
 > - **Cách có được** gồm bốn nguồn: _Bán ở_ (cửa hàng NPC, giá bằng Linh thạch), _Rơi từ_ (quái, tỉ lệ %), _Đổi ở_ (Tàng Kinh Các / Bảo khố tông môn, giá bằng cống hiến và cấp tông tối thiểu), _Thưởng nhiệm vụ_.
 
-### Kim (9 chiêu)
+### Kim (10 chiêu)
 
 | Chiêu | ID | Cảnh giới | Phẩm | Hình | Hồi chiêu | Hiệu ứng | Cách có được |
 |---|---|---|---|---|---|---|---|
@@ -26,6 +26,7 @@
 | **Thu Thủy Kiếm Ảnh** | `thu_thuy_kiem_anh` | Kim Đan | Huyền | Quạt trước mặt | 5s | Chảy máu 3s (25% sát thương gốc mỗi giây), xác suất 50% | Rơi từ Sương Hồ 1,2% |
 | **Bạch Kim Trảo** | `bach_kim_trao` | Nguyên Anh | Huyền | Quạt trước mặt | 3,2s | Chảy máu 4,5s (18% sát thương gốc mỗi giây), xác suất 55% | Rơi từ Hàn Lang 1,5%; Đổi ở Tàng Kinh Các tông môn (56 cống hiến, từ cấp tông 4); Thưởng nhiệm vụ "Rèn trảo bạch kim" |
 | **Vạn Kiếm Quy Tông** | `van_kiem_quy_tong` | Nguyên Anh | Địa | Toả nhiều tia | 5s | Vỡ giáp 3s (nhận thêm 10% sát thương), xác suất 40% | Rơi từ Phong Nha 0,8% |
+| **Tâm Kiếm Vô Hình** | `tam_kiem_vo_hinh` | Hóa Thần | Địa | Tia thẳng | 4,5s | Chảy máu 3s (15% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Thương Nguyệt Lang 0,6%, Ngân Nguyệt Lang 1% |
 
 ### Mộc (9 chiêu)
 
@@ -54,7 +55,7 @@
 | **Huyết Ti Phược Thân** | `huyet_ti_phuoc_than` | Nguyên Anh | Địa | Quạt trước mặt | 7s | Choáng 0,75s, xác suất 60%; Suy Yếu 3s (gây ít hơn 15% sát thương, trùm chỉ chịu một nửa), xác suất 60% | Rơi từ Hàn Lang 0,6% |
 | **Nộ Đào Bài Không** | `no_dao_bai_khong` | Nguyên Anh | Địa | Quạt trước mặt | 5s | — | Rơi từ Hàn Lang 0,6% |
 
-### Hỏa (13 chiêu)
+### Hỏa (14 chiêu)
 
 | Chiêu | ID | Cảnh giới | Phẩm | Hình | Hồi chiêu | Hiệu ứng | Cách có được |
 |---|---|---|---|---|---|---|---|
@@ -71,8 +72,9 @@
 | **Huyết Mang Phá Giáp** | `huyet_mang_pha_giap` | Nguyên Anh | Địa | Quạt trước mặt | 5s | Chảy máu 3s (25% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Phong Nha 0,5% |
 | **Phượng Minh Cầu Hoàng** | `phuong_minh_cau_hoang` | Nguyên Anh | Địa | Quạt trước mặt | 7s | Choáng 0,9s, xác suất 70%; Bỏng 3s (20% sát thương gốc mỗi giây), xác suất 50% | Rơi từ Độc Tước 0,6% |
 | **Liệt Hỏa Kiếm** | `liet_hoa_kiem` | Nguyên Anh | Địa | Quạt trước mặt | 3,5s | Bỏng 4,5s (20% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Độc Tước 1,8%, Thiên Hàn Vương 25%; Đổi ở Tàng Kinh Các tông môn (92 cống hiến, từ cấp tông 5) |
+| **Xích Luyện Đoạn Hồn** | `xich_luyen_doan_hon` | Hóa Thần | Địa | Quạt trước mặt | 5,5s | Chảy máu 4,5s (20% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Huyết Nguyệt Lang 0,6%, Xích Diễm Lang 1% |
 
-### Thổ (10 chiêu)
+### Thổ (11 chiêu)
 
 | Chiêu | ID | Cảnh giới | Phẩm | Hình | Hồi chiêu | Hiệu ứng | Cách có được |
 |---|---|---|---|---|---|---|---|
@@ -86,6 +88,7 @@
 | **Chướng Vụ Phong Lâm** | `chuong_vu_phong_lam` | Nguyên Anh | Địa | Quạt trước mặt | 5,5s | Độc 4,5s (25% sát thương gốc mỗi giây), xác suất 60% | Rơi từ Phong Nha 0,8% |
 | **Phá Sơn Nhất Kích** | `pha_son_nhat_kich` | Nguyên Anh | Địa | Vùng đặt xuống đất | 9s | Choáng 1,2s, xác suất 70%; Vỡ giáp 3s (nhận thêm 15% sát thương), xác suất 60% | Rơi từ Cốt Tượng 0,6% |
 | **Vân Thạch Trận** | `van_thach_tran` | Nguyên Anh | Địa | Vùng đặt xuống đất | 7s | Choáng 1,05s, xác suất 70%; Vỡ giáp 3s (nhận thêm 12% sát thương), xác suất 55% | Rơi từ Cốt Tượng 2%; Đổi ở Tàng Kinh Các tông môn (84 cống hiến, từ cấp tông 5) |
+| **Thái Sơn Áp Đỉnh** | `thai_son_ap_dinh` | Hóa Thần | Địa | Vùng đặt xuống đất | 7,5s | Choáng 1,05s, xác suất 80%; Vỡ giáp 3s (nhận thêm 12% sát thương), xác suất 50% | Rơi từ Thương Nguyệt Lang 1,2% |
 
 ### Băng (8 chiêu)
 
@@ -155,19 +158,19 @@
 
 > Số chiêu của mỗi hệ ở mỗi cảnh giới yêu cầu. Ô trống (–) là hệ chưa có chiêu nào đòi cảnh giới đó — dùng để chọn lô chiêu kế tiếp.
 
-| Hệ \ Cảnh giới | Phàm Nhân | Luyện Khí | Trúc Cơ | Kim Đan | Nguyên Anh | Tổng |
-|---|---:|---:|---:|---:|---:|---:|
-| Kim | – | 3 | 2 | 2 | 2 | 9 |
-| Mộc | – | 1 | 5 | 2 | 1 | 9 |
-| Thủy | – | 2 | 2 | 2 | 2 | 8 |
-| Hỏa | – | 6 | 1 | 3 | 3 | 13 |
-| Thổ | – | 3 | 2 | 2 | 3 | 10 |
-| Băng | – | 1 | 3 | 1 | 3 | 8 |
-| Phong | – | 2 | 1 | 2 | 2 | 7 |
-| Lôi | – | – | 2 | 3 | 3 | 8 |
-| Âm | – | 1 | 2 | 1 | 3 | 7 |
-| Vô sắc | – | 1 | 2 | 2 | 3 | 8 |
-| **Tổng** | 0 | 20 | 22 | 20 | 25 | 87 |
+| Hệ \ Cảnh giới | Phàm Nhân | Luyện Khí | Trúc Cơ | Kim Đan | Nguyên Anh | Hóa Thần | Tổng |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Kim | – | 3 | 2 | 2 | 2 | 1 | 10 |
+| Mộc | – | 1 | 5 | 2 | 1 | – | 9 |
+| Thủy | – | 2 | 2 | 2 | 2 | – | 8 |
+| Hỏa | – | 6 | 1 | 3 | 3 | 1 | 14 |
+| Thổ | – | 3 | 2 | 2 | 3 | 1 | 11 |
+| Băng | – | 1 | 3 | 1 | 3 | – | 8 |
+| Phong | – | 2 | 1 | 2 | 2 | – | 7 |
+| Lôi | – | – | 2 | 3 | 3 | – | 8 |
+| Âm | – | 1 | 2 | 1 | 3 | – | 7 |
+| Vô sắc | – | 1 | 2 | 2 | 3 | – | 8 |
+| **Tổng** | 0 | 20 | 22 | 20 | 25 | 3 | 90 |
 
 > Cột Phàm Nhân: chưa có chiêu nào đòi cảnh giới này.
 

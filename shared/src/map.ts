@@ -698,8 +698,16 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toPortal: "uy_van_nam",
       },
     ],
-    // CHƯA có quái: loài Hóa Thần (Thiên Lang Vương và đàn) do D1 (#1466) thêm sau A1. Cổng bắc tới Uy Vân Kinh đã có từ A2 lát 2. Không có `monsterCap` thì không sinh quái tự nhiên.
-    monsterCap: {},
+    // Sáu loài sói Hóa Thần (D1 #1466 lát A3; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3 / 6): tổng 62, vùng sinh tăng dần theo `minDanger` (0,15 / 0,30 / 0,45 / 0,60 / 0,72 / 0,85, tăng cùng `exp`).
+    // CHƯA có trùm (Thiên Lang Vương, Lang Vương: lát B, cộng 2 con thành 64) và chưa có NPC giao việc (E2). Phải khớp thuộc tính `monsterCap` trong `shared/maps/lang_hoang.json` (test "sổ đăng ký khớp tệp").
+    monsterCap: {
+      da_lang: 16,
+      hac_phong_lang: 12,
+      huyet_nguyet_lang: 10,
+      xich_diem_lang: 12,
+      thuong_nguyet_lang: 4,
+      ngan_nguyet_lang: 8,
+    },
   },
   {
     id: UY_VAN_ID,
