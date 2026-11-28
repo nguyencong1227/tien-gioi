@@ -88,6 +88,8 @@ describe("e2e:all - Bộ chạy toàn diện E2E (M7.16, Issue #694)", () => {
         "hud",
         "equip-six",
         "skill-book",
+        "pwa",
+        "net-slow",
       ];
       for (const n of batch) {
         expect(realPkg.scripts[`e2e:${n}`], `thiếu e2e:${n}`).toBe(

@@ -83,6 +83,8 @@
     "e2e:book-bag": "node ../client/scripts/check-book-bag.mjs",
     "e2e:status-speed": "node ../client/scripts/check-status-speed.mjs",
     "e2e:tap-hold": "node ../client/scripts/check-tap-hold.mjs",
+    "e2e:pwa": "node ../client/scripts/check-pwa.mjs",
+    "e2e:net-slow": "node ../client/scripts/check-net-slow.mjs",
     "e2e:hud": "node ../client/scripts/check-hud.mjs",
     "e2e:equip-six": "node ../client/scripts/check-equip-six.mjs",
     "e2e:skill-book": "node ../client/scripts/check-skill-book.mjs",
