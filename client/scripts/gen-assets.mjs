@@ -2314,13 +2314,21 @@ function buildAtlas() {
     for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
 
-  // Hai TRÙM Lang Hoang (D1 #1466 lát B): CHƯA có ảnh riêng; dùng BÍ DANH tới khung Hàn Lang (sói băng xanh, cùng họ, cùng cỡ; trùm nhỏ) và Thiên Hàn Vương (trùm cùng cỡ 88x80),
+  // Hai TRÙM Lang Hoang (D1 #1466 lát B) và sáu quái Uy Vân Kinh (lát A1 chương 6): CHƯA có ảnh riêng; dùng BÍ DANH tới khung Hàn Lang (sói băng xanh, cùng họ, cùng cỡ; trùm nhỏ) và Thiên Hàn Vương (trùm cùng cỡ 88x80),
   // KHÔNG thêm điểm ảnh (tiền lệ Thanh Xà ở #1559 chép khung nên atlas phình). Sáu sói thường đã có tranh riêng (`drawWolf`, B #1579) nên KHÔNG ở đây. B vẽ riêng từng trùm thì thêm block
   // `if (id === "<loài>")` trong `drawMonsterFrame`, chuyển loài đó sang danh sách chính ở trên và GỠ khỏi khối bí danh này.
   const monAliasSuffixes = ["", "-0", "-1", ...MONSTER_POSES.map((pose) => `-${pose}`)];
   for (const [mId, target] of [
     ["lang_vuong", "han_lang"],
     ["thien_lang_vuong", "thien_han_vuong"],
+    // Sáu quái Hóa Thần của Uy Vân Kinh (D1 #1466 lát A1 chương 6): atlas chính đã ~1872 / 2048 hàng nên KHÔNG thêm khung (B làm atlas Hóa Thần riêng); mượn khung có sẵn theo vai / cỡ,
+    // tới khi gói riêng có hình: Gồng lao -> Cốt Tượng (người xương) / Sương Hồ (bóng đói), Dày -> Thạch Quy, đạn độc -> Độc Tước / Độc Thiềm, bắn đạn -> Phong Nha
+    ["luyen_huyet_de_tu", "cot_tuong"],
+    ["nga_quy", "suong_ho"],
+    ["cuong_thi", "thach_quy"],
+    ["huyet_mi", "doc_tuoc"],
+    ["huyet_anh", "phong_nha"],
+    ["huyet_sat_chan_truyen", "doc_thiem"],
   ])
     for (const suffix of monAliasSuffixes)
       pushAlias(`mon-${mId}${suffix}`, `mon-${target}${suffix}`);

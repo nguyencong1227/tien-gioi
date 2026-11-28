@@ -46,11 +46,11 @@ Hệ ghi theo `he` của nguồn; `MonsterKind.element` (kiểu `Element` ở `s
 
 | id dự kiến | Tên (nguồn) | Hệ | Vai | Cấp | `minDanger` | Số | Nét chiến đấu | Khoá nguồn |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |
-| `luyen_huyet_de_tu` | Luyện Huyết Đệ Tử | hỏa | Gồng lao x0,9 | 19 | 0,15 | 16 | cận chiến người, móng nhuộm đỏ, **huyết tế** (tự hồi một ít khi trúng) | `enemy.luyen_huyet_de_tu` |
-| `nga_quy` | Ngạ Quỷ | hỏa | Gồng lao x0,85 (máu thấp, đàn đông) | 19 | 0,25 | 12 | lửa xanh, **oán niệm triền thân** (giảm tốc ngắn), bám đuổi | `enemy.nga_quy` |
-| `cuong_thi` | Cương Thi | thổ | Dày x0,95 | 20 | 0,40 | 10 | da cứng, **thi độc trảo** (độc), chậm | `enemy.cuong_thi` |
-| `huyet_mi` | Huyết Mị | hỏa | Đòn nặng + độc x0,9 | 20 | 0,55 | 10 | **phế huyết trảo**, **huyết chú** (độc / chảy máu), bám theo mùi máu | `enemy.huyet_mi` |
-| `huyet_anh` | Huyết Ảnh | hỏa | Bắn đạn x1,0 | 20 | 0,70 | 8 | **phân quang** (đạn), **huyết hải phiên đào** (vòng lớn, báo trước dài) | `enemy.huyet_anh` |
+| `luyen_huyet_de_tu` | Luyện Huyết Đệ Tử | hỏa | Gồng lao x0,9 | 19 | 0,30 | 16 | cận chiến người, móng nhuộm đỏ, **huyết tế** (tự hồi một ít khi trúng) | `enemy.luyen_huyet_de_tu` |
+| `nga_quy` | Ngạ Quỷ | hỏa | Gồng lao x0,85 (máu thấp, đàn đông) | 19 | 0,15 | 12 | lửa xanh, **oán niệm triền thân** (giảm tốc ngắn), bám đuổi | `enemy.nga_quy` |
+| `cuong_thi` | Cương Thi | thổ | Dày x0,95 | 20 | 0,60 | 10 | da cứng, **thi độc trảo** (độc), chậm | `enemy.cuong_thi` |
+| `huyet_mi` | Huyết Mị | hỏa | Đòn nặng + độc x0,9 | 21 | 0,70 | 10 | **phế huyết trảo**, **huyết chú** (độc / chảy máu), bám theo mùi máu | `enemy.huyet_mi` |
+| `huyet_anh` | Huyết Ảnh | hỏa | Bắn đạn x1,0 | 20 | 0,45 | 8 | **phân quang** (đạn), **huyết hải phiên đào** (vòng lớn, báo trước dài) | `enemy.huyet_anh` |
 | `huyet_sat_chan_truyen` | Huyết Sát Chân Truyền | hỏa | Đòn nặng + độc x1,1 | 21 | 0,82 | 6 | hút máu, **huyết vũ phiêu linh** (mưa), **huyết ảnh đoạt mệnh** (đòn nặng, báo trước) | `enemy.huyet_sat_chan_truyen` |
 
 | id dự kiến | Tên | Vai / số | Bộ chiêu (mô tả) | Nguồn |
@@ -117,7 +117,7 @@ Công thức đi qua `RECIPES` hiện có; giá bán theo `ITEM_VALUE` (không v
 1. **Lát A (quái thường + `monsterCap`; XONG: A1 #1573 khai báo, A2 #1576 nguyên liệu + bộ V + rèn, A3 cho sinh: 62 quái ở `lang_hoang`, báo cáo `hoa-than-kinh-te.ts`):** sáu loài Lang Hoang + `MONSTER_REALM` 5 + `monsterCap` + `DROP_TABLES` nguyên liệu; `can-bang` (`huntRate` / `huntFight` Hóa Thần), `so-tay-quai`, `check:content`, TOÀN BỘ `npm test`. **Phải có bộ V ở lát này** (mục 5.3) hoặc mô hình không săn nổi.
 2. **Lát B (trùm Thiên Lang Vương + Lang Vương; XONG ở nhánh `a/1466-lat-b`: bộ chiêu qua `bossViolations` + bot né hoàn hảo, rơi chắc nguyên liệu bộ V, `monsterCap` +2; "Yêu huyết tái sinh" (hồi máu) chưa có hình trong khung chiêu trùm nên để dành):** `bosses.ts` (bộ chiêu qua ba cổng `bossViolations`, bot né hoàn hảo `boss-data-dodge.test.ts`, `bossBalanceViolations`), `monsterCap`, `DROP_TABLES` trùm; `chan-duong.ts` (cảnh chặn đường Hóa Thần).
 3. **Lát C (sách chiêu Lang Hoang):** 3 sách (mục 5.2), `skillViolations`, `skill-kit.test`, `skills-dps.test`, `book-drop-realm.test`, icon + atlas.
-4. **Lát D, E, F:** như A, B, C cho Uy Vân Kinh.
+4. **Lát D, E, F:** như A, B, C cho Uy Vân Kinh. **Lát D1 (A1 chương 6) ĐÃ KHAI BÁO ở nhánh `a/1466-uy-van-quai`:** sáu loài thường (`uy-van-quai.test.ts`), CHƯA SINH, ảnh tạm là BÍ DANH tới khung có sẵn (atlas chính chạm trần, B làm atlas Hóa Thần riêng); `minDanger` đổi cho tăng cùng `exp` (0,15 / 0,30 / 0,45 / 0,60 / 0,70 / 0,82: Ngạ Quỷ nông nhất, Huyết Ảnh trước Cương Thi) và Huyết Mị cấp 21 (vai Đòn nặng). Còn: nguyên liệu `huyet_anh_tinh` + `manh_so_tran` + bộ V + rèn (lát D2), cho sinh (D3), trùm Huyết Ma Hộ Pháp + Huyết Hải Lão Ma (lát E), sách chiêu (lát F).
 5. **Đã có trước:** khung chiêu `SKILL_MULT_CAP` / `AMBUSH_FOE_LEVEL_CAP` tới bậc 9 (#1472); `expToNext` / `statsFor` tổng quát tới Độ Kiếp; không cần đổi công thức.
 6. Ghi nguồn (`NGUON_NOI_DUNG.md` mục 3), CREDITS (icon mới), CHANGELOG, cập nhật bảng việc `COT_TRUYEN.md` mục 9 (D1).
 7. Từ điển: thêm tên quái / vật phẩm mới (Thiên Lang Vương, Huyết Ma Hộ Pháp, Huyết Hải Lão Ma, Lang Vương, Thương Nguyệt Lang...) vào `shared/src/glossary.ts` + `docs/TU_DIEN_TIEN_GIOI.md` trong PR `shared/` riêng.

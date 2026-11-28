@@ -2,7 +2,7 @@
 
 > File này **SINH TỰ ĐỘNG** từ `server/src/balance/so-tay-quai.ts`, đọc dữ liệu thật ở `shared/` (`MONSTERS`, `DROP_TABLES`, `COIN_DROPS`, `ITEMS`, `MONSTER_REALM`, bản đồ).
 > Sau khi sửa số liệu quái / rơi đồ / bản đồ, chạy `npm run so-tay-quai -w server` để cập nhật; test `server/src/balance/so-tay-quai-sync.test.ts` bắt tài liệu lệch bản sinh.
-> Trạng thái: **25 quái**, **169 dòng rơi đồ**.
+> Trạng thái: **31 quái**, **181 dòng rơi đồ**.
 
 ---
 
@@ -30,9 +30,15 @@
 | **Độc Tước** | `doc_tuoc` | Thường | Nguyên Anh | 18 | 7050 | 512 | 2760 | 90% × 230-430 | Hàn Vân Lĩnh |
 | **Thiên Hàn Vương** | `thien_han_vuong` | Trùm | Nguyên Anh | 21 | 123000 | 240 | 38400 | 100% × 900-1470 | Hàn Vân Lĩnh |
 | **Dã Lang** | `da_lang` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 250-540 | Lang Hoang |
+| **Luyện Huyết Đệ Tử** | `luyen_huyet_de_tu` | Thường | Hóa Thần | 19 | 7035 | 418 | 7128 | 80% × 340-740 | — |
+| **Ngạ Quỷ** | `nga_quy` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 330-720 | — |
+| **Cương Thi** | `cuong_thi` | Thường | Hóa Thần | 20 | 30217 | 205 | 14706 | 80% × 550-900 | — |
 | **Hắc Phong Lang** | `hac_phong_lang` | Thường | Hóa Thần | 20 | 7170 | 516 | 8664 | 80% × 270-570 | Lang Hoang |
+| **Huyết Ảnh** | `huyet_anh` | Thường | Hóa Thần | 20 | 7547 | 543 | 9120 | 80% × 380-780 | — |
 | **Thương Nguyệt Lang** | `thuong_nguyet_lang` | Thường | Hóa Thần | 20 | 31807 | 216 | 15480 | 80% × 600-900 | Lang Hoang |
+| **Huyết Mị** | `huyet_mi` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 560-910 | — |
 | **Huyết Nguyệt Lang** | `huyet_nguyet_lang` | Thường | Hóa Thần | 21 | 8599 | 510 | 8712 | 80% × 280-580 | Lang Hoang |
+| **Huyết Sát Chân Truyền** | `huyet_sat_chan_truyen` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 850-1300 | — |
 | **Ngân Nguyệt Lang** | `ngan_nguyet_lang` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 640-980 | Lang Hoang |
 | **Xích Diễm Lang** | `xich_diem_lang` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 410-680 | Lang Hoang |
 | **Lang Vương** | `lang_vuong` | Trùm | Hóa Thần | 22 | 99500 | 190 | 103680 | 100% × 1100-1800 | Lang Hoang |
@@ -67,8 +73,8 @@
 | **Cốt Lang Vương** | `cot_lang_vuong` | Nguyên liệu | Tiên phẩm | Thương Nguyệt Lang 50%, Ngân Nguyệt Lang 30%, Lang Vương 80%, Thiên Lang Vương 100% |
 | **Hồn Tinh Thiên Lang** | `hon_tinh_thien_lang` | Nguyên liệu | Thần phẩm | Thương Nguyệt Lang 10%, Lang Vương 30%, Thiên Lang Vương 100% |
 | **Mảnh áo Liệt Dương** | `manh_ao_liet_duong` | Nguyên liệu | Tiên phẩm | Thiên Lang Vương 100% |
-| **Thượng Hồi Huyết Đan** | `thuong_hoi_huyet_dan` | Đan dược | Tiên phẩm | Hàn Lang 3%, Cốt Tượng 4%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 6%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 7%, Xích Diễm Lang 8%, Thương Nguyệt Lang 10%, Ngân Nguyệt Lang 10%, Lang Vương 60%, Thiên Lang Vương 100% |
-| **Thượng Hồi Linh Đan** | `thuong_hoi_linh_dan` | Đan dược | Tiên phẩm | Phong Nha 3%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 5%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 5%, Xích Diễm Lang 6%, Thương Nguyệt Lang 8%, Ngân Nguyệt Lang 8%, Lang Vương 50%, Thiên Lang Vương 100% |
+| **Thượng Hồi Huyết Đan** | `thuong_hoi_huyet_dan` | Đan dược | Tiên phẩm | Hàn Lang 3%, Cốt Tượng 4%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 6%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 7%, Xích Diễm Lang 8%, Thương Nguyệt Lang 10%, Ngân Nguyệt Lang 10%, Lang Vương 60%, Thiên Lang Vương 100%, Luyện Huyết Đệ Tử 6%, Ngạ Quỷ 6%, Cương Thi 8%, Huyết Mị 8%, Huyết Ảnh 7%, Huyết Sát Chân Truyền 10% |
+| **Thượng Hồi Linh Đan** | `thuong_hoi_linh_dan` | Đan dược | Tiên phẩm | Phong Nha 3%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 5%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 5%, Xích Diễm Lang 6%, Thương Nguyệt Lang 8%, Ngân Nguyệt Lang 8%, Lang Vương 50%, Thiên Lang Vương 100%, Luyện Huyết Đệ Tử 6%, Ngạ Quỷ 5%, Cương Thi 6%, Huyết Mị 6%, Huyết Ảnh 6%, Huyết Sát Chân Truyền 8% |
 | **Hỏa Vân Kiếm Pháp** | `kinh_hoa_van_kiem` | Kinh quyển | Linh phẩm | Hắc Hổ 1,2% |
 | **Bôn Thạch Quyền** | `kinh_bon_thach_quyen` | Kinh quyển | Linh phẩm | Hắc Hổ 1,2% |
 | **Thanh Tùng Châm Quyết** | `kinh_thanh_tung_phi_cham` | Kinh quyển | Bảo phẩm | Xích Mãng 25%, Độc Thiềm 2%, Phong Nha 2% |

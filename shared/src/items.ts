@@ -1221,6 +1221,31 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: bookIdOf("tam_kiem_vo_hinh"), chance: 0.2, min: 1, max: 1 },
     { itemId: bookIdOf("thai_son_ap_dinh"), chance: 0.2, min: 1, max: 1 },
   ],
+  // Quái Hóa Thần của Uy Vân Kinh (D1 #1466 lát A1 chương 6): CHƯA sinh. Bảng rơi TẠM chỉ có đan cấp 3 có sẵn; nguyên liệu riêng (Huyết Ảnh Tinh, Mảnh sổ huyết trận), bộ V và sách chiêu `reqRealm` 5 thêm ở các lát sau.
+  nga_quy: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
+  ],
+  luyen_huyet_de_tu: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  huyet_anh: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.07, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  cuong_thi: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  huyet_mi: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  huyet_sat_chan_truyen: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+  ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
   yeu_vuong: [

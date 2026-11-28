@@ -69,6 +69,13 @@ export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
   xich_diem_lang: 0xff7a3d, // cam lửa
   thuong_nguyet_lang: 0x9fd8c8, // xanh ngọc nhạt (lông sói già)
   ngan_nguyet_lang: 0xe8eef8, // bạc trăng
+  // Quái Hóa Thần của Uy Vân Kinh (D1 #1466 lát A1 chương 6): mỗi loài một màu, khác nhau và khác sáu sói Lang Hoang
+  luyen_huyet_de_tu: 0xd04848, // đỏ máu tươi (móng nhuộm đỏ)
+  nga_quy: 0x4fe0c0, // lửa xanh ngọc
+  cuong_thi: 0x8a9a6a, // xanh xám xác chết
+  huyet_mi: 0xe85a9a, // hồng máu (bóng thiếu nữ)
+  huyet_anh: 0xb03a52, // đỏ sẫm (bóng đỏ)
+  huyet_sat_chan_truyen: 0xff6a3a, // đỏ cam (huyết sát)
   lang_vuong: 0xff9a5a, // cam lửa sáng (trùm nhỏ Lang Hoang, D1 lát B)
   thien_lang_vuong: 0xf0f6ff, // bạc trắng phát sáng (trùm Lang Hoang)
 };
