@@ -195,6 +195,14 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   // Trùm Lang Hoang (D1 lát B): chia cho đội; giữ thứ tự theo `exp` (Lang Vương 103.680 < Thiên Lang Vương 230.400) và ~x2,8 Thiên Hàn Vương (900-1470)
   lang_vuong: { chance: 1, min: 1100, max: 1800 },
   thien_lang_vuong: { chance: 1, min: 2500, max: 4000 },
+  // Quái Hóa Thần của Uy Vân Kinh (D1 #1466 lát A1 chương 6): CHƯA sinh nên (như sói Lang Hoang lúc A1) xếp chung nhóm "bi_canh" với trùm bí cảnh: trung bình mỗi con phải >= Linh Hư Yêu Vương 400.
+  // Giữ thứ tự theo `exp` (nga_quy 6.732 < luyen_huyet_de_tu 7.128 < huyet_anh 9.120 < cuong_thi 14.706 < huyet_mi 14.904 < huyet_sat_chan_truyen 18.216). Số khởi đầu, lát cho sinh hiệu chỉnh theo `docs/CAN_BANG.md`.
+  nga_quy: { chance: 0.8, min: 330, max: 720 },
+  luyen_huyet_de_tu: { chance: 0.8, min: 340, max: 740 },
+  huyet_anh: { chance: 0.8, min: 380, max: 780 },
+  cuong_thi: { chance: 0.8, min: 550, max: 900 },
+  huyet_mi: { chance: 0.9, min: 560, max: 910 },
+  huyet_sat_chan_truyen: { chance: 0.9, min: 850, max: 1300 },
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */
