@@ -177,6 +177,9 @@ try {
     await evalJs(`(() => { const sc = window.__scene; window.__casts = [];
       const orig = sc.room.send.bind(sc.room);
       sc.room.send = (t, d) => { if (t === "cast") window.__casts.push(d); return orig(t, d); };
+      window.__toasts = [];
+      const tEl = document.getElementById('toast');
+      new MutationObserver(() => { const x = tEl.textContent; if (x) window.__toasts.push(x); }).observe(tEl, { subtree: true, childList: true, characterData: true });
       sc.cameras.main.centerOn(sc.predX, sc.predY); return 1; })()`);
   };
   /**
@@ -189,8 +192,37 @@ try {
     return x.cls.includes("k-cooldown");
   };
   const casts = () => evalJs("JSON.stringify(window.__casts)").then(JSON.parse);
-  const clearCasts = () => evalJs("window.__casts.length = 0; 1");
-  const toastText = () => evalJs("document.getElementById('toast').textContent");
+  /** Xoá cả tin `cast` lẫn các toast đã ghi (gọi trước mỗi lần bấm phím để kiểm đúng lần đó) */
+  const clearCasts = () => evalJs("window.__casts.length = 0; window.__toasts.length = 0; 1");
+  /**
+   * Toast của lần bấm vừa rồi. Toast tự tắt sau vài giây và hiện sau cú bấm vài khung (trang quan sát `#toast` ghi MỌI chữ từng hiện vào `window.__toasts`): chờ tới khi có chữ
+   * (trần 10 s) thay vì đọc `#toast` đúng một khoảnh khắc (đọc muộn thì đã tắt, đọc sớm thì chưa hiện: đỏ oan ở máy tải nặng).
+   */
+  const toastText = async () => {
+    await waitUntilTrue(() => evalJs("window.__toasts.length > 0"), 10000, 100);
+    return evalJs("window.__toasts.join(' | ')");
+  };
+  /**
+   * Dừng đồng hồ `performance.now()` của TRANG (hồi chiêu giả, choáng đều tính theo đồng hồ đó): kiểm "đang hồi chiêu / đang choáng" đúng nghĩa bất kể tốc độ máy, không phụ thuộc 3 giây
+   * hồi chiêu hay 2,5 giây choáng chạy mất trong lúc các lệnh CDP chờ khung hình. Đồng hồ ảo = đồng hồ thật trừ thời gian đã dừng nên mở lại thì TIẾP TỤC từ chỗ dừng (không nhảy tới).
+   */
+  const freezeClock = () =>
+    evalJs(`(() => {
+      if (!window.__vc) {
+        const real = performance.now.bind(performance);
+        window.__vc = { real, off: 0, t: null, since: 0 };
+        performance.now = () => (window.__vc.t !== null ? window.__vc.t : window.__vc.real() - window.__vc.off);
+      }
+      const v = window.__vc;
+      if (v.t === null) { v.t = v.real() - v.off; v.since = v.real(); }
+      return v.t;
+    })()`);
+  const thawClock = () =>
+    evalJs(`(() => {
+      const v = window.__vc;
+      if (v && v.t !== null) { v.off += v.real() - v.since; v.t = null; }
+      return 1;
+    })()`);
   const KEYS = { 2: ["KeyL", 76], 3: ["KeyU", 85], 4: ["KeyI", 73], 5: ["KeyO", 79] };
   const press = async (n) => {
     const [code, vk] = KEYS[n];
@@ -249,6 +281,8 @@ try {
   // ---------------------------------------------------------------- 4 chiêu, Nguyên Anh
   console.log("--- 4 chiêu (?skills=mock&n=4): trạng thái ban đầu ---");
   await open("skills=mock&n=4");
+  // Đồng hồ trang DỪNG từ đây tới hết ca "hồi chiêu" (mở lại ở dưới): hồi chiêu 3 giây của ô 2 và hồi chiêu ô 3 sau `cast` đứng yên, kiểm tất định ở mọi tốc độ khung
+  await freezeClock();
   await rearmCooldown(); // hồi chiêu giả của ô 2 bắt đầu lại từ BÂY GIỜ (xem chú thích `rearmCooldown`)
   let s = await slots4();
   check(s[0].vis === "flex", `thanh hiện ở máy tính (display ${s[0].vis})`);
@@ -271,7 +305,6 @@ try {
   await shot("n4-ban-dau");
 
   console.log("--- phím L (ô đang hồi chiêu) KHÔNG gửi; phím U gửi đúng 1 cast ---");
-  await rearmCooldown(); // chưa cast lần nào nên phát lại vẫn cho hồi chiêu 3 giây MỚI: ô 2 chắc chắn đang hồi khi bấm L
   await clearCasts();
   await press(2);
   check((await casts()).length === 0, "L khi hồi chiêu: 0 tin cast");
@@ -289,6 +322,7 @@ try {
   await press(3);
   check((await casts()).length === 1, "U lần nữa trong lúc hồi chiêu: vẫn 1 tin");
   await shot("n4-hoi-chieu");
+  await thawClock(); // đồng hồ chạy tiếp: hồi chiêu còn lại của ô 2 (3 giây) đếm lùi THẬT từ đây
 
   console.log("--- vòng quét + số giây đếm lùi, hết hồi chiêu thì sẵn sàng lại ---");
   const s0 = await slot(2);
@@ -363,8 +397,9 @@ try {
   console.log("--- choáng: cả thanh xám, KHÔNG gửi ---");
   await open("skills=mock&n=4");
   await waitReady(2); // ô 2 hết hồi chiêu (chờ theo điều kiện, không `sleep(3300)`)
-  // Choáng 6 giây (trước 2,5): đủ chỗ cho các kiểm trong lúc choáng ở khung chậm; hết choáng thì chờ theo lớp k-ready, không `sleep`
-  await evalJs(`window.__scene.room.emit("status", { list: [["stun", 6000]] }); 1`);
+  // Choáng DÀI (10 phút): các kiểm "đang choáng" không phụ thuộc tốc độ máy (choáng 2,5 giây thì ở khung chậm đã hết trước khi kịp bấm). Dừng đồng hồ trang KHÔNG dùng được ở đây:
+  // thanh chiêu cập nhật định kỳ theo đồng hồ đó nên đứng yên thì không bao giờ vẽ lại ô choáng.
+  await evalJs(`window.__scene.room.emit("status", { list: [["stun", 600000]] }); 1`);
   await waitUntilTrue(
     async () => (await slots4()).every((x) => x.cls === "sk slot k-stunned"),
     15000,
@@ -379,6 +414,8 @@ try {
   await press(3);
   check((await casts()).length === 0, "U khi choáng: 0 tin cast");
   await shot("n4-choang");
+  // Hết choáng THEO THỜI GIAN (đường hết hạn của bộ theo dõi trạng thái): đặt lại choáng 1,5 giây rồi chờ lớp k-ready (không `sleep`)
+  await evalJs(`window.__scene.room.emit("status", { list: [["stun", 1500]] }); 1`);
   check(await waitReady(3), "hết choáng: sẵn sàng lại");
 
   // ---------------------------------------------------------------- thiếu linh lực
