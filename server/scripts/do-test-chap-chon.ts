@@ -69,6 +69,7 @@ export interface MeasureOptions {
   workers?: number;
   pattern?: string;
   outputJsonPath?: string;
+  append?: boolean;
 }
 
 function parseCliArgs(): MeasureOptions {
@@ -78,6 +79,7 @@ function parseCliArgs(): MeasureOptions {
   let workers = 2;
   let pattern: string | undefined;
   let outputJsonPath: string | undefined;
+  let append = false;
 
   for (const arg of args) {
     if (arg.startsWith("--mode=")) {
@@ -93,10 +95,12 @@ function parseCliArgs(): MeasureOptions {
       pattern = arg.split("=")[1];
     } else if (arg.startsWith("--out=")) {
       outputJsonPath = arg.split("=")[1];
+    } else if (arg === "--append" || arg === "--merge") {
+      append = true;
     }
   }
 
-  return { mode, runs, workers, pattern, outputJsonPath };
+  return { mode, runs, workers, pattern, outputJsonPath, append };
 }
 
 function runVitestInstance(
@@ -235,6 +239,24 @@ export async function measureFlakyTests(opts: MeasureOptions = {}): Promise<Batc
     console.log(`[CPU-LOAD] Đã khởi chạy ${workers.length} workers tính toán nền.\n`);
   }
 
+  // Nạp các runs cũ nếu có --append
+  let prevRuns: RunSummary[] = [];
+  let prevRunsTarget = 0;
+  if (opts.append && opts.outputJsonPath && existsSync(opts.outputJsonPath)) {
+    try {
+      const prevData = JSON.parse(readFileSync(opts.outputJsonPath, "utf8")) as BatchReport;
+      if (Array.isArray(prevData.runs)) {
+        prevRuns = prevData.runs;
+        prevRunsTarget = prevData.runsTarget ?? prevData.runs.length;
+        console.log(
+          `[APPEND] Đã nạp ${prevRuns.length} lượt đo trước đó, mục tiêu tổng: ${prevRunsTarget + runs} lượt.\n`,
+        );
+      }
+    } catch {
+      // bỏ qua nếu file cũ hỏng
+    }
+  }
+
   const runSummaries: RunSummary[] = [];
   const tmpFilesToClean: string[] = [];
 
@@ -289,6 +311,19 @@ export async function measureFlakyTests(opts: MeasureOptions = {}): Promise<Batc
           }
         }
       }
+
+      // Lưu ngay kết quả trung gian sau mỗi lượt để bảo toàn dữ liệu khi có gián đoạn
+      if (opts.outputJsonPath) {
+        try {
+          const intermediate = summarizeBatchReport(mode, prevRunsTarget + runs, [
+            ...prevRuns,
+            ...runSummaries,
+          ]);
+          writeFileSync(opts.outputJsonPath, JSON.stringify(intermediate, null, 2) + "\n", "utf8");
+        } catch {
+          // bỏ qua lỗi ghi đĩa tạm thời
+        }
+      }
     }
   } finally {
     // Dừng worker threads
@@ -302,6 +337,15 @@ export async function measureFlakyTests(opts: MeasureOptions = {}): Promise<Batc
     }
   }
 
+  const allRuns = [...prevRuns, ...runSummaries];
+  return summarizeBatchReport(mode, prevRunsTarget + runs, allRuns);
+}
+
+export function summarizeBatchReport(
+  mode: MeasurementMode,
+  runsTarget: number,
+  runSummaries: RunSummary[],
+): BatchReport {
   // Tổng hợp thống kê theo tệp test
   const suiteMap = new Map<
     string,
@@ -315,6 +359,10 @@ export async function measureFlakyTests(opts: MeasureOptions = {}): Promise<Batc
   >();
 
   const totalRunsCount = runSummaries.length;
+  runSummaries.forEach((r, idx) => {
+    r.runIndex = idx + 1;
+  });
+
   for (const r of runSummaries) {
     const failedSuitesThisRun = new Set<string>();
 
@@ -365,15 +413,16 @@ export async function measureFlakyTests(opts: MeasureOptions = {}): Promise<Batc
   const totalDurMs = runSummaries.reduce((a, b) => a + b.durationMs, 0);
   const avgRunDurationSec = Math.round((totalDurMs / totalRunsCount / 1000) * 10) / 10;
   const flakyCount = suiteStats.filter((s) => s.failedRuns > 0).length;
+  const maxTotalSuites = Math.max(...runSummaries.map((r) => r.totalSuites), 0);
 
   const report: BatchReport = {
     mode,
     timestamp: new Date().toISOString(),
-    runsTarget: runs,
+    runsTarget,
     runsCompleted: totalRunsCount,
     avgRunDurationSec,
     flakySuitesCount: flakyCount,
-    stableSuitesCount: (runSummaries[0]?.totalSuites ?? 0) - flakyCount,
+    stableSuitesCount: maxTotalSuites - flakyCount,
     suiteStats,
     runs: runSummaries,
   };
