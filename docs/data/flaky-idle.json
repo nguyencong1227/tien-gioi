@@ -1,11 +1,11 @@
 {
   "mode": "idle",
-  "timestamp": "2026-11-22T03:34:26.832Z",
-  "runsTarget": 10,
-  "runsCompleted": 10,
-  "avgRunDurationSec": 91.7,
+  "timestamp": "2026-11-28T12:42:56.729Z",
+  "runsTarget": 28,
+  "runsCompleted": 20,
+  "avgRunDurationSec": 109.5,
   "flakySuitesCount": 0,
-  "stableSuitesCount": 418,
+  "stableSuitesCount": 493,
   "suiteStats": [],
   "runs": [
     {
@@ -115,6 +115,116 @@
       "totalSuites": 418,
       "failedSuites": 0,
       "totalTests": 7787,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 11,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 133982,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 12,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 129816,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 13,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 121591,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 14,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 135190,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 15,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 121611,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 16,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 123634,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 17,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 134853,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 18,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 126199,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 19,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 123609,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 20,
+      "mode": "idle",
+      "success": true,
+      "durationMs": 121559,
+      "totalSuites": 493,
+      "failedSuites": 0,
+      "totalTests": 9112,
       "failedTests": 0,
       "failures": []
     }

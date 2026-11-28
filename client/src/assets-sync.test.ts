@@ -79,6 +79,12 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu 
   it("đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi", () => {
     const origCredits = fs.readFileSync(creditsFile, "utf8");
     const origRaSoat = fs.readFileSync(raSoatFile, "utf8");
+    // Dùng thư mục tạm riêng cho tiến trình test để tránh race condition khi vitest chạy song song (#752)
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "assets-sync-mut1-"));
+    const tmpCredits = path.join(tmpDir, "CREDITS.md");
+    const tmpRaSoat = path.join(tmpDir, "RA_SOAT_TAI_SAN.md");
+    fs.writeFileSync(tmpCredits, origCredits, "utf8");
+    fs.writeFileSync(tmpRaSoat, origRaSoat, "utf8");
 
     try {
       // Đột biến 1: sửa sai số lượng icon trong CREDITS.md
@@ -87,55 +93,79 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu 
         "<!-- AUTO-CREDITS-ITEM-COUNT:START -->999 tệp<!-- AUTO-CREDITS-ITEM-COUNT:END -->",
       );
       expect(mutatedCredits).not.toBe(origCredits);
-      fs.writeFileSync(creditsFile, mutatedCredits, "utf8");
-      const res1 = syncAssetDocs({ checkOnly: true });
+      fs.writeFileSync(tmpCredits, mutatedCredits, "utf8");
+      const res1 = syncAssetDocs({
+        checkOnly: true,
+        creditsPath: tmpCredits,
+        raSoatPath: tmpRaSoat,
+      });
       expect(res1.errors.length).toBeGreaterThan(0);
       expect(res1.errors[0]).toContain("CREDITS.md");
 
       // Khôi phục CREDITS, đột biến RA_SOAT
-      fs.writeFileSync(creditsFile, origCredits, "utf8");
+      fs.writeFileSync(tmpCredits, origCredits, "utf8");
       const mutatedRaSoat = origRaSoat.replace(
         /<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->[\s\S]*?<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:END -->/,
         "<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->| `item-*` | 999 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:END -->",
       );
       expect(mutatedRaSoat).not.toBe(origRaSoat);
-      fs.writeFileSync(raSoatFile, mutatedRaSoat, "utf8");
-      const res2 = syncAssetDocs({ checkOnly: true });
+      fs.writeFileSync(tmpRaSoat, mutatedRaSoat, "utf8");
+      const res2 = syncAssetDocs({
+        checkOnly: true,
+        creditsPath: tmpCredits,
+        raSoatPath: tmpRaSoat,
+      });
       expect(res2.errors.length).toBeGreaterThan(0);
       expect(res2.errors[0]).toContain("docs/RA_SOAT_TAI_SAN.md");
     } finally {
-      // Đảm bảo luôn khôi phục lại nội dung gốc
-      fs.writeFileSync(creditsFile, origCredits, "utf8");
-      fs.writeFileSync(raSoatFile, origRaSoat, "utf8");
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
   it("đột biến: phát hiện dấu xung đột git chưa giải quyết (<<<<<<< / ======= / >>>>>>>) hoặc marker lặp", () => {
     const origCredits = fs.readFileSync(creditsFile, "utf8");
     const origRaSoat = fs.readFileSync(raSoatFile, "utf8");
+    // Dùng thư mục tạm riêng cho tiến trình test để tránh race condition khi vitest chạy song song (#752)
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "assets-sync-mut2-"));
+    const tmpCredits = path.join(tmpDir, "CREDITS.md");
+    const tmpRaSoat = path.join(tmpDir, "RA_SOAT_TAI_SAN.md");
+    fs.writeFileSync(tmpCredits, origCredits, "utf8");
+    fs.writeFileSync(tmpRaSoat, origRaSoat, "utf8");
 
     try {
       // Đột biến 1: chèn <<<<<<< HEAD vào đầu CREDITS.md
-      fs.writeFileSync(creditsFile, "<<<<<<< HEAD\n" + origCredits, "utf8");
-      const resConflict1 = syncAssetDocs({ checkOnly: true });
+      fs.writeFileSync(tmpCredits, "<<<<<<< HEAD\n" + origCredits, "utf8");
+      const resConflict1 = syncAssetDocs({
+        checkOnly: true,
+        creditsPath: tmpCredits,
+        raSoatPath: tmpRaSoat,
+      });
       expect(resConflict1.errors.length).toBeGreaterThan(0);
       expect(resConflict1.errors.some((e) => e.includes("dấu xung đột git"))).toBe(true);
 
       // Đột biến 2: chèn ======= vào docs/RA_SOAT_TAI_SAN.md
-      fs.writeFileSync(creditsFile, origCredits, "utf8");
-      fs.writeFileSync(raSoatFile, "=======\n" + origRaSoat, "utf8");
-      const resConflict2 = syncAssetDocs({ checkOnly: true });
+      fs.writeFileSync(tmpCredits, origCredits, "utf8");
+      fs.writeFileSync(tmpRaSoat, "=======\n" + origRaSoat, "utf8");
+      const resConflict2 = syncAssetDocs({
+        checkOnly: true,
+        creditsPath: tmpCredits,
+        raSoatPath: tmpRaSoat,
+      });
       expect(resConflict2.errors.length).toBeGreaterThan(0);
       expect(resConflict2.errors.some((e) => e.includes("dấu xung đột git"))).toBe(true);
 
       // Đột biến 3: nhân đôi marker <!-- AUTO-CREDITS-ITEMS:START --> trong CREDITS.md
-      fs.writeFileSync(raSoatFile, origRaSoat, "utf8");
+      fs.writeFileSync(tmpRaSoat, origRaSoat, "utf8");
       const duplicatedMarker = origCredits.replace(
         "<!-- AUTO-CREDITS-ITEMS:START -->",
         "<!-- AUTO-CREDITS-ITEMS:START -->\n<!-- AUTO-CREDITS-ITEMS:START -->",
       );
-      fs.writeFileSync(creditsFile, duplicatedMarker, "utf8");
-      const resDuplicate = syncAssetDocs({ checkOnly: true });
+      fs.writeFileSync(tmpCredits, duplicatedMarker, "utf8");
+      const resDuplicate = syncAssetDocs({
+        checkOnly: true,
+        creditsPath: tmpCredits,
+        raSoatPath: tmpRaSoat,
+      });
       expect(resDuplicate.errors.length).toBeGreaterThan(0);
       expect(
         resDuplicate.errors.some(
@@ -143,9 +173,7 @@ describe("Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu 
         ),
       ).toBe(true);
     } finally {
-      // Luôn khôi phục nội dung gốc
-      fs.writeFileSync(creditsFile, origCredits, "utf8");
-      fs.writeFileSync(raSoatFile, origRaSoat, "utf8");
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 });

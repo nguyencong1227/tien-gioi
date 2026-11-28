@@ -1,12 +1,26 @@
 {
   "mode": "cpu-load",
-  "timestamp": "2026-11-16T15:36:06.660Z",
-  "runsTarget": 3,
-  "runsCompleted": 3,
-  "avgRunDurationSec": 91,
-  "flakySuitesCount": 0,
-  "stableSuitesCount": 1281,
-  "suiteStats": [],
+  "timestamp": "2026-11-28T12:14:49.579Z",
+  "runsTarget": 27,
+  "runsCompleted": 20,
+  "avgRunDurationSec": 142.9,
+  "flakySuitesCount": 1,
+  "stableSuitesCount": 1280,
+  "suiteStats": [
+    {
+      "suiteFile": "client/scripts/chrome-wait.test.ts",
+      "totalRuns": 20,
+      "failedRuns": 1,
+      "failureRatePct": 5,
+      "avgDurationMs": 0,
+      "failedTestTitles": {
+        "chrome-wait: chờ Chrome sẵn sàng cho check-*.mjs ở nightly (#1458) > waitPageTarget: Chrome mở cổng MUỘN (sau 400 ms) vẫn lấy được page target": 1
+      },
+      "sampleErrors": {
+        "chrome-wait: chờ Chrome sẵn sàng cho check-*.mjs ở nightly (#1458) > waitPageTarget: Chrome mở cổng MUỘN (sau 400 ms) vẫn lấy được page target": "AssertionError: expected undefined to be 'p' // Object.is equality\n    at /home/nguyencong/TT/tien-gioi-c/client/scripts/chrome-wait.test.ts:40:22\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+      }
+    }
+  ],
   "runs": [
     {
       "runIndex": 1,
@@ -38,6 +52,200 @@
       "totalSuites": 1281,
       "failedSuites": 0,
       "totalTests": 4903,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 4,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 152951,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 5,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 143125,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 6,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 148141,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 7,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 134261,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 8,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 144414,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 9,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 157443,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 10,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 161868,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 11,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 147989,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 12,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 145155,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 13,
+      "mode": "cpu-load",
+      "success": false,
+      "durationMs": 168844,
+      "totalSuites": 487,
+      "failedSuites": 1,
+      "totalTests": 9063,
+      "failedTests": 1,
+      "failures": [
+        {
+          "suiteFile": "client/scripts/chrome-wait.test.ts",
+          "testTitle": "chrome-wait: chờ Chrome sẵn sàng cho check-*.mjs ở nightly (#1458) > waitPageTarget: Chrome mở cổng MUỘN (sau 400 ms) vẫn lấy được page target",
+          "errorMessage": "AssertionError: expected undefined to be 'p' // Object.is equality\n    at /home/nguyencong/TT/tien-gioi-c/client/scripts/chrome-wait.test.ts:40:22\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20",
+          "durationMs": 6662.807617
+        }
+      ]
+    },
+    {
+      "runIndex": 14,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 151922,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 15,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 143625,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 16,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 146104,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 17,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 149761,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 18,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 137577,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 19,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 153707,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 20,
+      "mode": "cpu-load",
+      "success": true,
+      "durationMs": 197206,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
       "failedTests": 0,
       "failures": []
     }
