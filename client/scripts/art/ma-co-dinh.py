@@ -1,19 +1,20 @@
-"""Mã ỔN ĐỊNH cho bảng duyệt đồ hoạ (nhóm 13 T, nhóm 14 VP, nhóm 15 HU): bảng id -> số trong `docs/art/huong-moi/ma-co-dinh.json`.
+"""Mã ỔN ĐỊNH cho bảng duyệt đồ hoạ (nhóm 12 Q, nhóm 13 T, nhóm 14 VP, nhóm 15 HU): bảng id -> số trong `docs/art/huong-moi/ma-co-dinh.json`.
 
 Vì sao: mã VP / HU từng gán TUẦN TỰ theo thứ tự lặp (VP: đan / phù, kinh quyển, trang bị, nguyên liệu; HU: theo hệ), nên mỗi lần có vật phẩm / chiêu mới chèn GIỮA
 thì mọi mã phía sau nhích (24/11: VP 128 -> 147 làm 72 / 128 mã đổi nghĩa, HU 59 -> 78 làm 38 / 59 mã đổi nghĩa) trong khi người dùng đã nhận tờ ngày 23/11
 13:00 +0700 (commit dd32ff1b: VP-001..128, HU-01..59) và duyệt THEO MÃ. Nhóm 13 (trùm) cũng vậy (#1446): `T-nn` gán theo thứ tự trùm trong `MONSTERS` nên
-Thanh Xà chèn sau Xích Mãng (#1445) làm T-02..T-04 nhích, trong khi người dùng đã nhận tờ 23/11 với T-01..T-04. Nay:
+Thanh Xà chèn sau Xích Mãng (#1445) làm T-02..T-04 nhích, trong khi người dùng đã nhận tờ 23/11 với T-01..T-04. Nhóm 12 (quái thường) cũng vậy: `Q-nn` gán theo chỉ số trong danh sách quái thường nên
+sáu sói Hóa Thần của Lang Hoang (D1 #1466) chèn TRƯỚC Rắn Con làm Q-11, Q-12 của tờ 23/11 nhích thành Q-17, Q-18 (A và B chốt đóng băng Q-01..Q-12 ở PR này). Nay:
   - mã đã đóng băng giữ NGUYÊN (bảng là nguồn duy nhất; generator chỉ ĐỌC bảng);
   - id chưa có trong bảng nhận số MỚI ở CUỐI (max + 1, theo thứ tự lặp), KHÔNG bao giờ chèn giữa, KHÔNG dùng lại số của mã đã mồ côi (vật phẩm xoá / đổi id);
-  - số > `dong_bang.vp_toi_da` / `hu_toi_da` / `t_toi_da` là mã MỚI (sau 23/11): tờ đánh dấu và để ở tờ `-moi` riêng.
+  - số > `dong_bang.vp_toi_da` / `hu_toi_da` / `t_toi_da` / `q_toi_da` là mã MỚI (sau 23/11): tờ đánh dấu và để ở tờ `-moi` riêng.
 Mô-đun THUẦN (không cần Pillow), nên test chạy được ở mọi máy kể cả CI; `dung-bang-duyet.py` nạp bằng importlib (chế độ `python3 -I` không thêm thư mục script vào sys.path).
 """
 import json
 import os
 
-KINDS = ("vp", "hu", "t")
-FORMAT = {"vp": "VP-{:03d}", "hu": "HU-{:02d}", "t": "T-{:02d}"}
+KINDS = ("vp", "hu", "t", "q")
+FORMAT = {"vp": "VP-{:03d}", "hu": "HU-{:02d}", "t": "T-{:02d}", "q": "Q-{:02d}"}
 
 
 def load(path):
@@ -25,6 +26,7 @@ def load(path):
             raise ValueError(f"ma-co-dinh.json thiếu khoá {k!r}")
     t.setdefault("mo_coi", {})
     t.setdefault("t", {})  # bảng cũ (trước #1446) chưa có nhóm trùm: coi là rỗng, không báo hỏng
+    t.setdefault("q", {})  # bảng cũ (trước khi đóng băng nhóm 12, quái thường) chưa có nhóm Q: coi là rỗng, không báo hỏng
     for kind in KINDS:
         seen = {}
         for iid, n in t[kind].items():
@@ -71,7 +73,7 @@ def extended(table, kind, codes):
 
 
 def save(path, table):
-    """Ghi bảng (khoá `vp` / `hu` / `t` sắp theo số, một id mỗi dòng cho dễ so diff)."""
+    """Ghi bảng (khoá `vp` / `hu` / `t` / `q` sắp theo số, một id mỗi dòng cho dễ so diff)."""
     out = {k: table[k] for k in table if k not in KINDS}
     for kind in KINDS:
         out[kind] = dict(sorted(table[kind].items(), key=lambda kv: kv[1]))
