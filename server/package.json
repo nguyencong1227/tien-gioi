@@ -83,6 +83,7 @@
     "e2e:status-speed": "node ../client/scripts/check-status-speed.mjs",
     "e2e:tap-hold": "node ../client/scripts/check-tap-hold.mjs",
     "e2e:hud": "node ../client/scripts/check-hud.mjs",
+    "e2e:sell-confirm": "node ../client/scripts/check-sell-confirm.mjs",
     "e2e:equip-six": "node ../client/scripts/check-equip-six.mjs",
     "e2e:skill-book": "node ../client/scripts/check-skill-book.mjs",
     "e2e:ban-do-trong": "tsx scripts/e2e-ban-do-trong.ts",
