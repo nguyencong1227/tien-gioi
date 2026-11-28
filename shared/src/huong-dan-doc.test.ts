@@ -252,8 +252,9 @@ describe("docs/HUONG_DAN_NGUOI_CHOI.md: số liệu khớp dữ liệu thật (#
   });
 
   it("trùm nhiều chiêu và chặn đường", () => {
+    const SO_CHU = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười"]; // số trùm viết bằng chữ ("bốn con trùm"...)
     const trum = Object.keys(BOSS_BY_KIND);
-    co(`${trum.length === 4 ? "bốn" : String(trum.length)} con trùm`, "số trùm có bộ chiêu");
+    co(`${SO_CHU[trum.length] ?? String(trum.length)} con trùm`, "số trùm có bộ chiêu");
     for (const k of trum) co(`**${MONSTER_BY_ID[k].name}**`, `trùm ${k}`);
     co(`**ít nhất ${phay(giay(BOSS_MIN_TELEGRAPH_MS))} giây**`, "BOSS_MIN_TELEGRAPH_MS");
     co(`khoảng ${phut(AMBUSH_COOLDOWN_MS)} phút sau một lần`, "AMBUSH_COOLDOWN_MS");

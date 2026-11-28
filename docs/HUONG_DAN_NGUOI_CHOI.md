@@ -291,7 +291,7 @@ Chi tiết thiết kế: [docs/THIET_KE_BI_CANH.md](THIET_KE_BI_CANH.md).
 
 ## Trùm nhiều chiêu: học né
 
-Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh) không còn chỉ đứng đánh: mỗi con có **bộ chiêu** riêng, đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
+Hiện có năm con trùm có **bộ chiêu** riêng (bốn con từ bản 0.4.0: **Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh; thêm **Thanh Xà**, kẻ cầm đầu bầy chặn đường ở Lạc Hà): không còn chỉ đứng đánh, mỗi con ra chiêu có báo trước và nhiều con đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
 
 ### Đọc vùng cảnh báo
 
@@ -307,7 +307,7 @@ Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hà
 - Trên thanh máu trùm (đầu màn hình) có **tên chiêu đang vận**, **vạch giai đoạn** và, khi có, **chỉ báo cuồng nộ**. Đang vận chiêu thì trùm đứng yên một nhịp: đó là lúc đánh trả.
 - Mạng chậm không sao: màn hình tự rút ngắn vòng đếm theo độ trễ của bạn để vòng đầy đúng lúc bạn còn né kịp (mạng quá chậm trên khoảng 190 ms vẫn thiệt thòi, hãy chơi gần đường truyền tốt).
 
-### Bốn trùm
+### Năm trùm
 
 | Trùm | Chiêu chính | Khi máu xuống thấp |
 | --- | --- | --- |
@@ -315,6 +315,7 @@ Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hà
 | **Hắc Giao** (Kim Đan, đội 3-4) | Sóng nước (đường), Vực xoáy (kéo rồi nổ), **Vảy giáp** (giảm 40% sát thương nhận trong 4 giây: có vầng giáp thấy được, đợi hết giáp rồi dồn sát thương) | Dưới 40% máu: cuồng nộ nhẹ (đánh mạnh hơn, ra chiêu dày hơn) |
 | **Thiên Hàn Vương** (Nguyên Anh, đội 3-4) | Đập đất, Hàn long lao tới, **Mưa băng**, Vùng băng giá (làm chậm) | Dưới 50%: **hàn khí** quanh thân gây tê cóng; dưới 25%: triệu hai **Hàn Lang** |
 | **Linh Hư Yêu Vương** (bí cảnh) | Vòng nổ yêu khí, Truy kích kẻ đứng **xa nhất**, Dịch chuyển chớp | Dưới 70%: dịch chuyển chớp; dưới 35%: **phân thân**; sau **5 phút**: cuồng nộ (đòn nặng hơn, nhanh hơn) |
+| **Thanh Xà** (Luyện Khí, chỉ gặp khi cầm đầu bầy chặn đường ở Lạc Hà) | Quật đuôi (nón), Xà xung lao tới (đường) | Chỉ một giai đoạn: không triệu hồi, không cuồng nộ; hai chiêu đều có báo trước đủ để né |
 
 - **Quái con** do trùm gọi (Rắn Con, Hàn Lang, phân thân) **không rơi đồ, không cho tu vi**: hạ chúng để bớt sát thương, đừng cày chúng.
 - **Linh Hư Yêu Vương** đánh nhẹ nhưng trận dài: đội 4 người vẫn hạ được khi trúng vài đòn; đội 3 người nên **né** gần như mọi đòn. Mang đủ đan hồi máu.
