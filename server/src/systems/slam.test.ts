@@ -259,9 +259,13 @@ describe("đập đất: trùm vừa lao vừa đập (M7.3)", () => {
 });
 
 describe("đập đất: dữ liệu (M7.3)", () => {
-  it("quái nào có `slam` thì số liệu hợp lệ: gồng 600-1500 ms (kịp tránh), vòng rộng hơn tầm đánh gần, x1,2-x3, hồi >= 4 s; hiện chỉ Cốt Tượng và trùm Thiên Hàn Vương", () => {
+  it("quái nào có `slam` thì số liệu hợp lệ: gồng 600-1500 ms (kịp tránh), vòng rộng hơn tầm đánh gần, x1,2-x3, hồi >= 4 s; hiện Cốt Tượng, trùm Thiên Hàn Vương và Thương Nguyệt Lang (Hóa Thần, D1 #1466 lát A1)", () => {
     const withSlam = MONSTERS.filter((m) => m.slam);
-    expect(withSlam.map((m) => m.id).sort()).toEqual(["cot_tuong", "thien_han_vuong"]);
+    expect(withSlam.map((m) => m.id).sort()).toEqual([
+      "cot_tuong",
+      "thien_han_vuong",
+      "thuong_nguyet_lang",
+    ]);
     for (const m of withSlam) {
       const s = m.slam!;
       expect(s.windupMs, m.id).toBeGreaterThanOrEqual(600);

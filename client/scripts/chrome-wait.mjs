@@ -1,4 +1,4 @@
-/* global fetch, setTimeout */
+/* global fetch, setTimeout, AbortSignal */
 // Chờ Chrome headless sẵn sàng cho các kịch bản `check-*.mjs` chạy ở E2E hằng đêm (#1458).
 // Trước đây mỗi script tự lặp 15 s (100 x 150 ms) cho page target và 12-16 s cho cảnh: runner CI khởi động Chrome chậm làm kịch bản đỏ oan
 // ("Không tìm thấy Chrome page target" sau 15,3 s ở run 45539915300 / 45243928886). 60 s là mức A đã chốt cho `check-inv-select` / `check-move-keys` (#1389);
@@ -16,12 +16,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function waitPageTarget(cdpPort, timeoutMs = START_WAIT_MS, shouldStop = () => false) {
   for (const t0 = Date.now(); Date.now() - t0 < timeoutMs && !shouldStop();) {
     try {
-      const res = await fetch(`http://127.0.0.1:${cdpPort}/json`);
+      const fetchTimeout = Math.min(Math.max(timeoutMs, 50), 2000);
+      const res = await fetch(`http://127.0.0.1:${cdpPort}/json`, {
+        signal: AbortSignal.timeout(fetchTimeout),
+      });
       const list = await res.json();
       const page = Array.isArray(list) ? list.find((t) => t && t.type === "page") : null;
       if (page && page.webSocketDebuggerUrl) return page;
     } catch {
-      // Chrome chưa mở cổng
+      // Chrome chưa mở cổng hoặc fetch timeout
     }
     await sleep(150);
   }

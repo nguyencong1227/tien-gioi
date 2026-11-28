@@ -62,6 +62,13 @@ export const MONSTER_FX_TINT: Readonly<Record<string, number>> = {
   doc_tuoc: 0x9be05a, // độc lục sáng (khác vàng lục của Độc Thiềm)
   thien_han_vuong: 0xbff4ff, // băng sâu phát sáng (trùm)
   thanh_xa: 0x4fd06a, // xanh rắn (trùm CẦM ĐƯỜNG Lạc Hà, CD5 #1065; khác xanh vàng của Độc Thiềm 0xc4f24a)
+  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): mỗi loài một màu, khác nhau và khác Hàn Lang xanh lam
+  da_lang: 0xc8b48a, // bụi đất nâu xám
+  hac_phong_lang: 0x9fb0c8, // gió xám xanh
+  huyet_nguyet_lang: 0xff4a4a, // đỏ máu
+  xich_diem_lang: 0xff7a3d, // cam lửa
+  thuong_nguyet_lang: 0x9fd8c8, // xanh ngọc nhạt (lông sói già)
+  ngan_nguyet_lang: 0xe8eef8, // bạc trăng
 };
 
 /** Quái `kind` trong sổ game; id lạ / độc ("constructor", "__proto__") là `undefined` (state do server gửi, không tin). */
