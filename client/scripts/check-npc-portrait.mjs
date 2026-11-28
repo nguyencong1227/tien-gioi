@@ -1,11 +1,10 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm CHÂN DUNG NPC ở HỘP THOẠI (`client/src/npc-portrait.ts`, gói tải theo nhu cầu `art:npc`; M7.12 / #513) trong Chrome THẬT, chế độ mock (không cần máy chủ /
  * Vite), qua ĐƯỜNG TẢI THẬT của gói (manifest -> tải tệp -> URL có băm -> giải mã): máy chủ tĩnh của script dựng một gói GIẢ `art:npc` (ảnh thế chỗ
  * `login_bg.webp`, cỡ + băm tính từ tệp thật), còn `NPC_PORTRAITS` thì đặt qua `window.__npcPortraitOverride` (chỉ có ở `?debug`) vì chưa có ảnh lô 3.
  *
- *   npm run build -w client && node client/scripts/check-npc-portrait.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-npc-portrait.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
  *
  * Sáu khung (năm chuẩn + 568x320): gói tải OK => chân dung HIỆN sau khi tải xong, vuông, nằm TRỌN trong đầu hộp thoại, tên NPC và nút Đóng KHÔNG bị đè,
  * hộp thoại gọn khung; manifest tải MỘT lần, tệp bằng URL có băm; vẽ lại hộp thoại cùng NPC KHÔNG chớp; đổi sang NPC không chân dung thì ảnh ẩn NGAY;
@@ -14,14 +13,15 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -66,9 +66,10 @@ async function main() {
     mode === "ok" ? standBase : Buffer.concat([standBase, Buffer.from(mode)]);
   const shaOf = (b) => crypto.createHash("sha256").update(b).digest("hex");
   const PACK_FILE = "art-npc/npc_duoc_su.webp";
-  const state = { packMode: "ok", manifestHits: 0, fileUrls: [] };
+  const state = { packMode: "ok", manifestHits: 0, manifestReqs: 0, fileUrls: [], served: 0 };
   const server = http.createServer((req, res) => {
     const urlPath = req.url.split("?")[0];
+    if (urlPath === "/packs/manifest.json") state.manifestReqs++; // mọi yêu cầu manifest (kể cả ca "không có gói"): kịch bản chờ THEO yêu cầu thay vì ngủ cố định
     if (urlPath === "/packs/manifest.json" && state.packMode !== "none") {
       state.manifestHits++;
       const body = payloadOf(state.packMode);
@@ -92,12 +93,14 @@ async function main() {
       if (state.packMode === "badfile") {
         res.writeHead(404);
         res.end();
+        state.served++;
         return;
       }
       const body = payloadOf(state.packMode);
       const send = () => {
         res.writeHead(200, { "Content-Type": "image/webp", "Cache-Control": "no-store" });
         res.end(body);
+        state.served++;
       };
       if (state.packMode === "slow" || state.packMode === "slow2") setTimeout(send, 4500);
       else send();
@@ -118,37 +121,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-npc-portrait-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true },
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
-    if (!page) throw new Error("Không tìm thấy Chrome page target.");
+    launched = await launchChrome({ name: "npc-portrait" });
+    const page = launched.page;
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
       ws.onopen = res;
@@ -181,7 +162,8 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     const DIALOG_MSG = (npcId) => ({
@@ -202,6 +184,8 @@ async function main() {
     const loadPage = async (vp, mode) => {
       state.packMode = mode;
       state.manifestHits = 0;
+      state.manifestReqs = 0;
+      state.served = 0;
       state.fileUrls.length = 0;
       await send("Emulation.setDeviceMetricsOverride", {
         width: vp.w,
@@ -213,17 +197,29 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__scene && window.__ui && window.__npcPortraitOverride && !document.getElementById("ui")?.hidden)`,
+      const ready = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__scene && window.__ui && window.__npcPortraitOverride && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        60000,
+        200,
+      );
       if (!ready) return false;
-      await sleep(500);
+      // Chờ THEO ĐIỀU KIỆN thay `sleep(500)`: phông đã tải xong và `data-input` đã đặt lên <html>
+      const settled = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+            ),
+          ),
+        30000,
+        100,
+      );
+      if (!settled) throw new Error("phông chưa tải xong / thiếu data-input sau 30 s");
       await evalJs(
         `["dungeon-mock-badge", "duel-mock-badge"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; })`,
       );
@@ -249,8 +245,20 @@ async function main() {
           scrollW: document.documentElement.scrollWidth,
         };
       })()`);
+    /** Chờ `n` khung hình của trang (rAF liên tiếp) để trang kịp xử lý một phản hồi mạng đã tới; ở khung chậm mỗi khung dài hơn nên chờ tự co giãn theo. */
+    const frames = (n) =>
+      evalJs(
+        `new Promise((r) => { let k = ${n}; const f = () => (--k <= 0 ? r(1) : requestAnimationFrame(f)); requestAnimationFrame(f); })`,
+      );
+    /** Chờ THEO SỰ KIỆN thay `sleep` cố định: `cond()` (đọc bộ đếm của máy chủ giả) đúng thì thêm 8 khung hình + 250 ms cho trang xử lý xong phản hồi rồi mới đo ca "KHÔNG hiện". */
+    const afterEvent = async (cond, what) => {
+      const seen = await waitUntilTrue(async () => cond(), 30000, 50);
+      if (!seen) throw new Error(`máy chủ giả chưa thấy ${what} sau 30 s`);
+      await frames(8);
+      await sleep(250);
+    };
     /** Chờ tới khi `pred(m)` đúng (tối đa `ms`), trả số đo cuối. */
-    const until = async (pred, ms = 6000) => {
+    const until = async (pred, ms = 15000) => {
       let m = await measure();
       for (let t = 0; t < ms && !pred(m); t += 150) {
         await sleep(150);
@@ -340,7 +348,7 @@ async function main() {
       );
       // về lại NPC có chân dung: hiện lại (gói đã có sẵn, không tải thêm manifest)
       await openDialog("duoc_su");
-      m = await until((x) => x.art.shown, 4000);
+      m = await until((x) => x.art.shown, 12000);
       check(m.art.shown && m.nameText === "Hà lão", "về lại NPC có chân dung: ảnh hiện lại");
       check(state.manifestHits === 1, "vẫn chỉ MỘT lần tải manifest sau khi đổi NPC qua lại");
       // đóng hộp thoại: ảnh ẩn, bỏ src
@@ -354,7 +362,7 @@ async function main() {
       await loadPage(vp, "none");
       await evalJs(`window.__npcPortraitOverride("duoc_su", "npc_duoc_su.webp"); 1`);
       await openDialog("duoc_su");
-      await sleep(1800);
+      await afterEvent(() => state.manifestReqs >= 1, "yêu cầu manifest");
       m = await measure();
       check(m.open && m.nameText === "Hà lão", "không có gói: hộp thoại vẫn mở với tên");
       check(!m.art.shown && m.artSrc === null, "không có gói: ảnh ẩn, không ô trống / ảnh vỡ");
@@ -363,7 +371,7 @@ async function main() {
       await loadPage(vp, "badfile");
       await evalJs(`window.__npcPortraitOverride("duoc_su", "npc_duoc_su.webp"); 1`);
       await openDialog("duoc_su");
-      await sleep(2000);
+      await afterEvent(() => state.served >= 1, "yêu cầu tệp gói (404)");
       m = await measure();
       check(m.open && !m.art.shown && m.artSrc === null, "tệp gói lỗi: hộp thoại vẫn mở, ảnh ẩn");
 
@@ -371,19 +379,19 @@ async function main() {
       await loadPage(vp, "slow");
       await evalJs(`window.__npcPortraitOverride("duoc_su", "npc_duoc_su.webp"); 1`);
       await openDialog("duoc_su");
-      await sleep(3600);
+      await sleep(3600); // hợp đồng THỜI GIAN THẬT: client chờ gói 3 giây, máy chủ giả trả sau 4,5 giây (đồng hồ thật, không phụ thuộc tốc độ khung)
       m = await measure();
       check(m.open && !m.art.shown, "gói chưa về sau 3 giây: ảnh ẩn, hộp thoại vẫn dùng được");
-      m = await until((x) => x.art.shown, 6000);
+      m = await until((x) => x.art.shown, 20000);
       check(m.art.shown && m.nw > 0, "gói về muộn: ảnh HIỆN (áp dụng khi về)");
 
       // ---- E. đóng hộp thoại TRƯỚC khi gói về muộn: về xong cũng KHÔNG hiện ----
       await loadPage(vp, "slow2");
       await evalJs(`window.__npcPortraitOverride("duoc_su", "npc_duoc_su.webp"); 1`);
       await openDialog("duoc_su");
-      await sleep(3600);
+      await sleep(3600); // như ca D: đóng khi gói chưa về (máy chủ giả trả sau 4,5 giây)
       await evalJs(`window.__ui.closeDialog(); 1`);
-      await sleep(3500); // gói về trong lúc hộp thoại đã đóng
+      await afterEvent(() => state.served >= 1, "gói về muộn"); // gói về trong lúc hộp thoại đã đóng
       m = await measure();
       check(
         !m.open && !m.art.shown && m.artSrc === null,
@@ -391,21 +399,8 @@ async function main() {
       );
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL");
-    } catch {
-      chrome.kill("SIGKILL");
-    }
+    if (launched) await launched.close();
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);
