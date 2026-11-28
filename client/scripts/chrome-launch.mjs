@@ -25,6 +25,9 @@ async function startChrome({ name, extraArgs, url, bin }) {
   const args = [
     "--headless=new",
     "--no-sandbox",
+    // KHÔNG hỏi keyring hệ thống (gnome-keyring / libsecret qua DBus) khi mã hoá cookie: keyring đang KHOÁ (máy vừa khởi động lại, chưa ai đăng nhập đồ hoạ) làm mạng của Chrome
+    // treo im ở bước điều hướng (0 % CPU, mọi lệnh CDP không trả lời; 28/11/2026). `--password-store=basic` bỏ qua keyring; kịch bản kiểm không lưu mật khẩu thật.
+    "--password-store=basic",
     ...extraArgs,
     ...getChromeGpuFlags(),
     `--remote-debugging-port=${cdpPort}`,

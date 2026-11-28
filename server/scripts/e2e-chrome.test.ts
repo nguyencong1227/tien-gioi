@@ -86,6 +86,45 @@ describe("e2e-chrome: helper dựng Chrome với chẩn đoán và tự thử l�
     launched.kill();
   });
 
+  it("cờ mặc định có --password-store=basic: keyring GNOME khoá làm Chrome treo ở bước điều hướng (28/11/2026); đột biến: bỏ cờ khỏi e2e-chrome.ts -> đỏ", async () => {
+    const port = await freePort();
+    const argsFile = path.join(tmpDir, "args-basic.json");
+    const fakeExe = path.join(tmpDir, "fake-chrome-args");
+    // Chrome giả (thực thi được): ghi các cờ nhận được rồi mở /json ở đúng cổng --remote-debugging-port
+    writeFileSync(
+      fakeExe,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const http = require("node:http");
+fs.writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));
+const arg = process.argv.find((a) => a.startsWith("--remote-debugging-port="));
+const port = Number(arg.split("=")[1]);
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify([{ type: "page", webSocketDebuggerUrl: "ws://127.0.0.1:" + port + "/devtools/page/1" }]));
+}).listen(port, "127.0.0.1");
+setInterval(() => {}, 1000);
+`,
+      { mode: 0o755 },
+    );
+
+    const launched = await launchChrome({
+      cdpPort: port,
+      userDataDir: path.join(tmpDir, "user-data"),
+      executable: fakeExe,
+      timeoutMs: 5000,
+      pollIntervalMs: 50,
+      log: () => {},
+    });
+    try {
+      const args: string[] = JSON.parse(readFileSync(argsFile, "utf8"));
+      expect(args).toContain("--password-store=basic");
+      expect(args).toContain("--headless=new");
+    } finally {
+      launched.kill();
+    }
+  });
+
   it("Ca 2: Chrome giả chết ngay ở lần 1, thành công ở lần 2 -> ghi log 'đã dựng lại Chrome lần 2'", async () => {
     const port = await freePort();
     const fakeScript = path.join(tmpDir, "fake-chrome-retry.js");

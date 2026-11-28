@@ -16,6 +16,7 @@ const http = require("node:http");
 const arg = (n) => (process.argv.find((a) => a.startsWith("--" + n + "=")) || "").split("=").slice(1).join("=");
 const port = Number(arg("remote-debugging-port"));
 const mode = process.env.FAKE_MODE;
+if (process.env.FAKE_ARGS_FILE) fs.writeFileSync(process.env.FAKE_ARGS_FILE, JSON.stringify(process.argv.slice(2)));
 let n = 0;
 if (process.env.FAKE_COUNTER) {
   try { n = Number(fs.readFileSync(process.env.FAKE_COUNTER, "utf8")); } catch {}
@@ -45,7 +46,13 @@ chmodSync(bin, 0o755);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 function setEnv(env: Record<string, string>) {
-  for (const k of ["FAKE_MODE", "FAKE_COUNTER", "FAKE_DELAY_MS", "FAKE_CHILD_PID"])
+  for (const k of [
+    "FAKE_MODE",
+    "FAKE_COUNTER",
+    "FAKE_DELAY_MS",
+    "FAKE_CHILD_PID",
+    "FAKE_ARGS_FILE",
+  ])
     delete process.env[k];
   Object.assign(process.env, env);
 }
@@ -61,6 +68,20 @@ describe("chrome-launch: khởi động Chrome cho check-*.mjs ở nightly (#145
     await h.close();
     expect(existsSync(h.tmp)).toBe(false);
     expect(() => process.kill(pid, 0)).toThrow(); // tiến trình đã chết
+  });
+
+  it("cờ --password-store=basic LUÔN có: keyring GNOME khoá làm Chrome treo ở bước điều hướng (28/11/2026); đột biến: bỏ cờ khỏi chrome-launch.mjs -> đỏ", async () => {
+    const argsFile = path.join(dir, "args-basic.json");
+    rmSync(argsFile, { force: true });
+    setEnv({ FAKE_MODE: "ok", FAKE_DELAY_MS: "100", FAKE_ARGS_FILE: argsFile });
+    const h = await launchChrome({ name: "thu", bin, waitMs: 8000 });
+    try {
+      const args: string[] = JSON.parse(readFileSync(argsFile, "utf8"));
+      expect(args).toContain("--password-store=basic");
+      expect(args).toContain("--headless=new"); // các cờ nền vẫn còn
+    } finally {
+      await h.close();
+    }
   });
 
   it("close() dọn CẢ NHÓM tiến trình: tiến trình CON của Chrome cũng chết (chrome.kill() đơn lẻ để lại tiến trình mồ côi)", async () => {
