@@ -50,6 +50,14 @@ export const ASSUME = {
     cot_tuong: 12,
     doc_tuoc: 14,
     thien_han_vuong: 90,
+    // Sói Hóa Thần của Lang Hoang (D1 #1466 lát A3): lấy theo loài Nguyên Anh cùng vai (Hàn Lang / Phong Nha / Cốt Tượng / Độc Tước); 62 con trên bản đồ 128 x 112 (Hàn Vân 62 trên 128 x 128 nên Lang Hoang
+    // hơi dày hơn). Loài sâu thưa hơn nên tìm lâu hơn. `search-check.ts` chưa đo Lang Hoang (đo sau khi trùm vào).
+    da_lang: 10,
+    hac_phong_lang: 10,
+    huyet_nguyet_lang: 12,
+    xich_diem_lang: 12,
+    thuong_nguyet_lang: 14,
+    ngan_nguyet_lang: 14,
   } as Record<string, number>,
   /** Tỉ lệ đòn của quái thực sự trúng (người chơi né / lùi được một phần) */
   hitTaken: 0.8,
