@@ -24,6 +24,8 @@ export const MONSTER_REALM: Readonly<Record<string, number>> = {
   cot_tuong: 4,
   doc_tuoc: 4,
   thien_han_vuong: 4,
+  // Trùm CẦM ĐƯỜNG Lạc Hà (CD5 #1065): cấp 7, bậc Luyện Khí; không rơi sách chiêu, khai để sổ tay quái (#1420) đủ mọi quái
+  thanh_xa: 1,
 };
 
 /** Bậc khai của quái `id` (id đến từ client / file lưu thì không tin `MONSTER_REALM["constructor"]`); `undefined` nếu chưa khai. */
