@@ -72,6 +72,15 @@ export const ITEM_VALUE: Record<string, number> = {
   han_vu_kiem: 15000,
   han_lang_bao: 12000,
   phong_nha_phu: 12000,
+  // Nguyên liệu Hóa Thần của Lang Hoang (D1 lát A2): ~x2,8 loài Nguyên Anh cùng vai (KHUNG mục 3); hồn tinh ~x2,8 Thiên Hàn châu
+  bi_lang_hoang: 380,
+  nanh_nguyet: 380,
+  cot_lang_vuong: 500,
+  hon_tinh_thien_lang: 5000,
+  // Bộ V Hóa Thần (D1 lát A2): ~x2,8 bộ IV, luôn thấp hơn phí rèn + nguyên liệu
+  kiem_nanh_nguyet: 42000,
+  bao_huyet_nguyet: 33600,
+  phu_hon_thien_lang: 33600,
   // Đồ ba ô riêng của chủ (M7.4, `owner-gear.ts`)
   ...OWNER_GEAR_VALUE,
   // Kinh quyển 12 chiêu (M7.4, `books.ts`)

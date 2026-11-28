@@ -910,7 +910,8 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
       expect(rows, l).toBeLessThanOrEqual(30); // tờ không quá cao
       // mọi vật phẩm trừ NGUYÊN LIỆU quái có ô C (gói icon có đủ đan, phù, sách, trang bị 5 bậc); nguyên liệu chỉ nanh / xương / ngọc
       if (!m![1].includes("nguyen-lieu")) expect(priv_, l).toBe(rows);
-      else expect(priv_, l).toBeGreaterThan(0);
+      // tờ "-moi" = nguyên liệu MỚI sau mốc đóng băng 23/11 (vd Hóa Thần của Lang Hoang): gói icon riêng chưa có hình cho chúng nên không có ô C
+      else if (!m![1].endsWith("-moi")) expect(priv_, l).toBeGreaterThan(0);
       const a = fs.readFileSync(path.join(pub, `${m![1]}.png`));
       const b = fs.readFileSync(path.join(priv, `${m![1]}-day-du.png`));
       expect(

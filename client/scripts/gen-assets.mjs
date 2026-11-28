@@ -934,6 +934,7 @@ const SWORDS = {
   huyen_quy_kiem: [0x56674a, 0xc9d36a, 0x2f3a28, 4.4], // dày nặng
   hac_giao_kiem: [0x24465f, 0x6fc3e6, 0x16222f, 3.4],
   han_vu_kiem: [0x6fa9cf, 0xf2fbff, 0x2c4a6a, 2.6], // Nguyên Anh (M7.5c): lưỡi băng mảnh, mép trắng
+  kiem_nanh_nguyet: [0xc4cfe0, 0xffffff, 0x3a4658, 2.8], // Hóa Thần (D1 lát A2, ẢNH TẠM bằng bảng màu): lưỡi bạc trăng
 };
 const ROBES = {
   tho_nhung_bao: [0xe9e1cf, 0x4ba368],
@@ -943,6 +944,7 @@ const ROBES = {
   quy_giap_bao: [0x49573f, 0xc9d36a],
   giao_lan_bao: [0x1d3550, 0x6fc3e6],
   han_lang_bao: [0x7fa6c8, 0x1f4f8f], // Nguyên Anh (M7.5c): vải xanh băng đậm hơn nền ô túi
+  bao_huyet_nguyet: [0xa85a4a, 0xe8c25a], // Hóa Thần (D1 lát A2, ẢNH TẠM): vải đỏ thẫm, viền vàng
 };
 const TALISMANS = {
   lang_nha_phu: [0x9c9585, 0x9fd0ea],
@@ -952,6 +954,7 @@ const TALISMANS = {
   quy_tuc_phu: [0x6e8060, 0xc9d36a],
   giao_long_phu: [0x2e5a7a, 0x6fc3e6],
   phong_nha_phu: [0x9aa0ab, 0xe8c25a], // Nguyên Anh (M7.5c): phù thép, linh văn vàng kim
+  phu_hon_thien_lang: [0x7fb8aa, 0xeaf6f2], // Hóa Thần (D1 lát A2, ẢNH TẠM): phù xanh ngọc, linh văn trắng
 };
 
 // Đồ ba ô RIÊNG của chủ (M7.4, shared/src/owner-gear.ts): hài, ngọc bội, pháp bảo: [màu chính, màu phụ]. Hình tạm vẽ bằng code, đổi màu theo bậc.
@@ -1166,6 +1169,14 @@ const OUTLINED_ICONS = new Set([
   "phong_nha_phu",
   "tuyet_hanh_ngoa",
   "han_tinh_boi",
+  // Hóa Thần của Lang Hoang (D1 lát A2): nguyên liệu nhạt và đồ bạc / xanh ngọc trên ô túi nhạt
+  "bi_lang_hoang",
+  "nanh_nguyet",
+  "cot_lang_vuong",
+  "hon_tinh_thien_lang",
+  "kiem_nanh_nguyet",
+  "bao_huyet_nguyet",
+  "phu_hon_thien_lang",
 ]);
 
 function drawItemIcon(id) {
@@ -1332,6 +1343,42 @@ function drawItemIcon(id) {
     s.circle(9, 12, 1.6, 0xd9c6f0, 200);
     s.tri(18, 15, 20, 20, 16, 19, 0x8fe35a);
     s.circle(18, 20, 1.5, 0x8fe35a);
+  } else if (id === "bi_lang_hoang") {
+    // Da Lang Hoang (D1 lát A2, ẢNH TẠM): tấm da gấp, mép lông xù, hai mũi khâu
+    s.rect(5, 8, 14, 10, 0x8a7656);
+    s.rect(6, 9, 12, 8, 0xb09a7a);
+    for (const x of [6, 9, 12, 15, 18]) s.tri(x, 6, x - 1.5, 9, x + 1.5, 9, 0xc9b592);
+    for (const x of [6, 9, 12, 15, 18]) s.tri(x, 20, x - 1.5, 17, x + 1.5, 17, 0x8a7656);
+    s.line(8, 13, 16, 13, 0x5a4a34, 1);
+    s.set(8, 12, 0x5a4a34);
+    s.set(12, 12, 0x5a4a34);
+    s.set(16, 12, 0x5a4a34);
+  } else if (id === "nanh_nguyet") {
+    // Nanh Trăng (D1 lát A2, ẢNH TẠM): nanh sói cong như trăng non, ánh bạc, chân nanh xám
+    s.tri(7, 20, 17, 20, 12, 3, 0xdfe6f0);
+    s.tri(10, 20, 14, 20, 12, 7, 0xffffff, 200);
+    s.rect(7, 19, 10, 3, 0x7a8294);
+    s.circle(12, 6, 5, 0xe6f0ff, 50);
+  } else if (id === "cot_lang_vuong") {
+    // Cốt Lang Vương (D1 lát A2, ẢNH TẠM): ba đốt xương sống xếp dọc, vân khắc xanh ngọc
+    for (const [cy, r] of [
+      [6, 3.6],
+      [12, 4.2],
+      [18, 3.6],
+    ]) {
+      s.circle(12, cy, r, 0xcfe0d8);
+      s.circle(12, cy, r - 1.2, 0xe8f2ee);
+      s.line(10, cy, 14, cy, 0x6fb8a0, 1);
+    }
+    s.line(12, 3, 12, 21, 0x9fd8c8, 1.4);
+  } else if (id === "hon_tinh_thien_lang") {
+    // Hồn Tinh Thiên Lang (D1 lát A2, ẢNH TẠM): tinh thể thoi xanh trắng, tia sao bốn hướng
+    s.circle(12, 12, 10, 0x9fe8d8, 45);
+    s.tri(12, 2, 5, 12, 19, 12, 0xcfeee8);
+    s.tri(12, 22, 5, 12, 19, 12, 0x6fb8a8);
+    s.tri(12, 6, 9, 12, 15, 12, 0xffffff, 200);
+    s.line(12, 0.5, 12, 3, 0xffffff, 1);
+    s.line(12, 21, 12, 23.5, 0xffffff, 1);
   } else if (id === "han_lang_mao") {
     // Hàn Lang Mao (M7.5c): nhúm lông sói băng cứng, đầu lông kết tinh, sao tuyết nhỏ
     s.line(6, 19, 8, 8, 0x86aac4, 2);
@@ -1815,6 +1862,14 @@ function drawNpcSprite(id) {
       prop: "lantern",
     },
     lai_buon_han: { robe: 0x5d6f9a, trim: 0xf0d27a, hair: 0x4a4f5c, beard: false, prop: "pack" },
+    // Tuyết Đao Quan (Lang Hoang, D1 lát A2): thợ rèn bộ V; ẢNH TẠM theo tông áo da sói, búa rèn (B vẽ riêng sau)
+    tho_ren_tuyet_dao: {
+      robe: 0x6a4a3a,
+      trim: 0xdfe6f0,
+      hair: 0x9a9a9a,
+      beard: true,
+      prop: "hammer",
+    },
     tho_ren_han: { robe: 0x6a3f4a, trim: 0x9fd0ea, hair: 0x2c3a4a, beard: true, prop: "hammer" },
   }[id];
   if (!cfg) throw new Error(`Chưa có tranh NPC: ${id}`);
@@ -2000,6 +2055,7 @@ function buildAtlas() {
     "tram_truong_han",
     "lai_buon_han",
     "tho_ren_han",
+    "tho_ren_tuyet_dao",
     "lao_dan",
     "tran_uy",
     "lao_phu",
@@ -2056,6 +2112,14 @@ function buildAtlas() {
     "han_vu_kiem",
     "han_lang_bao",
     "phong_nha_phu",
+    // Hóa Thần của Lang Hoang (D1 #1466 lát A2): 4 nguyên liệu + 3 món bộ V (ẢNH TẠM vẽ bằng code / bảng màu; B vẽ riêng sau)
+    "bi_lang_hoang",
+    "nanh_nguyet",
+    "cot_lang_vuong",
+    "hon_tinh_thien_lang",
+    "kiem_nanh_nguyet",
+    "bao_huyet_nguyet",
+    "phu_hon_thien_lang",
     "thuong_hoi_huyet_dan",
     "thuong_hoi_linh_dan",
     // Nghề nhỏ lát 1 (#763): ba đan hộ đạo theo bậc cảnh giới

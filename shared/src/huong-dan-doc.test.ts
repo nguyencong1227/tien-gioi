@@ -93,6 +93,7 @@ import {
   PARTY_EXP_BONUS,
   PARTY_INVITE_TTL_MS,
   PARTY_MAX,
+  QUESTS,
   RARITY_NAMES,
   REALMS,
   SECT_CREATE_COST,
@@ -336,7 +337,11 @@ describe("docs/HUONG_DAN_NGUOI_CHOI.md: số liệu khớp dữ liệu thật (#
     const xay = ["lang_hoang", "uy_van"];
     const coNoiDung =
       MONSTERS.some((q) => xay.some((id) => (getMap(id)?.monsterCapOf(q.id) ?? 0) > 0)) ||
-      NPCS.some((n) => n.mapId !== undefined && xay.includes(n.mapId));
+      // NPC giao nhiệm vụ mới tính là "chơi được" (thợ rèn / lái buôn một mình, D1 #1466 lát A2, chưa phải nội dung chơi: chưa có quái sinh để lấy nguyên liệu)
+      NPCS.some(
+        (n) =>
+          n.mapId !== undefined && xay.includes(n.mapId) && QUESTS.some((q) => q.giver === n.id),
+      );
     expect(
       doc.includes("Đang xây dựng"),
       "Lang Hoang / Uy Vân Kinh đã có quái hoặc NPC thì bỏ nhãn 'Đang xây dựng' và câu 'chưa có quái vật và NPC nhiệm vụ'; còn chưa có thì giữ",
