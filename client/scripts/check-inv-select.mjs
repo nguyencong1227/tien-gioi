@@ -393,6 +393,25 @@ async function main() {
         await sleep(150);
         st = await state();
         check(!st.confirmOpen && st.drops.length === 0, "Giữ lại: hộp đóng, không gửi dropItem");
+        // CHỐT CHẶN QUÁ TAY, KHÔNG CÓ RĂNG với lỗi này (A đo: tắt ghép cặp vẫn XANH ở khổ chuột): `click` chuột nhả ngoài nút Vứt rơi vào tổ tiên chung chứ không vào nút xác nhận; chỉ ca CẢM ỨNG phát hiện lỗi.
+        // NHẤN GIỮ chuột 700 ms trên "Vứt hết" rồi nhả: hộp mở ở lúc NHẤN (dưới con trỏ), `click` của lần nhả tới SAU cửa sổ chống click ma 450 ms tính từ lúc mở;
+        // `click` đó KHÔNG được xác nhận Vứt (cửa sổ thời gian cố định không đúng cho mọi thời gian giữ: phải ghép cặp với lần nhấn mở hộp). Tất định: 700 ms > 450 ms ở mọi tốc độ khung.
+        await pastGuard();
+        const allHold = await center("#inv-btn-dropall");
+        await moveTo(allHold.x, allHold.y);
+        await mouse("mousePressed", allHold.x, allHold.y);
+        await sleep(700);
+        await mouse("mouseReleased", allHold.x, allHold.y);
+        await sleep(800);
+        st = await state();
+        check(
+          st.confirmOpen && st.drops.length === 0,
+          `chuột nhấn GIỮ 700 ms trên Vứt hết rồi nhả: hộp vẫn mở, KHÔNG vứt (hộp ${st.confirmOpen ? "mở" : "đóng"}, drops ${JSON.stringify(st.drops)})`,
+        );
+        await pastGuard();
+        const noHold = await center("#inv-drop-no");
+        await clickAt(noHold.x, noHold.y);
+        await sleep(150);
         // đổi ô khi hộp đang mở: hộp đóng
         await clickAt(all.x, all.y);
         await sleep(120);
@@ -483,6 +502,27 @@ async function main() {
         await sleep(200);
         st = await state();
         check(!st.confirmOpen && st.drops.length === 0, "chạm Giữ lại: hộp đóng, không gửi gì");
+        // NHẤN GIỮ ngón 700 ms trên "Vứt hết" rồi nhả: hộp mở ở lúc NHẤN (ngay dưới ngón), `click` của lần nhả rơi vào nút "Vứt" trong hộp SAU cửa sổ chống click ma 450 ms tính từ
+        // lúc mở (nhật ký sự kiện thật: pointerdown -> pointerup +355 ms -> click trên inv-drop-yes +114 ms = ~470 ms): trước đây xác nhận luôn, vứt đồ khi người chơi chưa kịp đọc.
+        // Ghép cặp: `click` của chính cú chạm mở hộp phải bị bỏ dù tới trễ. Tất định (700 ms > 450 ms ở mọi tốc độ khung).
+        await pastGuard();
+        const allHold = await center("#inv-btn-dropall");
+        await send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [{ x: allHold.x, y: allHold.y }],
+        });
+        await sleep(700);
+        await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await sleep(800);
+        st = await state();
+        check(
+          st.confirmOpen && st.drops.length === 0,
+          `chạm GIỮ 700 ms trên Vứt hết rồi nhả: hộp vẫn mở, KHÔNG vứt (hộp ${st.confirmOpen ? "mở" : "đóng"}, drops ${JSON.stringify(st.drops)})`,
+        );
+        await pastGuard();
+        const noHold = await center("#inv-drop-no");
+        await tapAt(noHold.x, noHold.y);
+        await sleep(200);
         await pastGuard(); // qua cửa sổ sau khi đóng rồi mới dừng đồng hồ
         await freezeClock();
         await tapAt(all.x, all.y);
