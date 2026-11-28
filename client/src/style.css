@@ -4610,6 +4610,16 @@ body.in-limbo #chat-log {
   font-style: italic;
 }
 
+/* Giấc mơ bến sông (#1464): ngay dưới "Kiếp thứ 1 khép lại", chữ nghiêng nhạt hơn dòng tiêu đề; chiếm chỗ bằng margin của .limbo-sub nên kéo sát lên */
+.limbo-dream {
+  font-size: var(--fs-13);
+  line-height: 1.5;
+  color: #d8b4fe;
+  margin: -6px 0 14px;
+  font-style: italic;
+  opacity: 0.9;
+}
+
 .limbo-summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
