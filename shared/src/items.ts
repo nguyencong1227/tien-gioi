@@ -1073,6 +1073,32 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Trùm rơi kinh quyển chiêu cao cấp nhất (M7.9, #654): Liệt Hỏa Kiếm, hiếm nhưng là phần thưởng hạ trùm
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.25, min: 1, max: 1 },
   ],
+  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): CHƯA sinh ngoài hoang. Bảng TẠM chỉ dùng đan có sẵn (đủ để mọi quái có bảng rơi và có kỳ vọng đồ bán được > 0); lát A2 thay bằng
+  // nguyên liệu Hóa Thần riêng (`docs/QUAI_HOA_THAN_DE_XUAT.md` mục 5.1) + bộ V, lát C thêm sách chiêu `reqRealm` 5.
+  da_lang: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
+  ],
+  hac_phong_lang: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  huyet_nguyet_lang: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.07, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
+  ],
+  xich_diem_lang: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+  ],
+  thuong_nguyet_lang: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+  ],
+  ngan_nguyet_lang: [
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+  ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
   yeu_vuong: [

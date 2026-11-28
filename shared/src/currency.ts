@@ -173,6 +173,14 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   cot_tuong: { chance: 0.8, min: 200, max: 400 },
   doc_tuoc: { chance: 0.9, min: 230, max: 430 },
   thien_han_vuong: { chance: 1, min: 900, max: 1470 }, // trùm: chia cho đội
+  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): khoảng x2,8 thu nhập Nguyên Anh cùng vai (`docs/KHUNG_HOA_THAN.md` mục 3), giữ thứ tự theo `exp` (`currency.test.ts`: loài chưa sinh xếp chung nhóm
+  // "bi_canh" với trùm bí cảnh, nên trung bình phải >= Linh Hư Yêu Vương 400). Số khởi đầu, lát A3 hiệu chỉnh theo `docs/CAN_BANG.md`.
+  da_lang: { chance: 0.8, min: 330, max: 720 },
+  hac_phong_lang: { chance: 0.8, min: 360, max: 760 },
+  huyet_nguyet_lang: { chance: 0.8, min: 370, max: 770 },
+  xich_diem_lang: { chance: 0.9, min: 550, max: 900 },
+  thuong_nguyet_lang: { chance: 0.8, min: 800, max: 1200 },
+  ngan_nguyet_lang: { chance: 0.9, min: 850, max: 1300 },
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */
