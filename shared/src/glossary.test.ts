@@ -169,6 +169,48 @@ describe("glossaryViolations — ca chứng minh (dữ liệu giả)", () => {
     expect(glossaryViolations("chờ tìm lối ra.")).toEqual([]);
   });
 
+  it("mục 75 (#1462): thuật ngữ truyện mới — dạng thiếu dấu bị bắt, dạng chuẩn KHÔNG báo oan", () => {
+    // Địa danh, quốc gia, nhân vật, khái niệm của mạch truyện (docs/COT_TRUYEN.md). Đột biến: xoá một term khỏi GLOSSARY
+    // (vd `dia-danh.dai-ung`) thì dòng tương ứng ở đây đỏ.
+    for (const [bad, good] of [
+      ["Thien Mon", "Thiên Môn"],
+      ["Doan Thien", "Đoạn Thiên"],
+      ["Ngu To", "Ngũ Tổ"],
+      ["Yeu Hoang", "Yêu Hoàng"],
+      ["Vinh Trieu Hai", "Vĩnh Triều Hải"],
+      ["Tam Thien Hoi", "Tầm Thiên Hội"],
+      ["Lao Do", "Lão Đò"],
+      ["Vong Xuyen", "Vong Xuyên"],
+      ["Uy Van Kinh", "Uy Vân Kinh"],
+      ["Tuyet Dao Quan", "Tuyết Đao Quan"],
+      ["Trieu Khu", "Triều Khư"],
+      ["U Hon Dien", "U Hồn Điện"],
+      ["Vong Quan", "Vọng Quan"],
+      ["Kiem Trach", "Kiếm Trạch"],
+      ["Tieu Phong Quan", "Tiểu Phong Quan"],
+      ["Thien Mon Ha", "Thiên Môn Hạ"],
+      ["Dai Ung", "Đại Ung"],
+      ["Bac Minh", "Bắc Minh"],
+      ["Luong Quoc", "Lương Quốc"],
+      ["Viem Quoc", "Viêm Quốc"],
+      ["Thinh Quoc", "Thịnh Quốc"],
+    ] as const) {
+      expect(glossaryViolations(`Ta đến ${bad} hôm qua.`), bad).toContain(
+        `thấy '${bad}' -> dùng '${good}'`,
+      );
+      expect(glossaryViolations(`Ta đến ${good} hôm qua.`), good).toEqual([]);
+    }
+    // Lang Hoang vốn không dấu: viết đúng không báo (không có biến thể sai để bắt).
+    expect(glossaryViolations("Ta đến Lang Hoang hôm qua.")).toEqual([]);
+    // "Thiên Môn Hạ" chứa "Thiên Môn" nhưng cả hai đều là dạng chuẩn: KHÔNG báo.
+    expect(glossaryViolations("Dưới chân Thiên Môn, tại Thiên Môn Hạ.")).toEqual([]);
+  });
+
+  it("chữ thường thiếu dấu CÓ THỂ là chữ hợp lệ ('ngu to', 'lao do') KHÔNG bị báo (chỉ bắt dạng hoa chữ đầu)", () => {
+    // 'ngu' / 'to' / 'lao' / 'do' đều là âm tiết hợp lệ không dấu: chữ thường dễ báo oan nên KHÔNG liệt kê (xem note term).
+    expect(glossaryViolations("Kẻ ngu to xác cũng biết lao do việc.")).toEqual([]);
+  });
+
   it("dạng NFD của chữ ĐÚNG không bị báo oan (matcher NFC hóa trước; quy tắc NFC của `ngon-ngu` lo phần dấu tách rời)", () => {
     const nfd = "Ngươi ở Trúc Cơ.".normalize("NFD");
     expect(nfd).not.toBe(nfd.normalize("NFC"));
