@@ -1,6 +1,9 @@
 // Quái Hóa Thần của Lang Hoang, lát A1 của D1 (#1466, mục 75; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3, khung `docs/KHUNG_HOA_THAN.md` mục 4.1).
 // Sáu loài thường đã KHAI BÁO nhưng CHƯA CHO SINH (lát A3 khai `monsterCap` của `lang_hoang` rồi sửa ca "chưa sinh" ở đây). Test canh: số liệu bám vai của khung,
 // hành vi theo vai, cấp trong trần chặn đường Hóa Thần, thứ tự `minDanger` theo `exp`, bậc `MONSTER_REALM` 5, bảng rơi + tiền, và đúng là chưa sinh ở đâu.
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   AMBUSH_FOE_LEVEL_CAP,
@@ -32,6 +35,11 @@ const LOAI = [
   { id: "thuong_nguyet_lang", vai: "day", he: 1.0, element: "phong", behavior: undefined },
   { id: "ngan_nguyet_lang", vai: "nang", he: 1.1, element: "phong", behavior: undefined },
 ] as const;
+
+const NGUON_DOC = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), "../../docs/NGUON_NOI_DUNG.md"),
+  "utf8",
+);
 
 describe("quái Hóa Thần Lang Hoang (D1 #1466 lát A1)", () => {
   it("sáu loài có thật, bậc `MONSTER_REALM` 5 (Hóa Thần), không phải trùm", () => {
@@ -131,5 +139,16 @@ describe("quái Hóa Thần Lang Hoang (D1 #1466 lát A1)", () => {
         avg(theoExp[i + 1].id),
         `${theoExp[i + 1].id} >= ${theoExp[i].id}`,
       ).toBeGreaterThanOrEqual(avg(theoExp[i].id));
+  });
+  it("mỗi loài có ĐÚNG MỘT dòng `du_lieu` ở docs/NGUON_NOI_DUNG.md mục 3 (khoá `enemy.<id>`, ghi #1466, KHONG_AP_DUNG, trỏ id trong `game.ts`)", () => {
+    for (const l of LOAI) {
+      const rows = NGUON_DOC.split("\n").filter(
+        (r) => r.startsWith("|") && r.includes(`\`enemy.${l.id}\``) && r.includes("#1466"),
+      );
+      expect(rows.length, `${l.id}: số dòng nguồn`).toBe(1);
+      const cols = rows[0].split("|").map((c) => c.trim());
+      expect([cols[1], cols[5], cols[6]], l.id).toEqual(["du_lieu", "#1466", "KHONG_AP_DUNG"]);
+      expect(rows[0].includes(`id \`${l.id}\``), `${l.id}: trỏ id`).toBe(true);
+    }
   });
 });
