@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 _spec = importlib.util.spec_from_file_location("ma_co_dinh", os.path.join(HERE, "ma-co-dinh.py"))
 MA = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (Q / T / VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
+_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (NPC / Q / T / VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
 MA_PATH = os.path.join(ROOT, "docs/art/huong-moi/ma-co-dinh.json")
 CODES = None  # bảng mã đã nạp (main() đặt; mã gọi trực tiếp thì `codes()` nạp từ MA_PATH)
 NEW_TAG = " · MỚI (sau 23/11)"  # đánh dấu hàng có mã vượt mốc đóng băng
@@ -432,9 +432,19 @@ NPC_ROLE = {  # id -> (vai Xianxia, đơn vị Wuxia thân top-down hoặc None)
 }
 
 
+def npc_order(names):
+    """THỨ TỰ NPC của nhóm 11 (dùng chung cho `group_npc` và `--ghi-ma`): theo `NPCS`. Mã KHÔNG phụ thuộc thứ tự này (lấy từ bảng ỔN ĐỊNH); thứ tự chỉ quyết định số cấp cho NPC MỚI chưa có trong bảng."""
+    return list(names["npcs"])
+
+
 def group_npc(L, names):
+    """NPC (nhóm 11). Mã NPC lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (NPC-01..15 của tờ 23/11 giữ nguyên, NPC mới nhận số ở CUỐI): trước đây `NPC-{i:02d}` theo chỉ số trong `NPCS` nên NPC chèn GIỮA làm NPC-13..15 nhích. Hàng cũ theo số trước, hàng MỚI (đánh dấu) sau."""
+    t = codes()
+    npcs = npc_order(names)
+    num = MA.assign_codes(t["n"], [n["id"] for n in npcs])
     rows = []
-    for i, n in enumerate(names["npcs"], 1):
+    for n in sorted(npcs, key=lambda n: num[n["id"]]):
+        i = num[n["id"]]
         role, body = NPC_ROLE.get(n["id"], (None, None))
         opts = [
             cell(L, "A", "xian", lambda r=role: L.xian_portrait(r), f"chân dung '{role}' (hộp thoại)", 64) if role else Cell("A", "xian", [], "", 64),
@@ -442,7 +452,7 @@ def group_npc(L, names):
             Cell("C", "ninja", [], "", 42),
         ]
         rec = ("A cho chân dung" + (" + B cho thân" if body else "")) if role else "giữ hiện tại (vật trang trí)"
-        rows.append(dict(code=f"NPC-{i:02d}", name=f"{n['name']} — {n['title']}", rec=rec, cur=cell(L, "", "cur", lambda nid=n["id"]: L.cur(f"npc-{nid}"), "hiện tại 36x42", 42), opts=opts))
+        rows.append(dict(code=MA.label("n", i), name=f"{n['name']} — {n['title']}" + (NEW_TAG if MA.is_new(t, "n", i) else ""), rec=rec, cur=cell(L, "", "cur", lambda nid=n["id"]: L.cur(f"npc-{nid}"), "hiện tại 36x42", 42), opts=opts))
     return "11-npc", "Nhóm 11 — NPC (NPC): chân dung hộp thoại (A) và thân trên bản đồ (B) chọn ĐỘC LẬP", rows
 
 
@@ -1042,8 +1052,8 @@ def main():
     ap.add_argument("--md", default=None, help="ghi các bảng markdown của các nhóm đã dựng vào tệp này (nối vào cuối)")
     ap.add_argument("--json", default=None, help="xuất duyet.json (mục 74: dữ liệu cho trang web duyệt) cho các nhóm đã dựng, vd docs/art/huong-moi/duyet.json; kèm ảnh cắt riêng từng ô vào --anh-dir")
     ap.add_argument("--anh-dir", default="/mnt/data/assets-private/preview", help="thư mục preview RIÊNG chứa ảnh cắt riêng (duyet/<mã>/<hien-tai|A|B|C>.png) khi có --json; ngoài repo")
-    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 12 / 13 / 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
-    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 12 / 13 / 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
+    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 11 / 12 / 13 / 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
+    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 11 / 12 / 13 / 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
     a = ap.parse_args()
     import json
 
@@ -1081,6 +1091,8 @@ def main():
         print(f"ĐÃ XUẤT {a.json}: {n_ma} mã, {n_img} ảnh cắt riêng -> {os.path.join(a.anh_dir, 'duyet')}")
     if a.ghi_ma:
         t = CODES
+        if "11" in built:
+            t = MA.extended(t, "n", MA.assign_codes(t["n"], [n["id"] for n in npc_order(names)]))
         if "12" in built:
             t = MA.extended(t, "q", MA.assign_codes(t["q"], [m["id"] for m in quai_order(names)]))
         if "13" in built:
@@ -1090,7 +1102,7 @@ def main():
         if "15" in built:
             t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for sk in hu_order(names)[1]]))
         MA.save(a.ma, t)
-        print(f"ĐÃ GHI bảng mã: Q {len(t['q'])}, T {len(t['t'])}, VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
+        print(f"ĐÃ GHI bảng mã: NPC {len(t['n'])}, Q {len(t['q'])}, T {len(t['t'])}, VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
 
 
 if __name__ == "__main__":
