@@ -81,13 +81,15 @@ describe("Hàn Vân Lĩnh: cổng với Âm Sương Trạch (M7.5)", () => {
 });
 
 describe("Hàn Vân Lĩnh: phòng riêng và quái Nguyên Anh (M7.5)", () => {
-  it("có phòng Colyseus riêng (`world_han_van`), tên khác ba phòng kia", () => {
+  it("có phòng Colyseus riêng (`world_han_van`), tên khác các phòng kia", () => {
     expect(roomNameOf(HAN_VAN_ID)).toBe("world_han_van");
     expect(MAPS.map((m) => roomNameOf(m.id))).toEqual([
       "world",
       "world_hac_phong",
       "world_am_suong",
       "world_han_van",
+      "world_lang_hoang",
+      "world_uy_van",
     ]);
   });
 

@@ -97,6 +97,12 @@ export function pickNeighborSkipFixed(
  * Phần tử mà mũi tên là của CHÍNH nó (chỉnh thanh trượt, đổi lựa chọn, di chuyển con trỏ chữ): không cướp mũi tên.
  * Thanh trượt nằm NGANG: chỉ Trái / Phải là của nó khi biết `dir`; Lên / Xuống vẫn chuyển focus, nếu không người chơi đứng ở thanh âm lượng
  * đầu Cài đặt sẽ không đi tiếp xuống được bằng mũi tên (chỉ còn Tab). Ô chọn (select) và ô chữ giữ mọi mũi tên (Tab là lối thoát).
+ * Ô TÌM một dòng (`type="search"`: ô tìm món ở cửa hàng, ô tìm chiêu) cũng chỉ giữ Trái / Phải (con trỏ chữ): Lên / Xuống không có nghĩa gì trong ô một dòng,
+ * mà giữ lại thì ô tìm là BẪY BÀN PHÍM (e2e:ban-phim đỏ ở cửa hàng 22 món từ khi có ô tìm: mũi tên đi xuống từ tab Mua rơi vào ô tìm rồi kẹt, không tới được nút + / Mua).
+ * Ô số (`number`) vẫn giữ cả bốn phím vì Lên / Xuống đổi giá trị của nó.
+ * Ô chữ một dòng còn lại (ô số lượng ở cửa hàng / kho tông môn là `type="text"`, Lên / Xuống do chính ô xử lý) NHẢ Trái / Phải khi con trỏ đã ở MÉP ô
+ * (Trái ở đầu chữ, Phải ở cuối chữ, không bôi đen): không còn gì để di chuyển trong ô nên mũi tên đi tiếp sang phần tử lân cận. Trước đây ô số lượng là BẪY:
+ * bấm Trái từ nút Mua (hoặc Lên từ nút Mua của thẻ dưới) rơi vào ô số lượng rồi kẹt, chỉ còn Tab / Esc (Esc làm mất chỗ đứng trong danh sách 22 món).
  */
 export function ownsArrowKeys(el: Element | null, dir?: NavDir): boolean {
   if (!el) return false;
@@ -105,9 +111,25 @@ export function ownsArrowKeys(el: Element | null, dir?: NavDir): boolean {
   if (tag === "input") {
     const type = (el as HTMLInputElement).type?.toLowerCase();
     if (type === "range" && dir) return dir === "left" || dir === "right";
+    if (type === "search" && (dir === "up" || dir === "down")) return false;
+    if (dir && caretAtEdge(el as HTMLInputElement, type, dir)) return false;
     return !(type === "checkbox" || type === "button" || type === "submit");
   }
   return Boolean((el as HTMLElement).isContentEditable);
+}
+
+/** Loại ô chữ một dòng đọc được vị trí con trỏ (`number` / `email` trả `null` ở `selectionStart`: không biết thì coi như con trỏ KHÔNG ở mép, ô giữ phím như cũ). */
+const CARET_INPUT_TYPES = new Set(["text", "search", "tel", "url", "password"]);
+
+/** Con trỏ đã ở mép theo hướng `dir` (Trái: ở đầu chữ, Phải: ở cuối chữ, không bôi đen)? Lên / Xuống: không (do ô tự xử lý). */
+function caretAtEdge(input: HTMLInputElement, type: string | undefined, dir: NavDir): boolean {
+  if (!type || !CARET_INPUT_TYPES.has(type)) return false;
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  if (typeof start !== "number" || typeof end !== "number" || start !== end) return false;
+  if (dir === "left") return start === 0;
+  if (dir === "right") return end === (input.value ?? "").length;
+  return false;
 }
 
 /**

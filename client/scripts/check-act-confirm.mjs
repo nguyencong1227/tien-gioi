@@ -1,9 +1,9 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm HỘP XÁC NHẬN DÙNG CHUNG (issue #779, docs/RA_SOAT_THAO_TAC.md) ở thao tác ĐỘT PHÁ trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-act-confirm.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-act-confirm.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
+ *   (`--slow-frame <ms>` / `TG_SLOW_FRAME_MS`: mỗi khung hình trang bận `ms` ms (`slow-frame.mjs`) để thử khung chậm 25-50 ms, nhiều lõi VÀ một lõi `taskset -c 0`.)
  *
  * Dùng sự kiện đầu vào THẬT của Chrome (`Input.dispatchMouseEvent` / `dispatchTouchEvent` / `dispatchKeyEvent`):
  *   - Đủ điều kiện (tầng cuối, đầy tu vi): bấm / chạm nút Đột phá -> HỘP hiện nêu cảnh giới, xác suất thành công và hậu quả thất bại; CHƯA gửi `breakthrough`;
@@ -18,13 +18,13 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -77,37 +77,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-act-confirm-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
-  );
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
+  let launched = null;
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
-    if (!page) throw new Error("Không tìm thấy Chrome page target.");
+    launched = await launchChrome({ name: "act-confirm" });
+    const page = launched.page;
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
       ws.onopen = res;
@@ -140,7 +118,7 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     // ---- đầu vào THẬT của Chrome ----
@@ -315,15 +293,7 @@ async function main() {
       check(st.yes === "Đột phá" && st.no === "Chưa", `nút: "${st.no}" / "${st.yes}"`);
       check(st.active === "act-btn-no", `focus ở "Chưa" (${st.active})`);
       check((await sentCount("breakthrough")) === 0, "chưa gửi breakthrough khi chưa xác nhận");
-      // click ma: bấm Đột phá NGAY
       const yes = await center("#act-btn-yes");
-      await tap(yes.x, yes.y);
-      await sleep(100);
-      st = await box();
-      check(
-        st.open && (await sentCount("breakthrough")) === 0,
-        "bấm Đột phá ngay khi hộp vừa mở (click ma): bị bỏ qua, hộp vẫn mở",
-      );
       await shot("xac-nhan-dot-pha");
       await sleep(560);
       check(
@@ -340,9 +310,18 @@ async function main() {
         !(await box()).open && (await sentCount("breakthrough")) === 0,
         "Chưa: hộp đóng, không gửi",
       );
-      // xác nhận: đúng MỘT
-      b = await center("#sk-break");
-      await tap(b.x, b.y);
+      // click ma: bấm Đột phá NGAY khi hộp vừa mở. KHÔNG phụ thuộc đồng hồ: mở hộp VÀ bấm "Đột phá" trong CÙNG MỘT lượt JS của trang (độ trễ ~0 ms, không qua CDP; `pointerdown` tổng hợp), nên cú bấm luôn rơi trong
+      // cửa sổ chống click ma ACT_CONFIRM_GUARD_MS (450 ms) dù runner chậm (trước đây center() + tap() chạy SAU khi mở hộp: trên runner CI không GPU cú bấm trễ quá 450 ms nên được tính là thật)
+      // (nút HUD và nút trong hộp nối `pointerdown`, nên dùng PointerEvent tổng hợp chứ không `.click()`)
+      await evalJs(
+        `(() => { const pd = (id) => document.getElementById(id).dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 })); pd("sk-break"); pd("act-btn-yes"); return 1; })()`,
+      );
+      st = await box();
+      check(
+        st.open && (await sentCount("breakthrough")) === 0,
+        "bấm Đột phá ngay khi hộp vừa mở (click ma): bị bỏ qua, hộp vẫn mở",
+      );
+      // xác nhận: đúng MỘT (hộp đang mở từ bước trên; chờ ĐÃ QUA cửa sổ rồi mới bấm: ngủ dài hơn cửa sổ chỉ an toàn hơn trên runner chậm)
       await sleep(600);
       const yes2 = await center("#act-btn-yes");
       await tap(yes2.x, yes2.y);
@@ -370,9 +349,10 @@ async function main() {
       await press2("x", "KeyX");
       await sleep(150);
       check(!(await box()).open && (await sentCount("breakthrough")) === 0, "X = giữ lại");
-      await press2("v", "KeyV");
-      await sleep(80);
-      await press2("y", "KeyY");
+      // Y NGAY khi hộp vừa mở: V rồi Y trong CÙNG MỘT lượt JS của trang (keydown tổng hợp, độ trễ ~0 ms) thay vì hai phím CDP cách nhau 80 ms + độ trễ runner
+      await evalJs(
+        `(() => { const k = (type, key, code) => window.dispatchEvent(new KeyboardEvent(type, { key, code, bubbles: true, cancelable: true })); k("keydown", "v", "KeyV"); k("keyup", "v", "KeyV"); k("keydown", "y", "KeyY"); k("keyup", "y", "KeyY"); return 1; })()`,
+      );
       await sleep(100);
       check(
         (await box()).open && (await sentCount("breakthrough")) === 0,
@@ -451,9 +431,13 @@ async function main() {
           windowsVirtualKeyCode: 68,
           ...extra,
         });
+      // Chờ theo ĐIỀU KIỆN (tối đa 10 s) tới khi nhân vật đã đi > 20 px thay vì đo quãng đường trong đúng 500 ms: khung chậm / một lõi (--slow-frame 25-50 ms + taskset -c 0) chỉ đi 8-17 px trong 500 ms
       await keyD("rawKeyDown");
-      await sleep(500);
-      const walked = await dx();
+      let walked = 0;
+      for (let i = 0; i < 100 && walked <= 20; i++) {
+        await sleep(100);
+        walked = await dx();
+      }
       check(walked > 20, `đang giữ D, hộp chưa mở: nhân vật đi (${Math.round(walked)} px)`);
       await press2("v", "KeyV");
       await sleep(150);
@@ -468,8 +452,12 @@ async function main() {
       await press("Escape");
       await sleep(150);
       check(!(await box()).open, "Esc đóng hộp");
-      await sleep(300);
-      const afterEsc = await dx();
+      // cùng lý do: chờ tới khi đi tiếp > 10 px (tối đa 10 s), không đo trong đúng 300 ms
+      let afterEsc = frozenB;
+      for (let i = 0; i < 100 && afterEsc - frozenB <= 10; i++) {
+        await sleep(100);
+        afterEsc = await dx();
+      }
       check(
         afterEsc - frozenB > 10,
         `đóng hộp mà D còn giữ: đi tiếp (${Math.round(afterEsc - frozenB)} px)`,
@@ -501,21 +489,8 @@ async function main() {
       );
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
+    if (launched) await launched.close();
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

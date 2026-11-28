@@ -10,7 +10,7 @@ import {
 } from "./ambush-data";
 import { AMBUSH_FOE_COUNT_MAX, AMBUSH_FOE_LEVEL_CAP, AMBUSH_TIERS } from "./ambush";
 import { MONSTER_BY_ID } from "./game";
-import { stepOf } from "./realms";
+import { REALMS, stepOf } from "./realms";
 import { BOSSES } from "./bosses";
 import { DEFAULT_MAP_ID, MAPS } from "./map";
 
@@ -45,9 +45,22 @@ describe("dữ liệu chặn đường: khung", () => {
 });
 
 describe("dữ liệu chặn đường THẬT: bầy kẻ chặn đường (CD5b #1065)", () => {
-  it("25 bầy; đủ cảnh + bầy cho mọi (bản đồ, mức) kể cả CẦM ĐẦU của Lạc Hà (G bổ sung Thanh Xà, CD5 #1065)", () => {
+  it("25 bầy; độ phủ chỉ còn thiếu cảnh + bầy cả ba bậc của Lang Hoang và Uy Vân Kinh (bản đồ mới của mục 75; E / D bổ sung rồi sửa dòng này); CẦM ĐẦU của Lạc Hà đã đủ (G bổ sung Thanh Xà, CD5 #1065)", () => {
     expect(AMBUSH_FOES.length).toBe(25);
-    expect(ambushCoverageViolations()).toEqual([]);
+    expect(ambushCoverageViolations()).toEqual([
+      "lang_hoang / normal: thiếu cảnh",
+      "lang_hoang / normal: thiếu bầy",
+      "lang_hoang / elite: thiếu cảnh",
+      "lang_hoang / elite: thiếu bầy",
+      "lang_hoang / leader: thiếu cảnh",
+      "lang_hoang / leader: thiếu bầy",
+      "uy_van / normal: thiếu cảnh",
+      "uy_van / normal: thiếu bầy",
+      "uy_van / elite: thiếu cảnh",
+      "uy_van / elite: thiếu bầy",
+      "uy_van / leader: thiếu cảnh",
+      "uy_van / leader: thiếu bầy",
+    ]);
   });
 
   it("khoảng bậc HẸP (<= 5 bậc): `payRewards` chưa giảm tu vi theo chênh bậc nên người bậc cao hơn nhiều vẫn nhận đủ", () => {
@@ -250,7 +263,18 @@ describe("ambushViolations: bầy", () => {
         ],
       );
     it("trần theo cảnh giới đúng bảng và loài nằm đúng chỗ", () => {
-      expect(AMBUSH_FOE_LEVEL_CAP).toEqual({ 0: 1, 1: 7, 2: 12, 3: 15, 4: 18 });
+      expect(AMBUSH_FOE_LEVEL_CAP).toEqual({
+        0: 1,
+        1: 7,
+        2: 12,
+        3: 15,
+        4: 18,
+        5: 21,
+        6: 24,
+        7: 27,
+        8: 30,
+        9: 33,
+      });
       expect(MONSTER_BY_ID.lang!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[0]!);
       expect(MONSTER_BY_ID.ho!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[1]!);
       expect(MONSTER_BY_ID.mang!.level).toBeLessThanOrEqual(AMBUSH_FOE_LEVEL_CAP[2]!);
@@ -274,8 +298,26 @@ describe("ambushViolations: bầy", () => {
           new RegExp(`${kind} cấp \\d+ vượt trần ${AMBUSH_FOE_LEVEL_CAP[realm]}`),
         );
     });
-    it("cảnh giới chưa khai báo trần (Hóa Thần trở lên) bị bắt: phải thêm trần trước khi thêm nội dung", () => {
-      expect(at(5, "lang").join("\n")).toMatch(/chưa có trần cấp/);
+    it("MỌI cảnh giới của REALMS đều có trần (A1 #1461): từ Nguyên Anh mỗi cảnh giới thêm 3 cấp (mỗi cảnh giới 3 bậc)", () => {
+      expect(Object.keys(AMBUSH_FOE_LEVEL_CAP).length).toBe(REALMS.length);
+      for (let r = 4; r < REALMS.length; r++)
+        expect(AMBUSH_FOE_LEVEL_CAP[r], `trần cảnh giới ${r}`).toBe(18 + 3 * (r - 4));
+    });
+    it("Hóa Thần: loài cấp vừa tầm qua, và trùm Nguyên Anh (cấp 21) hợp lệ ở Hóa Thần nhưng vượt trần ở Nguyên Anh", () => {
+      expect(at(5, "lang")).toEqual([]);
+      expect(at(5, "thien_han_vuong")).toEqual([]); // cấp 21 <= trần 21
+      expect(at(4, "thien_han_vuong").join("\n")).toMatch(/thien_han_vuong cấp 21 vượt trần 18/);
+    });
+    it("cảnh giới thiếu trần bị bắt: phải thêm trần trước khi thêm nội dung (gỡ tạm khoá 5 để thử nhánh phòng thủ)", () => {
+      const cap = AMBUSH_FOE_LEVEL_CAP as Record<number, number>;
+      const saved = cap[5];
+      delete cap[5];
+      try {
+        expect(at(5, "lang").join("\n")).toMatch(/chưa có trần cấp/);
+      } finally {
+        cap[5] = saved!;
+      }
+      expect(at(5, "lang")).toEqual([]);
     });
     it("trần tính theo CẢNH GIỚI của bậc đầu (bầy trải nhiều bậc dùng bậc thấp nhất)", () => {
       // bầy từ Luyện Khí (bậc đầu) tới Kim Đan (bậc cuối) có Xích Mãng: vượt trần Luyện Khí nên bắt (người Luyện Khí gặp phải)

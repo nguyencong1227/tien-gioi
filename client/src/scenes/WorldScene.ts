@@ -63,6 +63,10 @@ import {
   visualPackPaths,
   visualFadePlan,
   visualOverDepth,
+  visualTreeSpots,
+  visualWithoutTreeTiles,
+  VISUAL_TREE_FRAME,
+  VISUAL_TREE_FRAME_NAME,
   visualRows,
   visualTextureKey,
   type VisualMap,
@@ -215,6 +219,7 @@ import {
   isMockDungeonEnabled,
   MOCK_DUNGEON_SAMPLES,
 } from "../dungeon";
+import { MOCK_SESSION_ID } from "../mock-map";
 import { respawnDeathText } from "../death-text";
 import { dropSourceIn, hopLabel, nextHop, questGoal, type NavHop } from "../quest-nav";
 import { npcMarkerStyle } from "../npc-marker";
@@ -624,6 +629,8 @@ export class WorldScene extends Phaser.Scene {
   private visualMapId = "";
   visualLayers: Phaser.Tilemaps.TilemapLayer[] = [];
   private visualTilemaps: Phaser.Tilemaps.Tilemap[] = [];
+  /** Cây nguyên khối của lớp hình Tiled (mục 73): mỗi ô thân cây là một sprite neo ở gốc, xếp lớp theo y */
+  private visualTrees: Phaser.GameObjects.Image[] = [];
   private visualSeq = 0;
   /** Số lần đã làm mờ chuyển từ nền cũ sang lớp hình (công khai cho script kiểm `?debug`). */
   visualFades = 0;
@@ -1072,8 +1079,10 @@ export class WorldScene extends Phaser.Scene {
   private destroyTiledVisual() {
     for (const l of this.visualLayers) l.destroy();
     for (const t of this.visualTilemaps) t.destroy();
+    for (const tr of this.visualTrees) tr.destroy();
     this.visualLayers = [];
     this.visualTilemaps = [];
+    this.visualTrees = [];
   }
 
   /** Bỏ lớp hình của bản đồ vừa rời: huỷ lớp, quên `visual.json`, xoá texture (gói đã giải phóng), vô hiệu mọi lần xin đang chạy. */
@@ -1166,10 +1175,30 @@ export class WorldScene extends Phaser.Scene {
       this.visualLayers.push(layer);
       return true;
     };
+    // Cây vẽ bằng sprite nguyên khối (mục 73): bỏ ô thân (decor) + ô tán (over) khỏi hai lớp ô
     const ok =
-      mk(vm.ground, -10) && mk(vm.decor, -9) && mk(vm.over, visualOverDepth(this.map.worldH));
-    if (!ok) this.destroyTiledVisual();
-    return ok;
+      mk(vm.ground, -10) &&
+      mk(visualWithoutTreeTiles(vm.decor), -9) &&
+      mk(visualWithoutTreeTiles(vm.over), visualOverDepth(this.map.worldH));
+    if (!ok) {
+      this.destroyTiledVisual();
+      return false;
+    }
+    const tex = this.textures.get(key);
+    const f = VISUAL_TREE_FRAME;
+    if (!tex.has(VISUAL_TREE_FRAME_NAME)) tex.add(VISUAL_TREE_FRAME_NAME, 0, f.x, f.y, f.w, f.h);
+    for (const s of visualTreeSpots(vm.decor, vm.width, vm.height, TILE)) {
+      // gốc ở giữa đáy khung; độ sâu = y của gốc như mọi thực thể (đứng sau cây bị tán che, đứng trước che rễ)
+      this.visualTrees.push(
+        this.add
+          .image(s.x, s.y, key, VISUAL_TREE_FRAME_NAME)
+          .setOrigin(0.5, 1)
+          .setScale(TILE / VISUAL_TILE)
+          .setFlipX(s.flip)
+          .setDepth(s.y),
+      );
+    }
+    return true;
   }
 
   /** Tháo mọi đối tượng của cách vẽ nền CŨ (lớp ô, trang trí, nước, màu phủ) ra khỏi trạng thái cảnh và trả về để gỡ ngay hoặc gỡ sau khi làm mờ. */
@@ -1207,7 +1236,7 @@ export class WorldScene extends Phaser.Scene {
     const plan = visualFadePlan(legacy.length > 0, getQuality().reducedMotion);
     if (tiled && fade && plan.fade) {
       this.visualFades++;
-      const fresh = [...this.visualLayers]; // bản sao: nếu dựng lại giữa chừng thì tween chạy trên lớp đã gỡ (vô hại)
+      const fresh = [...this.visualLayers, ...this.visualTrees]; // bản sao: nếu dựng lại giữa chừng thì tween chạy trên lớp đã gỡ (vô hại)
       for (const l of fresh) l.setAlpha(0);
       this.tweens.add({
         targets: fresh,
@@ -2651,7 +2680,11 @@ export class WorldScene extends Phaser.Scene {
     // Phòng đã vào TỪ TRƯỚC khi gắn vào cảnh (qua cổng: đợi gói bản đồ tới 8 s sau khi vào phòng, main.ts `travelTo`): lần đồng bộ state đầu đã xảy ra rồi
     // và nơi đứng yên (không patch) sẽ không có lần nào nữa, nên `predX` / `predY` kẹt ở toạ độ bản đồ CŨ (camera nhìn sai chỗ, đường đi tính sai).
     // Đối chiếu ngay một lần; chưa có state / chưa có mình thì `reconcile` tự bỏ qua.
-    if (!isInitial) this.reconcile();
+    // CẢ LẦN VÀO ĐẦU (không chỉ qua cổng): vào phòng thật rồi mới dựng cảnh (tải gói / phông / cảnh mất vài trăm ms) thì lần đồng bộ state đầu đã xảy ra TRƯỚC `onStateChange` ở trên. Phòng có quái /
+    // người khác thì patch tới liên tục nên tự lành, nhưng BẢN ĐỒ TRỐNG (Lang Hoang, Uy Vân Kinh chưa quái; không ai khác) đứng yên không có patch nào: `hasMe` = false, `predX` / `predY` = (0, 0),
+    // camera nhìn góc trên-trái bản đồ (núi viền) thay vì chỗ người chơi đứng tới khi cử động (đo 26/11 ở Lang Hoang: me() = (2080, 3344), pred = (0, 0), camera (-71, -40) sau 3 s). Phòng GIẢ
+    // (`MOCK_SESSION_ID`) giữ nguyên: mock chỉ đồng bộ khi `?map=` (xem `mock-map.ts` `mockSyncsState`) để ảnh / số đo của các kịch bản cũ không đổi.
+    if (!isInitial || this.room.sessionId !== MOCK_SESSION_ID) this.reconcile();
     // Ghi lại handler theo loại để phát lại các tin server gửi ngay lúc vào phòng (xem early-messages.ts)
     const handlers: Record<string, (msg: any) => void> = {};
     const reg = (type: string, fn: (msg: any) => void) => {

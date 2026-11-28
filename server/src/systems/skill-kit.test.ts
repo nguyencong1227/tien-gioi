@@ -7,14 +7,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   LEARNABLE_SKILLS,
+  SKILL_BY_ID,
   skillCooldownMs,
   skillDamageMult,
   skillMpCost,
   statusOf,
+  type FxMsg,
   type SkillDef,
 } from "@tien-gioi/shared";
 import type { PlayerCtrl } from "../world";
 import { cast, shapeHits } from "./cast";
+import { planBolt, type PTarget } from "./pbolt";
 import { tickWorld } from "./tick";
 import { addMonster, addPlayer, makeWorld } from "./test-helpers";
 
@@ -114,6 +117,8 @@ function bigMonster(t: ReturnType<typeof setup>, dx: number, dy: number) {
   return m;
 }
 
+let testedHitShapesCount = 0;
+
 describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
   "skill-kit: chiêu %s qua cast thật",
   (_id, def) => {
@@ -160,18 +165,175 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
       const t = setup();
       equip(t.c, 2, def.id);
       vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      if (def.shape === "bolt") {
+        // Nhánh đạn hẹn giờ (CT3 #1108): đạn bay theo tốc độ, trúng quái trên đường bay, xuyên/nảy theo dữ liệu chiêu
+        const speed = Math.max(1, def.speed ?? 500);
+        const range = def.range;
+        const pierce = Math.max(0, Math.floor(def.pierce ?? 0));
+        const bounce = Math.max(0, Math.floor(def.bounce ?? 0));
+        const count = Math.max(1, Math.floor(def.count ?? 1));
+        const spread = Math.max(0, def.arc ?? 0);
+
+        // Đặt quái trên đường bay chính (angle = 0): m1 gần, m2 sau m1 (cho xuyên)
+        const d1 = Math.min(80, range * 0.3);
+        const d2 = Math.min(160, range * 0.6);
+        const m1 = bigMonster(t, d1, 0);
+        const m2 = bigMonster(t, d2, 0);
+        // Quái miss lệch xa hẳn khỏi đường bay
+        const miss = bigMonster(t, z.out[0], z.out[1]);
+
+        // Nếu chiêu có nảy (bounce > 0): đặt m3 trong bán kính nảy từ m2
+        const testMonsters = [m1, m2, miss];
+        let m3: ReturnType<typeof bigMonster> | undefined;
+        if (bounce > 0) {
+          m3 = bigMonster(t, d2, 60);
+          testMonsters.push(m3);
+        }
+
+        // Đối chiếu với quy hoạch thuần planBolt (không chép công thức)
+        const targets: PTarget[] = testMonsters.map((tm) => ({
+          id: tm.id,
+          x: tm.m.x,
+          y: tm.m.y,
+          r: tm.mc.def.radius,
+        }));
+        const expectedHits: Record<string, number> = {};
+        const expectedLegs: { x: number; y: number; angle: number; ms: number }[] = [];
+
+        for (let i = 0; i < count; i++) {
+          const a = count === 1 ? 0 : 0 - spread / 2 + (spread * i) / (count - 1);
+          const plan = planBolt({
+            x: t.p.x,
+            y: t.p.y,
+            angle: a,
+            speed,
+            range,
+            pierce,
+            bounce,
+            targets,
+            blocked: (x, y) => t.w.map.isBlockedPx(x, y),
+          });
+          for (const h of plan.hits) expectedHits[h.id] = (expectedHits[h.id] ?? 0) + 1;
+          for (const l of plan.legs) {
+            expectedLegs.push({
+              x: l.x,
+              y: l.y,
+              angle: l.angle,
+              ms: Math.round((l.dist / speed) * 1000),
+            });
+          }
+        }
+
+        cast(t.w, "a", { slot: 2, angle: 0 });
+
+        // Chờ vận chiêu xong nếu có windupMs và cho đạn bay hết qua tickWorld (tối đa 200 tick)
+        const pins = testMonsters.map((tm) => [tm.m, tm.m.x, tm.m.y] as const);
+        for (let step = 0; step < 200 && t.c.windup !== undefined; step++) {
+          t.w.now += 50;
+          tickWorld(t.w, 50);
+          for (const [m, x, y] of pins) {
+            m.x = x;
+            m.y = y;
+          }
+        }
+        for (let step = 0; step < 200; step++) {
+          if (t.w.pbolts.length === 0) break;
+          t.w.now += 50;
+          tickWorld(t.w, 50);
+          for (const [m, x, y] of pins) {
+            m.x = x;
+            m.y = y;
+          }
+        }
+
+        expect(t.w.pbolts.length, `${def.id}: đạn phải bay xong`).toBe(0);
+        // Quái ngoài đường không bị đánh
+        expect(dmgOf(t.dmgs, miss.id), `${def.id}: quái ngoài đường không bị đánh`).toEqual([]);
+        // Khớp số lần trúng của m1
+        expect(dmgOf(t.dmgs, m1.id).length, `${def.id}: m1 hits`).toBe(expectedHits[m1.id] ?? 0);
+        expect(
+          expectedHits[m1.id] ?? 0,
+          `${def.id}: m1 phải trúng ít nhất một viên`,
+        ).toBeGreaterThan(0);
+
+        // Khớp số lần trúng của m2 (xuyên)
+        expect(dmgOf(t.dmgs, m2.id).length, `${def.id}: m2 hits`).toBe(expectedHits[m2.id] ?? 0);
+        if (pierce > 0) {
+          expect(
+            dmgOf(t.dmgs, m2.id).length,
+            `${def.id}: m2 phải trúng nhờ pierce`,
+          ).toBeGreaterThan(0);
+        } else {
+          expect(dmgOf(t.dmgs, m2.id), `${def.id}: m2 không trúng khi không có pierce`).toEqual([]);
+        }
+
+        // Khớp số lần trúng của m3 (nảy) nếu có
+        if (m3) {
+          expect(dmgOf(t.dmgs, m3.id).length, `${def.id}: m3 hits`).toBe(expectedHits[m3.id] ?? 0);
+          if (bounce > 0) {
+            expect(
+              dmgOf(t.dmgs, m3.id).length,
+              `${def.id}: m3 phải trúng nhờ bounce`,
+            ).toBeGreaterThan(0);
+          }
+        }
+
+        // fx pbolt có đúng số đoạn và ms đúng
+        const pboltFxs = t.fx.filter((f) => f.kind === "pbolt") as Array<
+          Extract<FxMsg, { kind: "pbolt" }>
+        >;
+        expect(pboltFxs.length, `${def.id}: số đoạn fx pbolt`).toBe(expectedLegs.length);
+        for (let k = 0; k < expectedLegs.length; k++) {
+          expect(pboltFxs[k].ms, `${def.id}: fx pbolt leg ${k} ms`).toBe(expectedLegs[k].ms);
+        }
+
+        testedHitShapesCount++;
+        return;
+      }
+
+      if (def.shape === "chain") {
+        // Sét lan (mục 51): đánh mục tiêu đầu trong tầm với, nảy sang các quái khác (dùng castAndSettle để windupMs không đỏ giả)
+        const hit = bigMonster(t, z.in[0], z.in[1]);
+        const miss = bigMonster(t, z.out[0], z.out[1]);
+        castAndSettle(t, def, hit.id);
+        expect(dmgOf(t.dmgs, hit.id).length, `${def.id}: quái trong tầm bị đánh`).toBeGreaterThan(
+          0,
+        );
+        expect(dmgOf(t.dmgs, miss.id), `${def.id}: quái ngoài tầm không bị đánh`).toEqual([]);
+        testedHitShapesCount++;
+        return;
+      }
+
+      if (isDelayed(def)) {
+        // Chiêu trễ (zone / trap / aura / totem / windupMs)
+        const hit = bigMonster(t, z.in[0], z.in[1]);
+        const miss = bigMonster(t, z.out[0], z.out[1]);
+        castAndSettle(t, def, hit.id);
+        expect(
+          dmgOf(t.dmgs, hit.id).length,
+          `${def.id}: quái trong vùng phải bị đánh`,
+        ).toBeGreaterThan(0);
+        expect(dmgOf(t.dmgs, miss.id), `${def.id}: quái ngoài vùng không bị đánh`).toEqual([]);
+        testedHitShapesCount++;
+        return;
+      }
+
+      // Chiêu tức thời thông thường (cone, line, fan, nova, ground)
       const hit = bigMonster(t, z.in[0], z.in[1]);
       const miss = bigMonster(t, z.out[0], z.out[1]);
       const R = hit.mc.def.radius;
       const want = shapeHits(def, t.p.x, t.p.y, 0, hit.m.x, hit.m.y, R);
       const missHits = shapeHits(def, t.p.x, t.p.y, 0, miss.m.x, miss.m.y, R);
-      // Điểm chọn phải thực sự trong / ngoài vùng (với bán kính thật); nếu không thì bỏ qua ca này.
-      if (want <= 0 || missHits !== 0) return;
+
+      // Điểm chọn phải thực sự trúng trong vùng và quái miss phải ngoài vùng: KHÔNG return âm thầm
+      expect(want, `${def.id}: điểm in (${z.in}) phải trúng ít nhất một tia`).toBeGreaterThan(0);
+      expect(missHits, `${def.id}: điểm out (${z.out}) phải nằm ngoài vùng`).toBe(0);
+
       cast(t.w, "a", { slot: 2, angle: 0 });
-      if (isDelayed(def)) return; // chiêu trễ: số lần trúng theo thời gian, ca riêng bên dưới
       expect(dmgOf(t.dmgs, hit.id).length, def.id).toBe(want);
-      expect(want, def.id).toBeGreaterThan(0);
       expect(dmgOf(t.dmgs, miss.id), def.id).toEqual([]);
+      testedHitShapesCount++;
     });
 
     it("trạng thái: có hại lên kẻ trúng đòn, có lợi lên chính mình (không ngược)", () => {
@@ -188,9 +350,12 @@ describe.each(LEARNABLE_SKILLS.map((d) => [d.id, d] as const))(
             const t = setup();
             equip(t.c, 2, def.id);
             const hit = bigMonster(t, z.in[0], z.in[1]);
-            // Điểm trong vùng thật (bán kính quái); nếu không thì bỏ qua ca này (điểm chọn chưa hợp cho chiêu này).
-            if (shapeHits(def, t.p.x, t.p.y, 0, hit.m.x, hit.m.y, hit.mc.def.radius) <= 0) return;
             castAndSettle(t, def, hit.id);
+            // KHÔNG return âm thầm: quái phải thực sự bị trúng đòn để nhận trạng thái
+            expect(
+              dmgOf(t.dmgs, hit.id).length,
+              `${def.id}: quái phải trúng đòn để nhận trạng thái có hại`,
+            ).toBeGreaterThan(0);
             for (const e of harmful)
               if (e.chance > 0)
                 expect(
@@ -311,6 +476,117 @@ describe("skill-kit: guard — choáng / chết / ghost / Hoàng Tuyền KHÔNG 
       expect(t.c.skillCd[0], mode).toBe(0);
     });
   }
+});
+
+describe("skill-kit: bao phủ kiểm tra hình", () => {
+  it("toàn bộ chiêu có mult > 0 đều được kiểm tra hình trúng thực sự (không pass rỗng)", () => {
+    const required = LEARNABLE_SKILLS.filter((s) => s.mult > 0).length;
+    expect(testedHitShapesCount).toBeGreaterThanOrEqual(required);
+  });
+});
+
+describe("skill-kit: ca riêng cho bolt (đạn hẹn giờ)", () => {
+  it("quy hoạch và thực thi qua cast thật: count toả arc, pierce xuyên, bounce nảy, fx pbolt đúng ms", () => {
+    const boltDef: SkillDef = {
+      ...SKILL_BY_ID["bon_thach_quyen"]!,
+      id: "test_bolt_bounce_pierce",
+      name: "Đạn Thử Nghiệm",
+      shape: "bolt",
+      fx: "bolt",
+      speed: 500,
+      range: 600,
+      width: 16,
+      count: 1,
+      pierce: 1,
+      bounce: 1,
+      mult: 1.5,
+      effects: [],
+    };
+    (SKILL_BY_ID as Record<string, SkillDef>)[boltDef.id] = boltDef;
+    try {
+      const t = setup();
+      equip(t.c, 2, boltDef.id);
+      // q1 trên đường bay (x = 100)
+      const q1 = bigMonster(t, 100, 0);
+      // q2 sau q1 trên đường bay (x = 200, nhận xuyên pierce)
+      const q2 = bigMonster(t, 200, 0);
+      // q3 gần q2 (x = 200, y = 60; cách q2 60 px <= PBOLT_BOUNCE_RADIUS 160 px, nhận nảy bounce)
+      const q3 = bigMonster(t, 200, 60);
+      // q_miss ngoài tầm
+      const q_miss = bigMonster(t, 100, 400);
+
+      const speed = boltDef.speed ?? 500;
+      const targets: PTarget[] = [q1, q2, q3, q_miss].map((m) => ({
+        id: m.id,
+        x: m.m.x,
+        y: m.m.y,
+        r: m.mc.def.radius,
+      }));
+      const plan = planBolt({
+        x: t.p.x,
+        y: t.p.y,
+        angle: 0,
+        speed,
+        range: boltDef.range,
+        pierce: 1,
+        bounce: 1,
+        targets,
+        blocked: (x, y) => t.w.map.isBlockedPx(x, y),
+      });
+
+      cast(t.w, "a", { slot: 2, angle: 0 });
+
+      // Trôi w.now + tickPBolts qua tickWorld (chờ windupMs xong nếu có)
+      const pins = [q1, q2, q3, q_miss].map((tm) => [tm.m, tm.m.x, tm.m.y] as const);
+      for (let i = 0; i < 200 && t.c.windup !== undefined; i++) {
+        t.w.now += 50;
+        tickWorld(t.w, 50);
+        for (const [m, x, y] of pins) {
+          m.x = x;
+          m.y = y;
+        }
+      }
+      for (let i = 0; i < 200; i++) {
+        if (t.w.pbolts.length === 0) break;
+        t.w.now += 50;
+        tickWorld(t.w, 50);
+        for (const [m, x, y] of pins) {
+          m.x = x;
+          m.y = y;
+        }
+      }
+
+      expect(t.w.pbolts.length).toBe(0);
+      // Quái ngoài đường không bị đánh
+      expect(dmgOf(t.dmgs, q_miss.id)).toEqual([]);
+      // q1 bị trúng 1 lần
+      expect(dmgOf(t.dmgs, q1.id).length).toBe(1);
+      // q2 bị trúng 1 lần (nhờ xuyên pierce = 1)
+      expect(dmgOf(t.dmgs, q2.id).length).toBe(1);
+      // q3 bị trúng 1 lần (nhờ nảy bounce = 1)
+      expect(dmgOf(t.dmgs, q3.id).length).toBe(1);
+
+      // Khớp số lần trúng từ planBolt thuần
+      for (const m of [q1, q2, q3, q_miss]) {
+        const expectedCount = plan.hits.filter((h) => h.id === m.id).length;
+        expect(dmgOf(t.dmgs, m.id).length).toBe(expectedCount);
+      }
+
+      // fx pbolt có đúng 2 đoạn (đoạn 1 tới q2, đoạn 2 nảy sang q3)
+      const pboltFxs = t.fx.filter((f) => f.kind === "pbolt") as Array<
+        Extract<FxMsg, { kind: "pbolt" }>
+      >;
+      expect(pboltFxs.length).toBe(plan.legs.length);
+      for (let k = 0; k < plan.legs.length; k++) {
+        const leg = plan.legs[k];
+        expect(pboltFxs[k].ms).toBe(Math.round((leg.dist / speed) * 1000));
+        expect(pboltFxs[k].x).toBeCloseTo(leg.x, 0);
+        expect(pboltFxs[k].y).toBeCloseTo(leg.y, 0);
+      }
+    } finally {
+      delete (SKILL_BY_ID as Record<string, SkillDef>)[boltDef.id];
+    }
+  });
 });
 
 afterEach(() => vi.restoreAllMocks());

@@ -165,4 +165,60 @@ describe("dirOfArrowKey / ownsArrowKeys", () => {
       expect(ownsArrowKeys(el("INPUT", "text"), d)).toBe(true);
     }
   });
+  it("ô tìm một dòng (type=search): chỉ Trái / Phải là của nó, Lên / Xuống chuyển focus (không bẫy ở cửa hàng 22 món)", () => {
+    const search = el("INPUT", "search");
+    expect(ownsArrowKeys(search, "left")).toBe(true);
+    expect(ownsArrowKeys(search, "right")).toBe(true);
+    expect(ownsArrowKeys(search, "up")).toBe(false);
+    expect(ownsArrowKeys(search, "down")).toBe(false);
+    // không biết hướng thì vẫn coi là của ô (hành vi cũ của lời gọi không truyền dir)
+    expect(ownsArrowKeys(search)).toBe(true);
+    // ô số: Lên / Xuống đổi giá trị nên vẫn là của nó
+    for (const d of ["up", "down"] as const)
+      expect(ownsArrowKeys(el("INPUT", "number"), d)).toBe(true);
+  });
+  it("ô chữ một dòng: Trái ở đầu chữ / Phải ở cuối chữ NHẢ mũi tên (ô số lượng không còn là bẫy); giữa chữ hoặc đang bôi đen vẫn của ô", () => {
+    const text = (value: string, start: number, end: number, type = "text") =>
+      ({
+        tagName: "INPUT",
+        type,
+        value,
+        selectionStart: start,
+        selectionEnd: end,
+      }) as unknown as Element;
+    // chữ "12", con trỏ giữa: cả hai hướng là của ô
+    expect(ownsArrowKeys(text("12", 1, 1), "left")).toBe(true);
+    expect(ownsArrowKeys(text("12", 1, 1), "right")).toBe(true);
+    // con trỏ ở đầu: Trái nhả, Phải vẫn của ô (còn chữ bên phải)
+    expect(ownsArrowKeys(text("12", 0, 0), "left")).toBe(false);
+    expect(ownsArrowKeys(text("12", 0, 0), "right")).toBe(true);
+    // con trỏ ở cuối: Phải nhả, Trái vẫn của ô
+    expect(ownsArrowKeys(text("12", 2, 2), "right")).toBe(false);
+    expect(ownsArrowKeys(text("12", 2, 2), "left")).toBe(true);
+    // ô trống: đầu cũng là cuối, cả hai hướng nhả
+    expect(ownsArrowKeys(text("", 0, 0), "left")).toBe(false);
+    expect(ownsArrowKeys(text("", 0, 0), "right")).toBe(false);
+    // đang bôi đen: mũi tên đầu tiên chỉ bỏ bôi đen, còn của ô (kể cả bôi đen cả chữ)
+    expect(ownsArrowKeys(text("12", 0, 2), "left")).toBe(true);
+    expect(ownsArrowKeys(text("12", 0, 2), "right")).toBe(true);
+    // Lên / Xuống của ô chữ vẫn là của ô (ô số lượng tự xử lý: đổi số)
+    expect(ownsArrowKeys(text("12", 0, 0), "up")).toBe(true);
+    expect(ownsArrowKeys(text("12", 2, 2), "down")).toBe(true);
+    // ô tìm: Trái ở đầu cũng nhả
+    expect(ownsArrowKeys(text("", 0, 0, "search"), "left")).toBe(false);
+    // ô số (không đọc được con trỏ: selectionStart null) và thiếu thông tin thì giữ như cũ
+    expect(
+      ownsArrowKeys(
+        {
+          tagName: "INPUT",
+          type: "number",
+          value: "5",
+          selectionStart: null,
+          selectionEnd: null,
+        } as unknown as Element,
+        "left",
+      ),
+    ).toBe(true);
+    expect(ownsArrowKeys(el("INPUT", "text"), "left")).toBe(true);
+  });
 });

@@ -373,7 +373,7 @@ const NA_REST_BELOW_MP = 0.2;
 const NA_RESUME_HP = 0.95;
 const NA_RESUME_MP = 0.9;
 
-const SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van"];
+const SOAK_MAP_IDS = ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"];
 
 /**
  * 15 toạ độ an toàn (isPositionSafe = true, không bị chặn bởi cây/đá) nằm sâu trong vùng nguy hiểm cao

@@ -1,6 +1,7 @@
 // Bảng duyệt đồ hoạ từng phần (`dung-bang-duyet.py`, QUYET_DINH_M3 mục 67.2 / 69, issue #1330). Điều QUAN TRỌNG nhất là ranh giới GIẤY PHÉP: tờ ảnh CÔNG KHAI (vào repo) KHÔNG được chứa
 // hình của gói cấm phân phối lại (Wuxia RTS, Sunnyside, Cainos). Phần đọc mã chạy ở mọi máy; phần dựng thật cần Pillow + các gói ở /mnt/data (máy chủ chung có, CI không): thiếu thì bỏ qua.
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -61,8 +62,12 @@ describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu
     const blk = /<!-- NHOM 14 -->([\s\S]*?)<!-- \/NHOM 14 -->/.exec(doc);
     expect(blk, "thiếu khối NHOM 14").toBeTruthy();
     const codes = [...blk![1].matchAll(/^\| (VP-\d{3}) \|/gm)].map((m) => m[1]);
-    expect(codes).toHaveLength(ITEMS.length);
-    expect(codes).toEqual(ITEMS.map((_, i) => `VP-${String(i + 1).padStart(3, "0")}`));
+    // Mã VP lấy từ bảng ỔN ĐỊNH (ma-co-dinh.json) chứ KHÔNG còn là VP-001.. theo thứ tự ITEMS: tờ có thể THIẾU vật phẩm mới thêm sau lần dựng lại cuối (PR nội dung không dựng
+    // lại tờ), nhưng mỗi mã đúng MỘT hàng, các mã liên tục 001..K, và K không vượt số vật phẩm.
+    expect(new Set(codes).size, "mã VP lặp").toBe(codes.length);
+    expect(codes.length).toBeGreaterThanOrEqual(128);
+    expect(codes.length).toBeLessThanOrEqual(ITEMS.length);
+    expect([...codes].sort()).toEqual(codes.map((_, i) => `VP-${String(i + 1).padStart(3, "0")}`));
     const sheets = [...blk![1].matchAll(/`(14-vat-pham-[a-z-]+\d?)\.png`/g)].map((m) => m[1]);
     expect(new Set(sheets).size).toBeGreaterThanOrEqual(4);
     for (const f of new Set(sheets))
@@ -83,6 +88,324 @@ describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu
     const inC = body.match(/Cell\("C", "hicon"/g)?.length ?? 0;
     expect(all).toBeGreaterThan(2);
     expect(inC).toBe(all);
+  });
+});
+
+// Mã ỔN ĐỊNH (A chốt 25/11): mã T / VP / HU của tờ người dùng đã nhận ngày 23/11 13:00 +0700 (commit dd32ff1b: T-01..04, VP-001..128, HU-01..59) KHÔNG BAO GIỜ đổi; trùm / vật phẩm / chiêu thêm sau nhận số ở CUỐI.
+// Mô-đun `ma-co-dinh.py` thuần (không Pillow) nên chạy ở mọi máy có python3, kể cả CI.
+const hasPython = spawnSync("python3", ["-I", "-c", "pass"], { encoding: "utf8" }).status === 0;
+const MA_FILE = path.join(here, "ma-co-dinh.py");
+const MA_JSON = path.join(here, "..", "..", "..", "docs/art/huong-moi/ma-co-dinh.json");
+const DONG_BANG = { vp: 128, hu: 59, t: 4 };
+/** Trùm của tờ 23/11 (T-01..T-04, #1446): đúng thứ tự `MONSTERS` lúc đó; Thanh Xà (#1445) và mọi trùm sau nhận số Ở CUỐI. */
+const DONG_BANG_T = { mang: 1, hac_giao: 2, thien_han_vuong: 3, yeu_vuong: 4 };
+/** sha256 của các dòng `vp:<id>=<số>` rồi `hu:<id>=<số>` (số tăng dần) của phần ĐÃ ĐÓNG BĂNG; sửa một mã đã giao người dùng là đỏ. */
+const DONG_BANG_SHA256 = "ac64cbf5272abeeb19a3e75e2a0fd9620a3a2d91a860047b518044b86421a83c";
+
+type MaTable = {
+  dong_bang: { commit: string; vp_toi_da: number; hu_toi_da: number; t_toi_da: number };
+  mo_coi: Record<string, string>;
+  vp: Record<string, number>;
+  hu: Record<string, number>;
+  t: Record<string, number>;
+};
+const maTable = (): MaTable => JSON.parse(fs.readFileSync(MA_JSON, "utf8")) as MaTable;
+/** Chạy một đoạn python với mô-đun mã nạp sẵn là `MA`; nhận / trả JSON. */
+function ma(code: string, input: unknown = null) {
+  const r = spawnSync(
+    "python3",
+    [
+      "-I",
+      "-c",
+      `import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("ma", ${JSON.stringify(MA_FILE)})
+MA = importlib.util.module_from_spec(spec); spec.loader.exec_module(MA)
+inp = json.load(sys.stdin)
+${code}`,
+    ],
+    { input: JSON.stringify(input), encoding: "utf8" },
+  );
+  return { status: r.status, out: String(r.stdout), err: String(r.stderr) };
+}
+
+const MOI_TAG = / · MỚI \(sau 23\/11\)$/;
+/**
+ * Kiểm các hàng `T-nn` của tài liệu duyệt so với bảng mã ỔN ĐỊNH; trả danh sách lỗi (rỗng = khớp).
+ * Hàng có số TRONG bảng: đúng trùm của bảng. Hàng chưa có trong bảng chỉ hợp lệ khi là trùm CHƯA vào bảng, số liền ngay sau số lớn nhất của bảng
+ * (đúng cách `assign_codes` cấp: max + 1, max + 2...), mỗi trùm / mỗi số đúng một hàng: PR nội dung dựng lại tờ bằng `--groups 13 --md` KHÔNG `--ghi-ma` (A chốt ở #1445, để hai PR không cùng cấp một số
+ * T-nn), nên tờ có thể có hàng MỚI tạm trước khi lần dựng lại có chủ ý ghi bảng. Nhãn "· MỚI (sau 23/11)" có đúng khi và chỉ khi số vượt mốc đóng băng.
+ */
+function trumDocErrors(
+  doc: string,
+  table: Record<string, number>,
+  frozenMax: number,
+  bosses: Map<string, string>,
+): string[] {
+  const idOf = new Map(Object.entries(table).map(([id, n]) => [n, id] as const));
+  const maxNum = Math.max(0, ...Object.values(table));
+  const unregistered = new Set(
+    [...bosses].filter(([id]) => !(id in table)).map(([, name]) => name),
+  );
+  const errs: string[] = [];
+  const seenNum = new Set<number>();
+  const seenName = new Set<string>();
+  for (const m of doc.matchAll(/^\| T-(\d+) \| ([^|]*?) \|/gm)) {
+    const n = Number(m[1]);
+    const shown = m[2].replace(MOI_TAG, "");
+    if (MOI_TAG.test(m[2]) !== n > frozenMax)
+      errs.push(`T-${m[1]}: nhãn MỚI sai (mốc đóng băng ${frozenMax})`);
+    if (seenNum.has(n)) errs.push(`T-${m[1]}: số xuất hiện hai lần`);
+    seenNum.add(n);
+    const id = idOf.get(n);
+    if (id !== undefined) {
+      if (shown !== bosses.get(id)) errs.push(`T-${m[1]}: bảng nói ${id}, tờ ghi ${shown}`);
+      continue;
+    }
+    if (!unregistered.has(shown)) errs.push(`T-${m[1]}: ${shown} không phải trùm chưa vào bảng`);
+    if (seenName.has(shown)) errs.push(`T-${m[1]}: ${shown} xuất hiện hai lần`);
+    seenName.add(shown);
+  }
+  [...seenNum]
+    .filter((n) => !idOf.has(n))
+    .sort((a, b) => a - b)
+    .forEach((n, i) => {
+      if (n !== maxNum + 1 + i)
+        errs.push(`T-${n}: số mới phải liền ngay sau T-${maxNum + i} (bảng tới T-${maxNum})`);
+    });
+  return errs;
+}
+
+describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.json)", () => {
+  const repo = path.join(here, "..", "..", "..");
+
+  it("phần ĐÃ ĐÓNG BĂNG (tờ 23/11 dd32ff1b: T-01..04, VP-001..128, HU-01..59) giữ nguyên từng id -> số", () => {
+    const t = maTable();
+    expect(t.dong_bang).toMatchObject({
+      commit: "dd32ff1b",
+      vp_toi_da: DONG_BANG.vp,
+      hu_toi_da: DONG_BANG.hu,
+      t_toi_da: DONG_BANG.t,
+    });
+    // trùm: phần <= t_toi_da đúng bốn trùm người dùng đã nhận (Xích Mãng, Hắc Giao, Thiên Hàn Vương, Linh Hư Yêu Vương), từng số
+    expect(
+      Object.fromEntries(Object.entries(t.t).filter(([, n]) => n <= DONG_BANG.t)),
+      "T-01..04 của tờ 23/11",
+    ).toEqual(DONG_BANG_T);
+    const frozen = (kind: "vp" | "hu", max: number) =>
+      Object.entries(t[kind])
+        .filter(([, n]) => n <= max)
+        .sort((a, b) => a[1] - b[1])
+        .map(([id, n]) => `${kind}:${id}=${n}`);
+    const lines = [...frozen("vp", DONG_BANG.vp), ...frozen("hu", DONG_BANG.hu)];
+    expect(lines).toHaveLength(DONG_BANG.vp + DONG_BANG.hu);
+    expect(createHash("sha256").update(lines.join("\n")).digest("hex")).toBe(DONG_BANG_SHA256);
+  });
+
+  it("bảng hợp lệ: số liên tục 1..K, không trùng số / id; mọi id còn khớp vật phẩm / chiêu / trùm (id không còn khớp phải khai trong mo_coi)", () => {
+    const t = maTable();
+    const itemIds = new Set(ITEMS.map((i) => i.id));
+    const skillIds = new Set(LEARNABLE_SKILLS.map((k) => k.id));
+    const bossIds = new Set(MONSTERS.filter((m) => m.boss).map((m) => m.id));
+    for (const [kind, known] of [
+      ["vp", itemIds],
+      ["hu", skillIds],
+      ["t", bossIds],
+    ] as const) {
+      const nums = Object.values(t[kind]).sort((a, b) => a - b);
+      expect(nums, `${kind}: số liên tục từ 1`).toEqual(nums.map((_, i) => i + 1));
+      const orphan = Object.keys(t[kind]).filter((id) => !known.has(id));
+      for (const id of orphan)
+        expect(
+          t.mo_coi[`${kind}:${id}`],
+          `${kind}:${id} không còn khớp: khai trong mo_coi (số không dùng lại)`,
+        ).toBeTruthy();
+    }
+  });
+
+  it("mã T / VP / HU trong DUYET_TUNG_PHAN.md khớp bảng (cùng số = cùng trùm / vật phẩm / chiêu), nên tờ không bao giờ đổi nghĩa mã", () => {
+    const t = maTable();
+    const doc = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+    const byNum = (kind: "vp" | "hu" | "t") =>
+      new Map(Object.entries(t[kind]).map(([id, n]) => [n, id] as const));
+    const vpId = byNum("vp");
+    const huId = byNum("hu");
+    const items = new Map(ITEMS.map((i) => [i.id, i.name] as const));
+    const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
+    const bosses = new Map(MONSTERS.filter((m) => m.boss).map((m) => [m.id, m.name] as const));
+    let vpRows = 0;
+    let huRows = 0;
+    for (const m of doc.matchAll(/^\| (VP|HU)-(\d+) \| ([^|]*?) \|/gm)) {
+      const n = Number(m[2]);
+      const shown = m[3].replace(/ · MỚI \(sau 23\/11\)$/, "");
+      if (m[1] === "VP") {
+        vpRows++;
+        expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
+      } else {
+        huRows++;
+        expect(shown.startsWith(`${skills.get(huId.get(n) ?? "")} (`), `HU-${m[2]}: ${shown}`).toBe(
+          true,
+        );
+      }
+    }
+    expect(vpRows).toBeGreaterThanOrEqual(DONG_BANG.vp);
+    expect(huRows).toBeGreaterThanOrEqual(DONG_BANG.hu);
+    expect(trumDocErrors(doc, t.t, DONG_BANG.t, bosses)).toEqual([]);
+    expect((doc.match(/^\| T-\d+ \|/gm) ?? []).length).toBeGreaterThanOrEqual(DONG_BANG.t);
+  });
+
+  it("trumDocErrors: hàng T MỚI tạm (trùm chưa vào bảng, số CUỐI, ghi MỚI) được chấp nhận; mọi kiểu lệch khác bị bắt", () => {
+    const table = { mang: 1, hac_giao: 2 };
+    const bosses = new Map([
+      ["mang", "Xích Mãng"],
+      ["hac_giao", "Hắc Giao"],
+      ["thanh_xa", "Thanh Xà"],
+      ["trum_b", "Trùm B"],
+    ]);
+    const row = (n: number, name: string, moi = false) =>
+      `| T-${String(n).padStart(2, "0")} | ${name}${moi ? " · MỚI (sau 23/11)" : ""} | hiện tại |\n`;
+    const old = row(1, "Xích Mãng") + row(2, "Hắc Giao");
+    const check = (doc: string) => trumDocErrors(doc, table, 2, bosses);
+    expect(check(old)).toEqual([]); // bảng == tờ
+    expect(check(old + row(3, "Thanh Xà", true))).toEqual([]); // trùm mới CHƯA ghi bảng: hợp lệ
+    expect(check(old + row(3, "Thanh Xà", true) + row(4, "Trùm B", true))).toEqual([]);
+    // mỗi kiểu lệch phải bị bắt (ít nhất một lỗi)
+    const bad: [string, string][] = [
+      ["tên lệch số đã đóng băng", row(1, "Hắc Giao") + row(2, "Xích Mãng")],
+      ["thiếu nhãn MỚI ở số vượt mốc", old + row(3, "Thanh Xà")],
+      ["nhãn MỚI ở số đã đóng băng", row(1, "Xích Mãng", true) + row(2, "Hắc Giao")],
+      [
+        "trùm chưa vào bảng chiếm số đã dùng (chèn giữa)",
+        row(1, "Thanh Xà", true) + row(2, "Hắc Giao"),
+      ],
+      ["trùm mới không phải trùm có thật", old + row(3, "Trùm Ma", true)],
+      ["trùm ĐÃ ở bảng mang số mới", old + row(3, "Xích Mãng", true)],
+      ["hai hàng cùng số", old + row(3, "Thanh Xà", true) + row(3, "Trùm B", true)],
+      ["một trùm hai hàng", old + row(3, "Thanh Xà", true) + row(4, "Thanh Xà", true)],
+      ["bỏ cách số (T-04 khi bảng mới tới T-02)", old + row(4, "Thanh Xà", true)],
+    ];
+    for (const [what, doc] of bad) expect(check(doc), what).not.toEqual([]);
+  });
+
+  it.skipIf(!hasPython)(
+    "assign_codes: id cũ giữ số, id mới nhận số Ở CUỐI dù chèn GIỮA danh sách",
+    () => {
+      const r = ma(`print(json.dumps(MA.assign_codes(inp["t"], inp["ids"])))`, {
+        t: { a: 1, b: 2 },
+        ids: ["x", "a", "y", "b", "z"],
+      });
+      expect(r.status, r.err).toBe(0);
+      expect(JSON.parse(r.out)).toEqual({ x: 3, a: 1, y: 4, b: 2, z: 5 });
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "assign_codes: số của id MỒ CÔI (đã xoá / đổi id) không bao giờ cấp lại; id lặp là lỗi",
+    () => {
+      const orphan = ma(
+        `print(json.dumps(MA.assign_codes(inp["t"], inp["ids"])))`,
+        { t: { a: 1, b: 2, c: 3 }, ids: ["a", "b", "z"] }, // c bị xoá
+      );
+      expect(orphan.status, orphan.err).toBe(0);
+      expect(JSON.parse(orphan.out)).toEqual({ a: 1, b: 2, z: 4 });
+      const dup = ma(`MA.assign_codes(inp["t"], inp["ids"])`, { t: { a: 1 }, ids: ["a", "a"] });
+      expect(dup.status).not.toBe(0);
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "is_new / label / extended: mốc đóng băng, định dạng mã, không đổi bảng gốc",
+    () => {
+      const tbl = {
+        dong_bang: { vp_toi_da: 128, hu_toi_da: 59, t_toi_da: 4 },
+        vp: { a: 1 },
+        hu: { b: 1 },
+        t: { c: 1 },
+      };
+      const r = ma(
+        `t = inp
+e = MA.extended(t, "vp", {"n": 129})
+print(json.dumps([MA.is_new(t, "vp", 128), MA.is_new(t, "vp", 129), MA.is_new(t, "hu", 59), MA.is_new(t, "hu", 60), MA.label("vp", 7), MA.label("hu", 7), e["vp"], t["vp"], MA.is_new(t, "t", 4), MA.is_new(t, "t", 5), MA.label("t", 5)]))`,
+        tbl,
+      );
+      expect(r.status, r.err).toBe(0);
+      expect(JSON.parse(r.out)).toEqual([
+        false,
+        true,
+        false,
+        true,
+        "VP-007",
+        "HU-07",
+        { a: 1, n: 129 },
+        { a: 1 },
+        false,
+        true,
+        "T-05",
+      ]);
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "load: bảng trùng số, số không hợp lệ hay thiếu khoá là lỗi (không nuốt lặng)",
+    () => {
+      const base = { dong_bang: {}, vp: {}, hu: {} };
+      const bad: unknown[] = [
+        { ...base, vp: { a: 1, b: 1 } },
+        { ...base, hu: { a: 0 } },
+        { ...base, hu: { a: "1" } },
+        { ...base, t: { a: 1, b: 1 } }, // trùm trùng số (#1446)
+        { ...base, t: { a: 0 } },
+        { dong_bang: {}, vp: {} },
+      ];
+      for (const b of bad) {
+        const r = ma(
+          `import tempfile, os
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf8"); json.dump(inp, f); f.close()
+try:
+    MA.load(f.name)
+finally:
+    os.unlink(f.name)`,
+          b,
+        );
+        expect(r.status, JSON.stringify(b)).not.toBe(0);
+      }
+    },
+  );
+
+  it.skipIf(!hasPython)(
+    "load: bảng CŨ chưa có nhóm trùm `t` vẫn nạp được (t rỗng); `t` có dữ liệu thì giữ nguyên",
+    () => {
+      const r = ma(
+        `import tempfile, os
+f = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf8"); json.dump(inp, f); f.close()
+try:
+    old = MA.load(f.name)
+finally:
+    os.unlink(f.name)
+print(json.dumps([old["t"], MA.assign_codes(old["t"], ["x", "y"])]))`,
+        { dong_bang: {}, vp: {}, hu: {} },
+      );
+      expect(r.status, r.err).toBe(0);
+      expect(JSON.parse(r.out)).toEqual([{}, { x: 1, y: 2 }]);
+    },
+  );
+
+  it("generator CHỈ đọc bảng: group_trum / group_vp / group_hu cấp mã bằng MA.assign_codes, không còn bộ đếm tuần tự", () => {
+    const body = (from: string, to: string) => code.slice(code.indexOf(from), code.indexOf(to));
+    const trum = body("def group_trum(", "ELEMENT_ORDER = (");
+    const vp = body("def group_vp(", "# Nền / màn tải / Hoàng Tuyền (nhóm 17");
+    const hu = body("def group_hu(", "def group_ui(");
+    expect(trum.length).toBeGreaterThan(500);
+    expect(vp.length).toBeGreaterThan(500);
+    expect(hu.length).toBeGreaterThan(500);
+    expect(trum).toMatch(/MA\.assign_codes\(t\["t"\]/);
+    expect(trum).not.toMatch(/enumerate\(/); // mã T từng là `T-{i:02d}` theo chỉ số trong danh sách trùm (#1446)
+    expect(code).not.toMatch(/f"T-\{i:02d\}"/);
+    expect(vp).toMatch(/MA\.assign_codes\(t\["vp"\]/);
+    expect(hu).toMatch(/MA\.assign_codes\(t\["hu"\]/);
+    for (const b of [vp, hu]) expect(b).not.toMatch(/\bn \+= 1\b/);
+    expect(hu).not.toMatch(/enumerate\(/); // group_hu không có lý do dùng chỉ số thứ tự (group_vp có: đánh số tờ chia nhỏ)
+    expect(code).not.toMatch(/f"VP-\{n:03d\}"/);
+    expect(code).not.toMatch(/f"HU-\{n:02d\}"/);
   });
 });
 
@@ -239,6 +562,239 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it("mã VP / HU của tờ VỪA DỰNG khớp bảng ma-co-dinh.json (đổi ITEMS / chiêu không làm nhích mã; mã mới ở CUỐI, ghi MỚI)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const md = path.join(dir, "ma.md");
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "14,15",
+        "--public",
+        pub,
+        "--private",
+        priv,
+        "--names",
+        namesFile,
+        "--md",
+        md,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const t = maTable();
+    const items = new Map(ITEMS.map((i) => [i.id, i.name] as const));
+    const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
+    const vpId = new Map(Object.entries(t.vp).map(([id, n]) => [n, id] as const));
+    const huId = new Map(Object.entries(t.hu).map(([id, n]) => [n, id] as const));
+    const maxVp = Math.max(...Object.values(t.vp));
+    const maxHu = Math.max(...Object.values(t.hu));
+    const unregItems = new Set(ITEMS.filter((i) => !(i.id in t.vp)).map((i) => i.name));
+    const unregSkills = new Set(LEARNABLE_SKILLS.filter((k) => !(k.id in t.hu)).map((k) => k.name));
+    const text = fs.readFileSync(md, "utf8");
+    let vp = 0;
+    let hu = 0;
+    for (const m of text.matchAll(/^\| (VP|HU)-(\d+) \| ([^|]*?) \|/gm)) {
+      const n = Number(m[2]);
+      const mới = / · MỚI \(sau 23\/11\)$/.test(m[3]);
+      const shown = m[3].replace(/ · MỚI \(sau 23\/11\)$/, "");
+      if (m[1] === "VP") {
+        vp++;
+        if (vpId.has(n)) expect(shown, `VP-${m[2]}`).toBe(items.get(vpId.get(n) ?? ""));
+        else {
+          // vật phẩm PR nội dung thêm mà CHƯA --ghi-ma: mã tạm ở CUỐI (> số lớn nhất trong bảng), tên là một vật phẩm chưa có trong bảng
+          expect(n, `VP-${m[2]} chưa có trong bảng: phải ở CUỐI`).toBeGreaterThan(maxVp);
+          expect(unregItems.has(shown), `VP-${m[2]}: ${shown}`).toBe(true);
+        }
+        expect(mới, `VP-${m[2]} MỚI`).toBe(n > DONG_BANG.vp);
+      } else {
+        hu++;
+        if (huId.has(n))
+          expect(
+            shown.startsWith(`${skills.get(huId.get(n) ?? "")} (`),
+            `HU-${m[2]}: ${shown}`,
+          ).toBe(true);
+        else {
+          expect(n, `HU-${m[2]} chưa có trong bảng: phải ở CUỐI`).toBeGreaterThan(maxHu);
+          expect(
+            [...unregSkills].some((k) => shown.startsWith(`${k} (`)),
+            `HU-${m[2]}: ${shown}`,
+          ).toBe(true);
+        }
+        expect(mới, `HU-${m[2]} MỚI`).toBe(n > DONG_BANG.hu);
+      }
+    }
+    expect(vp).toBe(ITEMS.length);
+    expect(hu).toBe(LEARNABLE_SKILLS.length);
+  }, 120_000);
+
+  it("--ghi-ma ghi ĐÚNG số đã in trên tờ: 2 trang bị MỚI cùng phẩm ngược thứ tự (phẩm, tên) và 2 chiêu MỚI ngược thứ tự hệ (A review #1423)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const tmp = fs.mkdtempSync(path.join(dir, "ghi-ma-"));
+    const names = JSON.parse(fs.readFileSync(namesFile, "utf8")) as {
+      items: unknown[];
+      skills: unknown[];
+    };
+    // `zz_a` đứng TRƯỚC `aa_b` trong danh sách, nhưng tờ sắp trang bị theo (phẩm, tên): "A Kiếm" trước "Z Kiếm"
+    names.items.push(
+      { id: "zz_a", name: "Z Kiếm", type: "equip", rarity: 2, rarityName: "Trúc Cơ" },
+      { id: "aa_b", name: "A Kiếm", type: "equip", rarity: 2, rarityName: "Trúc Cơ" },
+    );
+    // chiêu: `zz_moc` (hệ Mộc) đứng TRƯỚC `aa_kim` (hệ Kim) trong danh sách, nhưng tờ đi theo thứ tự hệ (Kim trước Mộc)
+    names.skills.push(
+      { id: "zz_moc", name: "Z Mộc", element: "moc", shape: "cone", style: null },
+      { id: "aa_kim", name: "A Kim", element: "kim", shape: "cone", style: null },
+    );
+    const fake = path.join(tmp, "names.json");
+    const maFile = path.join(tmp, "ma.json");
+    const md = path.join(tmp, "doc.md");
+    fs.writeFileSync(fake, JSON.stringify(names));
+    fs.copyFileSync(MA_JSON, maFile);
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "14,15",
+        "--public",
+        path.join(tmp, "pub"),
+        "--private",
+        path.join(tmp, "priv"),
+        "--names",
+        fake,
+        "--ma",
+        maFile,
+        "--md",
+        md,
+        "--ghi-ma",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const shown = new Map<string, number>(); // tên hiển thị trên tờ -> số mã in ra
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| VP-(\d+) \| ([^|]*?) \|/gm))
+      shown.set(m[2].replace(/ · MỚI \(sau 23\/11\)$/, ""), Number(m[1]));
+    const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).vp;
+    expect(written.aa_b, "A Kiếm").toBe(shown.get("A Kiếm"));
+    expect(written.zz_a, "Z Kiếm").toBe(shown.get("Z Kiếm"));
+    expect(written.aa_b).toBeLessThan(written.zz_a); // sắp theo (phẩm, tên): A trước Z
+    const nums = Object.values(written).sort((a, b) => a - b);
+    expect(nums).toEqual(nums.map((_, i) => i + 1)); // vẫn liên tục, không số nào bị cấp hai lần
+    // nhóm 15 cùng luật: số ghi == số in, và theo thứ tự hệ (Kim trước Mộc) dù danh sách đưa Mộc trước
+    const huShown = new Map<string, number>();
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| HU-(\d+) \| ([^|(]*?) \(/gm))
+      huShown.set(m[2], Number(m[1]));
+    const huWritten = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).hu;
+    expect(huWritten.aa_kim, "A Kim").toBe(huShown.get("A Kim"));
+    expect(huWritten.zz_moc, "Z Mộc").toBe(huShown.get("Z Mộc"));
+    expect(huWritten.aa_kim).toBeLessThan(huWritten.zz_moc);
+    const huNums = Object.values(huWritten).sort((a, b) => a - b);
+    expect(huNums).toEqual(huNums.map((_, i) => i + 1));
+  }, 120_000);
+
+  it("nhóm 13 (trùm): chèn trùm MỚI lên ĐẦU danh sách và đảo thứ tự trùm cũ KHÔNG làm T-01..04 đổi nghĩa; trùm mới ở CUỐI, ghi MỚI; --ghi-ma ghi đúng số đã in (#1446)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const tmp = fs.mkdtempSync(path.join(dir, "trum-"));
+    const names = JSON.parse(fs.readFileSync(namesFile, "utf8")) as {
+      mons: { id: string; name: string; boss: boolean }[];
+    };
+    const oldBosses = names.mons.filter((m) => m.boss);
+    const quai = names.mons.filter((m) => !m.boss);
+    // hai trùm mới ở ĐẦU danh sách (trước đây sẽ chiếm T-01, T-02 và đẩy Xích Mãng... xuống), trùm cũ đảo ngược thứ tự
+    const fresh = [
+      { id: "zz_trum_a", name: "Trùm Z", boss: true },
+      { id: "aa_trum_b", name: "Trùm A", boss: true },
+    ];
+    names.mons = [...quai, ...fresh, ...[...oldBosses].reverse()];
+    const fake = path.join(tmp, "names.json");
+    const maFile = path.join(tmp, "ma.json");
+    const md = path.join(tmp, "doc.md");
+    fs.writeFileSync(fake, JSON.stringify(names));
+    fs.copyFileSync(MA_JSON, maFile);
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "13",
+        "--public",
+        path.join(tmp, "pub"),
+        "--private",
+        path.join(tmp, "priv"),
+        "--names",
+        fake,
+        "--ma",
+        maFile,
+        "--md",
+        md,
+        "--ghi-ma",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const rows: { n: number; shown: string; mới: boolean }[] = [];
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| T-(\d+) \| ([^|]*?) \|/gm))
+      rows.push({
+        n: Number(m[1]),
+        shown: m[2].replace(/ · MỚI \(sau 23\/11\)$/, ""),
+        mới: / · MỚI \(sau 23\/11\)$/.test(m[2]),
+      });
+    const byId = new Map(MONSTERS.map((m) => [m.id, m.name] as const));
+    // bốn trùm của tờ 23/11: ĐÚNG số, ĐÚNG tên, không ghi MỚI, dù danh sách đảo và có trùm chèn đầu
+    for (const [id, n] of Object.entries(DONG_BANG_T)) {
+      const row = rows.find((x) => x.n === n);
+      expect(row?.shown, `T-${n} (${id})`).toBe(byId.get(id));
+      expect(row?.mới, `T-${n} không phải MỚI`).toBe(false);
+    }
+    // trùm mới: số CUỐI (5, 6), theo thứ tự xuất hiện trong danh sách, ghi MỚI
+    const zz = rows.find((x) => x.shown === "Trùm Z");
+    const aa = rows.find((x) => x.shown === "Trùm A");
+    expect([zz?.n, zz?.mới, aa?.n, aa?.mới]).toEqual([5, true, 6, true]);
+    expect(rows.map((x) => x.n)).toEqual([1, 2, 3, 4, 5, 6]); // tờ: hàng cũ theo số trước, hàng MỚI sau
+    // --ghi-ma: số ghi vào bảng == số in trên tờ; phần đóng băng không bị đụng
+    const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).t;
+    expect(written).toEqual({ ...DONG_BANG_T, zz_trum_a: 5, aa_trum_b: 6 });
+
+    // luồng PR nội dung (#1445): dựng lại tờ bằng `--groups 13 --md` KHÔNG `--ghi-ma` => bảng không đổi, tờ có hàng MỚI tạm, và kiểm tài liệu chấp nhận đúng tờ này
+    const md2 = path.join(tmp, "doc-khong-ghi.md");
+    const ma2 = path.join(tmp, "ma-khong-ghi.json");
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md2);
+    fs.copyFileSync(MA_JSON, ma2);
+    const r2 = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "13",
+        "--public",
+        path.join(tmp, "pub2"),
+        "--private",
+        path.join(tmp, "priv2"),
+        "--names",
+        fake,
+        "--ma",
+        ma2,
+        "--md",
+        md2,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r2.status, String(r2.stderr)).toBe(0);
+    expect((JSON.parse(fs.readFileSync(ma2, "utf8")) as MaTable).t).toEqual(DONG_BANG_T); // không --ghi-ma: bảng giữ nguyên
+    const allBosses = new Map(names.mons.filter((m) => m.boss).map((m) => [m.id, m.name] as const));
+    const doc2 = fs.readFileSync(md2, "utf8");
+    expect((doc2.match(/^\| T-\d+ \|/gm) ?? []).length).toBe(6);
+    expect(trumDocErrors(doc2, DONG_BANG_T, DONG_BANG.t, allBosses)).toEqual([]);
+  }, 120_000);
+
   it("dựng đủ 4 nhóm: mỗi nhóm một tờ công khai + một tờ đầy đủ, đúng số mã", () => {
     expect(run.status, String(run.stderr)).toBe(0);
     const out = String(run.stdout);
@@ -311,18 +867,23 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     expect(a.equals(b), "gói riêng lọt ra tờ công khai").toBe(false);
   });
 
-  it("MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ)", () => {
-    const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
-    const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
-    expect(sheets.length).toBeGreaterThanOrEqual(22); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16) + 1 (nhóm 17)
-    for (const f of sheets) {
-      const inRepo = fs.readFileSync(path.join(repoDir, f));
-      expect(
-        inRepo.equals(fs.readFileSync(path.join(pub, f))),
-        `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16,17 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
-      ).toBe(true);
-    }
-  });
+  // CHỈ chạy khi DUYET_KIEM=1 (A, 25/11): tờ trong repo CỐ Ý đóng băng trong lúc người dùng duyệt (PR nội dung KHÔNG dựng lại tờ; B dựng lại MỘT LẦN lúc duyệt), nên so khớp
+  // mặc định sẽ đỏ ở mọi PR thêm vật phẩm / chiêu. Chạy trước khi duyệt / sau khi đổi bố cục công cụ: `DUYET_KIEM=1 npx vitest run client/scripts/art/dung-bang-duyet.test.ts`.
+  it.skipIf(process.env.DUYET_KIEM !== "1")(
+    "MỌI tờ công khai trong repo (docs/art/huong-moi) == bản dựng lại từ mã (đổi bố cục công cụ mà quên dựng lại tờ cũ thì đỏ; chỉ chạy khi DUYET_KIEM=1)",
+    () => {
+      const repoDir = path.join(here, "..", "..", "..", "docs/art/huong-moi");
+      const sheets = fs.readdirSync(pub).filter((f) => f.endsWith(".png"));
+      expect(sheets.length).toBeGreaterThanOrEqual(22); // 4 (nhóm 10-13) + 6 (nhóm 14) + 10 (nhóm 15) + 1 (nhóm 16) + 1 (nhóm 17)
+      for (const f of sheets) {
+        const inRepo = fs.readFileSync(path.join(repoDir, f));
+        expect(
+          inRepo.equals(fs.readFileSync(path.join(pub, f))),
+          `${f}: tờ trong repo LỆCH bản dựng lại: chạy lại dung-bang-duyet.py --groups 10,11,12,13,14,15,16,17 --md docs/art/huong-moi/DUYET_TUNG_PHAN.md`,
+        ).toBe(true);
+      }
+    },
+  );
 
   it("nhóm 14 (vật phẩm): từ sáu tờ trở lên, mỗi tờ <= 30 hàng, tổng đúng số vật phẩm; ô C (icon HOANTDZ, gói riêng) có ở mọi tờ có món hợp, tờ công khai KHÁC tờ đầy đủ đúng khi có ô riêng", () => {
     const out = String(run.stdout);
@@ -400,4 +961,188 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
       );
     expect(fullDiffers, "đối chứng: tờ đầy đủ phải đổi khi ảnh gói riêng đổi").toBe(true);
   }, 120_000);
+});
+
+// ---- duyet.json (QUYET_DINH_M3 mục 74): dữ liệu cho trang web duyệt đồ hoạ của Dev G ----
+interface DuyetOpt {
+  chu?: string;
+  nguon: string;
+  rieng: boolean;
+  anh: string | null;
+  co_hinh: boolean;
+  co_goc: number[] | null;
+  so_khung: number;
+}
+interface DuyetItem {
+  ma: string;
+  doi_tuong: string;
+  moi: boolean;
+  khuyen_nghi: string;
+  hien_tai: DuyetOpt;
+  phuong_an: DuyetOpt[];
+}
+interface DuyetGroup {
+  id: string;
+  kieu: string;
+  ma: DuyetItem[];
+}
+interface DuyetJson {
+  phien_ban: number;
+  nguon: Record<string, { ten: string; giay_phep: string; rieng: boolean }>;
+  nhom: DuyetGroup[];
+}
+
+describe("dung-bang-duyet.py: duyet.json cho trang web duyệt (mục 74), phần đọc tệp (chạy mọi máy)", () => {
+  const repo = path.join(here, "..", "..", "..");
+  const data = JSON.parse(
+    fs.readFileSync(path.join(repo, "docs/art/huong-moi/duyet.json"), "utf8"),
+  ) as DuyetJson;
+  const md = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
+  const items = data.nhom.flatMap((g) => g.ma.map((m) => ({ g, m })));
+  const KIEU: Record<string, string> = {
+    "10": "NV",
+    "11": "NPC",
+    "12": "Q",
+    "13": "T",
+    "14": "VP",
+    "15": "HU",
+    "16": "UI",
+    "17": "NEN",
+  };
+
+  it("hợp lệ: phiên bản 1, đủ 8 nhóm 10..17 (mỗi tờ ảnh một mục) đúng kiểu, mã duy nhất mang đúng tiền tố của kiểu nhóm", () => {
+    expect(data.phien_ban).toBe(1);
+    // `nhom` có MỘT mục cho MỖI tờ ảnh (nhóm 14 có 7 tờ, nhóm 15 có 10 tờ): id lặp lại, thứ tự nhóm 10..17
+    expect([...new Set(data.nhom.map((g) => g.id))]).toEqual(Object.keys(KIEU));
+    for (const g of data.nhom) expect(g.kieu, `nhóm ${g.id}`).toBe(KIEU[g.id]);
+    const codes = items.map(({ m }) => m.ma);
+    expect(new Set(codes).size, "mã trùng").toBe(codes.length);
+    for (const { g, m } of items)
+      expect(m.ma, `mã ${m.ma} ở nhóm ${g.id}`).toMatch(new RegExp(`^${g.kieu}-\\d+$`));
+    expect(codes.length).toBeGreaterThanOrEqual(300);
+  });
+
+  it("mỗi mã có hình HIỆN TẠI và ĐÚNG ba phương án A / B / C theo thứ tự", () => {
+    for (const { m } of items) {
+      expect(
+        m.phuong_an.map((o) => o.chu),
+        m.ma,
+      ).toEqual(["A", "B", "C"]);
+      expect(m.hien_tai, m.ma).toBeTruthy();
+      expect(m.doi_tuong.length, `${m.ma}: thiếu mô tả đối tượng`).toBeGreaterThan(2);
+    }
+  });
+
+  it("tập mã KHỚP đúng tập mã của DUYET_TUNG_PHAN.md (không thừa / thiếu) và cờ `moi` khớp dấu MỚI trong tài liệu", () => {
+    const rows = new Map<string, boolean>();
+    for (const line of md.split("\n")) {
+      const r = /^\| ((?:NV|NPC|Q|T|VP|HU|UI|NEN)-\d+) \|/.exec(line);
+      if (r) rows.set(r[1], line.includes("MỚI (sau 23/11)"));
+    }
+    const jsonCodes = new Map(items.map(({ m }) => [m.ma, m.moi] as const));
+    expect([...jsonCodes.keys()].sort()).toEqual([...rows.keys()].sort());
+    for (const [ma, moi] of rows)
+      expect(jsonCodes.get(ma), `${ma}: cờ moi lệch tài liệu`).toBe(moi);
+  });
+
+  it("ranh giới GIẤY PHÉP: bảng `nguon` đúng (bốn gói cấm phân phối lại là riêng, ba nguồn công khai thì không) và MỌI ô mang đúng cờ `rieng` của nguồn nó", () => {
+    for (const k of ["wuxia", "sunny", "hicon", "bb"]) expect(data.nguon[k]?.rieng, k).toBe(true);
+    for (const k of ["cur", "ninja", "xian"]) expect(data.nguon[k]?.rieng, k).toBe(false);
+    for (const { m } of items)
+      for (const o of [m.hien_tai, ...m.phuong_an])
+        expect(o.rieng, `${m.ma}/${o.chu ?? "hien-tai"} nguồn ${o.nguon}`).toBe(
+          data.nguon[o.nguon].rieng,
+        );
+  });
+
+  it("đường dẫn ảnh luôn TƯƠNG ĐỐI thư mục preview riêng (duyet/<mã>/<hien-tai|A|B|C>.png), không bao giờ đường dẫn tuyệt đối hay vào repo; ô không hình có anh null", () => {
+    const raw = fs.readFileSync(path.join(repo, "docs/art/huong-moi/duyet.json"), "utf8");
+    // `/mnt/data` chỉ được nhắc ở lời ghi chú đầu tệp (nơi để ảnh), KHÔNG ở đường dẫn ảnh nào
+    expect(raw.split("\n").filter((l) => l.includes("/mnt/data/")).length).toBe(1);
+    for (const { m } of items) {
+      for (const [tag, o] of [
+        ["hien-tai", m.hien_tai] as const,
+        ...m.phuong_an.map((p) => [p.chu as string, p] as const),
+      ]) {
+        if (o.co_hinh) {
+          expect(o.anh, `${m.ma}/${tag}`).toBe(`duyet/${m.ma}/${tag}.png`);
+          expect(o.co_goc?.length, `${m.ma}/${tag} co_goc`).toBe(2);
+          expect(o.co_goc?.every((n) => n > 0)).toBe(true);
+          expect(o.so_khung, `${m.ma}/${tag} so_khung`).toBeGreaterThanOrEqual(1);
+        } else {
+          expect(o.anh, `${m.ma}/${tag}`).toBeNull();
+          expect(o.co_goc).toBeNull();
+        }
+      }
+    }
+  });
+});
+
+describe("dung-bang-duyet.py: duyet.json DỰNG THẬT (cần Pillow + gói ở /mnt/data)", () => {
+  const repo = path.join(here, "..", "..", "..");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-test-duyet-json-"));
+  afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  it.skipIf(!can)(
+    "dựng lại nhóm 10 và 13 ra ĐÚNG các mục trong docs/art/huong-moi/duyet.json (tất định); ảnh cắt riêng có thật, kể cả ô gói riêng, và CHỈ ở thư mục preview",
+    () => {
+      const jsonOut = path.join(tmp, "duyet.json");
+      const pub = path.join(tmp, "pub");
+      const priv = path.join(tmp, "priv");
+      const preview = path.join(tmp, "preview");
+      const ma = path.join(tmp, "ma.json");
+      fs.copyFileSync(path.join(repo, "docs/art/huong-moi/ma-co-dinh.json"), ma);
+      const r = spawnSync(
+        "python3",
+        [
+          "-I",
+          SCRIPT,
+          "--groups",
+          "10,13",
+          "--public",
+          pub,
+          "--private",
+          priv,
+          "--ma",
+          ma,
+          "--json",
+          jsonOut,
+          "--anh-dir",
+          preview,
+        ],
+        { encoding: "utf8", cwd: repo },
+      );
+      expect(r.status, r.stderr).toBe(0);
+      const fresh = JSON.parse(fs.readFileSync(jsonOut, "utf8")) as DuyetJson;
+      const repoData = JSON.parse(
+        fs.readFileSync(path.join(repo, "docs/art/huong-moi/duyet.json"), "utf8"),
+      ) as DuyetJson;
+      const byCode = new Map(repoData.nhom.flatMap((g) => g.ma).map((m) => [m.ma, m] as const));
+      const freshItems = fresh.nhom.flatMap((g) => g.ma);
+      expect(freshItems.map((m) => m.ma)).toEqual([
+        "NV-01",
+        "NV-02",
+        "NV-03",
+        "NV-04",
+        "T-01",
+        "T-02",
+        "T-03",
+        "T-04",
+      ]);
+      for (const m of freshItems) expect(m, m.ma).toEqual(byCode.get(m.ma));
+      // ô của gói riêng (Wuxia RTS ở NV-01 B): CÓ ảnh cắt riêng trong thư mục preview, và KHÔNG có trong tờ / thư mục công khai
+      const nv01 = freshItems.find((m) => m.ma === "NV-01")!;
+      const b = nv01.phuong_an.find((o) => o.chu === "B")!;
+      expect(b.rieng).toBe(true);
+      expect(b.co_hinh).toBe(true);
+      const png = fs.readFileSync(path.join(preview, b.anh as string));
+      expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      const publicFiles = fs.readdirSync(pub, { recursive: true }).map(String);
+      expect(
+        publicFiles.every((f) => !f.includes("duyet/")),
+        "ảnh cắt riêng không được vào thư mục công khai",
+      ).toBe(true);
+    },
+    240_000,
+  );
 });

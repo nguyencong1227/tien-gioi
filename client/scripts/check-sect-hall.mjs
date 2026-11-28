@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm tab "Nội vụ" của bảng Tông môn (M8.6, issue #843; `sect-hall.ts` + `sect-hall-ui.ts` + `ui.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
@@ -29,13 +28,13 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -89,36 +88,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-sect-hall-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
-  );
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
+  let launched = null;
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    launched = await launchChrome({ name: "sect-hall" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -170,15 +148,15 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && window.__sampleSectHall && !document.getElementById("ui")?.hidden)`,
+      const ready = Boolean(
+        await waitUntilTrue(async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && window.__sampleSectHall && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        ),
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
@@ -764,24 +742,36 @@ async function main() {
 
       // ---- nhiệm vụ TÔNG MÔN trong sổ nhiệm vụ / HUD: không có NPC giao, trả ở bảng Tông môn ----
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
-      // Nhiệm vụ lấy từ ảnh chụp mẫu (dữ liệu THẬT của game, E / D còn thay ở M8.7): không cứng id / tên của bảng khung. `step` lớn = đã xong mọi bước (sẵn sàng trả)
-      const hudQuest = await evalJs(
-        `(() => { const q = window.__sampleSectHall(2, Date.now()).quests[0]; return { questId: q.questId, title: q.title }; })()`,
+      // Nhiệm vụ lấy từ ảnh chụp mẫu (dữ liệu THẬT của game, E / D còn thay ở M8.7): không cứng id / tên của bảng khung. `step` lớn = đã xong mọi bước (sẵn sàng trả).
+      // KHÔNG lấy cứng `quests[0]` của ngày hôm nay: nhiệm vụ mẫu XOAY THEO NGÀY, và loại NỘP VẬT PHẨM (bước `collect`, vd "Nộp thú phàm") chỉ sẵn sàng khi TÚI đủ đồ (`questReady`),
+      // `step: 99` với túi rỗng báo "Cần đủ ...: 0/8" chứ không "ĐÃ ĐỦ" => cứ vài ngày (27/11/2026, rồi 30/11, 4/12...) nightly đỏ 12 kiểm dù mã không đổi (A, đọc log run 45929833792).
+      // Thử lần lượt nhiệm vụ của 8 ngày liền kề, lấy nhiệm vụ ĐẦU TIÊN mà HUD báo sẵn sàng với túi rỗng (không cứng id / loại: bảng nhiệm vụ còn đổi). Chọn theo kết quả này không nới kiểm bên dưới:
+      // vẫn đòi tên, huy hiệu 'Tông' và câu 'ĐÃ ĐỦ — mở bảng Tông môn > ...' đúng; không có nhiệm vụ nào sẵn sàng thì kiểm ĐỎ.
+      const readHudQuests = () =>
+        evalJs(
+          `[...document.querySelectorAll(".qt-item")].map((e) => ({ title: e.querySelector(".qt-title span")?.textContent ?? "", badge: e.querySelector(".qt-badge")?.textContent ?? "", step: e.querySelector(".qt-step")?.textContent ?? "", ready: e.classList.contains("ready") }))`,
+        );
+      const hudCandidates = await evalJs(
+        `(() => { const seen = new Set(); const out = []; for (let k = 0; k < 8; k++) for (const q of window.__sampleSectHall(2, Date.now() + k * 86400000).quests) { if (seen.has(q.questId)) continue; seen.add(q.questId); out.push({ questId: q.questId, title: q.title }); } return out; })()`,
       );
-      await evalJs(
-        `window.__ui.onQuests({ active: [{ id: ${JSON.stringify(hudQuest.questId)}, step: 99, count: 0 }], done: [], dailyDone: [] }); 1`,
-      );
-      await sleep(150);
-      const qt = await evalJs(
-        `[...document.querySelectorAll(".qt-item")].map((e) => ({ title: e.querySelector(".qt-title span")?.textContent ?? "", badge: e.querySelector(".qt-badge")?.textContent ?? "", step: e.querySelector(".qt-step")?.textContent ?? "", ready: e.classList.contains("ready") }))`,
-      );
+      let hudQuest = hudCandidates[0];
+      let qt = [];
+      for (const cand of hudCandidates) {
+        await evalJs(
+          `window.__ui.onQuests({ active: [{ id: ${JSON.stringify(cand.questId)}, step: 99, count: 0 }], done: [], dailyDone: [] }); 1`,
+        );
+        await sleep(150);
+        hudQuest = cand;
+        qt = await readHudQuests();
+        if (qt.length === 1 && qt[0].ready) break; // không có nhiệm vụ nào sẵn sàng thì dừng ở cái cuối: kiểm bên dưới ĐỎ
+      }
       check(
         qt.length === 1 &&
           qt[0].title === hudQuest.title &&
           qt[0].badge === "Tông" &&
           qt[0].ready &&
-          /Mở bảng Tông môn > Nội vụ để trả/.test(qt[0].step),
-        `HUD: nhiệm vụ tông môn hiện tên + huy hiệu 'Tông' + 'Mở bảng Tông môn > Nội vụ để trả': ${JSON.stringify(qt[0])}`,
+          /^ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ/.test(qt[0].step),
+        `HUD: nhiệm vụ tông môn hiện tên + huy hiệu 'Tông' + 'ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ' (questReadyText, mục 66): ${JSON.stringify(qt[0])}`,
       );
       await evalJs(`window.__ui.toggleQuestModal(true); 1`);
       await sleep(200);
@@ -792,7 +782,7 @@ async function main() {
         qc.length === 1 &&
           qc[0].giver === "Nhiệm vụ nội vụ tông môn" &&
           !/tong_mon/.test(qc[0].giver) &&
-          /Mở bảng Tông môn > Nội vụ/.test(qc[0].progress),
+          /ĐÃ ĐỦ — mở bảng Tông môn > Nội vụ để trả nhiệm vụ/.test(qc[0].progress),
         `sổ nhiệm vụ: không hiện id 'tong_mon', ghi nơi trả là bảng Tông môn: ${JSON.stringify(qc[0])}`,
       );
       await evalJs(
@@ -1014,21 +1004,8 @@ async function main() {
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
+    if (launched) await launched.close();
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

@@ -74,7 +74,7 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
 
   it("MAPS cùng id, cùng thứ tự với PROCEDURAL_MAPS", () => {
     expect(MAPS.map((m) => m.id)).toEqual(PROCEDURAL_MAPS.map((m) => m.id));
-    expect(MAPS.length).toBe(4);
+    expect(MAPS.length).toBe(6);
   });
 
   for (const def of PROCEDURAL_MAPS) {
@@ -84,6 +84,24 @@ describe("bốn bản đồ thường đọc từ tệp Tiled == bản sinh theo
         it("tệp hợp lệ theo tiledViolations; getMap thấy bản dựng từ tệp (có ô dựng sẵn)", () => {
           expect(tiledViolations(TILED_MAP_FILES[def.id])).toEqual([]);
           expect(getMap(def.id)!.def.tiles).toBeDefined();
+        });
+
+        // Sổ PROCEDURAL_MAPS vẫn là nguồn của đấu trường (`seed + 7919`, tên) và của `mapById`, còn game chạy từ TỆP: mọi thứ KHÔNG phải ô phải khớp, nếu không hai nơi nói hai chuyện
+        // (A2 #1467: lúc đăng ký Lang Hoang, dán sai toạ độ cổng hoặc quên `monsterCap` ở một bên thì chỉ lộ khi chơi)
+        it("sổ đăng ký khớp tệp ở mọi thứ KHÔNG phải ô: kích thước, trấn, tên, hạt giống, monsterCap, hang, cổng", () => {
+          const file = getMap(def.id)!;
+          const reg = new GameMap(def);
+          expect([file.def.w, file.def.h]).toEqual([reg.def.w, reg.def.h]);
+          expect(file.def.town).toEqual(reg.def.town);
+          expect(file.townPx).toEqual(reg.townPx);
+          expect(file.townName).toBe(reg.townName);
+          expect(file.wildName).toBe(reg.wildName);
+          expect(file.def.name).toBe(reg.def.name);
+          expect(file.def.seed).toBe(reg.def.seed);
+          expect(file.monsterCap).toEqual(reg.monsterCap);
+          expect(file.def.monsterCap).toEqual(reg.def.monsterCap);
+          expect(file.lairPx).toEqual(reg.lairPx);
+          expect(file.portals).toEqual(reg.portals);
         });
       });
       continue;

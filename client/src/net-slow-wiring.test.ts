@@ -6,8 +6,16 @@ import { describe, expect, it } from "vitest";
 import { NET_LOST_TEXT } from "./net-slow";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
-const ui = readFileSync(new URL("./ui.ts", import.meta.url), "utf8");
-const main = readFileSync(new URL("./main.ts", import.meta.url), "utf8");
+
+/**
+ * Bỏ chú thích (`/* ... *\/` và `// ...`) khỏi mã nguồn trước khi so khớp: dòng nối bị COMMENT RA (đột biến `// ui.setNetSlow(slow);` / `// activeNetSlow?.stop();`)
+ * từng làm test vẫn xanh vì regex khớp luôn chữ trong chú thích. `(^|[^:])` giữ nguyên `https://...` trong chuỗi.
+ */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+const ui = stripComments(readFileSync(new URL("./ui.ts", import.meta.url), "utf8"));
+const main = stripComments(readFileSync(new URL("./main.ts", import.meta.url), "utf8"));
 
 /** Cắt khối `setNetSlow(...) { ... }` / `isNetSlowShown() { ... }` trong `ui.ts` (tới `}` thụt lề hai ô, đầu khối kế tiếp). */
 function uiBlock(name: string): string {

@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm KHUNG bảng "Xã hội" (M9, #1025; `client/src/social-tabs.ts`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite),
  * ở sáu khung nhìn (năm khung chuẩn + điện thoại ngang nhỏ 568x320):
@@ -28,13 +27,13 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -88,36 +87,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-social-shell-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true },
-  );
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
+  let launched = null;
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    launched = await launchChrome({ name: "social-shell" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -174,15 +152,15 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1${query}`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = Boolean(
+        await waitUntilTrue(async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        ),
+      );
       await sleep(400);
       await evalJs(
         `["dungeon-mock-badge", "duel-mock-badge"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; })`,
@@ -629,7 +607,7 @@ async function main() {
             barTop: parseFloat(getComputedStyle(bar).top), wbH: getComputedStyle(document.documentElement).getPropertyValue("--wb-h").trim(),
             overflow: banner.scrollWidth - banner.clientWidth, pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
             vw: window.innerWidth, vh: window.innerHeight,
-            tab: { status: q("wbt-status").textContent, detail: q("wbt-detail").textContent, retryHidden: q("wbt-retry").hidden, retryH: r(q("wbt-retry")).h, emptyHidden: q("wbt-empty").hidden, wrapHidden: q("wbt-wrap").hidden, tz: q("wbt-tz").textContent },
+            tab: { status: q("wbt-status").textContent, detail: q("wbt-detail").textContent, retryHidden: q("wbt-retry").hidden, retryH: r(q("wbt-retry")).h, emptyHidden: q("wbt-empty").hidden, wrapHidden: q("wbt-wrap").hidden, tz: q("wbt-tz").textContent, sched: [...q("wbt-body").children].map((tr) => [...tr.children].map((td) => td.textContent)) },
             toasts: [...document.querySelectorAll("#toast p")].map((p) => p.className + ":" + p.textContent),
           };
         })()`);
@@ -657,11 +635,26 @@ async function main() {
         `máy chủ im quá 6 s: nút Tải lại (${Math.round(w.tab.retryH)} px), "${w.tab.status}"`,
       );
       check(w.hidden, "chưa có tin: banner ẩn");
-      // lịch hằng ngày: dữ liệu thật còn RỖNG (E chưa nhập) -> câu giữ chỗ, không bảng rỗng
-      check(
-        !w.tab.emptyHidden && w.tab.wrapHidden && w.tab.tz === "",
-        "lịch rỗng: 'Lịch sự kiện chưa được công bố.', không hiện bảng / ghi chú múi giờ",
-      );
+      // lịch hằng ngày theo DỮ LIỆU THẬT của shared (WORLD_BOSS_SCHEDULE): có khung giờ -> bảng + ghi chú múi giờ, câu giữ chỗ ẩn; rỗng -> câu giữ chỗ, không bảng rỗng.
+      // (trước 25/11 kiểm cứng 'lịch rỗng' nên đỏ từ khi A nhập lịch thật ở M9.10; nay đúng cả hai trạng thái dữ liệu)
+      const sched = w.tab.sched;
+      if (sched.length > 0) {
+        check(
+          w.tab.emptyHidden && !w.tab.wrapHidden && w.tab.tz !== "",
+          `lịch có ${sched.length} khung giờ: bảng hiện, câu giữ chỗ ẩn, ghi chú múi giờ "${w.tab.tz}"`,
+        );
+        check(
+          sched.every(
+            (r) => r.length === 4 && /^\d{1,2}:\d\d/.test(r[0]) && r.every((c) => c !== ""),
+          ),
+          `mỗi hàng lịch đủ 4 ô (giờ / trùm / bản đồ / thời lượng), không ô trống: ${JSON.stringify(sched[0])}`,
+        );
+      } else {
+        check(
+          !w.tab.emptyHidden && w.tab.wrapHidden && w.tab.tz === "",
+          "lịch rỗng: 'Lịch sự kiện chưa được công bố.', không hiện bảng / ghi chú múi giờ",
+        );
+      }
 
       // sắp xuất hiện (5 phút): trạng thái ở tab + đếm ngược GIẢM theo thời gian; banner hiện
       await sendWb("soon");
@@ -1292,21 +1285,8 @@ async function main() {
       check(s.modalHidden, "Shift+G lần nữa đóng bảng");
     }
   } finally {
-    try {
-      process.kill(-chrome.pid);
-    } catch {
-      // đã thoát
-    }
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
+    if (launched) await launched.close();
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

@@ -95,11 +95,11 @@ describe("nhịp tu luyện (mô hình simulate, có nội dung mới)", () => {
   const minutes = (rows: ReturnType<typeof simulate>, realm: number) =>
     rows.filter((r) => r.realm === realm).reduce((a, r) => a + r.minutes, 0);
 
-  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 49 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ; #1333: `thanh_lo_tram` lên sàn 240 rút 1 phút)", () => {
+  it("quái Kim Đan KHÔNG phá nhịp Luyện Khí / Trúc Cơ; Trúc Cơ cộng dồn 2 giờ 47 phút (chuỗi nhiệm vụ Trúc Cơ mới thưởng 500 tu vi, mục tiêu ~3 giờ; #1333: `thanh_lo_tram` lên sàn 240 rút 1 phút; E1 #1450: ba việc phụ Hắc Phong 90 + 102 + 117 = 309 tu vi rút thêm 2 phút)", () => {
     const before = simulate(2);
     const after = withKimDan(() => simulate(2));
     expect(after.map((r) => r.minutes)).toEqual(before.map((r) => r.minutes));
-    expect(Math.round(after.at(-1)!.total)).toBe(169);
+    expect(Math.round(after.at(-1)!.total)).toBe(167);
     // Luyện Khí: 51 phút cộng dồn (bao gồm 3 việc phụ Lạc Hà #754 thưởng exp 25/30/35 = 90, trong trần 2,5 %)
     expect(Math.round(after.filter((r) => r.realm <= 1).at(-1)!.total)).toBe(51);
   });

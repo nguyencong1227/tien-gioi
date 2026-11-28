@@ -76,6 +76,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(100);
 });
 
@@ -86,12 +87,16 @@ afterAll(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T> {
+async function waitFor<T>(
+  fn: () => T | Promise<T | undefined | false> | undefined | false,
+  ms = 3000,
+  what = "điều kiện",
+): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error("Hết thời gian chờ điều kiện");
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
@@ -234,8 +239,13 @@ describe("vào phòng bằng token", () => {
 
   it("đăng xuất / hết phiên: token bị thu hồi thì không vào được nữa", async () => {
     const a = await account("Thoat Phien");
-    await joinWith({ token: a.token }).then((j) => j.room.leave(true));
-    await sleep(150);
+    const j = await joinWith({ token: a.token });
+    const sid = j.room.sessionId;
+    const w = worldOf(j.room);
+    expect(w.ctrl.has(sid)).toBe(true);
+    await j.room.leave(true);
+    // Chờ dương: máy chủ xử lý xong onLeave và dọn người chơi khỏi phòng
+    await waitFor(() => !w.ctrl.has(sid), 3000, "người chơi đã dọn khỏi phòng");
     await auth.logout(a.token);
     expect((await joinError({ token: a.token })).code).toBe(JOIN_BAD_TOKEN);
   });
@@ -245,7 +255,15 @@ describe("vào phòng bằng token", () => {
     const j = await joinWith({ token: a.token });
     (serverRoom(j.room).state as any).players.get(j.room.sessionId).exp = 77;
     await j.room.leave(true);
-    await waitFor(() => stores.loadPlayer("Giu Tu Vi").then((s) => s?.exp === 77));
+    // Chờ dương: máy chủ lưu hồ sơ nhân vật cập nhật tu vi exp = 77 xuống đĩa
+    await waitFor(
+      async () => {
+        const s = await stores.loadPlayer("Giu Tu Vi");
+        return s?.exp === 77 ? s : undefined;
+      },
+      3000,
+      "hồ sơ nhân vật được lưu với exp = 77",
+    );
     const again = await joinWith({ token: a.token });
     expect(again.me().exp).toBe(77);
     expect((await souls.get(a.id))?.id).toBe(a.id);
@@ -253,9 +271,20 @@ describe("vào phòng bằng token", () => {
 
   it("nhân vật đang ở bản đồ khác: JOIN_WRONG_MAP báo bản đồ đúng", async () => {
     const a = await account("Hac Phong Khach");
-    await joinWith({ token: a.token }).then((j) => j.room.leave(true));
-    await sleep(150);
-    const save = (await stores.loadPlayer("Hac Phong Khach"))!;
+    const j = await joinWith({ token: a.token });
+    const sid = j.room.sessionId;
+    const w = worldOf(j.room);
+    expect(w.ctrl.has(sid)).toBe(true);
+    await j.room.leave(true);
+    // Chờ dương: máy chủ hoàn tất onLeave và lưu hồ sơ nhân vật (chỉ lần lưu lúc rời mới ghi trường life)
+    const save = await waitFor(
+      async () => {
+        const s = await stores.loadPlayer("Hac Phong Khach");
+        return s && s.life !== undefined && !w.ctrl.has(sid) ? s : undefined;
+      },
+      3000,
+      "hồ sơ nhân vật được lưu kèm life và dọn khỏi phòng",
+    );
     await stores.savePlayer({ ...save, mapId: HAC_PHONG_ID });
     const e = await joinError({ token: a.token });
     expect(e.code).toBe(JOIN_WRONG_MAP);

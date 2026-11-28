@@ -697,11 +697,11 @@ if (process.argv[1]?.endsWith("bench.ts")) {
     console.log(
       `Mô phỏng nhiều World đồng thời trong một tiến trình (${seconds}s = ${seconds * 20} tick), ngân sách tổng < 10 ms (#141)\n`,
     );
-    // `--maps=lac_ha,hac_phong,am_suong,han_van` chọn các bản đồ (mặc định bốn bản đồ, M7.10 #511); `--per-map N` người mỗi bản đồ (mặc định 50)
+    // `--maps=lac_ha,hac_phong,am_suong,han_van,lang_hoang,uy_van` chọn các bản đồ (mặc định sáu bản đồ, M7.10 #511 + #1470); `--per-map N` người mỗi bản đồ (mặc định 50)
     const mapsArg = process.argv.find((a) => a.startsWith("--maps="));
     const multiIds = mapsArg
       ? mapsArg.slice(7).split(",").filter(Boolean)
-      : ["lac_ha", "hac_phong", "am_suong", "han_van"];
+      : ["lac_ha", "hac_phong", "am_suong", "han_van", "lang_hoang", "uy_van"];
     const unknownMap = multiIds.find((id) => !getMap(id));
     if (unknownMap) {
       console.error(`Bản đồ lạ: ${unknownMap}`);

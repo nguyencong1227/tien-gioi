@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm THẺ MINH HOẠ BẢN ĐỒ ở màn chuyển cảnh qua cổng (`client/src/map-card.ts`, M7.12 / #513) trong Chrome THẬT, chế độ mock
  * (không cần máy chủ / Vite), ở sáu khung nhìn (năm khung chuẩn + điện thoại ngang nhỏ 568x320):
@@ -18,13 +17,14 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -87,36 +87,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-map-card-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true },
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
+    launched = await launchChrome({ name: "map-card" });
+    const page = launched.page;
     if (!page) throw new Error("Không tìm thấy Chrome page target.");
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
@@ -150,7 +129,8 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
@@ -166,15 +146,16 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__ui && window.__mapCardOverride && !document.getElementById("ui")?.hidden)`,
+      const ready = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__ui && window.__mapCardOverride && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        60000,
+        200,
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
@@ -206,11 +187,31 @@ async function main() {
         await evalJs(
           `window.__ui.showTransition(${JSON.stringify(name)}, ${JSON.stringify(mapId)}); 1`,
         );
-        await sleep(900); // mống mắt 400 ms + tên hiện dần + ảnh tải
+        // Chờ THEO ĐIỀU KIỆN (không ngủ cố định 900 ms): lớp phủ hiện, mọi hoạt ảnh HỮU HẠN xong (mống mắt 400 ms + tên hiện dần; `getBoundingClientRect` đo cả phép biến hình
+        // giữa hoạt ảnh, ở khung chậm sai số lớn) và ảnh thẻ (nếu có `src`) đã tải xong (thành công hoặc lỗi)
+        const settled = await waitUntilTrue(
+          () =>
+            evalJs(`(() => {
+              const o = document.getElementById("transition-overlay");
+              if (o.hidden) return false;
+              const card = document.getElementById("transition-card");
+              if (card.getAttribute("src") !== null && !card.complete) return false;
+              return o.getAnimations({ subtree: true }).every((a) => !(a.effect && Number.isFinite(a.effect.getComputedTiming().endTime)) || a.playState === "finished" || a.playState === "idle");
+            })()`),
+          20000,
+          100,
+        );
+        if (!settled) throw new Error(`màn chuyển cảnh '${name}' chưa ổn định sau 20 s`);
+        await sleep(100);
       };
       const hide = async () => {
         await evalJs("window.__ui.hideTransition(); 1");
-        await sleep(600);
+        const gone = await waitUntilTrue(
+          () => evalJs(`document.getElementById("transition-overlay").hidden`),
+          10000,
+          100,
+        );
+        if (!gone) throw new Error("hideTransition: lớp phủ chưa ẩn sau 10 s");
       };
 
       /** Kiểm hình học của thẻ đang hiện (dùng cho cả năm thẻ thật). */
@@ -299,6 +300,22 @@ async function main() {
       m = await measure();
       check(m.cardHidden && !m.card.shown, 'mapId "constructor": không có thẻ, không lỗi');
       await hide();
+
+      // ---- 5b. HAI BẢN ĐỒ MỚI của mục 75 (đã đăng ký, CHƯA có thẻ AI: miễn ở map-card.test.ts, chờ quy trình ảnh AI): thẻ ẩn, tên hiện, không tràn ----
+      // Có ảnh thẻ cho bản đồ nào thì chuyển bản đồ đó sang REAL_CARDS và bỏ khỏi danh sách này.
+      for (const [mapId, name] of [
+        ["lang_hoang", "Lang Hoang"],
+        ["uy_van", "Uy Vân Kinh"],
+      ]) {
+        await show(name, mapId);
+        m = await measure();
+        check(m.cardHidden && !m.card.shown && m.cardSrc === null, `${mapId}: chưa có thẻ, thẻ ẩn`);
+        check(
+          m.name.shown && m.nameText === name && m.name.r <= m.vw + 0.5 && m.scrollW <= m.vw + 1,
+          `${mapId}: tên '${name}' hiện, không tràn ngang (rộng ${Math.round(m.name.w)} / ${m.vw})`,
+        );
+        await hide();
+      }
 
       // ---- 6. THẺ Ở ĐẦU BẢNG SƠN HÀ ĐỒ (`M`): theo bản đồ ĐANG XEM; điện thoại ngang thấp (<= 480 px cao) bỏ hẳn ----
       const SHORT = vp.h <= 480;
@@ -395,22 +412,12 @@ async function main() {
         await evalJs("window.__ui.toggleMapModal(false); 1");
       }
     }
+  } catch (e) {
+    console.log(`  ✗ lỗi không mong đợi: ${e && e.message ? e.message : e}`);
+    failures++;
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL");
-    } catch {
-      chrome.kill("SIGKILL");
-    }
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
+    if (launched) await launched.close();
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

@@ -280,6 +280,13 @@ import { LEAVE_BUTTONS, pickPromptButton, pickVisible, type PromptAnswer } from 
 import { dirOfArrowKey, moveFocus, ownsArrowKeys, withFocusKept } from "./panel-nav";
 import { skillIconSvg } from "./skill-icon";
 import {
+  SHOP_FILTER_MIN,
+  cleanShopQuery,
+  filterShopIds,
+  shopFilterActive,
+  shopFilterSummary,
+} from "./shop-filter";
+import {
   DEFAULT_SKILL_FILTER,
   cleanSkillFilter,
   elementCounts,
@@ -309,7 +316,6 @@ import {
   type DropPlan,
 } from "./inv-drop";
 import {
-  inConfirmGuard,
   rebirthPlan,
   sectCreatePlan,
   sectCreateStillValid,
@@ -371,6 +377,8 @@ import { renderPrivateCredits } from "./private-credits";
 import { describeStep, renderQuestTrackerView } from "./ui-quest-tracker";
 import { createQtyStepper, type QtyStepper } from "./qty-stepper";
 import { buyQtyMax, sellQtyMax } from "./shop-qty";
+import { createTapDedupe } from "./tap-dedupe";
+import { createConfirmGuard } from "./confirm-guard";
 
 // `fmt` từng được xuất từ đây (test `sect.test.ts` nhập động): giữ tên xuất cũ sau khi chuyển sang `ui-util.ts`.
 export { fmt };
@@ -1748,27 +1756,32 @@ function selectSlot(i: number) {
 // ---------- Hộp xác nhận DÙNG CHUNG (issue #779, docs/RA_SOAT_THAO_TAC.md) ----------
 let actConfirmAction: (() => void) | null = null;
 let actConfirmOpener: HTMLElement | null = null;
-let actConfirmOpenedAt = -Infinity;
+/** Chống click ma của hộp xác nhận dùng chung: GHÉP CẶP với cú chạm mở / đóng hộp (nhấn giữ lâu thì `click` của lần nhả vẫn bị bỏ), cửa sổ 450 ms làm cận dưới (confirm-guard.ts). */
+const actGuard = createConfirmGuard();
 /** Hộp đang mở do nút Bán ở cửa hàng: cửa hàng đóng (đi xa NPC, Esc...) thì hộp đóng theo, không bán vào chỗ không còn mở. */
 let actConfirmFromShop = false;
 /** Hộp đang mở do biểu mẫu Lập / Nộp của bảng Tông môn: bảng đóng (Esc, bị trục xuất, đổi cảnh) thì hộp đóng theo, không lập / nộp vào chỗ không còn mở. */
 let actConfirmFromSect = false;
-/** Lúc hộp xác nhận đóng gần nhất (ms, `performance.now`). Hộp đóng ngay ở `pointerdown`, nên `click` do trình duyệt tạo sau khi nhả ngón rơi xuống nút ở DƯỚI hộp (nút Bán): bỏ qua `click` trong cửa sổ chống click ma. */
-let actConfirmClosedAt = -1e12;
 
 /**
  * `click` "ma" (chuột / chạm: `detail > 0`) ngay sau khi hộp xác nhận vừa đóng, rơi xuống nút bên dưới hộp. Thao tác bằng BÀN PHÍM (Enter / Cách: `detail === 0`) hoặc lập trình thì không
  * phải click ma, không chặn (người dùng bàn phím xác nhận bằng Y rồi bấm Enter ngay phải được).
  */
 function ghostClick(e: MouseEvent): boolean {
-  return e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now());
+  // MỘT sự kiện có thể qua nhiều bộ xử lý đều hỏi `ghostClick` (nút bên dưới + bộ chặn chung): `ignoreAfterClose` tiêu khoản nợ ở lần hỏi đầu nên nhớ kết quả theo sự kiện
+  if (e === ghostMemoEvent) return ghostMemoResult;
+  ghostMemoEvent = e;
+  ghostMemoResult = e.detail > 0 && actGuard.ignoreAfterClose(performance.now());
+  return ghostMemoResult;
 }
+let ghostMemoEvent: MouseEvent | null = null;
+let ghostMemoResult = false;
 
 /** Mở hộp xác nhận: nêu hậu quả bằng chữ; "Giữ lại" được focus; `onOk` chỉ chạy khi bấm xác nhận SAU cửa sổ chống click ma. */
 function askActConfirm(spec: ConfirmSpec, onOk: () => void, opener: HTMLElement | null) {
   actConfirmAction = onOk;
   actConfirmOpener = opener;
-  actConfirmOpenedAt = performance.now();
+  actGuard.open(performance.now());
   $("act-confirm-text").textContent = spec.text;
   const warn = $("act-confirm-warn");
   warn.textContent = spec.warn ?? "";
@@ -1787,7 +1800,7 @@ function closeActConfirm(refocus = true): boolean {
   actConfirmAction = null;
   actConfirmFromShop = false;
   actConfirmFromSect = false;
-  actConfirmClosedAt = performance.now();
+  actGuard.closed(performance.now());
   const back = actConfirmOpener;
   actConfirmOpener = null;
   if (refocus && back && !back.hidden) back.focus();
@@ -1803,16 +1816,14 @@ let dropStepper: QtyStepper | null = null;
 /** Nút đã mở hộp (trả focus về đó khi đóng hộp bằng Esc / "Giữ lại") */
 let dropConfirmOpener: HTMLElement | null = null;
 /**
- * Chống "click ma" (cảm ứng): hộp xác nhận hiện NGAY CHỖ nút Vứt vừa chạm; `click` do trình duyệt tạo sau khi nhả ngón có thể rơi vào nút "Vứt" của
- * hộp (bố cục vừa đổi) và xác nhận luôn mà người chơi chưa kịp đọc. Hai nút trong hộp bỏ qua mọi lần bấm trong chừng này ms đầu sau khi hộp mở.
+ * Chống "click ma" (cảm ứng) của hộp xác nhận vứt: GHÉP CẶP với cú chạm mở / đóng hộp (confirm-guard.ts) và giữ `DROP_CONFIRM_GUARD_MS` làm cận dưới.
+ * - Hộp hiện NGAY CHỖ nút Vứt vừa chạm; `click` do trình duyệt tạo sau khi nhả ngón có thể rơi vào nút "Vứt" của hộp và xác nhận luôn mà người chơi chưa kịp đọc.
+ *   Nhấn GIỮ lâu thì `click` tới SAU cận dưới, nên chỉ cửa sổ thời gian là không đủ: hộp mở lúc con trỏ đang nhấn "nợ" đúng một `click`, bỏ qua dù trễ.
+ * - Hộp vừa ĐÓNG thì hàng nút "Vứt 1" / "Vứt hết" hiện lại, có khi đúng chỗ ngón vừa chạm "Vứt" / "Giữ lại"; `click` của cú chạm đóng hộp rơi vào nút đó
+ *   (`bindTap` nhớ lần chạm theo TỪNG nút nên không nhận ra) và mở hộp lần nữa ngay sau khi vừa vứt: hai nút này bỏ qua click chuột / chạm đó.
  */
 const DROP_CONFIRM_GUARD_MS = 450;
-let dropConfirmOpenedAt = -Infinity;
-/**
- * Lúc hộp xác nhận vừa ĐÓNG: hộp biến mất thì hàng nút "Vứt 1" / "Vứt hết" hiện lại, có khi đúng chỗ ngón vừa chạm "Vứt" / "Giữ lại", và `click` do trình duyệt tạo sau khi nhả ngón rơi
- * vào nút đó (`bindTap` nhớ lần chạm theo TỪNG nút nên không nhận ra) và mở hộp lần nữa ngay sau khi vừa vứt. Hai nút này bỏ qua click chuột / chạm trong cửa sổ chống click ma sau khi hộp đóng.
- */
-let dropConfirmClosedAt = -Infinity;
+const dropGuard = createConfirmGuard(DROP_CONFIRM_GUARD_MS);
 
 /** Mở hộp xác nhận vứt cho ô được chọn: ghi rõ TÊN + SỐ LƯỢNG (+ dòng nhắc đồ quý). `all` = "Vứt hết", ngược lại vứt 1. */
 function askDropConfirm(all: boolean, opener: HTMLElement | null) {
@@ -1822,7 +1833,7 @@ function askDropConfirm(all: boolean, opener: HTMLElement | null) {
   dropPlanPending = plan;
   dropPlanInit = plan;
   dropConfirmOpener = opener;
-  dropConfirmOpenedAt = performance.now();
+  dropGuard.open(performance.now());
   $("inv-drop-text").textContent = dropConfirmText(def.name, plan);
   // ô số lượng: chỉ khi có từ 2 cái (1 cái thì không có gì để chọn); "Vứt 1" mở với số 1, "Vứt hết" mở với toàn bộ, chỉnh được trước khi xác nhận
   const stepper = dropStepper;
@@ -1845,7 +1856,7 @@ function closeDropConfirm(refocus = true): boolean {
   const box = document.getElementById("inv-drop-confirm");
   if (!box || box.hidden) return false;
   box.hidden = true;
-  dropConfirmClosedAt = performance.now();
+  dropGuard.closed(performance.now());
   $("inv-detail").classList.remove("dropping");
   dropPlanPending = null;
   dropPlanInit = null;
@@ -1870,7 +1881,7 @@ function onDropQtyChange(q: number | null) {
  * Số trong ô trống / sai thì KHÔNG vứt và hộp vẫn mở (không gửi gì, không đoán số).
  */
 function confirmDrop() {
-  if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return; // click ma ngay sau khi hộp mở: bỏ qua
+  if (dropGuard.ignoreInside(performance.now())) return; // click ma của cú chạm mở hộp (ghép cặp) hoặc ngay sau khi hộp mở (cận dưới 450 ms): bỏ qua
   let plan = dropPlanPending;
   const init = dropPlanInit;
   if (plan && init && !$("inv-drop-qty").hidden && dropStepper) {
@@ -2918,6 +2929,8 @@ function renderForgeModalImpl() {
 let shopModalOpen = false;
 let shopNpcId = "duoc_su";
 let shopTab: "buy" | "sell" = "buy";
+/** Chuỗi tìm ở tab Mua (rà giao diện 25/11: cửa hàng 22 món); trống = không lọc. Về trống mỗi lần mở cửa hàng. */
+let shopQuery = "";
 const shopBuyQuantities: Record<string, number> = {};
 /** Số lượng định bán theo `ô:món` (không chỉ theo ô: ô đổi sang món khác thì không thừa kế số lượng của món cũ) */
 const shopSellQuantities: Record<string, number> = {};
@@ -2986,8 +2999,48 @@ function renderShopModal() {
     tabSell.classList.add("active");
     listBuy.hidden = true;
     listSell.hidden = false;
+    $("shop-filter").hidden = true;
+    $("shop-nomatch").hidden = true;
     renderShopSell();
   }
+}
+
+/** Thanh tìm món (không đụng danh sách, để ô tìm giữ nguyên con trỏ khi gõ): hiện / ẩn, dòng đếm "Hiện X / Y món", nút Bỏ lọc, dòng "không khớp". */
+function renderShopFilterBar(show: boolean, shown: number, total: number) {
+  const active = show && shopFilterActive(shopQuery);
+  $("shop-filter").hidden = !show;
+  $("shop-count").textContent = shopFilterSummary(shown, total, active);
+  $("shop-filter-clear").hidden = !active;
+  $("shop-nomatch").hidden = !(show && total > 0 && shown === 0);
+}
+
+/** Nối ô tìm món (một lần lúc dựng giao diện). Chuỗi gõ vào đi qua `cleanShopQuery` trước khi dùng. */
+function bindShopFilter() {
+  const input = document.getElementById("shop-q") as HTMLInputElement | null;
+  if (!input) return;
+  input.addEventListener("input", () => {
+    shopQuery = cleanShopQuery(input.value);
+    renderShopBuy();
+  });
+  input.addEventListener("keydown", (e) => {
+    // Esc trong ô tìm: có chữ thì xoá chữ (không đóng bảng); hết chữ thì bỏ focus để Esc đóng bảng như thường (như ô tìm chiêu)
+    if (e.key !== "Escape") return;
+    if (shopQuery !== "") {
+      e.preventDefault();
+      e.stopPropagation();
+      input.value = "";
+      shopQuery = "";
+      renderShopBuy();
+    } else {
+      input.blur();
+    }
+  });
+  document.getElementById("shop-filter-clear")?.addEventListener("click", () => {
+    shopQuery = "";
+    input.value = "";
+    renderShopBuy();
+    input.focus();
+  });
 }
 
 function renderShopBuy() {
@@ -3000,6 +3053,7 @@ function renderShopBuyImpl() {
 
   const shop = SHOP_BY_NPC[shopNpcId];
   if (!shop || shop.itemIds.length === 0) {
+    renderShopFilterBar(false, 0, 0);
     const emptyP = document.createElement("p");
     emptyP.className = "shop-empty";
     emptyP.textContent = "Cửa hàng hiện chưa có mặt hàng nào.";
@@ -3007,7 +3061,14 @@ function renderShopBuyImpl() {
     return;
   }
 
-  for (const itemId of shop.itemIds) {
+  // ô tìm chỉ hiện khi cửa hàng bán nhiều món (rà giao diện 25/11); dưới ngưỡng thì luôn hiện đủ, bất kể chuỗi tìm cũ
+  const showBar = shop.itemIds.length >= SHOP_FILTER_MIN;
+  const shownIds = showBar
+    ? filterShopIds(shop.itemIds, shopQuery, (id) => ITEM_BY_ID[id])
+    : shop.itemIds;
+  renderShopFilterBar(showBar, shownIds.length, shop.itemIds.length);
+
+  for (const itemId of shownIds) {
     const def = ITEM_BY_ID[itemId];
     if (!def) continue;
 
@@ -4907,18 +4968,40 @@ export const ui = {
       grid.append(btn);
     }
 
+    // Nuôi bộ chống click ma của hộp xác nhận bằng MỌI lần nhấn / nhả con trỏ trong trang (pha bắt: chạy TRƯỚC bộ xử lý của nút mở hộp, nên hộp mở bởi chính cú nhấn đó thấy con trỏ đang nhấn)
+    window.addEventListener(
+      "pointerdown",
+      () => {
+        const n = performance.now();
+        actGuard.pointerDown(n);
+        dropGuard.pointerDown(n);
+      },
+      true,
+    );
+    for (const ev of ["pointerup", "pointercancel"] as const)
+      window.addEventListener(
+        ev,
+        () => {
+          const n = performance.now();
+          actGuard.pointerUp(n);
+          dropGuard.pointerUp(n);
+        },
+        true,
+      );
+
     const bindTap = (id: string, fn: () => void) => {
       const el = $(id);
       if (!el) return;
-      // -Infinity (không phải 0): với 0, mọi `click` trong 300 ms đầu sau khi tải trang bị coi là trùng với một lần chạm và bỏ qua
-      let lastTap = -Infinity;
+      // `fn` chạy ở `pointerdown`; `click` đi kèm lần chạm đó bị bỏ qua. Mốc là `pointerdown` HOẶC `pointerup` gần nhất (xem tap-dedupe.ts): nhấn giữ lâu thì `click` vẫn tới ngay sau lần NHẢ
+      const tap = createTapDedupe();
       el.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        lastTap = performance.now();
+        tap.down(performance.now());
         fn();
       });
+      el.addEventListener("pointerup", () => tap.up(performance.now()));
       el.addEventListener("click", (e) => {
-        if (performance.now() - lastTap < 300) return;
+        if (tap.ignoreClick(performance.now())) return;
         e.preventDefault();
         fn();
       });
@@ -4955,7 +5038,7 @@ export const ui = {
       $(id).addEventListener(
         "click",
         (e) => {
-          if (e.detail > 0 && performance.now() - dropConfirmClosedAt < DROP_CONFIRM_GUARD_MS)
+          if (e.detail > 0 && dropGuard.ignoreAfterClose(performance.now()))
             e.stopImmediatePropagation();
         },
         true,
@@ -4977,17 +5060,17 @@ export const ui = {
     bindTap("inv-drop-yes", () => confirmDrop());
     // Hộp xác nhận dùng chung: bỏ qua bấm trong cửa sổ chống click ma; "Chưa / Giữ lại" cũng vậy (hộp không được chớp tắt dưới ngón tay)
     bindTap("act-btn-yes", () => {
-      if (inConfirmGuard(actConfirmOpenedAt, performance.now())) return;
+      if (actGuard.ignoreInside(performance.now())) return;
       const go = actConfirmAction;
       closeActConfirm(true);
       go?.();
     });
     bindTap("act-btn-no", () => {
-      if (inConfirmGuard(actConfirmOpenedAt, performance.now())) return;
+      if (actGuard.ignoreInside(performance.now())) return;
       closeActConfirm(true);
     });
     bindTap("inv-drop-no", () => {
-      if (performance.now() - dropConfirmOpenedAt < DROP_CONFIRM_GUARD_MS) return;
+      if (dropGuard.ignoreInside(performance.now())) return;
       closeDropConfirm(true);
     });
     bindTap("quick-1", () => this.useQuick(1));
@@ -5141,7 +5224,7 @@ export const ui = {
     // sẽ rơi xuống đây và mở lại hộp; chỉ chặn click của chuột / chạm (`detail > 0`) trong cửa sổ chống click ma, Enter / Space bằng bàn phím (`detail` = 0) vẫn bấm được ngay.
     $("sect-vault-act").addEventListener("click", (e) => {
       e.preventDefault();
-      if (e.detail > 0 && inConfirmGuard(actConfirmClosedAt, performance.now())) return;
+      if (ghostClick(e)) return;
       runVaultAction();
     });
     $("sect-vault-policy").addEventListener("submit", (e) => {
@@ -5429,6 +5512,7 @@ export const ui = {
     bindTap("btn-skills", () => this.toggleSkillsModal());
     bindTap("skills-close", () => this.toggleSkillsModal(false));
     bindSkillFilter();
+    bindShopFilter();
     bindTap("tab-q-active", () => {
       questTab = "active";
       $("tab-q-active").classList.add("active");
@@ -5778,7 +5862,7 @@ export const ui = {
     const id = pickPromptButton(answer, buttonShown);
     if (!id) return false;
     // X (giữ lại) là ý định CHỦ Ý bằng bàn phím: không bị cửa sổ chống click ma của hộp xác nhận dùng chung chặn (Y vẫn bị chặn trong cửa sổ đó)
-    if (id === "act-btn-no") actConfirmOpenedAt = performance.now() - 10_000;
+    if (id === "act-btn-no") actGuard.expire();
     $(id).click();
     return true;
   },
@@ -5917,6 +6001,10 @@ export const ui = {
     shopModalOpen = force ?? !shopModalOpen;
     $("shop-modal").hidden = !shopModalOpen;
     if (shopModalOpen) {
+      // mở cửa hàng nào cũng bắt đầu không lọc (chuỗi tìm của lần trước không được giấu món của cửa hàng này)
+      shopQuery = "";
+      const q = document.getElementById("shop-q") as HTMLInputElement | null;
+      if (q) q.value = "";
       modalStack.push("shop-modal");
       focusModal($("shop-modal"));
       renderShopModal();

@@ -1,18 +1,17 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm KINH QUYỂN ở TÚI ĐỒ (M7.4 #505, `client/src/item-use.ts` + `ui.ts`) trong Chrome THẬT (`?skills=mock`, không cần máy chủ):
 //  - chi tiết túi: quyển có nút "Học", đan dược "Dùng" (đổi qua lại không kẹt nhãn), nguyên liệu ẩn nút; 12 icon sách tải được;
 //  - dòng "Dạy: <chiêu> · Đủ cảnh giới (..) / Cần .." ở khung chi tiết, đổi theo cảnh giới (Luyện Khí học được chiêu cơ bản, chiêu Trúc Cơ thì "Cần"); món khác ẩn khung;
 //  - bấm nút Học, nhấp đúp ô và phím Enter trên ô (#463) đều gửi `useItem {slot}` cho quyển và đan dược, KHÔNG gửi cho nguyên liệu;
 //  - 0 lỗi JS. Có thể chụp ảnh: `--shots <thư mục>`. Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-book-bag.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-book-bag.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -21,39 +20,15 @@ const argOf = (name, dflt) => {
 };
 const BASE_URL = await resolveClientUrl(argOf("--url", ""));
 const SHOTS = argOf("--shots", "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-book-bag-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "book-bag" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -103,7 +78,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.removeItem('tg_reduced_motion')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
 
   // ---- tiện ích trong trang -----------------------------------------------------------------------------------
@@ -164,17 +140,28 @@ try {
       deviceScaleFactor: 1,
       mobile: W < 700,
     });
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?skills=mock&n=2&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (
-        await evalJs(
-          "Boolean(window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
-        )
-      )
-        break;
-    }
-    await sleep(500);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__ui && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`${W}x${H}: cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(500)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`${W}x${H}: phông chưa tải xong / thiếu data-input sau 30 s`);
     // ghi lại mọi tin gửi lên máy chủ giả
     await evalJs(
       `window.__sent = []; const r = window.__scene.room; const o = r.send.bind(r); r.send = (t, p) => { window.__sent.push([t, p]); return o(t, p); }; 0`,
@@ -280,16 +267,7 @@ try {
   }
   check(pageErrors === 0, `0 lỗi JS (có ${pageErrors})`);
 } finally {
-  try {
-    chrome.kill();
-  } catch {
-    /* đã thoát */
-  }
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures ? `\n${failures} KIỂM TRA ĐỎ` : "\nTẤT CẢ ĐẠT");
 process.exit(failures ? 1 : 0);

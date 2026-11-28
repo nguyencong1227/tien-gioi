@@ -45,6 +45,7 @@ beforeAll(async () => {
 
 afterEach(async () => {
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(150);
 });
 
@@ -182,7 +183,8 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     expect(offer.ms).toBeGreaterThan(9000);
 
     h.room.send(AMBUSH_MSG.seen, { id: offer.id });
-    await sleep(AMBUSH_ARM_MS + 80); // qua thời gian "mở khoá" (đến sớm hơn bị bỏ qua)
+    // Chờ đồng hồ: qua thời gian "mở khoá" chống bấm nhầm (đến sớm hơn bị bỏ qua)
+    await sleep(AMBUSH_ARM_MS + 80);
     h.room.send(AMBUSH_MSG.choose, { id: offer.id, choice: "flee_coin" });
     const end = await waitFor(() => h.ends[0], 3000, "nhận ambushEnd");
     expect(end).toEqual({ result: "fled", paid: { coin: offer.price.coin.price } });
@@ -214,6 +216,7 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     expect(rollAmbush(w, sid, p, c)).toBe(true);
     const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
     h.room.send(AMBUSH_MSG.seen, { id: offer.id });
+    // Chờ âm: quá thời gian AMBUSH_SEEN_MS khẳng định hộp thoại vẫn mở (không bị huỷ)
     await sleep(AMBUSH_SEEN_MS + 700);
     expect(c.ambush.offer?.id).toBe(offer.id);
     expect(h.ends).toHaveLength(0);
@@ -227,6 +230,7 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     const { w, sid, p, c } = prime(h);
     expect(c.proto).toBe(AMBUSH_MIN_PROTOCOL - 1);
     expect(rollAmbush(w, sid, p, c)).toBe(false);
+    // Chờ âm: khẳng định client cũ không bao giờ nhận được hộp thoại offer
     await sleep(200);
     expect(h.offers).toHaveLength(0);
   }, 10_000);
@@ -236,6 +240,7 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     const { w, sid, p, c } = prime(h);
     expect(rollAmbush(w, sid, p, c)).toBe(true);
     const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
+    // Chờ đồng hồ: qua thời gian mở khoá chống bấm nhầm
     await sleep(AMBUSH_ARM_MS + 80);
     // Ít tin rác thôi: `ambushChoose` có giới hạn tần suất (burst 4), gửi nhiều hơn thì tin hợp lệ phía sau cũng bị bỏ
     for (const bad of [
@@ -244,7 +249,8 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
       "flee_coin",
     ] as unknown[])
       h.room.send(AMBUSH_MSG.choose, bad);
-    await sleep(1100); // đủ cho thùng giới hạn tần suất hồi lại
+    // Chờ đồng hồ: đủ cho thùng giới hạn tần suất (1 tin/giây) hồi lại
+    await sleep(1100);
     expect(c.coin).toBe(5000);
     expect(p.exp).toBe(400);
     expect(c.ambush.offer?.id).toBe(offer.id);
@@ -267,12 +273,14 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     expect(rollAmbush(w, sid, p, c)).toBe(true);
     const offer = await waitFor(() => h.offers[0], 3000, "nhận ambushOffer");
     h.room.send(AMBUSH_MSG.seen, { id: offer.id });
-    await sleep(100);
+    // Chờ dương: máy chủ nhận tin seen và đánh dấu offer.seen = true
+    await waitFor(() => c.ambush.offer?.seen === true, 2000, "máy chủ nhận tin seen");
     const endsAt0 = c.ambush.offer.endsAt;
     (h.room.connection.transport as any).ws.close();
     await waitFor(() => !h.room.connection.isOpen);
     await waitFor(() => (serverRoom(h.room) as any).ghosts.has(sid), 3000, "thành hồn lìa xác");
-    await sleep(1200); // trong lúc rớt, đồng hồ hộp thoại không chạy: hạn dời tiến theo thời gian rớt
+    // Chờ đồng hồ: trong lúc rớt, đồng hồ hộp thoại không chạy: hạn dời tiến theo thời gian rớt
+    await sleep(1200);
     expect(c.ambush.offer).toBeDefined();
     expect(c.ambush.offer.endsAt).toBeGreaterThan(endsAt0 + 800);
 
@@ -285,6 +293,7 @@ describe("Gặp chặn đường qua mạng (máy chủ Colyseus thật, AMBUSH=
     expect(again.id).toBe(offer.id); // CÙNG id: client coi là cập nhật, không dựng lại
     expect(again.ms).toBeGreaterThan(8000); // thời gian còn lại THẬT, không bị trừ lúc rớt
 
+    // Chờ đồng hồ: qua thời gian mở khoá sau khi nối lại
     await sleep(AMBUSH_ARM_MS);
     r2.send(AMBUSH_MSG.choose, { id: offer.id, choice: "flee_coin" });
     const end = await waitFor(() => h2.ends[0], 3000, "nhận ambushEnd sau nối lại");

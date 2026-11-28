@@ -53,6 +53,8 @@ import {
   HAC_PHONG_ID,
   AM_SUONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   JOIN_WRONG_MAP,
   MAPS,
   getMap,
@@ -105,12 +107,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Đủ lâu để thấy nhân vật KHÔNG hồi sinh theo đồng hồ (RESPAWN_MS cũ là 5 giây): kiểm ngắn, đồng hồ giả ở test đơn vị lo phần còn lại */
 const RESPAWN_MS_TEST = 1200;
 
-async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T> {
+async function waitFor<T>(
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
+  ms = 3000,
+  what = "điều kiện",
+): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error("Hết thời gian chờ điều kiện");
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
@@ -175,6 +181,22 @@ function serverState(room: Room) {
   return serverRoom(room).state as WorldState;
 }
 
+/** Cho người chơi rời phòng chủ động và chờ người chơi dọn sạch khỏi phòng Colyseus thật. */
+async function leaveRoom(a: { room: Room } | Room) {
+  const room = "room" in a ? a.room : a;
+  const rId = room.roomId;
+  const sid = room.sessionId;
+  await room.leave(true);
+  const idx = rooms.indexOf(room);
+  if (idx >= 0) rooms.splice(idx, 1);
+  // Chờ dương / điều kiện tiên quyết: người chơi đã dọn sạch khỏi state của phòng
+  await waitFor(
+    () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+    3000,
+    "người chơi đã dọn khỏi phòng",
+  );
+}
+
 describe("vào game", () => {
   it("từ chối tên không hợp lệ", async () => {
     const client = new Client(`ws://localhost:${PORT}`);
@@ -221,9 +243,7 @@ describe("vào game", () => {
 
   it("tên đã có chủ thì mã khác không vào được", async () => {
     const a = await join("Chu Nhan");
-    await a.room.leave(true);
-    rooms.length = 0;
-    await sleep(150);
+    await leaveRoom(a);
     const client = new Client(`ws://localhost:${PORT}`);
     await expect(
       client.joinOrCreate(ROOM_NAME, { name: "Chu Nhan", secret: secretOf("ke gian") }),
@@ -299,6 +319,23 @@ describe("rớt mạng và nối lại (#116)", () => {
    */
   const waitGhost = (a: { room: Room }, sid = a.room.sessionId) =>
     waitFor(() => (serverRoom(a.room) as any).ghosts.has(sid), 5000);
+
+  /**
+   * Làm `persist` của phòng CHẬM `ms`: `onLeave` còn kẹt ở `await this.persist(...)` (ghi tệp, trên runner CI đĩa tải có thể mất vài trăm ms) TRƯỚC khi tới
+   * `reconnected(...)`, trong khi client đã nhận Room mới. Khẳng định ngay sau `reconnectTo` về điều `reconnected` làm (gỡ hồn lìa xác, cấp hộ thể) là
+   * cuộc đua; ca nào khẳng định như vậy phải CHỜ THEO ĐIỀU KIỆN và dùng hàm này để bắt buộc cuộc đua xảy ra mọi lần (CI main d93ba929 đỏ ca #1292).
+   * Trả hàm khôi phục (xoá thuộc tính ghi đè trên thể hiện: phòng dùng chung giữa các ca nên KHÔNG để rò sang ca sau).
+   */
+  const slowPersist = (sr: any, ms: number) => {
+    const orig = sr.persist;
+    sr.persist = async function (this: unknown, ...args: unknown[]) {
+      await sleep(ms);
+      return orig.apply(this, args);
+    };
+    return () => {
+      delete sr.persist;
+    };
+  };
 
   it("nối lại trong thời gian chờ: cùng sessionId, nhân vật còn nguyên, nhận lại túi / ví, vùng nhìn đúng, điều khiển được", async () => {
     const a = await join("Noi Lai");
@@ -480,11 +517,19 @@ describe("rớt mạng và nối lại (#116)", () => {
     const a = await join("Ho The Ro");
     const sr = serverRoom(a.room) as any;
     const sid = a.room.sessionId;
-    dropConnection(a.room);
-    await waitGhost(a);
-    const r2 = await reconnectTo(a.room);
+    const restorePersist = slowPersist(sr, 400);
+    let r2: Awaited<ReturnType<typeof reconnectTo>>;
+    try {
+      dropConnection(a.room);
+      await waitGhost(a);
+      r2 = await reconnectTo(a.room);
+    } finally {
+      // Nối lại ném lỗi thì vẫn phải gỡ persist chậm: phòng dùng chung giữa các ca, để rò sẽ làm ca sau đỏ khó hiểu (nit của B ở #1449)
+      restorePersist();
+    }
     // Nối lại thì được hộ thể (`reconnected` -> `grantShield`). Kéo hạn dài để `tickNetGuard` KHÔNG kịp gỡ trước khi rời: ca này chỉ đo việc dọn khi rời phòng, không phụ thuộc tải máy
-    expect(sr.world.shielded.has(sid)).toBe(true);
+    // `reconnected` chạy SAU `await this.persist(...)` của `onLeave` nên có thể trễ hơn lúc client nhận Room mới (`slowPersist` bắt buộc cuộc đua): chờ theo điều kiện, không khẳng định ngay
+    await waitFor(() => sr.world.shielded.has(sid), 2000);
     sr.world.ctrl.get(sid).shieldUntil = sr.world.now + 600_000;
     await r2.room.leave(true);
     await waitFor(() => !sr.state.players.has(sid), 3000);
@@ -1087,9 +1132,7 @@ describe("túi đồ và đồ rơi", () => {
     const a = await join(name);
     a.room.send("chat", { text: "/give nanh_soi 7" });
     await waitFor(() => a.invs.find((m) => m.gained));
-    await a.room.leave(true);
-    rooms.length = 0;
-    await sleep(200);
+    await leaveRoom(a);
     const again = await join(name);
     const inv = await waitFor(() => again.invs[0]);
     expect(inv.slots[0]).toEqual({ itemId: "nanh_soi", qty: 7 });
@@ -1112,9 +1155,7 @@ describe("túi đồ và đồ rơi", () => {
     });
     await sleep(150);
     expect(other.wallets.length).toBe(before);
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(200);
+    await leaveRoom(a);
     const again = await join(name);
     const w = await waitFor(() => again.wallets[0]);
     expect(w).toEqual({ coin: 123 });
@@ -1131,9 +1172,7 @@ describe("túi đồ và đồ rơi", () => {
     for (const [i, [bad, expected]] of cases.entries()) {
       const name = `Tien Hong ${i}`;
       const a = await join(name);
-      await a.room.leave(true);
-      rooms.splice(rooms.indexOf(a.room), 1);
-      await sleep(200);
+      await leaveRoom(a);
       const file = readdirSync(dataDir)
         .filter((x) => x.endsWith(".json"))
         .find((f) => JSON.parse(readFileSync(path.join(dataDir, f), "utf8")).name === name)!;
@@ -1198,9 +1237,7 @@ describe("túi đồ và đồ rơi", () => {
     expect((serverRoom(a.room) as any).world.ctrl.get(a.room.sessionId)!.coin).toBe(expectedCoin);
 
     // Thoát ra vào lại: còn 1 đan và đúng số tiền
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(200);
+    await leaveRoom(a);
     const again = await join(name);
     expect((await waitFor(() => again.wallets[0])).coin).toBe(expectedCoin);
     const inv = await waitFor(() => again.invs[0]);
@@ -1229,9 +1266,7 @@ describe("túi đồ và đồ rơi", () => {
     expect(got).toEqual({ coin: COIN_DROPS.tho!.min, gained: COIN_DROPS.tho!.min });
     await sleep(150);
     expect(other.wallets.length).toBe(before); // người không góp sát thương không nhận gì
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(200);
+    await leaveRoom(a);
     const again = await join(name);
     expect((await waitFor(() => again.wallets[0])).coin).toBe(COIN_DROPS.tho!.min);
   });
@@ -1328,9 +1363,7 @@ describe("nhiệm vụ và NPC", () => {
     standAt(a.room, "truong_tran");
     a.room.send("questAccept", { questId: "nhap_the" });
     await waitFor(() => a.quests.at(-1)?.active.length === 1);
-    await a.room.leave(true);
-    rooms.length = 0;
-    await sleep(200);
+    await leaveRoom(a);
     const again = await join(name);
     const q = await waitFor(() => again.quests[0]);
     expect(q.active).toEqual([{ id: "nhap_the", step: 0, count: 0 }]);
@@ -1589,9 +1622,7 @@ describe("trang bị và rèn đồ", () => {
     await waitFor(
       () => (b.room.state as any).players.get(a.room.sessionId)?.weapon === "lang_nha_kiem",
     );
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(200);
+    await leaveRoom(a);
     const again = await join(name);
     expect(again.me().weapon).toBe("lang_nha_kiem");
   });
@@ -1626,9 +1657,7 @@ describe("trang bị và rèn đồ", () => {
       // Ép pháp bảo vào ô CHƯA MỞ (như file sửa tay / lỗi): lưu xong nạp lại thì bị bỏ, hài vẫn còn
       (serverState(a.room).players.get(a.room.sessionId) as any).treasure = "t_o_treasure";
       // Thoát ra vào lại: nạp từ file lưu, vẫn mặc và chỉ số còn
-      await a.room.leave(true);
-      rooms.splice(rooms.indexOf(a.room), 1);
-      await sleep(200);
+      await leaveRoom(a);
       const again = await join(name);
       expect(again.me().boots).toBe("t_o_boots");
       expect(again.me().maxHp).toBe(hp0 + 37);
@@ -2453,6 +2482,119 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
     ).toBeLessThan(2);
     expect(fileOf(name).mapId).toBe(AM_SUONG_ID);
   }, 35000);
+
+  it("mục 75 A2: đi qua cổng xuyên BA phòng Colyseus thật mới (Hàn Vân -> Lang Hoang -> Uy Vân Kinh) và quay về; giữ tu vi / đồ, đúng chỗ xuất hiện, vào nhầm phòng bị chuyển hướng", async () => {
+    const name = "Lang Uy Van";
+    const hanVan = getMap(HAN_VAN_ID)!;
+    const langHoang = getMap(LANG_HOANG_ID)!;
+    const uyVan = getMap(UY_VAN_ID)!;
+    const hvBac = hanVan.portal("han_van_bac")!; // -> lang_hoang_nam
+    const lhNam = langHoang.portal("lang_hoang_nam")!; // -> han_van_bac
+    const lhBac = langHoang.portal("lang_hoang_bac")!; // -> uy_van_nam
+    const uvNam = uyVan.portal("uy_van_nam")!; // -> lang_hoang_bac
+
+    // Nhân vật mới chỉ tạo ở Lạc Hà (cổng bản đồ khác không cho tạo): tạo xong đặt thẳng vào Hàn Vân, cạnh cổng bắc (cổng đi giữa các bản đồ không đòi cảnh giới)
+    const a0 = await join(name);
+    await a0.room.leave(true);
+    rooms.splice(rooms.indexOf(a0.room), 1);
+    await sleep(200);
+    const saved = readdirSync(dataDir)
+      .filter((x) => x.endsWith(".json"))
+      .map((x) => path.join(dataDir, x))
+      .find((x) => JSON.parse(readFileSync(x, "utf8")).name === name)!;
+    writeFileSync(
+      saved,
+      JSON.stringify({
+        ...JSON.parse(readFileSync(saved, "utf8")),
+        mapId: HAN_VAN_ID,
+        x: hvBac.spawn.x,
+        y: hvBac.spawn.y,
+        exp: 250,
+      }),
+    );
+    const a = await join(name, secretOf(name), HAN_VAN_ID);
+    expect(serverRoom(a.room).mapId).toBe(HAN_VAN_ID);
+    a.room.send("chat", { text: "/give han_lang_mao 5" });
+    await waitFor(() => a.invs.find((m) => m.gained));
+    const gotA = listenTravel(a.room);
+
+    // Bước 1: Hàn Vân -> Lang Hoang (cổng bắc mới)
+    standAt(a.room, hvBac);
+    a.room.send("travel", { portalId: hvBac.id });
+    await waitFor(() => gotA.length === 1);
+    expect(gotA[0]).toEqual({ mapId: LANG_HOANG_ID });
+    await waitFor(() => !a.room.connection.isOpen);
+
+    // 2. Vào phòng Lang Hoang: đúng chỗ xuất hiện của cổng nam, trong khu an toàn, giữ tu vi và đồ
+    const b = await join(name, secretOf(name), LANG_HOANG_ID);
+    expect(serverRoom(b.room).mapId).toBe(LANG_HOANG_ID);
+    expect(Math.hypot(b.me().x - lhNam.spawn.x, b.me().y - lhNam.spawn.y)).toBeLessThan(2);
+    expect(langHoang.inSafe(b.me().x, b.me().y)).toBe(true);
+    expect(b.me().exp).toBe(250);
+    expect(
+      (await waitFor(() => b.invs[0])).slots.find((s) => s?.itemId === "han_lang_mao")?.qty,
+    ).toBe(5);
+    expect(fileOf(name).mapId).toBe(LANG_HOANG_ID);
+    // bản đồ trống: không có quái nào được sinh ở phòng mới (monsterCap rỗng, không rơi về quái Lạc Hà)
+    expect(serverState(b.room).monsters.size).toBe(0);
+    const gotB = listenTravel(b.room);
+
+    // Bước 2: Lang Hoang -> Uy Vân Kinh (cổng bắc)
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(b.room, lhBac);
+    b.room.send("travel", { portalId: lhBac.id });
+    await waitFor(() => gotB.length === 1);
+    expect(gotB[0]).toEqual({ mapId: UY_VAN_ID });
+    await waitFor(() => !b.room.connection.isOpen);
+
+    // 3. Vào phòng Uy Vân Kinh
+    const c = await join(name, secretOf(name), UY_VAN_ID);
+    expect(serverRoom(c.room).mapId).toBe(UY_VAN_ID);
+    expect(Math.hypot(c.me().x - uvNam.spawn.x, c.me().y - uvNam.spawn.y)).toBeLessThan(2);
+    expect(uyVan.inSafe(c.me().x, c.me().y)).toBe(true);
+    expect(c.me().exp).toBe(250);
+    expect(serverState(c.room).monsters.size).toBe(0);
+    expect(fileOf(name).mapId).toBe(UY_VAN_ID);
+
+    // Vào nhầm phòng Lang Hoang từ Uy Vân Kinh: bị từ chối và chỉ sang UY_VAN_ID
+    const wrong = await (async () => {
+      try {
+        await new Client(`ws://localhost:${PORT}`).joinOrCreate(roomNameOf(LANG_HOANG_ID), {
+          name,
+          secret: secretOf(name),
+        });
+      } catch (err: any) {
+        return { code: err.code as number, message: String(err.message) };
+      }
+      throw new Error("đáng ra phải bị chuyển hướng");
+    })();
+    expect(parseWrongMap(wrong.code, wrong.message)).toBe(UY_VAN_ID);
+
+    // Quay về: Uy Vân Kinh -> Lang Hoang -> Hàn Vân
+    const gotC = listenTravel(c.room);
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(c.room, uvNam);
+    c.room.send("travel", { portalId: uvNam.id });
+    await waitFor(() => gotC.length === 1);
+    expect(gotC[0]).toEqual({ mapId: LANG_HOANG_ID });
+    await waitFor(() => !c.room.connection.isOpen);
+
+    const d = await join(name, secretOf(name), LANG_HOANG_ID);
+    expect(Math.hypot(d.me().x - lhBac.spawn.x, d.me().y - lhBac.spawn.y)).toBeLessThan(2);
+    const gotD = listenTravel(d.room);
+    await sleep(TRAVEL_COOLDOWN_MS + 200);
+    standAt(d.room, lhNam);
+    d.room.send("travel", { portalId: lhNam.id });
+    await waitFor(() => gotD.length === 1);
+    expect(gotD[0]).toEqual({ mapId: HAN_VAN_ID });
+    await waitFor(() => !d.room.connection.isOpen);
+
+    const e = await join(name, secretOf(name), HAN_VAN_ID);
+    expect(Math.hypot(e.me().x - hvBac.spawn.x, e.me().y - hvBac.spawn.y)).toBeLessThan(2);
+    expect(hanVan.inSafe(e.me().x, e.me().y)).toBe(true);
+    expect(fileOf(name).mapId).toBe(HAN_VAN_ID);
+    expect(e.me().exp).toBe(250);
+  }, 60000);
 });
 
 describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc thoát phòng (#514, THIET_KE_NGHE_NHO 8.6)", () => {
@@ -2542,10 +2684,8 @@ describe("nghề nhỏ: hiệu lực chế phẩm mất khi qua cổng hoặc th
     const name = "Thoat Xoa Dan";
     const a = await join(name);
     await dungDanVaBuff(a);
-    await a.room.leave(true); // thoát chủ động: không chờ nối lại
-    await sleep(300);
+    await leaveRoom(a);
     const b = await join(name);
-    await sleep(200);
     expect(idsOf(b.room)).toEqual([]);
   });
 });
@@ -2650,11 +2790,7 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
       )!;
     return path.join(dataDir, f);
   };
-  const leave = async (a: { room: Room }) => {
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(250);
-  };
+  const leave = leaveRoom;
 
   it("vào game lần đầu: tạo chân linh (kiếp 1, 0 Duyên) trong DATA_DIR/souls; lifeId sinh một lần và giữ nguyên qua các lần vào", async () => {
     const name = "Chan Linh Moi";
@@ -2803,17 +2939,29 @@ describe("kho nhân vật thay được (M3 bước 3b): WorldRoom chỉ biết 
       const name = "Kho Bo Nho";
       const a = await join(name);
       expect(memory.get(key(name))).toMatchObject({ name, realm: 0 }); // tạo mới -> ghi vào kho giả
+      const savesBeforeA = calls.filter((c) => c === `save:${key(name)}`).length;
       await a.room.leave(true); // lưu lúc rời phòng
       rooms.splice(rooms.indexOf(a.room), 1);
-      await sleep(250);
-      expect(calls.filter((c) => c === `save:${key(name)}`).length).toBeGreaterThanOrEqual(2);
+      // Chờ dương: lần lưu lúc rời phòng được ghi vào kho giả
+      await waitFor(
+        () => calls.filter((c) => c === `save:${key(name)}`).length > savesBeforeA,
+        3000,
+        "lưu lúc rời phòng vào kho giả",
+      );
+      expect(calls.filter((c) => c === `save:${key(name)}`).length).toBeGreaterThan(savesBeforeA);
       // vào lại: nạp từ kho giả (đúng mã), không tạo nhân vật mới
       const b = await join(name);
       expect(calls).toContain(`load:${key(name)}`);
       expect(b.me().name).toBe(name);
+      const savesBeforeB = calls.filter((c) => c === `save:${key(name)}`).length;
       await b.room.leave(true);
       rooms.splice(rooms.indexOf(b.room), 1);
-      await sleep(250);
+      // Chờ dương: lần lưu lúc b rời phòng được ghi vào kho giả và dọn khỏi phòng
+      await waitFor(
+        () => calls.filter((c) => c === `save:${key(name)}`).length > savesBeforeB,
+        3000,
+        "lưu lúc b rời phòng vào kho giả",
+      );
       // sai mã bí mật bị từ chối dựa trên dữ liệu của kho giả
       const client = new Client(`ws://localhost:${PORT}`);
       await expect(
@@ -2844,11 +2992,7 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     const full = path.join(dataDir, f);
     writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
   };
-  const leave = async (a: { room: Room }) => {
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(250);
-  };
+  const leave = leaveRoom;
 
   /** Dựng người đã chơi tới Luyện Khí tầng 9 sau 48 phút, mang đồ, rồi cho quái đánh chết */
   async function playAndDie(a: Awaited<ReturnType<typeof join>>) {
@@ -3338,11 +3482,7 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
     const full = path.join(dataDir, f);
     writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
   };
-  const leave = async (a: { room: Room }) => {
-    await a.room.leave(true);
-    rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(250);
-  };
+  const leave = leaveRoom;
   /** Nghe tin `skills` TRƯỚC khi gửi `skillSlot` (tin gửi lúc vào phòng tới trước khi client đăng ký được). */
   const listen = (a: { room: Room }) => {
     const msgs: SkillsMsg[] = [];
@@ -3387,6 +3527,7 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
       null,
     ])
       a.room.send("skillSlot", bad);
+    // Chờ âm: tin rác bị từ chối, không thay đổi sổ chiêu
     await sleep(300);
     expect(a.toasts.filter((t) => t.tone === "bad").length).toBeGreaterThanOrEqual(3);
     expect(msgs.slice(n).every((x) => x.slots.join() === "hoa_van_kiem,bon_thach_quyen,,")).toBe(
@@ -3394,7 +3535,19 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
     );
     // rời phòng: sổ được LƯU
     await leave(a);
-    expect(playerOf(name).skills).toEqual({
+    const saved = await waitFor(
+      () => {
+        try {
+          const raw = playerOf(name);
+          if (raw.skills?.slots?.[1] === "bon_thach_quyen") return raw;
+        } catch {
+          return undefined;
+        }
+      },
+      3000,
+      "sổ chiêu được lưu xuống đĩa",
+    );
+    expect(saved.skills).toEqual({
       learned: { hoa_van_kiem: 2, bon_thach_quyen: 1 },
       slots: ["hoa_van_kiem", "bon_thach_quyen", "", ""],
     });

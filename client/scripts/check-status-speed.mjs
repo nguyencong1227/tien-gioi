@@ -1,35 +1,19 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process */
+/* global console, setTimeout, process */
 // Kiểm đoán trước di chuyển theo trạng thái của chính mình (M7.2b, StatusEntry.ratio + moveSpeedMul dùng chung): giữ phím mũi tên THẬT qua CDP, đo
 // quãng đường mỗi `input` ở client khi (a) không có gì, (b) tăng tốc +40 %, (c) tê cóng 50 %, (d) cả hai, (e) hết hạn, (f) choáng (không gửi `input`,
 // đứng yên), rồi (g) `reconcile` chạy lại input chưa xác nhận với CÙNG hệ số (khớp vị trí đoán trước) và bỏ qua khi choáng, (h) đổi bản đồ xoá danh sách.
 // Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn. Dùng chế độ mock (?duel=mock&debug=1) nên KHÔNG cần server.
-//   node client/scripts/check-status-speed.mjs [--url <client đang chạy sẵn, tuỳ chọn>]
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { spawn } from "node:child_process";
+//   node client/scripts/check-status-speed.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>]
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const i = process.argv.indexOf("--url");
 const BASE_URL = await resolveClientUrl(i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : "");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-status-speed-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
@@ -37,19 +21,8 @@ const check = (ok, msg) => {
 };
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "status-speed" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -86,7 +59,8 @@ try {
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: "try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}",
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   await send("Emulation.setDeviceMetricsOverride", {
     width: 1280,
@@ -94,12 +68,28 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
+  // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+  await evalJs("window.__isOldPage = true");
   await send("Page.navigate", { url: `${BASE_URL}/?duel=mock&debug=1` });
-  for (let k = 0; k < 40; k++) {
-    await sleep(300);
-    if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())")) break;
-  }
-  await sleep(600);
+  const ready = await waitUntilTrue(
+    () =>
+      evalJs(
+        "Boolean(!window.__isOldPage && window.__scene && window.__scene.me && window.__scene.me())",
+      ),
+    60000,
+    300,
+  );
+  if (!ready) throw new Error(`cảnh mock không sẵn sàng sau 60 s`);
+  // Chờ THEO ĐIỀU KIỆN thay `sleep(600)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+  const settled = await waitUntilTrue(
+    () =>
+      evalJs(
+        `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+      ),
+    30000,
+    100,
+  );
+  if (!settled) throw new Error(`phông chưa tải xong / thiếu data-input sau 30 s`);
 
   // Đếm `input` gửi đi (mock chỉ in log); mock không chạy đối chiếu nên tự đặt predX / predY về chỗ đứng của máy chủ trước mỗi pha
   await evalJs(`(() => {
@@ -128,12 +118,43 @@ try {
   // Qua đúng đường tin nhắn: mock room phát tin "status" tới handler mà cảnh đã đăng ký (đột biến bỏ đăng ký handler sẽ đỏ)
   const setStatus = (list) =>
     evalJs(`window.__scene.room.emit("status", { list: ${JSON.stringify(list)} }); 1`);
-  /** Giữ mũi tên phải `ms` ms: trả quãng đường (px) mỗi input và số input đã gửi */
-  const hold = async (ms = 700) => {
+  /** Giữ mũi tên phải: trả quãng đường (px) mỗi input và số input đã gửi.
+   *  `minInputs` > 0: giữ cho tới khi ĐÃ GỬI đủ ngần ấy input (tối đa 20 s), KHÔNG theo thời gian cố định: số input trong một cửa sổ cố định tuỳ tốc độ khung
+   *  (khung chậm ~45 ms gửi 4-7 input trong 700 ms thay vì 14-17) nên `n >= 8` sau `sleep(700)` đỏ ở runner chậm dù bước mỗi input vẫn đúng.
+   *  `minInputs` = 0: giữ `ms` ms (ca choáng: mong đợi 0 input, chờ theo số không có nghĩa).
+   *  `keep` (danh sách trạng thái, tuỳ chọn): áp dụng NGAY trước khi nhấn phím rồi LÀM MỚI mỗi ~150 ms suốt lượt giữ (máy chủ cũng làm mới trạng thái định kỳ).
+   *  Trạng thái là đồng hồ THẬT của trang và bị kẹp theo `STATUSES.maxMs` (choáng 1,2 s, tê cóng 6 s, tăng tốc 8 s): khi máy tải (khung ~170 ms, mỗi lệnh CDP chờ một khung)
+   *  từ lúc đặt tới input đầu tiên đã mất > 1,2 s và một lượt giữ kéo dài 2-6 s, nên không làm mới thì choáng hết hạn TRƯỚC khi nhấn phím (đo: 6-7 input lọt qua,
+   *  `stunned = 0` suốt cửa sổ) và tê cóng / tăng tốc hết hạn giữa chừng (tỉ lệ ra 1,0 thay vì 0,7). Không `keep` = không làm mới (ca "đã hết hạn"). */
+  const hold = async (ms = 700, minInputs = 0, keep = null) => {
     await reset();
     const a = await pos();
+    let lastSet = Date.now();
+    if (keep) await setStatus(keep);
     await keyEv("rawKeyDown");
-    await sleep(ms);
+    const refresh = async () => {
+      if (keep && Date.now() - lastSet >= 150) {
+        lastSet = Date.now();
+        await setStatus(keep);
+      }
+    };
+    if (minInputs > 0) {
+      const enough = await waitUntilTrue(
+        async () => {
+          await refresh();
+          return Number(await evalJs("window.__inputs")) >= minInputs;
+        },
+        20000,
+        25,
+      );
+      if (!enough) throw new Error(`giữ phím 20 s mà chưa gửi đủ ${minInputs} input`);
+    } else {
+      const until = Date.now() + ms;
+      while (Date.now() < until) {
+        await sleep(25);
+        await refresh();
+      }
+    }
     await keyEv("keyUp");
     await sleep(120);
     const b = await pos();
@@ -150,40 +171,35 @@ try {
   };
 
   console.log("--- Đoán trước theo trạng thái (mock, phím thật) ---");
-  await setStatus([]);
-  const base = await hold();
+  const base = await hold(0, 10, []);
   console.log("  nền:", JSON.stringify(base));
   check(
     base.n >= 8 && base.per > 1,
     `không có trạng thái: đi được (${base.n} input, ${base.per.toFixed(3)} px/input)`,
   );
 
-  await setStatus([["haste", 8000, 0.4]]);
-  const fast = await hold();
+  const fast = await hold(0, 10, [["haste", 8000, 0.4]]);
   check(
     fast.n >= 8 && near(fast.per / base.per, 1.4, 0.01),
     `tăng tốc +40%: quãng đường mỗi input x${(fast.per / base.per).toFixed(4)} (mong đợi 1,4)`,
   );
 
-  await setStatus([["chill", 8000, 0.5]]);
-  const slow = await hold();
+  const slow = await hold(0, 10, [["chill", 8000, 0.5]]);
   check(
     slow.n >= 8 && near(slow.per / base.per, 0.5, 0.01),
     `tê cóng 50%: x${(slow.per / base.per).toFixed(4)} (mong đợi 0,5)`,
   );
 
-  await setStatus([
+  const both = await hold(0, 10, [
     ["haste", 8000, 0.4],
     ["chill", 8000, 0.5],
   ]);
-  const both = await hold();
   check(
     both.n >= 8 && near(both.per / base.per, 0.7, 0.01),
     `cả hai: (1 + 0,4) x (1 - 0,5) = x${(both.per / base.per).toFixed(4)} (mong đợi 0,7)`,
   );
 
-  await setStatus([["haste", 8000, 99]]);
-  const clamped = await hold();
+  const clamped = await hold(0, 10, [["haste", 8000, 99]]);
   check(
     near(clamped.per / base.per, 1.6, 0.01),
     `cường độ rác 99 bị kẹp theo maxRatio 0,6: x${(clamped.per / base.per).toFixed(4)} (mong đợi 1,6)`,
@@ -191,14 +207,13 @@ try {
 
   await setStatus([["haste", 300, 0.4]]);
   await sleep(500);
-  const expired = await hold();
+  const expired = await hold(0, 10);
   check(
     near(expired.per / base.per, 1, 0.01),
     `tăng tốc 300 ms đã hết hạn: về x${(expired.per / base.per).toFixed(4)} (mong đợi 1)`,
   );
 
-  await setStatus([["stun", 8000]]);
-  const stun = await hold();
+  const stun = await hold(700, 0, [["stun", 8000]]);
   check(
     stun.n === 0 && stun.dx === 0,
     `choáng: KHÔNG gửi input (${stun.n}) và đứng yên (dx ${stun.dx})`,
@@ -208,30 +223,35 @@ try {
 
   await setStatus([["stun", 300]]);
   await sleep(500);
-  const afterStun = await hold();
+  const afterStun = await hold(0, 10);
   check(
     afterStun.n >= 8 && near(afterStun.per / base.per, 1, 0.01),
     `hết choáng thì đi lại bình thường (${afterStun.n} input)`,
   );
 
   console.log("\n--- Đối chiếu (reconcile) chạy lại input chưa xác nhận ---");
-  await setStatus([["haste", 8000, 0.4]]);
-  const r1 = await hold(500);
-  const before = await pos();
-  const meNow = JSON.parse(
-    await evalJs("JSON.stringify({ x: window.__scene.me().x, y: window.__scene.me().y })"),
+  const r1 = await hold(0, 8, [["haste", 8000, 0.4]]);
+  // MỘT lượt JS cho trước / sau đối chiếu: input muộn của lượt giữ phím (khung chậm) không chen được giữa hai lệnh CDP
+  const rec = JSON.parse(
+    await evalJs(`(() => { const sc = window.__scene, me = sc.me();
+      const before = { x: sc.predX, y: sc.predY }, meNow = { x: me.x, y: me.y };
+      sc.reconcile();
+      return JSON.stringify({ before, meNow, after: { x: sc.predX, y: sc.predY } }); })()`),
   );
-  await evalJs("window.__scene.reconcile(); 1");
-  const afterRec = await pos();
+  const { before, meNow, after: afterRec } = rec;
   check(
     near(afterRec.x, before.x, 0.01) &&
       near(afterRec.y, before.y, 0.01) &&
       afterRec.x > meNow.x + 5,
     `tăng tốc: đối chiếu cho đúng vị trí đã đoán trước (${before.x.toFixed(2)} -> ${afterRec.x.toFixed(2)}; ${r1.n} input chưa xác nhận)`,
   );
-  await setStatus([["stun", 8000]]);
-  await evalJs("window.__scene.reconcile(); 1");
-  const stunRec = await pos();
+  // đặt choáng + đối chiếu + đọc vị trí trong CÙNG lượt JS: choáng chỉ sống tối đa 1,2 s (`STUN_MAX_MS`), mỗi lệnh CDP ở khung chậm đã chiếm cả khung
+  const stunRec = JSON.parse(
+    await evalJs(`(() => { const sc = window.__scene;
+      sc.room.emit("status", { list: [["stun", 8000]] });
+      sc.reconcile();
+      return JSON.stringify({ x: sc.predX, y: sc.predY }); })()`),
+  );
   check(
     near(stunRec.x, meNow.x, 0.01),
     `đang choáng: đối chiếu KHÔNG chạy lại input chưa xác nhận (về ${stunRec.x.toFixed(2)} = máy chủ ${meNow.x.toFixed(2)})`,
@@ -280,13 +300,7 @@ try {
   check(pageErrors === 0, `0 lỗi console / exception (${pageErrors})`);
   ws.close();
 } finally {
-  chrome.kill("SIGKILL");
-  await sleep(600);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
-  } catch {
-    // dọn thư mục tạm không bắt buộc
-  }
+  if (launched) await launched.close();
 }
 if (failures > 0) {
   console.log(`\n✗ ${failures} kiểm tra ĐỎ`);

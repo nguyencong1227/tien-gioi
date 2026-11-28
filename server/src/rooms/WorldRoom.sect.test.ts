@@ -45,6 +45,7 @@ beforeAll(async () => {
 afterEach(async () => {
   restoreSaves(); // trả việc lưu về bình thường trước khi đóng phòng (đóng phòng cũng lưu hồ sơ)
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(150);
 });
 afterAll(async () => {
@@ -138,9 +139,12 @@ const sectFiles = () =>
 /** Nhân vật ở Hắc Phong Cốc: tạo ở Lạc Hà rồi sửa hồ sơ sang bản đồ đó (như đã đi qua cổng), vào phòng của bản đồ đó. */
 async function joinIn(name: string, mapId: string): Promise<Hero> {
   const first = await join(name, roomNameOf(DEFAULT_MAP_ID));
+  const srv = serverRoom(first.room);
+  const sid = first.room.sessionId;
   await first.room.leave(true);
   rooms.splice(rooms.indexOf(first.room), 1);
-  await sleep(200);
+  // Chờ dương: nhân vật hoàn tất rời phòng và lưu hồ sơ trước khi đọc file save để sửa toạ độ/bản đồ
+  await waitFor(() => !srv.state.players.has(sid), 3000, "rời phòng và lưu hồ sơ");
   const f = readdirSync(dataDir)
     .filter((x) => x.endsWith(".json"))
     .map((x) => path.join(dataDir, x))
@@ -211,9 +215,12 @@ describe("tông môn: luồng đầy đủ", () => {
     expect(file.members).toHaveLength(2);
 
     // B thoát hẳn rồi vào lại phòng: vẫn ở tông môn (theo linh hồn), nhận ảnh chụp, biệt hiệu hiện lại
+    const srvB = serverRoom(B.room);
+    const sidB = B.room.sessionId;
     await B.room.leave(true);
     rooms.splice(rooms.indexOf(B.room), 1);
-    await sleep(200);
+    // Chờ dương: B hoàn tất rời phòng cũ trước khi vào phòng mới
+    await waitFor(() => !srvB.state.players.has(sidB), 3000, "B hoàn tất rời phòng cũ");
     const B2 = await join(B.name, roomNameOf(HAC_PHONG_ID));
     await waitFor(() => lastSnap(B2)?.myRank === "de_tu", 5000, "B vào lại vẫn ở tông môn");
     expect(lastSnap(B2)?.coin).toBe(50);
@@ -327,6 +334,7 @@ describe("tông môn: luồng đầy đủ", () => {
     ] as const) {
       C.room.send(type, body);
     }
+    // Chờ âm: khẳng định chuỗi tin rác và tin trái phép bị máy chủ bỏ qua, không làm đổi trạng thái tông môn
     await sleep(600);
     expect(lastSnap(A)).toMatchObject({
       myRank: "chu",
@@ -383,6 +391,7 @@ describe("tông môn: kho đồ qua server Colyseus thật (mục 27)", () => {
     for (const bad of [null, {}, { slot: -1, qty: 1 }, { slot: 0, itemId: "constructor", qty: 1 }])
       B.room.send(SECT_MSG.vaultWithdraw, bad);
     B.room.send(SECT_MSG.vaultPolicy, { drawPerDay: 99 });
+    // Chờ âm: khẳng định tin rút đồ rác và đổi hạn mức trái phép bị bỏ qua, số lượng đồ trong kho không đổi
     await sleep(300);
     expect(countIn(lastVault(A)?.slots, MAT.id)).toBe(30);
 

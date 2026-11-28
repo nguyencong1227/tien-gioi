@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Client, type Room } from "colyseus.js";
 import { ROOM_NAME } from "@tien-gioi/shared";
@@ -30,6 +30,7 @@ afterEach(async () => {
   setAuditSink(null);
   vi.restoreAllMocks();
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await new Promise((r) => setTimeout(r, 120));
 });
 afterAll(async () => {
@@ -38,6 +39,19 @@ afterAll(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function waitFor<T>(
+  fn: () => T | Promise<T | undefined | false> | undefined | false,
+  ms = 3000,
+  what = "điều kiện",
+): Promise<T> {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
+    await sleep(20);
+  }
+}
 const MA = "ma-that-cua-nhan-vat-0123456789";
 const MA_SAI = "ma-sai-ma-sai-ma-sai-ma-sai-01";
 async function join(name: string, secret: string) {
@@ -52,9 +66,16 @@ describe("nhật ký kiểm toán ở phòng", () => {
     lines.length = 0;
     const a = await join("Kiem Toan Mot", MA);
     expect(lines).toEqual([]); // vào đúng: không ghi
+    const sid = a.sessionId;
+    const rId = a.roomId;
     await a.leave(true);
     rooms.pop();
-    await sleep(200);
+    // Chờ dương: máy chủ hoàn tất onLeave và dọn người chơi khỏi phòng
+    await waitFor(
+      () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+      3000,
+      "người chơi đã dọn khỏi phòng",
+    );
     await expect(join("Kiem Toan Mot", MA_SAI)).rejects.toMatchObject({ code: 403 });
     expect(events()).toEqual([
       expect.objectContaining({
@@ -77,7 +98,8 @@ describe("nhật ký kiểm toán ở phòng", () => {
     let code = 0;
     a.onLeave((c) => (code = c));
     for (let i = 0; i < 400; i++) a.send("talk", { npcId: "truong_tran" });
-    for (let i = 0; i < 100 && !code; i++) await sleep(30);
+    // Chờ dương: người chơi bị ngắt kết nối với mã 4429 do gửi tin quá tần suất
+    await waitFor(() => (code > 0 ? code : undefined), 3000, "mã ngắt kết nối do spam");
     expect(code).toBe(4429);
     const kicks = events().filter((e) => e.ev === "room.spam_kick");
     expect(kicks).toEqual([
@@ -89,9 +111,16 @@ describe("nhật ký kiểm toán ở phòng", () => {
     setAuditSink(null);
     const a = await join("Kiem Toan Ba", MA);
     expect(a.connection.isOpen).toBe(true);
+    const sid = a.sessionId;
+    const rId = a.roomId;
     await a.leave(true);
     rooms.pop();
-    await sleep(200);
+    // Chờ dương: máy chủ hoàn tất onLeave và dọn người chơi khỏi phòng
+    await waitFor(
+      () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+      3000,
+      "người chơi đã dọn khỏi phòng",
+    );
     await expect(join("Kiem Toan Ba", MA_SAI)).rejects.toMatchObject({ code: 403 });
     expect(lines.filter((l) => l.includes("Kiem Toan Ba"))).toEqual([]);
   });

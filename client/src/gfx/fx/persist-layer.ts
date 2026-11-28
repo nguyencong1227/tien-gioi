@@ -9,6 +9,11 @@
 import type Phaser from "phaser";
 import {
   PERSIST_ANCHOR_GRACE_MS,
+  PERSIST_TOTEM_FILL_ALPHA,
+  PERSIST_TOTEM_RING_ALPHA,
+  PERSIST_TOTEM_RING_ARC,
+  PERSIST_TOTEM_RING_DASHES,
+  PERSIST_TOTEM_RING_WIDTH,
   persistAlive,
   persistAlpha,
   persistArmed,
@@ -301,7 +306,7 @@ export class PersistLayer {
     }
   }
 
-  /** Tượng: bệ + cột đá có quầng sáng chớp theo nhịp, vòng tầm đánh mờ (nét đứt) quanh chân. */
+  /** Tượng: bệ + cột đá có quầng sáng chớp theo nhịp, vòng tầm đánh (nét đứt, nền nhạt) quanh chân; nét / độ đậm ở `PERSIST_TOTEM_RING_*` (persist-fx.ts). */
   private drawTotem(
     g: Phaser.GameObjects.Graphics,
     plan: PersistPlan,
@@ -311,11 +316,19 @@ export class PersistLayer {
     pulse: number,
     detail: boolean,
   ): void {
-    g.lineStyle(1, plan.tint, 0.22 * a * boost);
-    for (let k = 0; k < 12; k++) {
-      const s = (k * TAU) / 12;
+    if (detail) {
+      g.fillStyle(plan.tint, PERSIST_TOTEM_FILL_ALPHA * a * boost);
+      g.fillCircle(0, 0, r);
+    }
+    g.lineStyle(
+      PERSIST_TOTEM_RING_WIDTH,
+      plan.tint,
+      Math.min(1, PERSIST_TOTEM_RING_ALPHA * a * boost),
+    );
+    for (let k = 0; k < PERSIST_TOTEM_RING_DASHES; k++) {
+      const s = (k * TAU) / PERSIST_TOTEM_RING_DASHES;
       g.beginPath();
-      g.arc(0, 0, r, s, s + 0.3);
+      g.arc(0, 0, r, s, s + PERSIST_TOTEM_RING_ARC);
       g.strokePath();
     }
     g.fillStyle(0x1b1612, 0.55 * a);

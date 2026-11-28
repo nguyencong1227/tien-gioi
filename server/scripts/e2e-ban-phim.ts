@@ -12,7 +12,7 @@
 // 10. Nói chuyện NPC chỉ bằng phím: F mở hộp thoại, Enter tua chữ, mũi tên vào dòng lựa chọn, phím số chọn dòng (nhận nhiệm vụ).
 // 11. Cửa hàng chỉ bằng phím: phím số mở "Cửa hàng", mũi tên tới nút +, Enter tăng số lượng (focus KHÔNG rơi khi bảng vẽ lại), Enter Mua (Linh thạch giảm, túi tăng).
 // Chạy: `npm run build && npm run e2e:ban-phim -w server`.
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -30,7 +30,8 @@ import {
   roomNameOf,
   getMap,
 } from "@tien-gioi/shared";
-import { Tab, sleep, shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, sleep, shown, listenWithRetry, removeTmpDirs } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 import { ACT_CONFIRM_GUARD_MS } from "../../client/src/act-confirm";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -213,36 +214,17 @@ async function main() {
   };
   let fatal: string | null = null;
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      extraFlags: [
         // Chrome headless không có chuột nên `pointer: fine` = false và nhãn phím (CSS chỉ cho máy tính) bị ẩn: giả lập chuột (4 = fine, 2 = hover)
         "--blink-settings=primaryPointerType=4,availablePointerTypes=4,primaryHoverType=2,availableHoverTypes=2",
-        "about:blank",
       ],
-      { stdio: "ignore" },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     await tab.send("Page.addScriptToEvaluateOnNewDocument", {
       // "Thủ công — khoá mục tiêu": ca Tab / Shift+Tab / Esc dưới đây kiểm CHẾ ĐỘ THỦ CÔNG (chưa khoá, Tab khoá con gần nhất...). Mặc định mới là Tự động (mục 26: tự nhắm gần nhất,
       // `check-aim-mode.mjs` kiểm bằng Chrome thật) nên ở đây phải chọn Thủ công.
@@ -834,6 +816,46 @@ async function main() {
       "Enter trên nút Mua: túi có Hồi Huyết Đan mua thêm (server)",
       Number(await ev(`window.__ui.getCurrentCoin()`)) < 500,
       `Linh thạch=${await ev(`window.__ui.getCurrentCoin()`)}`,
+    );
+    // Ô số lượng KHÔNG là bẫy mũi tên (rà giao diện 25/11): từ nút Mua bấm Trái tới ô số lượng của ĐÚNG thẻ, rồi rời ô bằng Trái (ở đầu chữ) / Phải (ở cuối chữ),
+    // không cần Tab / Esc (Esc làm mất chỗ đứng trong danh sách 22 món). Trước khi ownsArrowKeys nhả mũi tên ở mép chữ, ô giữ mọi phím và focus kẹt tại đó.
+    const qtyInputSel = '[data-nav="buy:hoi_huyet_dan:input"]';
+    const activeIsQtyInput = () =>
+      ev(`document.activeElement === document.querySelector('#shop-modal ${qtyInputSel}')`);
+    const leaveQtyInput = async (key: typeof K.left, max = 3) => {
+      let n = 0;
+      while (n < max && (await activeIsQtyInput())) {
+        await press(t, key);
+        n++;
+      }
+      return { left: !(await activeIsQtyInput()), presses: n };
+    };
+    const sameCardActive = () =>
+      ev(
+        `(() => { const a = document.activeElement; const i = document.querySelector('#shop-modal ${qtyInputSel}'); const c = i && i.closest('.shop-card'); return !!(a && c && c.contains(a) && a.tagName === 'BUTTON'); })()`,
+      );
+    await arrowTo(
+      t,
+      '#shop-modal .shop-card:has([data-nav="buy:hoi_huyet_dan:plus"]) .shop-act-btn.buy',
+    );
+    await arrowTo(t, `#shop-modal ${qtyInputSel}`);
+    check(
+      "Mũi tên đưa focus vào ô số lượng của Hồi Huyết Đan",
+      !!(await activeIsQtyInput()),
+      String(await ev(`document.activeElement && document.activeElement.className`)),
+    );
+    const outRight = await leaveQtyInput(K.right);
+    check(
+      "Ô số lượng: Phải (con trỏ ở cuối chữ) rời được ô sang nút cùng thẻ, không kẹt",
+      outRight.left && !!(await sameCardActive()),
+      `rời=${outRight.left} sau ${outRight.presses} phím, nút cùng thẻ=${await sameCardActive()}`,
+    );
+    await arrowTo(t, `#shop-modal ${qtyInputSel}`);
+    const outLeft = await leaveQtyInput(K.left);
+    check(
+      "Ô số lượng: Trái (sau khi con trỏ về đầu chữ) rời được ô sang nút cùng thẻ, không kẹt",
+      outLeft.left && !!(await sameCardActive()),
+      `rời=${outLeft.left} sau ${outLeft.presses} phím, nút cùng thẻ=${await sameCardActive()}`,
     );
     await press(t, K.esc);
     check("Esc đóng cửa hàng", !(await ev(shown("shop-modal"))), "shop-modal vẫn mở");

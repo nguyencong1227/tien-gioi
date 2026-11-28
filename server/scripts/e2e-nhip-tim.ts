@@ -14,7 +14,7 @@
 //     (nhờ ping) và tắt khi nối lại xong.
 // Chạy: `npm run build && npm run e2e:nhip-tim -w server` (cần google-chrome).
 
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
@@ -27,15 +27,8 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { HEARTBEAT_TIMEOUT_MS, NET_BEAT_MS, RESUME_TIMEOUT_MS } from "@tien-gioi/shared";
 // Ngưỡng báo "Mạng chậm" của client (chip báo sớm hơn nhịp tim, QUYET_DINH_M3 mục 25): nhập từ mã client để script và mã dùng MỘT con số
 import { SLOW_AFTER_MS, SLOW_POLL_MS } from "../../client/src/net-slow";
-import {
-  Tab,
-  sleep,
-  shown,
-  killChrome,
-  removeTmpDirs,
-  listenWithRetry,
-  getChromeGpuFlags,
-} from "./e2e-kit";
+import { Tab, sleep, shown, killChrome, removeTmpDirs, listenWithRetry } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
@@ -355,35 +348,13 @@ async function main() {
   let blackholeAt = 0; // lúc bật blackhole ca 1 (chỉ để in chẩn đoán khi thất bại)
 
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore", detached: true },
-    );
-
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 15000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     const T = tab;
 
     let identityScript: string | null = null;

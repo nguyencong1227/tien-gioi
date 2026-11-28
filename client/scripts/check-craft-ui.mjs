@@ -1,5 +1,4 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm giao diện nghề nhỏ lát 1 (#514, issue #769) trong Chrome THẬT ở năm khung nhìn, chế độ mock (không cần máy chủ / Vite):
  *
@@ -17,13 +16,14 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -116,37 +116,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-craft-ui-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome (zygote, GPU) một lần
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
-    if (!page) throw new Error("Không tìm thấy Chrome page target.");
+    launched = await launchChrome({ name: "craft-ui" });
+    const page = launched.page;
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
       ws.onopen = res;
@@ -188,7 +166,8 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     // `--vp 360x640` chỉ chạy một khung nhìn (chạy đột biến nhanh)
@@ -210,24 +189,44 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__cuOldPage && window.__getMap && window.__craftData && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__cuOldPage && window.__getMap && window.__craftData && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        60000,
+        200,
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
         continue;
       }
-      await sleep(600);
+      // Chờ THEO ĐIỀU KIỆN thay `sleep(600)`: phông đã tải xong và `data-input` đã đặt lên <html>
+      const settled = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+            ),
+          ),
+        30000,
+        100,
+      );
+      if (!settled) throw new Error(`${vp.name}: phông chưa tải xong / thiếu data-input sau 30 s`);
       await evalJs(
         `["dungeon-mock-badge", "duel-mock-badge"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; })`,
       );
+      /** Chờ THEO KHUNG HÌNH thay `sleep` cố định: >= 8 khung hình VÀ >= 250 ms (đồng hồ thật). Cảnh cập nhật chip trạng thái / nút Dùng theo nhịp ~60 ms TRONG vòng cập nhật của Phaser (mỗi khung),
+       *  nên ở khung chậm `sleep(350)` có thể không đủ một nhịp; chờ vài khung hình thì chắc chắn cảnh đã chạy lại cập nhật. */
+      const settle = () =>
+        evalJs(`new Promise((resolve) => {
+          const t0 = performance.now(); let n = 0;
+          const step = () => { n++; if (n >= 8 && performance.now() - t0 >= 250) resolve(1); else requestAnimationFrame(step); };
+          requestAnimationFrame(step);
+        })`);
       const shot = async (name) => {
         if (!shotsDir) return;
         await sleep(150);
@@ -275,7 +274,7 @@ async function main() {
         await evalJs(
           `(() => { const n = window.__craftData.NPC_BY_ID[${JSON.stringify(npcId)}]; const sc = window.__scene; sc.predX = n.x; sc.predY = n.y; sc.cameras.main.centerOn(n.x, n.y); return 1; })()`,
         );
-        await sleep(250);
+        await settle();
       };
 
       // ---- 1. Lò đan (và thợ rèn thường không đổi) ----
@@ -286,7 +285,7 @@ async function main() {
       );
       await standAt("tho_ren_suong");
       await evalJs(`window.__ui.openForgeModal("tho_ren_suong")`);
-      await sleep(300);
+      await settle();
       const forge = await evalJs(`(() => ({
         title: document.getElementById("forge-title").textContent,
         sub: document.getElementById("forge-sub").textContent,
@@ -321,7 +320,7 @@ async function main() {
       await evalJs(`window.__craftData.NPC_BY_ID.tho_ren_suong.station = undefined`);
       await standAt("tho_ren_suong");
       await evalJs(`window.__ui.openForgeModal("tho_ren_han")`);
-      await sleep(250);
+      await settle();
       const smith = await evalJs(
         `({ title: document.getElementById("forge-title").textContent, btn: document.querySelector("#forge-list .forge-btn")?.textContent ?? "" })`,
       );
@@ -336,7 +335,7 @@ async function main() {
       await evalJs(
         `window.__scene.onStatus({ list: [["burn", 5000], ["dao_ho", 899000, 0.15], ["haste", 6000, 0.3], ["shield", 59000, 0.2]] })`,
       );
-      await sleep(300);
+      await settle();
       const chips = await evalJs(
         `[...document.querySelectorAll(".st-badge")].map((e) => { const r = e.getBoundingClientRect(); return { id: e.dataset.status, label: e.textContent, aria: e.getAttribute("aria-label"), left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })`,
       );
@@ -362,17 +361,17 @@ async function main() {
       // ---- 3. Túi đồ: nút Dùng mờ + dòng Hiệu lực ----
       console.log("  [3] nút Dùng mờ + dòng Hiệu lực");
       await evalJs(`window.__scene.onStatus({ list: [] })`);
-      await sleep(200);
+      await settle();
       await evalJs(
         `(() => { window.__ui.onInv({ slots: [{ itemId: "t_dan_hodao", qty: 2 }, { itemId: "t_dan_tang_toc", qty: 2 }], cd: {} }); window.__ui.toggleInventory(true); return 1; })()`,
       );
-      await sleep(300);
+      await settle();
       const pick = async (i) => {
         // `pointerdown` chọn ô (như chuột / chạm); `focus()` không chắc bắn sự kiện khi Chrome headless chưa có tiêu điểm trang
         await evalJs(
           `document.querySelectorAll("#inv-grid button")[${i}].dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }))`,
         );
-        await sleep(150);
+        await settle();
         return evalJs(
           `(() => { const b = document.getElementById("inv-btn-use"); return { text: b.textContent, disabled: b.disabled, line: document.getElementById("inv-equip-cmp").hidden ? "" : document.getElementById("inv-equip-cmp").textContent }; })()`,
         );
@@ -404,7 +403,7 @@ async function main() {
         `dòng Hiệu lực: "${haste1.line}"`,
       );
       await evalJs(`window.__scene.onStatus({ list: [["haste", 6000, 0.3]] })`);
-      await sleep(350);
+      await settle();
       const haste2 = await evalJs(
         `(() => { const b = document.getElementById("inv-btn-use"); return { text: b.textContent, disabled: b.disabled }; })()`,
       );
@@ -414,7 +413,7 @@ async function main() {
       );
       // tấm túi đồ tự cuộn trên điện thoại ngang: cuộn nút vào tầm nhìn rồi mới đo
       await evalJs(`document.getElementById("inv-btn-use").scrollIntoView({ block: "center" })`);
-      await sleep(150);
+      await settle();
       if (vp.mobile)
         report(
           judgeBox(
@@ -429,7 +428,7 @@ async function main() {
       await shot("nut-dung-con-hieu-luc");
       // hết hạn: chip mất thì nút sáng lại (scene báo mỗi ~60 ms)
       await evalJs(`window.__scene.onStatus({ list: [] })`);
-      await sleep(400);
+      await settle();
       const haste3 = await evalJs(
         `(() => { const b = document.getElementById("inv-btn-use"); return { text: b.textContent, disabled: b.disabled }; })()`,
       );
@@ -442,11 +441,11 @@ async function main() {
       console.log("  [5] toast thành công khi dùng đan");
       await evalJs(`window.__sent.length = 0`);
       await evalJs(`document.getElementById("inv-btn-use").click()`);
-      await sleep(100);
+      await settle();
       const used = await evalJs(`window.__sent.filter((m) => m[0] === "useItem").length`);
       check(used === 1, `bấm Dùng gửi 1 tin useItem (${used})`);
       await evalJs(`window.__scene.onStatus({ list: [["dao_ho", 900000, 0.15]] })`);
-      await sleep(150);
+      await settle();
       const toast = await evalJs(
         `[...document.querySelectorAll("#toast p")].map((p) => p.textContent)`,
       );
@@ -471,7 +470,7 @@ async function main() {
       await evalJs(`window.__sent.length = 0`);
       await evalJs(`window.__scene.onStatus({ list: [["haste", 6000, 0.3]] })`); // chỉ buff chiêu: KHÔNG hỏi
       await evalJs(`window.__scene.travelPortal(${JSON.stringify(portalId)})`);
-      await sleep(150);
+      await settle();
       check(
         (await evalJs(`window.__sent.filter((m) => m[0] === "travel").length`)) === 1,
         "chỉ buff chiêu: gửi travel ngay, không hỏi",
@@ -485,7 +484,7 @@ async function main() {
         `window.__scene.onStatus({ list: [["haste", 6000, 0.3], ["dao_ho", 600000, 0.15]] })`,
       );
       await evalJs(`window.__scene.travelPortal(${JSON.stringify(portalId)})`);
-      await sleep(250);
+      await settle();
       check(await evalJs(`window.__ui.isTravelConfirmOpen()`), "có chip Hộ đạo: hộp xác nhận hiện");
       check(
         (await evalJs(`window.__sent.filter((m) => m[0] === "travel").length`)) === 0,
@@ -505,16 +504,16 @@ async function main() {
       );
       await shot("xac-nhan-qua-cong");
       await pressKey("x", "KeyX");
-      await sleep(200);
+      await settle();
       check(!(await evalJs(`window.__ui.isTravelConfirmOpen()`)), "phím X (Ở lại): hộp đóng");
       check(
         (await evalJs(`window.__sent.filter((m) => m[0] === "travel").length`)) === 0,
         "Ở lại: KHÔNG gửi travel",
       );
       await evalJs(`window.__scene.travelPortal(${JSON.stringify(portalId)})`);
-      await sleep(200);
+      await settle();
       await pressKey("y", "KeyY");
-      await sleep(250);
+      await settle();
       check(!(await evalJs(`window.__ui.isTravelConfirmOpen()`)), "phím Y (Đi): hộp đóng");
       check(
         (await evalJs(`window.__sent.filter((m) => m[0] === "travel").length`)) === 1,
@@ -523,9 +522,9 @@ async function main() {
       // hết hạn trong lúc hộp đang mở: tự đóng
       await evalJs(`window.__sent.length = 0`);
       await evalJs(`window.__scene.travelPortal(${JSON.stringify(portalId)})`);
-      await sleep(150);
+      await settle();
       await evalJs(`window.__scene.onStatus({ list: [] })`);
-      await sleep(400);
+      await settle();
       check(
         !(await evalJs(`window.__ui.isTravelConfirmOpen()`)),
         "chip hết hạn khi hộp đang mở: hộp tự đóng",
@@ -542,22 +541,8 @@ async function main() {
       })()`);
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
+    if (launched) await launched.close();
     server.close();
-    // Chrome còn ghi vào thư mục hồ sơ ngay sau SIGKILL (ENOTEMPTY): chờ nó thoát rồi xoá có thử lại; dọn không được thì bỏ qua, KHÔNG làm đỏ kết quả kiểm
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

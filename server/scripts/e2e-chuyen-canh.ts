@@ -7,7 +7,7 @@
 // Chặng ba (M7.5, #506, M7.8 #509): nhân vật lưu sẵn cạnh Lăng Hàn Quan đi Âm Sương Trạch -> Hàn Vân Lĩnh -> Âm Sương Trạch bằng cổng THẬT: bản đồ thứ tư dựng đủ lớp
 // (kiểu `han_van`), chỗ xuất hiện đúng cạnh Hồi Sương Quan (cổng nam, trong khu an toàn), quay về đúng cổng bắc Âm Sương.
 // Chạy: `npm run build && npm run e2e:chuyen-canh -w server` (cần google-chrome).
-import { spawn, spawnSync, execSync, type ChildProcess } from "node:child_process";
+import { spawnSync, execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import { Tab, sleep, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { Tab, sleep, listenWithRetry, removeTmpDirs } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 import { freePort } from "../src/test-port.js";
 import { getMap, DEFAULT_MAP_ID } from "@tien-gioi/shared";
 
@@ -69,34 +70,13 @@ async function main() {
   };
 
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore", detached: true },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     const T = tab;
 
     let currentName = "Chuyen Canh Cong";
@@ -333,7 +313,7 @@ async function main() {
     const checkDest = async (mapId: string) => {
       await sleep(800);
       const dest =
-        await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, vis: s.visualLayers.length, visFades: s.visualFades, visTex: s.textures.exists('map-visual:' + s.map.def.id), staleTex: ['lac_ha', 'hac_phong', 'am_suong', 'han_van'].filter((m) => m !== s.map.def.id && s.textures.exists('map-visual:' + m)), fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
+        await ev(`(() => { try { const s = window.__scene; return { decor: !!s.decorLayer, vis: s.visualLayers.length, visFades: s.visualFades, visTex: s.textures.exists('map-visual:' + s.map.def.id), staleTex: ['lac_ha', 'hac_phong', 'am_suong', 'han_van', 'lang_hoang', 'uy_van'].filter((m) => m !== s.map.def.id && s.textures.exists('map-visual:' + m)), fog: s.fogImages.length, light: s.lightVignette ? 1 : 0, mapId: s.map.def.id,
         decorKey: s.decorLayer ? s.decorLayer.tileset[0].image.key : '', portals: s.map.portals.length, portalVisuals: s.portalVisuals.length,
         zone: document.getElementById('minimap-zone')?.textContent || '', town: s.map.def.townName, wild: s.map.def.wildName }; } catch (e) { return { err: String((e && e.stack) || e) }; } })()`);
       must(!dest.err, `đọc trạng thái bản đồ đích (${dest.err})`);
@@ -546,6 +526,93 @@ async function main() {
       `về Âm Sương xuất hiện cạnh Lăng Hàn Quan: (${backXY.x.toFixed(0)}, ${backXY.y.toFixed(0)}) cách (${amBac.spawn.x}, ${amBac.spawn.y}) < 80 px`,
     );
     ok("về Âm Sương Trạch đúng cạnh Lăng Hàn Quan");
+
+    // ---------------- Chặng bốn (Mục 75, #1470): Hàn Vân Lĩnh -> Lang Hoang -> Uy Vân Kinh và quay về ----------------
+    // HAI nhân vật lưu sẵn cạnh cổng (như chặng hai / ba), KHÔNG đi bộ xuyên Lang Hoang: bản đồ 128 x 112 ô, từ cổng nam lên cổng bắc ~3000 px; runner CI
+    // chạy ~4 FPS nên nhân vật đi ~14 px/s và 90 s không tới (run 45691664338 trên `main` 0001a87f: "tới sát tâm cổng lang_hoang_bac" hết 90 s, đỏ 2/2 lần,
+    // máy dev 60 FPS thì xanh). Mỗi đoạn chỉ đi bộ một quãng ngắn từ chỗ xuất hiện của cổng tới tâm cổng.
+    out(
+      "\n--- Sáu bản đồ: Hàn Vân Lĩnh <-> Lang Hoang <-> Uy Vân Kinh (cổng thật, nhân vật lưu sẵn cạnh từng cổng) ---",
+    );
+    const hvBac = getMap("han_van")!.portal("han_van_bac")!;
+    const lhBacPortal = getMap("lang_hoang")!.portal("lang_hoang_bac")!;
+    // Lưu một nhân vật Hóa Thần đứng ở chỗ xuất hiện của cổng `portal` trên bản đồ `mapId`, đăng nhập và chờ vào đúng phòng (qua `wrong_map`)
+    const enterSaved = async (
+      name: string,
+      secret: string,
+      mapId: string,
+      spawn: { x: number; y: number },
+      roomLabel: string,
+    ) => {
+      await savePlayer({
+        name,
+        secretHash: hashSecret(secret),
+        realm: 5,
+        tier: 0,
+        exp: 0,
+        mapId,
+        x: spawn.x,
+        y: spawn.y,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      currentName = name;
+      currentSecret = secret;
+      await setStorage("");
+      await login(url);
+      await ev(
+        `(() => { const s = document.getElementById('set-quality'); s.value = 'high'; s.dispatchEvent(new Event('change')); })(); 1`,
+      );
+      await T.waitFor(
+        `window.__scene && window.__scene.map && window.__scene.map.def.id === ${JSON.stringify(mapId)}`,
+        `vào đúng phòng ${roomLabel} (wrong_map đưa về đúng phòng)`,
+        30000,
+      );
+      // Chờ vị trí THẬT của máy chủ (`me()`) về đúng chỗ xuất hiện rồi tới `predX` / `predY` (dự đoán của cảnh) khớp nó. Bản đồ trống (Lang Hoang, Uy Vân Kinh chưa quái) đứng yên không có patch state
+      // nào sau lần đồng bộ đầu: trước #1500 `predX` kẹt (0, 0) và BFS của `walkToPortal` hết đường (đã lách bằng cách nhích joystick; gỡ sau khi #1500 sửa client, `e2e:ban-do-trong` canh lỗi này).
+      // Hồi quy lại thì bước chờ pred dưới đây ĐỎ đúng chẩn đoán, không bị che.
+      const near = (a: string, b: string) =>
+        `Math.hypot(${a} - ${spawn.x}, ${b} - ${spawn.y}) < 120`;
+      await T.waitFor(
+        `(() => { const m = window.__scene.me && window.__scene.me(); return !!m && ${near("m.x", "m.y")}; })()`,
+        `máy chủ đặt nhân vật đúng chỗ xuất hiện (${Math.round(spawn.x)}, ${Math.round(spawn.y)}) ở ${roomLabel}`,
+        30000,
+      );
+      await T.waitFor(
+        near("window.__scene.predX", "window.__scene.predY"),
+        `dự đoán vị trí khớp chỗ xuất hiện ở ${roomLabel}`,
+        30000,
+      );
+      ok(`nhân vật lưu ở ${roomLabel} vào đúng phòng (qua wrong_map)`);
+    };
+    // 4a: cổng bắc Hàn Vân Lĩnh <-> cổng nam Lang Hoang (đi và về)
+    await enterSaved(
+      "Canh Lang Hoang",
+      "e2e_secret_cc_4444444444444",
+      "han_van",
+      hvBac.spawn,
+      "Hàn Vân Lĩnh",
+    );
+    await walkToPortal("han_van_bac");
+    await crossPortal("han_van_bac", "lang_hoang");
+    await checkDest("lang_hoang");
+    await walkToPortal("lang_hoang_nam");
+    await crossPortal("lang_hoang_nam", "han_van");
+    // 4b: cổng bắc Lang Hoang <-> cổng nam Uy Vân Kinh (đi và về)
+    await enterSaved(
+      "Canh Uy Van",
+      "e2e_secret_cc_5555555555555",
+      "lang_hoang",
+      lhBacPortal.spawn,
+      "Lang Hoang",
+    );
+    await walkToPortal("lang_hoang_bac");
+    await crossPortal("lang_hoang_bac", "uy_van");
+    await checkDest("uy_van");
+    await walkToPortal("uy_van_nam");
+    await crossPortal("uy_van_nam", "lang_hoang");
+    ok("qua lại thông suốt Hàn Vân Lĩnh <-> Lang Hoang <-> Uy Vân Kinh");
+
     must(T.errors.length === 0, `0 lỗi console / exception (${T.errors.slice(0, 2).join(" | ")})`);
     ok("0 lỗi console / exception");
     out("\n=== E2E CHUYỂN CẢNH QUA CỔNG ĐẠT ===");

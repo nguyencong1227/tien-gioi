@@ -4,7 +4,7 @@
 // đổi chất lượng đổi renderScale, xoay máy, màn 4K không phá vùng nhìn của server (VIEW_ENTER = 1100), Tiết kiệm pin ra đúng ~30 FPS
 // (ngưỡng Phaser 30 ra ~21 FPS) rồi trả về ~60 FPS, 0 lỗi console.
 // Chạy: `npm run build && npm run e2e:dpr -w server` (cần google-chrome).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdtempSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -13,22 +13,15 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
-import {
-  Tab,
-  sleep,
-  shown,
-  killChrome,
-  removeTmpDirs,
-  listenWithRetry,
-  getChromeGpuFlags,
-} from "./e2e-kit";
+import { Tab, sleep, shown, killChrome, removeTmpDirs, listenWithRetry } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
+import { freePort } from "../src/test-port.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../..");
 const clientDist = path.resolve(repoRoot, "client/dist");
 const pickPort = () => 38000 + Math.floor(Math.random() * 2000);
 let PORT = pickPort();
-const CDP = 9800 + Math.floor(Math.random() * 300);
 const out = (m: string) => console.log(m);
 
 async function main() {
@@ -66,34 +59,15 @@ async function main() {
   };
 
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore", detached: true },
-    );
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
-    tab = await Tab.open("A", first.webSocketDebuggerUrl);
+    const CDP = await freePort();
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      allocPort: () => freePort(),
+      log: out,
+    });
+    chrome = launched.chrome;
+    tab = await Tab.open("A", launched.webSocketDebuggerUrl);
     const T = tab;
 
     const NAME = "Do Phan Giai"; // ca 3 dùng đạo hiệu khác: ca 2 vừa rời phòng, nhân vật cũ còn trong thời gian chờ nối lại

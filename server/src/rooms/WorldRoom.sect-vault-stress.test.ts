@@ -20,6 +20,7 @@ import {
   SECT_MSG,
   addToInventory,
   roomNameOf,
+  sectFailMessage,
   type ChatOut,
   type LimboMsg,
   type RebornMsg,
@@ -63,15 +64,15 @@ afterAll(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function waitFor<T>(
-  fn: () => T | undefined | false,
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
   ms = 6000,
   what = "điều kiện",
 ): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error(`Hết thời gian chờ ${what}`);
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
@@ -90,6 +91,7 @@ interface Hero {
   vaults: SectVaultMsg[];
   chats: ChatOut[];
   toasts: string[];
+  toastMsgs: ToastMsg[];
   limbs: LimboMsg[]; // tin Hoàng Tuyền (chết do quái)
   reborns: RebornMsg[]; // tin đầu thai xong
 }
@@ -100,7 +102,10 @@ function listen(room: Room, h: Hero) {
   room.onMessage(SECT_MSG.invited, (m: SectInvitedMsg) => h.invited.push(m));
   room.onMessage(SECT_MSG.vault, (m: SectVaultMsg) => h.vaults.push(m));
   room.onMessage("chat", (m: ChatOut) => h.chats.push(m));
-  room.onMessage("toast", (m: ToastMsg) => h.toasts.push(m.text));
+  room.onMessage("toast", (m: ToastMsg) => {
+    h.toasts.push(m.text);
+    h.toastMsgs.push(m);
+  });
   room.onMessage("limbo", (m: LimboMsg) => h.limbs.push(m));
   room.onMessage("reborn", (m: RebornMsg) => h.reborns.push(m));
   for (const t of ["inv", "wallet", "quests", "dialog", "fx", "dmg", "soul", "party", "skills"]) {
@@ -123,6 +128,7 @@ async function join(name: string, roomName: string): Promise<Hero> {
     vaults: [],
     chats: [],
     toasts: [],
+    toastMsgs: [],
     limbs: [],
     reborns: [],
   };
@@ -276,22 +282,61 @@ describe("WorldRoom sect-vault soak & stress (Issue #790 K6)", () => {
     const targetSlot = vSlots[0];
 
     // Cả 4 bot cùng lao vào rút ở targetSlot và các slot khác
+    const toastsBefore = [Chu, Lao, De1, De2].map((h) => h.toasts.length);
     Chu.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
     Lao.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
     De1.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
     De2.room.send(SECT_MSG.vaultWithdraw, { slot: targetSlot, itemId: MAT.id, qty: 5 });
 
-    await sleep(400);
-
-    // Tổng số lượng tuyệt đối không vượt quá INITIAL_TOTAL
+    // Chờ cả 4 bot nhận được phản hồi cho yêu cầu rút của mình (thay vì sleep(400) cố định, #1397)
+    await waitFor(
+      () => [Chu, Lao, De1, De2].every((h, idx) => h.toasts.length > toastsBefore[idx]!),
+      5000,
+      "cả 4 bot nhận phản hồi rút đồ",
+    );
+    // Chờ bản chụp kho mới tới client Chu và tổng đồ bảo toàn (không bao giờ nhân đôi, #1397)
+    await waitFor(
+      () => countTotal() === INITIAL_TOTAL,
+      5000,
+      `tổng đồ bảo toàn và về đủ ${INITIAL_TOTAL} sau đợt 4 bot đua rút`,
+    );
     expect(countTotal()).toBe(INITIAL_TOTAL);
 
     // 5. Thử nghiệm khi đang qua cổng (travelling): thao tác kho bị từ chối
+    const de1SlotValid = ctrlOf(De1).inv.findIndex((s: any) => s?.itemId === MAT.id);
+    expect(de1SlotValid).toBeGreaterThanOrEqual(0);
+    const vSlotValid = (lastVault(Chu)?.slots ?? []).findIndex((s) => s?.itemId === MAT.id);
+    expect(vSlotValid).toBeGreaterThanOrEqual(0);
+
+    const de1MatBefore = countInSlots(ctrlOf(De1).inv, MAT.id);
+    const de1ToastsBefore = De1.toasts.length;
     ctrlOf(De1).travelling = true;
-    De1.room.send(SECT_MSG.vaultDeposit, { slot: 0, qty: 1 });
-    De1.room.send(SECT_MSG.vaultWithdraw, { slot: 0, itemId: MAT.id, qty: 1 });
-    await sleep(150);
+    // Gửi góp khi đang qua cổng: phải bị từ chối ngay với tone "bad" và lỗi "error"
+    De1.room.send(SECT_MSG.vaultDeposit, { slot: de1SlotValid, qty: 1 });
+    await waitFor(
+      () => De1.toasts.length >= de1ToastsBefore + 1,
+      4000,
+      "De1 nhận phản hồi từ chối góp đồ khi đang qua cổng",
+    );
+
+    // Gửi rút khi đang qua cổng (sau khi góp đã xong để book.busy không che chốt): phải bị từ chối với lỗi "error"
+    De1.room.send(SECT_MSG.vaultWithdraw, { slot: vSlotValid, itemId: MAT.id, qty: 1 });
+    await waitFor(
+      () => De1.toasts.length >= de1ToastsBefore + 2,
+      4000,
+      "De1 nhận phản hồi từ chối rút đồ khi đang qua cổng",
+    );
     ctrlOf(De1).travelling = false;
+
+    // Kiểm tra 2 toast mới đều có tone "bad" và báo lỗi từ chối thao tác (đóng nit travelling không răng, #1397)
+    const newToasts = De1.toastMsgs.slice(de1ToastsBefore, de1ToastsBefore + 2);
+    expect(newToasts).toHaveLength(2);
+    for (const t of newToasts) {
+      expect(t.tone).toBe("bad");
+      expect(t.text).toBe(sectFailMessage("error"));
+    }
+    // Túi của De1 hoàn toàn không đổi (thao tác không lọt qua)
+    expect(countInSlots(ctrlOf(De1).inv, MAT.id)).toBe(de1MatBefore);
 
     expect(countTotal()).toBe(INITIAL_TOTAL);
 

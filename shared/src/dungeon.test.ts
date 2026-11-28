@@ -36,6 +36,8 @@ import {
   HAC_PHONG_ID,
   AM_SUONG_ID,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   LINH_HU_MAP_ID,
   MAPS,
   BLOCKING,
@@ -259,7 +261,14 @@ describe("gục trong bí cảnh không mất kiếp (quyết định 11/11)", (
 describe("bản đồ và quái của bí cảnh", () => {
   it("bí cảnh KHÔNG nằm trong MAPS (không có phòng thường), vẫn tra được bằng getMap và không có trong tên phòng thường", () => {
     expect(MAPS.some((m) => m.id === LINH_HU_MAP_ID)).toBe(false);
-    expect(MAPS.map((m) => m.id)).toEqual([DEFAULT_MAP_ID, HAC_PHONG_ID, AM_SUONG_ID, HAN_VAN_ID]);
+    expect(MAPS.map((m) => m.id)).toEqual([
+      DEFAULT_MAP_ID,
+      HAC_PHONG_ID,
+      AM_SUONG_ID,
+      HAN_VAN_ID,
+      LANG_HOANG_ID,
+      UY_VAN_ID,
+    ]);
     expect(getMap(LINH_HU_MAP_ID)?.def.kind).toBe("dungeon");
     expect(isDungeonMap(LINH_HU_MAP_ID)).toBe(true);
     for (const id of [
@@ -267,6 +276,8 @@ describe("bản đồ và quái của bí cảnh", () => {
       HAC_PHONG_ID,
       AM_SUONG_ID,
       HAN_VAN_ID,
+      LANG_HOANG_ID,
+      UY_VAN_ID,
       "constructor",
       "",
       undefined,

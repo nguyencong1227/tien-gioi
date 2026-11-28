@@ -1,13 +1,15 @@
-// Từ cấm (issue #1199, mục 61.1): nguồn máy đọc được cho mọi agent nội dung (D / E / G) và để Dev F nối vào
-// `npm run check:content` (Phần 3 #1200). Chặn những chữ KHÔNG được phép xuất hiện trong NỘI DUNG GAME Tiên Giới:
-//   (1) tên riêng của truyện / game khác (Vạn Kiếp Tu Tiên và các tiên hiệp khác) — nhân vật, tông phái, môn phái,
-//       tự viện, quốc gia; thế giới Tiên Giới giữ nguyên, KHÔNG lấy của game/người khác (AGENTS.md "Asset nguồn 3").
+// Từ cấm (issue #1199, mục 61.1; sửa theo mục 75 / #1462): nguồn máy đọc được cho mọi agent nội dung (D / E / G) và để
+// Dev F nối vào `npm run check:content` (Phần 3 #1200). Chặn những chữ KHÔNG được phép xuất hiện trong NỘI DUNG GAME Tiên Giới:
+//   (1) tên riêng của truyện / game KHÁC (vd Hàn Lập của Phàm Nhân Tu Tiên) — nhân vật, tông phái, quốc gia mượn
+//       từ nguồn KHÔNG được phép (AGENTS.md "Asset nguồn 3"). Từ 25/11/2026 (QUYET_DINH_M3 mục 75) tên của Vạn Kiếp Tu
+//       Tiên (cốt truyện, địa danh, nhân vật, quốc gia, tông phái: Huyền Vũ Môn, Bắc Minh, Thanh Vân Môn...) ĐƯỢC dùng
+//       nên KHÔNG còn nằm ở đây; thuật ngữ chuẩn của chúng ở `glossary.ts` / `docs/TU_DIEN_TIEN_GIOI.md`.
 //   (2) từ hiện đại lạc văn phong tu tiên (ok / level / boss...) — nhất là trong LỜI THOẠI NPC, mô tả.
 //
 // KHÁC `glossary.ts` (bảng thuật ngữ CHUẨN + biến thể sai): ở đây là DANH SÁCH CHỮ CẤM — mọi dạng (hoa / thường,
 // thiếu dấu nếu là chữ trần) đều cấm vì KHÔNG có cách viết hợp lệ. Nên matcher KHớp KHÔNG phân biệt hoa / thường,
-// nhưng vẫn ranh giới từ hai bên + NFC để khỏi bám chữ khác (vd "ok" KHÔNG bám "book"; "Minh" trong "Bắc Minh"
-// KHÔNG bám chữ "minh" riêng lẻ hợp lệ).
+// nhưng vẫn ranh giới từ hai bên + NFC để khỏi bám chữ khác (vd "ok" KHÔNG bám "book"; "Hàn Lập"
+// KHÔNG bám chữ "hàn" / "lập" riêng lẻ hợp lệ).
 //
 // PHẠM VI ÁP DỤNG (quan trọng — tránh dương tính giả): CHỈ áp cho NỘI DUNG GAME (hội thoại, tên, mô tả vật phẩm /
 // chiêu / quái / NPC / nhiệm vụ...). KHÔNG áp cho chú thích tác quyền, CREDITS.md, NGUON_NOI_DUNG.md, hoặc chính các
@@ -29,37 +31,12 @@ export interface BannedTerm {
 }
 
 /**
- * DANH SÁCH TỪ CẤM. Dữ liệu lấy từ những chỗ đã xác nhận rò rỉ tên riêng của nguồn khác: AGENTS.md (Asset nguồn 3:
- * Thanh Vân Môn, Bắc Minh, Huyền Vũ Môn, Kim Đạo Tự, Đan Hà Cốc), test `skills-kim-tho.test.ts` (VKTT_PROPER), và
- * ví dụ người dùng trong issue #1199 (Hàn Lập). CHƯA phủ hết — gặp rò rỉ mới (tên nhân vật / tông phái truyện khác)
- * thì THÊM dòng vào đây, đừng bịa danh sách rộng không có bằng chứng.
+ * DANH SÁCH TỪ CẤM. Chỉ còn tên của truyện / game KHÁC (ví dụ người dùng trong issue #1199: Hàn Lập; danh sách rộng hơn
+ * ở `FOREIGN_NAMES` của `client/src/no-foreign-names.test.ts`) và từ hiện đại lạc văn phong. Tên của Vạn Kiếp Tu Tiên
+ * đã gỡ theo mục 75 (#1462). CHƯA phủ hết — gặp rò rỉ mới (tên nhân vật / tông phái truyện khác) thì THÊM dòng vào đây,
+ * đừng bịa danh sách rộng không có bằng chứng.
  */
 export const BANNED_TERMS: readonly BannedTerm[] = [
-  // --- Tông phái / môn phái / tự viện / cốc của Vạn Kiếp Tu Tiên (AGENTS.md + skills-kim-tho.test.ts) ---
-  {
-    term: "Thanh Vân Môn",
-    reason: "tông phái của Vạn Kiếp Tu Tiên; KHÔNG làm tông phái của Tiên Giới",
-  },
-  {
-    term: "Thanh Vân Kiếm Tông",
-    reason: "tông phái của Vạn Kiếp Tu Tiên; KHÔNG làm tông phái của Tiên Giới",
-  },
-  {
-    term: "Bắc Minh",
-    reason: "môn phái của Vạn Kiếp Tu Tiên; KHÔNG lấy làm của Tiên Giới",
-  },
-  {
-    term: "Huyền Vũ Môn",
-    reason: "môn phái của Vạn Kiếp Tu Tiên; KHÔNG lấy làm của Tiên Giới",
-  },
-  {
-    term: "Kim Đạo Tự",
-    reason: "tự viện của Vạn Kiếp Tu Tiên; KHÔNG lấy làm của Tiên Giới",
-  },
-  {
-    term: "Đan Hà Cốc",
-    reason: "cốc (địa danh tông phái) của Vạn Kiếp Tu Tiên; KHÔNG lấy làm của Tiên Giới",
-  },
   // --- Nhân vật của truyện / game khác (issue #1199 ví dụ) ---
   {
     term: "Hàn Lập",
@@ -95,12 +72,12 @@ function escapeRegex(s: string): string {
  *
  * KHÔNG phân biệt hoa / thường vì chữ cấm KHÔNG có dạng hợp lệ nào (khác `glossaryViolations` — nơi chỉ báo biến
  * thể sai, bỏ qua dạng chuẩn). Ranh giới chữ dùng lookbehind / lookahead `\p{L}` (chữ Unicode, kể cả tiếng Việt có
- * dấu) để khỏi bám chữ khác: "ok" KHÔNG bám "book"/"OKA"; "Bắc Minh" KHÔNG bám chữ "minh" riêng lẻ. MỖI term dựng
+ * dấu) để khỏi bám chữ khác: "ok" KHÔNG bám "book"/"OKA"; "Hàn Lập" KHÔNG bám chữ "hàn" / "lập" riêng lẻ. MỖI term dựng
  * MỘT RegExp (flag `giu` = global + KHÔNG phân biệt hoa thường + Unicode); các chữ trong term nối bằng `\s+` để
  * chịu nhiều dấu cách / xuống dòng / NBSP giữa chúng.
  *
  * KHÔNG dùng `toLowerCase()` + `indexOf`: `İ` (U+0130, "I" có chấm trên) thường hoá thành 2 ký tự làm lệch chỉ số,
- * bỏ lỡ vi phạm đứng sau nó (đã gặp ở đầu `07ef3b6f`: `"İ Thanh Vân Môn"` báo 0 thay vì 1).
+ * bỏ lỡ vi phạm đứng sau nó (đã gặp ở đầu `07ef3b6f`: `"İ Hàn Lập"` báo 0 thay vì 1).
  */
 export function bannedViolations(text: string): string[] {
   const src = text.normalize("NFC");

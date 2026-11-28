@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
-import { shown, getChromeGpuFlags } from "./e2e-kit";
+import { shown } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PORT = 36000 + Math.floor(Math.random() * 4000);
@@ -79,23 +80,11 @@ const server = spawn("npx", ["tsx", "src/index.ts"], {
 let serverLog = "";
 server.stdout.on("data", (d) => (serverLog += d));
 server.stderr.on("data", (d) => (serverLog += d));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP}`,
-    `--user-data-dir=${chromeDir}`,
-    "--window-size=1280,720",
-    "about:blank",
-  ],
-  { detached: true, stdio: "ignore" },
-);
+let chrome: any = null;
 const killAll = () => {
   for (const p of [server, chrome]) {
     try {
-      process.kill(-(p.pid as number), "SIGKILL");
+      if (p?.pid) process.kill(-(p.pid as number), "SIGKILL");
     } catch {
       /* bỏ qua: thử lại / đã chết */
     }
@@ -116,17 +105,13 @@ try {
   const health = await (await fetch(`http://127.0.0.1:${PORT}/health`)).json();
   if (health.authMode !== "account")
     throw new Error("server không ở chế độ account: " + JSON.stringify(health));
-  let targets = [];
-  for (let i = 0; i < 40; i++) {
-    try {
-      targets = await (await fetch(`http://127.0.0.1:${CDP}/json`)).json();
-      if (targets.length) break;
-    } catch {
-      /* bỏ qua: thử lại / đã chết */
-    }
-    await sleep(250);
-  }
-  ws = new WebSocket(targets.find((t: any) => t.type === "page").webSocketDebuggerUrl);
+  const launched = await launchChrome({
+    cdpPort: CDP,
+    userDataDir: chromeDir,
+    log: out,
+  });
+  chrome = launched.chrome;
+  ws = new WebSocket(launched.webSocketDebuggerUrl);
   await new Promise((r) => ws.on("open", r));
   let id = 0;
   const pending = new Map<number, (d: any) => void>();

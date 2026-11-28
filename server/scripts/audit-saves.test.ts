@@ -11,6 +11,8 @@ import {
   DUNGEON_DAILY_REWARDS,
   DUNGEON_MAPS,
   HAN_VAN_ID,
+  LANG_HOANG_ID,
+  UY_VAN_ID,
   INVENTORY_SLOTS,
   isArenaMap,
   isDungeonMap,
@@ -2876,6 +2878,85 @@ describe("audit-saves (Issue #112)", () => {
         updatedAt: "2026-11-15T00:00:00.000Z",
       });
       expect(auditSoulSaveData(soulRaw, soulRaw.length)).toEqual([]);
+    });
+  });
+
+  describe("Mục 75 / #1470: audit-saves Lang Hoang & Uy Vân Kinh", () => {
+    const lhMap = getMap(LANG_HOANG_ID)!;
+    const uvMap = getMap(UY_VAN_ID)!;
+
+    it("hồ sơ nhân vật lưu tại Lang Hoang hoặc Uy Vân Kinh (tại trạm an toàn) -> 0 lỗi", () => {
+      // Lang Hoang: Tuyết Đao Quan (x: 2048, y: 3136)
+      const pLh = {
+        ...validPlayer,
+        name: "Tuyết Đao Nhân",
+        mapId: LANG_HOANG_ID,
+        x: lhMap.townPx.x,
+        y: lhMap.townPx.y,
+      };
+      const rawLh = JSON.stringify(pLh);
+      expect(auditPlayerSaveData(rawLh, rawLh.length)).toEqual([]);
+
+      // Uy Vân Kinh: Trạm Uy Vân (x: 2048, y: 3136)
+      const pUv = {
+        ...validPlayer,
+        name: "Uy Vân Đạo Sĩ",
+        mapId: UY_VAN_ID,
+        x: uvMap.townPx.x,
+        y: uvMap.townPx.y,
+      };
+      const rawUv = JSON.stringify(pUv);
+      expect(auditPlayerSaveData(rawUv, rawUv.length)).toEqual([]);
+    });
+
+    it("toạ độ vượt biên hoặc rơi vào ô chặn trên Lang Hoang và Uy Vân Kinh -> pos_out_of_bounds, pos_blocked", () => {
+      // Vượt biên Lang Hoang
+      const outLh = JSON.stringify({
+        ...validPlayer,
+        mapId: LANG_HOANG_ID,
+        x: lhMap.worldW + 100,
+        y: 2000,
+      });
+      const errsOutLh = auditPlayerSaveData(outLh, outLh.length);
+      expect(errsOutLh.map((e) => e.code)).toContain("pos_out_of_bounds");
+
+      // Vượt biên Uy Vân Kinh
+      const outUv = JSON.stringify({
+        ...validPlayer,
+        mapId: UY_VAN_ID,
+        x: uvMap.worldW + 100,
+        y: 2000,
+      });
+      const errsOutUv = auditPlayerSaveData(outUv, outUv.length);
+      expect(errsOutUv.map((e) => e.code)).toContain("pos_out_of_bounds");
+
+      // Góc chặn (0, 0) mép bản đồ
+      for (const mapId of [LANG_HOANG_ID, UY_VAN_ID]) {
+        const blocked = JSON.stringify({
+          ...validPlayer,
+          mapId,
+          x: 0,
+          y: 0,
+        });
+        const errsBlocked = auditPlayerSaveData(blocked, blocked.length);
+        expect(errsBlocked.map((e) => e.code)).toContain("pos_blocked");
+      }
+    });
+
+    it("chỗ xuất hiện của mọi cổng trên Lang Hoang và Uy Vân Kinh là toạ độ lưu hợp lệ trong khu an toàn", () => {
+      for (const m of [lhMap, uvMap]) {
+        for (const portal of m.portals) {
+          const raw = JSON.stringify({
+            ...validPlayer,
+            mapId: m.def.id,
+            x: portal.spawn.x,
+            y: portal.spawn.y,
+          });
+          const errs = auditPlayerSaveData(raw, raw.length);
+          expect(errs, `${m.def.id}: cổng ${portal.id}`).toEqual([]);
+          expect(m.inSafe(portal.spawn.x, portal.spawn.y)).toBe(true);
+        }
+      }
     });
   });
 });

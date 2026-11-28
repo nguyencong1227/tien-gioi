@@ -7,7 +7,7 @@
 // Thoát 0 khi đạt, 1 khi sai. Không ghi vào `server/data/players` thật.
 //
 // Chạy: `npm run build && npm run e2e:pk` (cần google-chrome; client/dist phải là bản build mới).
-import { spawn, execSync, type ChildProcess } from "node:child_process";
+import { execSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -27,7 +27,8 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import WebSocket from "ws";
 import { DEFAULT_MAP_ID, roomNameOf, getMap } from "@tien-gioi/shared";
-import { shown, listenWithRetry, removeTmpDirs, getChromeGpuFlags } from "./e2e-kit";
+import { shown, listenWithRetry, removeTmpDirs, killChrome } from "./e2e-kit";
+import { launchChrome } from "./e2e-chrome";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -207,41 +208,16 @@ async function main() {
   let chrome: ChildProcess | null = null;
   const tabs: Tab[] = [];
   try {
-    chrome = spawn(
-      "google-chrome",
-      [
-        "--headless=new",
-        "--no-sandbox",
-        ...getChromeGpuFlags(),
-        `--remote-debugging-port=${CDP}`,
-        `--user-data-dir=${chromeDir}`,
-        "--window-size=1280,720",
-        "about:blank",
-      ],
-      { stdio: "ignore" },
-    );
-    let spawnError: Error | null = null;
-    chrome.once("error", (e) => (spawnError = e));
-    let targets: any[] = [];
-    for (const start = Date.now(); Date.now() - start < 30000;) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP}/json`);
-        if (res.ok) {
-          targets = (await res.json()) as any[];
-          break;
-        }
-      } catch {
-        await sleep(150);
-      }
-    }
-    if (spawnError)
-      throw new Error(`Không chạy được google-chrome: ${(spawnError as Error).message}`);
-    const first = targets.find((t) => t.type === "page");
-    if (!first?.webSocketDebuggerUrl) throw new Error("Không kết nối được Chrome DevTools");
+    const launched = await launchChrome({
+      cdpPort: CDP,
+      userDataDir: chromeDir,
+      log: out,
+    });
+    chrome = launched.chrome;
     const second = await (
       await fetch(`http://127.0.0.1:${CDP}/json/new?about:blank`, { method: "PUT" })
     ).json();
-    const ta = await Tab.open("A", first.webSocketDebuggerUrl);
+    const ta = await Tab.open("A", launched.webSocketDebuggerUrl);
     const tb = await Tab.open("B", (second as any).webSocketDebuggerUrl);
     tabs.push(ta, tb);
 
@@ -432,13 +408,7 @@ async function main() {
     process.exitCode = 1;
   } finally {
     for (const t of tabs) t.close();
-    if (chrome) {
-      try {
-        chrome.kill("SIGKILL");
-      } catch {
-        /* bỏ qua */
-      }
-    }
+    killChrome(chrome);
     await gameServer.gracefullyShutdown(false).catch(() => {});
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     await sleep(500); // Chrome vừa bị kill còn đang đóng tệp
