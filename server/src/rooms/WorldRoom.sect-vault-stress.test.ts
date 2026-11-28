@@ -64,15 +64,15 @@ afterAll(async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function waitFor<T>(
-  fn: () => T | undefined | false,
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
   ms = 6000,
   what = "điều kiện",
 ): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error(`Hết thời gian chờ ${what}`);
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
