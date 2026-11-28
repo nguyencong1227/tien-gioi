@@ -1177,6 +1177,23 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
   ],
+  // Trùm Lang Hoang (D1 #1466 lát B): bãi của đội 3-4 người; Cốt Lang Vương và Hồn Tinh Thiên Lang rơi CHẮC từ Thiên Lang Vương (nguyên liệu bộ V quý nhất), Lang Vương (trùm nhỏ) rơi ít hơn.
+  // Sách chiêu Hóa Thần (lát C) sẽ rơi từ Thiên Lang Vương ở lát sau.
+  lang_vuong: [
+    { itemId: "cot_lang_vuong", chance: 0.8, min: 1, max: 2 },
+    { itemId: "hon_tinh_thien_lang", chance: 0.3, min: 1, max: 1 },
+    { itemId: "nanh_nguyet", chance: 0.6, min: 1, max: 2 },
+    { itemId: "thuong_hoi_huyet_dan", chance: 0.6, min: 1, max: 1 },
+    { itemId: "thuong_hoi_linh_dan", chance: 0.5, min: 1, max: 1 },
+  ],
+  thien_lang_vuong: [
+    { itemId: "cot_lang_vuong", chance: 1, min: 2, max: 4 },
+    { itemId: "hon_tinh_thien_lang", chance: 1, min: 1, max: 2 },
+    { itemId: "bi_lang_hoang", chance: 0.8, min: 1, max: 2 },
+    { itemId: "nanh_nguyet", chance: 0.8, min: 1, max: 2 },
+    { itemId: "thuong_hoi_huyet_dan", chance: 1, min: 1, max: 2 },
+    { itemId: "thuong_hoi_linh_dan", chance: 1, min: 1, max: 2 },
+  ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
   yeu_vuong: [

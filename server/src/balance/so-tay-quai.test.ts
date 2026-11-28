@@ -137,8 +137,13 @@ describe("Sổ tay quái, mục 2: bảng đảo khớp DROP_TABLES tính độc
       }
       const dem = cell.split(", ").length;
       expect(dem, `${itemId}: số quái trong ô`).toBe(monsters.length);
+      // so từng MỤC của ô ("Tên 12%"), không so chuỗi con: tên "Lang Vương" nằm trong "Thiên Lang Vương" / "Cốt Lang Vương"
+      const muc = cell.split(", ");
       for (const m of MONSTERS.filter((x) => !monsters.includes(x.id)))
-        expect(cell.includes(`${m.name} `), `${itemId}: ghi nhầm ${m.name}`).toBe(false);
+        expect(
+          muc.some((e) => e.startsWith(`${m.name} `)),
+          `${itemId}: ghi nhầm ${m.name}`,
+        ).toBe(false);
     }
   });
 

@@ -58,6 +58,9 @@ export const ASSUME = {
     xich_diem_lang: 12,
     thuong_nguyet_lang: 14,
     ngan_nguyet_lang: 14,
+    // Trùm Lang Hoang (D1 lát B): như Thiên Hàn Vương (trùm chỉ vài con cả bản đồ, đi tìm lâu)
+    lang_vuong: 90,
+    thien_lang_vuong: 90,
   } as Record<string, number>,
   /** Tỉ lệ đòn của quái thực sự trúng (người chơi né / lùi được một phần) */
   hitTaken: 0.8,
