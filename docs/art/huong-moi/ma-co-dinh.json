@@ -1,11 +1,13 @@
 {
-  "_ghi_chu": "Bảng MÃ ỔN ĐỊNH của tờ duyệt đồ hoạ (client/scripts/art/ma-co-dinh.py). id -> số; mã = T-<số 2 chữ số> (trùm, nhóm 13) / VP-<số 3 chữ số> / HU-<số 2 chữ số>. Phần <= dong_bang là mã NGƯỜI DÙNG ĐÃ NHẬN (tờ 23/11/2026 13:00 +0700, commit dd32ff1b: T-01..04, VP-001..128, HU-01..59), KHÔNG BAO GIỜ sửa / đổi số. Mã mới nối ở CUỐI. Xoá / đổi id vật phẩm hay chiêu thì GIỮ dòng trong bảng (số không dùng lại) và ghi vào mo_coi.",
+  "_ghi_chu": "Bảng MÃ ỔN ĐỊNH của tờ duyệt đồ hoạ (client/scripts/art/ma-co-dinh.py). id -> số; mã = NPC-<số 2 chữ số> (NPC, nhóm 11) / Q-<số 2 chữ số> (quái thường, nhóm 12) / T-<số 2 chữ số> (trùm, nhóm 13) / VP-<số 3 chữ số> / HU-<số 2 chữ số>. Phần <= dong_bang là mã NGƯỜI DÙNG ĐÃ NHẬN (tờ 23/11/2026 13:00 +0700, commit dd32ff1b: NPC-01..15, Q-01..12, T-01..04, VP-001..128, HU-01..59), KHÔNG BAO GIỜ sửa / đổi số. Mã mới nối ở CUỐI. Xoá / đổi id vật phẩm hay chiêu thì GIỮ dòng trong bảng (số không dùng lại) và ghi vào mo_coi.",
   "dong_bang": {
     "commit": "dd32ff1b",
     "luc": "2026-11-23T13:00:16+07:00",
     "vp_toi_da": 128,
     "hu_toi_da": 59,
-    "t_toi_da": 4
+    "t_toi_da": 4,
+    "q_toi_da": 12,
+    "n_toi_da": 15
   },
   "mo_coi": {},
   "vp": {
@@ -171,7 +173,10 @@
     "bi_lang_hoang": 160,
     "nanh_nguyet": 161,
     "cot_lang_vuong": 162,
-    "hon_tinh_thien_lang": 163
+    "hon_tinh_thien_lang": 163,
+    "kinh_xich_luyen_doan_hon": 164,
+    "kinh_tam_kiem_vo_hinh": 165,
+    "kinh_thai_son_ap_dinh": 166
   },
   "hu": {
     "ung_trao": 1,
@@ -260,12 +265,46 @@
     "phat_hoa_hang_ma": 84,
     "huyet_mang_pha_giap": 85,
     "quy_anh_me_tung": 86,
-    "am_phong_quyen_hon": 87
+    "am_phong_quyen_hon": 87,
+    "tam_kiem_vo_hinh": 88,
+    "xich_luyen_doan_hon": 89,
+    "thai_son_ap_dinh": 90
   },
   "t": {
     "mang": 1,
     "hac_giao": 2,
     "thien_han_vuong": 3,
     "yeu_vuong": 4
+  },
+  "q": {
+    "tho": 1,
+    "lang": 2,
+    "ho": 3,
+    "suong_ho": 4,
+    "thach_quy": 5,
+    "doc_thiem": 6,
+    "han_lang": 7,
+    "phong_nha": 8,
+    "cot_tuong": 9,
+    "doc_tuoc": 10,
+    "ran_con": 11,
+    "phan_than_yeu_vuong": 12
+  },
+  "n": {
+    "truong_tran": 1,
+    "duoc_su": 2,
+    "tho_ren": 3,
+    "cao_thi": 4,
+    "lai_buon": 5,
+    "tran_uy": 6,
+    "tram_truong": 7,
+    "lai_buon_suong": 8,
+    "tho_ren_suong": 9,
+    "tram_truong_han": 10,
+    "lai_buon_han": 11,
+    "tho_ren_han": 12,
+    "thu_mon": 13,
+    "lao_dan": 14,
+    "lao_phu": 15
   }
 }

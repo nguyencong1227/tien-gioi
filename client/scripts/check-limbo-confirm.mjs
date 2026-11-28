@@ -1,10 +1,9 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, Buffer */
 /**
  * Kiểm hộp xác nhận ở màn HOÀNG TUYỀN (issue #779, docs/RA_SOAT_THAO_TAC.md hàng 11, 12; `act-confirm.ts`: `unlockPlan` / `rebirthPlan`) trong Chrome THẬT, chế độ mock (`?duel=mock&debug=1`,
  * `window.__debugLimbo`; không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-limbo-confirm.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-limbo-confirm.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
  *
  *   - mở nấc chân linh / xuất thân bằng Duyên: hộp "Mở <tên> tốn N Duyên (còn lại M)?" + nhắc không hoàn lại; chưa trừ gì khi chưa xác nhận; bấm "Mở" NGAY khi hộp vừa mở (click ma) bị bỏ qua;
  *     xác nhận trừ ĐÚNG MỘT lần (không bị click ma rơi xuống nút bên dưới mở lại hộp); "Giữ lại" / Esc (chỉ đóng hộp, Hoàng Tuyền còn mở) / X không trừ;
@@ -12,18 +11,24 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  *   - đầu thai: hộp TÓM TẮT "Đầu thai làm <xuất thân>, giữ K di vật, khắc N chiêu?"; "Xem lại" quay về màn chọn; xác nhận gửi đúng MỘT tin kèm lựa chọn; bàn phím: Enter chỉ mở hộp, Y gửi;
  *   - máy chủ đóng Hoàng Tuyền lúc hộp còn mở: hộp đóng theo.
  * `--shots`: lưu ảnh hộp mỗi khung nhìn.
+ *
+ * Chờ THEO ĐIỀU KIỆN (nightly #1458, lô 15): không còn `sleep` cố định. Hộp xác nhận có cửa sổ chống click ma 450 ms tính theo `performance.now` của trang
+ * (`confirm-guard.ts`): các kiểm "bấm NGAY khi hộp vừa mở bị bỏ qua / click ma sau khi đóng không mở lại hộp" phải rơi TRONG cửa sổ, nên [1] chạy chúng trên ĐỒNG HỒ ẢO
+ * (`performance.now` đứng yên trong đoạn ngắn, `advance(ms)` tua tay qua cửa sổ); dùng giờ thật thì ở khung chậm cửa sổ đã hết trước khi bấm. Đoạn đóng băng phải NGẮN: phím X / Y
+ * đi qua vòng lặp Phaser nên cần đồng hồ chạy (đóng băng cả kịch bản làm phím không được xử lý). Mọi chỗ còn lại chạy giờ THẬT và bấm / gõ LẶP tới khi hộp đạt trạng thái
+ * mong muốn (lần bấm trong cửa sổ bị bỏ qua đúng thiết kế); [8] chờ giờ thật 3 s của toast và của chờ máy chủ bằng điều kiện.
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
 const REPO = path.resolve(path.dirname(__filename), "../..");
 const DIST = path.join(REPO, "client/dist");
@@ -74,38 +79,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-limbo-confirm-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
-    if (!page) throw new Error("Không tìm thấy Chrome page target.");
-    const ws = new WebSocket(page.webSocketDebuggerUrl);
+    launched = await launchChrome({ name: "limbo-confirm", extraArgs: [] });
+    const ws = new WebSocket(launched.page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
       ws.onopen = res;
       ws.onerror = rej;
@@ -137,8 +119,35 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
+    /** Chờ `n` khung hình của trang (rAF liên tiếp): ở khung chậm mỗi khung dài hơn nên chờ tự co giãn theo (thay `sleep` cố định sau thao tác). */
+    const frames = (n) =>
+      evalJs(
+        `new Promise((r) => { let k = ${n}; const f = () => (--k <= 0 ? r(1) : requestAnimationFrame(f)); requestAnimationFrame(f); })`,
+      );
+    /** Chờ biểu thức JS trong trang đúng (điều kiện, không đoán giờ) */
+    const until = (expr, ms = 15000) => waitUntilTrue(() => evalJs(expr), ms, 50);
+    // ----- ĐỒNG HỒ ẢO của trang: `performance.now` đóng băng / tua tay (xem chú thích đầu tệp)
+    const clockInstall = () =>
+      evalJs(`(() => { if (window.__clk) return 1; const real = performance.now.bind(performance);
+        window.__clk = { real, frozen: null, skew: 0 };
+        performance.now = () => (window.__clk.frozen !== null ? window.__clk.frozen : window.__clk.real() + window.__clk.skew); return 1; })()`);
+    const freeze = () =>
+      evalJs(
+        `(() => { const c = window.__clk; if (c.frozen === null) c.frozen = c.real() + c.skew; return 1; })()`,
+      );
+    const advance = (ms) =>
+      evalJs(
+        `(() => { const c = window.__clk; if (c.frozen === null) c.skew += ${ms}; else c.frozen += ${ms}; return 1; })()`,
+      );
+    const thaw = () =>
+      evalJs(
+        `(() => { const c = window.__clk; if (c.frozen !== null) { c.skew = c.frozen - c.real(); c.frozen = null; } return 1; })()`,
+      );
+    /** Tua qua cửa sổ chống click ma (450 ms) của hộp xác nhận */
+    const PAST_GUARD = 600;
 
     for (const vp of VIEWPORTS) {
       if (onlyVp && vp.name !== onlyVp) continue;
@@ -153,24 +162,24 @@ async function main() {
         await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
       await evalJs("window.__isOldPage = true");
       await send("Page.navigate", { url: `http://127.0.0.1:${HTTP_PORT}/?duel=mock&debug=1` });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
+      const ready = await waitUntilTrue(
+        () =>
+          evalJs(
             `Boolean(!window.__isOldPage && typeof window.__debugLimbo === "function" && window.__ui)`,
           ),
-        );
-      }
+        45000,
+        100,
+      );
       if (!ready) {
         console.log("  ✗ trang không sẵn sàng (cần ?duel=mock&debug=1)");
         failures++;
         continue;
       }
-      await sleep(600);
+      await frames(5);
+      await clockInstall();
       const shot = async (name) => {
         if (!shotsDir) return;
-        await sleep(150);
+        await frames(3);
         const s = await send("Page.captureScreenshot", { format: "webp", quality: 75 });
         fs.writeFileSync(
           path.join(shotsDir, `${name}-${vp.name}.webp`),
@@ -246,6 +255,7 @@ async function main() {
         evalJs(`Number(document.getElementById("limbo-duyen-total")?.textContent)`);
       const choices = () => evalJs(`window.__rebirthChoices ?? []`);
       const limboOpen = () => evalJs(`window.__ui.isLimboOpen()`);
+      const waitBox = (open) => until(`window.__ui.isActConfirmOpen() === ${open}`);
       const MOCK = {
         summary: { kiep: 1, realm: 1, tier: 4, minutes: 42, kills: 68, bossKills: 1, gain: 16 },
         soul: {
@@ -262,7 +272,48 @@ async function main() {
         await evalJs(
           `window.__rebirthChoices = []; window.__ui.hideLimbo(); window.__debugLimbo(${JSON.stringify(MOCK)}); 1`,
         );
-        await sleep(400);
+        await until(`window.__ui.isLimboOpen() && document.body.classList.contains("in-limbo")`);
+        await frames(3);
+      };
+      // ----- GIỜ THẬT: bấm LẶP tới khi đạt (lần bấm trong cửa sổ chống click ma 450 ms bị bỏ qua đúng thiết kế, không đổi trạng thái); `done` kiểm điều kiện đạt
+      const tapUntil = (sel, done) =>
+        waitUntilTrue(
+          async () => {
+            const t = await center(sel);
+            if (!t) return false;
+            await tap(t.x, t.y);
+            return await done();
+          },
+          20000,
+          120,
+        );
+      const boxOpen = async () => (await box()).open;
+      const boxClosed = async () => !(await box()).open;
+      /** Bấm nút `sel` tới khi hộp xác nhận MỞ */
+      const tapOpen = (sel) => tapUntil(sel, boxOpen);
+      /** Bấm nút `sel` trong hộp tới khi hộp ĐÓNG (xác nhận / giữ lại) */
+      const tapInBox = (sel) => tapUntil(sel, boxClosed);
+      /** Phím `code` tới khi hộp ĐÓNG (Y trong cửa sổ chống click ma bị bỏ qua nên bấm lặp; X / Esc đóng ngay) */
+      const keyUntilClosed = (code, k, vk) =>
+        waitUntilTrue(
+          async () => {
+            await key(code, k, vk);
+            return await boxClosed();
+          },
+          20000,
+          150,
+        );
+      /**
+       * Chạy \`fn\` khi đồng hồ trang ĐỨNG YÊN (chỉ cho các kiểm CLICK MA phải rơi TRONG cửa sổ 450 ms: sự kiện DOM chạm / chuột). Giữ ngắn: phím X / Y đi qua vòng lặp
+       * Phaser nên cần đồng hồ chạy, đóng băng cả đoạn dài làm phím không được xử lý.
+       */
+      const frozen = async (fn) => {
+        await freeze();
+        try {
+          return await fn();
+        } finally {
+          await thaw();
+        }
       };
 
       console.log(
@@ -272,106 +323,101 @@ async function main() {
       check((await duyen()) === 500, "Duyên ban đầu 500");
       let b = await center('[data-nav="stone:khac"]');
       check(b && b.hit, "nút Mở Khắc chân linh bấm được");
-      await tap(b.x, b.y);
-      await sleep(100);
-      let st = await box();
-      check(st.open, "hộp xác nhận mở");
-      check(
-        /^Mở Khắc chân linh nấc 2 tốn \d+ Duyên \(còn lại \d+\)\?$/.test(st.text),
-        `câu hỏi: "${st.text}"`,
-      );
-      check(/không hoàn lại/.test(st.warn), `nhắc: "${st.warn}"`);
-      check(st.yes === "Mở" && st.no === "Giữ lại", `nút: "${st.no}" / "${st.yes}"`);
-      check(st.active === "act-btn-no", `focus ở "Giữ lại" (${st.active})`);
-      check((await duyen()) === 500, "chưa trừ Duyên");
-      const yes1 = await center("#act-btn-yes");
-      check(
-        yes1.hit && (!vp.mobile || (yes1.w >= 44 && yes1.h >= 44)),
-        `nút Mở trong hộp bấm được, không bị che (${Math.round(yes1.w)}x${Math.round(yes1.h)})`,
-      );
-      await tap(yes1.x, yes1.y);
-      await sleep(150);
-      check(
-        (await box()).open && (await duyen()) === 500,
-        "bấm NGAY khi hộp vừa mở (click ma): bị bỏ qua",
-      );
-      await shot("hoang-tuyen-mo-duyen");
-      await sleep(560);
-      await tap(yes1.x, yes1.y);
-      // `click` "ma" do trình duyệt tạo sau khi nhả ngón (cảm ứng: hộp đóng ở pointerdown nên click rơi xuống nút bên dưới): giả lập ngay sau khi hộp đóng
-      await sleep(80);
-      await evalJs(
-        `document.querySelector('[data-nav="stone:khac"]').dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })); 1`,
-      );
-      await sleep(60);
-      check(
-        !(await box()).open && (await duyen()) === 490,
-        `xác nhận sau cửa sổ chống click ma: trừ Duyên đúng MỘT lần, click ma ngay sau đó không mở lại hộp (${await duyen()})`,
-      );
-      // thao tác bằng BÀN PHÍM / lập trình (click có detail = 0) cũng NGAY sau khi hộp đóng (vẫn trong 450 ms) KHÔNG phải click ma: mở được hộp mới
-      await evalJs(`document.querySelector('[data-nav="stone:khac"]').click(); 1`);
-      await sleep(80);
-      check(
-        (await box()).open,
-        "click bàn phím (detail 0) ngay sau khi đóng hộp: mở hộp mới, không bị coi là click ma",
-      );
-      await sleep(400);
-      await key("KeyX", "x", 88);
-      await sleep(400);
+      let st;
+      let yes1;
+      // NỬA ĐẦU trên đồng hồ ĐỨNG YÊN: hộp mở rồi bấm NGAY (click ma) phải rơi TRONG cửa sổ 450 ms dù khung chậm tới đâu
+      await frozen(async () => {
+        await tap(b.x, b.y);
+        await waitBox(true);
+        st = await box();
+        check(st.open, "hộp xác nhận mở");
+        check(
+          /^Mở Khắc chân linh nấc 2 tốn \d+ Duyên \(còn lại \d+\)\?$/.test(st.text),
+          `câu hỏi: "${st.text}"`,
+        );
+        check(/không hoàn lại/.test(st.warn), `nhắc: "${st.warn}"`);
+        check(st.yes === "Mở" && st.no === "Giữ lại", `nút: "${st.no}" / "${st.yes}"`);
+        check(st.active === "act-btn-no", `focus ở "Giữ lại" (${st.active})`);
+        check((await duyen()) === 500, "chưa trừ Duyên");
+        yes1 = await center("#act-btn-yes");
+        check(
+          yes1.hit && (!vp.mobile || (yes1.w >= 44 && yes1.h >= 44)),
+          `nút Mở trong hộp bấm được, không bị che (${Math.round(yes1.w)}x${Math.round(yes1.h)})`,
+        );
+        await tap(yes1.x, yes1.y); // đồng hồ chưa tua: hộp vừa mở xong, NGAY trong cửa sổ chống click ma
+        await frames(3);
+        check(
+          (await box()).open && (await duyen()) === 500,
+          "bấm NGAY khi hộp vừa mở (click ma): bị bỏ qua",
+        );
+        await shot("hoang-tuyen-mo-duyen");
+      });
+      await advance(PAST_GUARD); // đồng hồ chạy lại và tua qua cửa sổ: xác nhận bây giờ phải được nhận
+      // NỬA SAU lại đóng băng (SAU khi đã quá cửa sổ mở): hộp đóng rồi click ma / click bàn phím phải rơi TRONG cửa sổ sau khi đóng
+      await frozen(async () => {
+        await tap(yes1.x, yes1.y);
+        await waitBox(false);
+        await until(`Number(document.getElementById("limbo-duyen-total")?.textContent) === 490`);
+        // `click` "ma" do trình duyệt tạo sau khi nhả ngón (cảm ứng: hộp đóng ở pointerdown nên click rơi xuống nút bên dưới): giả lập NGAY sau khi hộp đóng
+        await evalJs(
+          `document.querySelector('[data-nav="stone:khac"]').dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 })); 1`,
+        );
+        await frames(3);
+        check(
+          !(await box()).open && (await duyen()) === 490,
+          `xác nhận sau cửa sổ chống click ma: trừ Duyên đúng MỘT lần, click ma ngay sau đó không mở lại hộp (${await duyen()})`,
+        );
+        // thao tác bằng BÀN PHÍM / lập trình (click có detail = 0) cũng NGAY sau khi hộp đóng (vẫn trong 450 ms) KHÔNG phải click ma: mở được hộp mới
+        await evalJs(`document.querySelector('[data-nav="stone:khac"]').click(); 1`);
+        await waitBox(true);
+        check(
+          (await box()).open,
+          "click bàn phím (detail 0) ngay sau khi đóng hộp: mở hộp mới, không bị coi là click ma",
+        );
+      });
+      await keyUntilClosed("KeyX", "x", 88);
 
       console.log(
         "  [2] 'Giữ lại' / Esc / X: không trừ Duyên; Esc chỉ đóng hộp, KHÔNG đóng Hoàng Tuyền",
       );
       await openLimbo();
-      b = await center('[data-nav="stone:khac"]');
-      await tap(b.x, b.y);
-      await sleep(600);
-      const no = await center("#act-btn-no");
-      await tap(no.x, no.y);
-      await sleep(600);
+      await tapOpen('[data-nav="stone:khac"]');
+      await tapInBox("#act-btn-no");
       check(!(await box()).open && (await duyen()) === 500, "'Giữ lại': hộp đóng, không trừ");
-      b = await center('[data-nav="stone:khac"]');
-      await tap(b.x, b.y);
-      await sleep(300);
+      await tapOpen('[data-nav="stone:khac"]');
       await key("Escape", "Escape", 27);
-      await sleep(600);
+      await waitBox(false);
       check(
         !(await box()).open && (await duyen()) === 500 && (await limboOpen()),
         "Esc: hộp đóng, không trừ, Hoàng Tuyền VẪN mở",
       );
-      b = await center('[data-nav="stone:khac"]');
-      await tap(b.x, b.y);
-      await sleep(300);
-      await key("KeyX", "x", 88);
-      await sleep(600);
+      await tapOpen('[data-nav="stone:khac"]');
+      await keyUntilClosed("KeyX", "x", 88);
       check(!(await box()).open && (await duyen()) === 500, "phím X: giữ lại");
 
       console.log("  [3] mở xuất thân bằng Duyên");
       b = await center('[data-nav="origin-buy:kiem_khach"]');
       check(b && b.hit, "nút Mở xuất thân Kiếm khách bấm được");
-      await tap(b.x, b.y);
-      await sleep(300);
+      await tapOpen('[data-nav="origin-buy:kiem_khach"]');
       st = await box();
       check(
         /^Mở xuất thân Kiếm khách tốn 20 Duyên \(còn lại 480\)\?$/.test(st.text),
         `câu hỏi: "${st.text}"`,
       );
-      await key("KeyX", "x", 88);
-      await sleep(600);
+      await keyUntilClosed("KeyX", "x", 88);
 
       console.log("  [4] Duyên đổi giữa lúc hộp mở: xác nhận bị huỷ, không trừ theo lời hỏi cũ");
       await openLimbo();
-      b = await center('[data-nav="stone:khac"]');
-      await tap(b.x, b.y);
-      await sleep(600);
+      await tapOpen('[data-nav="stone:khac"]');
       await evalJs(
         `window.__ui.updateSoul({ kiep: 1, duyen: 5, unlocks: { ky_vat: 1, khac: 1 }, origins: [], engraved: ["ung_trao"] }); 1`,
       );
-      await sleep(200);
+      await until(`Number(document.getElementById("limbo-duyen-total")?.textContent) === 5`);
       check((await box()).open, "hộp còn mở sau khi chân linh đổi");
-      const y4 = await center("#act-btn-yes");
-      await tap(y4.x, y4.y);
-      await sleep(700);
+      await tapInBox("#act-btn-yes");
+      await until(
+        `[...document.querySelectorAll("#toast p")].some((p) => p.textContent.includes("Chân linh vừa đổi"))`,
+      );
       const toasts = await evalJs(
         `[...document.querySelectorAll("#toast p")].map((p) => p.textContent)`,
       );
@@ -387,11 +433,10 @@ async function main() {
       );
       await openLimbo();
       await evalJs(`document.querySelector('[data-nav="relic:lang_nha_kiem"]').click(); 1`); // giữ 1 di vật
-      await sleep(200);
+      await frames(3);
       b = await center("#limbo-btn-rebirth");
       check(b && b.hit, "nút Đầu thai bấm được");
-      await tap(b.x, b.y);
-      await sleep(100);
+      await tapOpen("#limbo-btn-rebirth");
       st = await box();
       check(
         /^Đầu thai làm Phàm gia, giữ 1 di vật, khắc 1 chiêu\?$/.test(st.text),
@@ -401,20 +446,14 @@ async function main() {
       check(st.yes === "Đầu thai" && st.no === "Xem lại", `nút: "${st.no}" / "${st.yes}"`);
       check((await choices()).length === 0, "chưa gửi đầu thai khi chưa xác nhận");
       await shot("hoang-tuyen-dau-thai");
-      await sleep(560);
-      const noBtn = await center("#act-btn-no");
-      await tap(noBtn.x, noBtn.y);
-      await sleep(600);
+      await tapInBox("#act-btn-no");
       check(
         !(await box()).open && (await choices()).length === 0 && (await limboOpen()),
         "'Xem lại': quay về màn chọn, chưa đầu thai",
       );
-      b = await center("#limbo-btn-rebirth");
-      await tap(b.x, b.y);
-      await sleep(700);
-      const yes5 = await center("#act-btn-yes");
-      await tap(yes5.x, yes5.y);
-      await sleep(700);
+      await tapOpen("#limbo-btn-rebirth");
+      await tapInBox("#act-btn-yes");
+      await until(`(window.__rebirthChoices ?? []).length >= 1`);
       const ch = await choices();
       check(
         !(await box()).open &&
@@ -429,21 +468,18 @@ async function main() {
       await openLimbo();
       await evalJs(`document.getElementById("limbo-btn-rebirth").focus(); 1`);
       await key("Enter", "Enter", 13);
-      await sleep(300);
+      await waitBox(true);
       check((await box()).open && (await choices()).length === 0, "Enter: hộp mở, chưa gửi");
-      await sleep(400);
-      await key("KeyY", "y", 89);
-      await sleep(500);
+      await keyUntilClosed("KeyY", "y", 89); // Y trong cửa sổ chống click ma bị bỏ qua: bấm lặp tới khi hộp đóng
+      await until(`(window.__rebirthChoices ?? []).length >= 1`);
       check(!(await box()).open && (await choices()).length === 1, "Y: gửi đúng một tin");
 
       console.log("  [7] máy chủ đóng Hoàng Tuyền (đã đầu thai) lúc hộp còn mở: hộp đóng theo");
       await openLimbo();
-      b = await center("#limbo-btn-rebirth");
-      await tap(b.x, b.y);
-      await sleep(300);
+      await tapOpen("#limbo-btn-rebirth");
       check((await box()).open, "hộp mở");
       await evalJs(`window.__ui.hideLimbo(); 1`);
-      await sleep(200);
+      await waitBox(false);
       check(!(await box()).open, "hideLimbo: hộp xác nhận cũng đóng");
 
       console.log(
@@ -461,11 +497,11 @@ async function main() {
       await openLimbo();
       check((await status()).hidden, "chưa bấm gì: dòng trạng thái ẩn");
       await evalJs(`window.__limboRefuse = ${JSON.stringify(REASON)}; 1`);
-      b = await center("#limbo-btn-rebirth");
-      await tap(b.x, b.y);
-      await sleep(600);
-      await tap((await center("#act-btn-yes")).x, (await center("#act-btn-yes")).y);
-      await sleep(400);
+      await tapUntil("#limbo-btn-rebirth", boxOpen);
+      await tapUntil("#act-btn-yes", boxClosed);
+      await until(
+        `(() => { const e = document.getElementById("limbo-rebirth-status"); return !e.hidden && e.textContent.includes(${JSON.stringify(REASON)}); })()`,
+      );
       let sRefuse = await status();
       check(
         !sRefuse.hidden && sRefuse.bad && sRefuse.text.includes(REASON),
@@ -474,40 +510,39 @@ async function main() {
       check(await limboOpen(), "vẫn ở màn Hoàng Tuyền (KHÔNG tự đóng)");
       check(!(await btnBusy()), "nút Đầu thai mở lại ngay (không chờ hết giờ)");
       await shot("hoang-tuyen-tu-choi");
-      await sleep(3300); // quá 3 s của toast: toast đã tắt, lý do vẫn còn
+      // quá 3 s của toast: toast đã tắt (chờ tới khi hết toast), lý do vẫn còn
+      await until(`document.querySelectorAll("#toast p").length === 0`);
       check(
         (await evalJs(`document.querySelectorAll("#toast p").length`)) === 0,
         "toast đã tắt sau 3 s",
       );
       sRefuse = await status();
       check(!sRefuse.hidden && sRefuse.text.includes(REASON), "lý do VẪN còn sau khi toast tắt");
-      check(await limboOpen(), "vẫn ở Hoàng Tuyền sau 3,3 s");
+      check(await limboOpen(), "vẫn ở Hoàng Tuyền sau khi toast tắt");
       // máy chủ sửa lại: bấm lại đầu thai được, màn đóng theo Mạnh Bà
       await evalJs(`window.__limboRefuse = undefined; 1`);
-      b = await center("#limbo-btn-rebirth");
-      await tap(b.x, b.y);
-      await sleep(600);
-      await tap((await center("#act-btn-yes")).x, (await center("#act-btn-yes")).y);
-      await sleep(500);
+      await tapUntil("#limbo-btn-rebirth", boxOpen);
+      await tapUntil("#act-btn-yes", boxClosed);
+      await until(`!window.__ui.isLimboOpen()`);
       check(!(await limboOpen()), "bấm lại sau khi hết lỗi: đầu thai, Hoàng Tuyền đóng");
       // toast KHÔNG liên quan lúc chờ (thông báo quái, thành tựu) không bị coi là lời từ chối
       await evalJs(`document.getElementById("reborn-overlay").hidden = true; 1`); // màn Mạnh Bà của lần đầu thai vừa rồi che nút
       await openLimbo();
-      b = await center("#limbo-btn-rebirth");
-      await tap(b.x, b.y);
-      await sleep(600);
+      await tapUntil("#limbo-btn-rebirth", boxOpen);
       await evalJs(`window.__limboHold = true; 1`);
-      await tap((await center("#act-btn-yes")).x, (await center("#act-btn-yes")).y);
+      await tapUntil("#act-btn-yes", boxClosed);
       await evalJs(
         `window.__ui.toast({ text: "★ Hôi Lang tinh anh: nên đi đội.", tone: "info" }); window.__ui.toast({ text: "Đạt thành tựu: Nhập Thế Lạc Hà", tone: "good" }); 1`,
       );
-      await sleep(200);
+      await frames(2);
       check(
         (await btnBusy()) && /Đang uống canh/.test((await status()).text),
         `toast không liên quan: vẫn "đang chờ", không báo lỗi oan ("${(await status()).text}")`,
       );
       // máy chủ IM LẶNG tới hết giờ chờ (3 s): nói rõ + mở lại nút (không để người chơi nhìn nút khoá không lý do)
-      await sleep(3300);
+      await until(
+        `(() => { const e = document.getElementById("limbo-rebirth-status"); return !e.hidden && e.classList.contains("bad") && /chưa phản hồi/.test(e.textContent); })()`,
+      );
       const sSilent = await status();
       check(
         !sSilent.hidden && sSilent.bad && /chưa phản hồi/.test(sSilent.text),
@@ -517,21 +552,8 @@ async function main() {
       await evalJs(`window.__limboHold = undefined; window.__ui.hideLimbo(); 1`);
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
+    await launched?.close();
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);

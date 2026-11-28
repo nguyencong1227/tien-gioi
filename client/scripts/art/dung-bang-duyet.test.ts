@@ -96,18 +96,66 @@ describe("dung-bang-duyet.py: nhóm 14 (vật phẩm), phần đọc tài liệu
 const hasPython = spawnSync("python3", ["-I", "-c", "pass"], { encoding: "utf8" }).status === 0;
 const MA_FILE = path.join(here, "ma-co-dinh.py");
 const MA_JSON = path.join(here, "..", "..", "..", "docs/art/huong-moi/ma-co-dinh.json");
-const DONG_BANG = { vp: 128, hu: 59, t: 4 };
+const DONG_BANG = { vp: 128, hu: 59, t: 4, q: 12, n: 15 };
 /** Trùm của tờ 23/11 (T-01..T-04, #1446): đúng thứ tự `MONSTERS` lúc đó; Thanh Xà (#1445) và mọi trùm sau nhận số Ở CUỐI. */
 const DONG_BANG_T = { mang: 1, hac_giao: 2, thien_han_vuong: 3, yeu_vuong: 4 };
+/**
+ * Quái thường của tờ 23/11 (Q-01..Q-12, nhóm 12, A và B chốt đóng băng 28/11): đúng thứ tự quái thường trong `MONSTERS` lúc đó (commit dd32ff1b);
+ * sáu sói Hóa Thần của Lang Hoang (D1 #1466) chèn TRƯỚC Rắn Con từng làm Q-11 / Q-12 nhích thành Q-17 / Q-18, nay quái mới nhận số Ở CUỐI.
+ */
+const DONG_BANG_Q = {
+  tho: 1,
+  lang: 2,
+  ho: 3,
+  suong_ho: 4,
+  thach_quy: 5,
+  doc_thiem: 6,
+  han_lang: 7,
+  phong_nha: 8,
+  cot_tuong: 9,
+  doc_tuoc: 10,
+  ran_con: 11,
+  phan_than_yeu_vuong: 12,
+};
+/**
+ * NPC của tờ 23/11 (NPC-01..NPC-15, nhóm 11, A đóng băng 28/11 cùng đợt với Q): đúng thứ tự trong `NPCS` lúc đó (commit dd32ff1b); thợ rèn Tuyết Đao (D1 #1466 lát A2) chèn TRƯỚC thủ môn bí cảnh
+ * làm NPC-13..15 (Huyền Cơ, Mộc Diên, Tô Linh Ấn) nhích, nay NPC mới nhận số Ở CUỐI.
+ */
+const DONG_BANG_N = {
+  truong_tran: 1,
+  duoc_su: 2,
+  tho_ren: 3,
+  cao_thi: 4,
+  lai_buon: 5,
+  tran_uy: 6,
+  tram_truong: 7,
+  lai_buon_suong: 8,
+  tho_ren_suong: 9,
+  tram_truong_han: 10,
+  lai_buon_han: 11,
+  tho_ren_han: 12,
+  thu_mon: 13,
+  lao_dan: 14,
+  lao_phu: 15,
+};
 /** sha256 của các dòng `vp:<id>=<số>` rồi `hu:<id>=<số>` (số tăng dần) của phần ĐÃ ĐÓNG BĂNG; sửa một mã đã giao người dùng là đỏ. */
 const DONG_BANG_SHA256 = "ac64cbf5272abeeb19a3e75e2a0fd9620a3a2d91a860047b518044b86421a83c";
 
 type MaTable = {
-  dong_bang: { commit: string; vp_toi_da: number; hu_toi_da: number; t_toi_da: number };
+  dong_bang: {
+    commit: string;
+    vp_toi_da: number;
+    hu_toi_da: number;
+    t_toi_da: number;
+    q_toi_da: number;
+    n_toi_da: number;
+  };
   mo_coi: Record<string, string>;
   vp: Record<string, number>;
   hu: Record<string, number>;
   t: Record<string, number>;
+  q: Record<string, number>;
+  n: Record<string, number>;
 };
 const maTable = (): MaTable => JSON.parse(fs.readFileSync(MA_JSON, "utf8")) as MaTable;
 /** Chạy một đoạn python với mô-đun mã nạp sẵn là `MA`; nhận / trả JSON. */
@@ -140,6 +188,7 @@ function trumDocErrors(
   table: Record<string, number>,
   frozenMax: number,
   bosses: Map<string, string>,
+  prefix: "T" | "Q" | "NPC" = "T", // "Q": cùng luật cho nhóm 12 (quái thường), `bosses` khi đó là Map id -> tên của QUÁI THƯỜNG; "NPC": nhóm 11, Map id -> "tên — chức danh"
 ): string[] {
   const idOf = new Map(Object.entries(table).map(([id, n]) => [n, id] as const));
   const maxNum = Math.max(0, ...Object.values(table));
@@ -149,20 +198,21 @@ function trumDocErrors(
   const errs: string[] = [];
   const seenNum = new Set<number>();
   const seenName = new Set<string>();
-  for (const m of doc.matchAll(/^\| T-(\d+) \| ([^|]*?) \|/gm)) {
+  for (const m of doc.matchAll(new RegExp(`^\\| ${prefix}-(\\d+) \\| ([^|]*?) \\|`, "gm"))) {
     const n = Number(m[1]);
     const shown = m[2].replace(MOI_TAG, "");
     if (MOI_TAG.test(m[2]) !== n > frozenMax)
-      errs.push(`T-${m[1]}: nhãn MỚI sai (mốc đóng băng ${frozenMax})`);
-    if (seenNum.has(n)) errs.push(`T-${m[1]}: số xuất hiện hai lần`);
+      errs.push(`${prefix}-${m[1]}: nhãn MỚI sai (mốc đóng băng ${frozenMax})`);
+    if (seenNum.has(n)) errs.push(`${prefix}-${m[1]}: số xuất hiện hai lần`);
     seenNum.add(n);
     const id = idOf.get(n);
     if (id !== undefined) {
-      if (shown !== bosses.get(id)) errs.push(`T-${m[1]}: bảng nói ${id}, tờ ghi ${shown}`);
+      if (shown !== bosses.get(id)) errs.push(`${prefix}-${m[1]}: bảng nói ${id}, tờ ghi ${shown}`);
       continue;
     }
-    if (!unregistered.has(shown)) errs.push(`T-${m[1]}: ${shown} không phải trùm chưa vào bảng`);
-    if (seenName.has(shown)) errs.push(`T-${m[1]}: ${shown} xuất hiện hai lần`);
+    if (!unregistered.has(shown))
+      errs.push(`${prefix}-${m[1]}: ${shown} không phải trùm chưa vào bảng`);
+    if (seenName.has(shown)) errs.push(`${prefix}-${m[1]}: ${shown} xuất hiện hai lần`);
     seenName.add(shown);
   }
   [...seenNum]
@@ -170,7 +220,9 @@ function trumDocErrors(
     .sort((a, b) => a - b)
     .forEach((n, i) => {
       if (n !== maxNum + 1 + i)
-        errs.push(`T-${n}: số mới phải liền ngay sau T-${maxNum + i} (bảng tới T-${maxNum})`);
+        errs.push(
+          `${prefix}-${n}: số mới phải liền ngay sau ${prefix}-${maxNum + i} (bảng tới ${prefix}-${maxNum})`,
+        );
     });
   return errs;
 }
@@ -178,19 +230,31 @@ function trumDocErrors(
 describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.json)", () => {
   const repo = path.join(here, "..", "..", "..");
 
-  it("phần ĐÃ ĐÓNG BĂNG (tờ 23/11 dd32ff1b: T-01..04, VP-001..128, HU-01..59) giữ nguyên từng id -> số", () => {
+  it("phần ĐÃ ĐÓNG BĂNG (tờ 23/11 dd32ff1b: NPC-01..15, Q-01..12, T-01..04, VP-001..128, HU-01..59) giữ nguyên từng id -> số", () => {
     const t = maTable();
     expect(t.dong_bang).toMatchObject({
       commit: "dd32ff1b",
       vp_toi_da: DONG_BANG.vp,
       hu_toi_da: DONG_BANG.hu,
       t_toi_da: DONG_BANG.t,
+      q_toi_da: DONG_BANG.q,
+      n_toi_da: DONG_BANG.n,
     });
     // trùm: phần <= t_toi_da đúng bốn trùm người dùng đã nhận (Xích Mãng, Hắc Giao, Thiên Hàn Vương, Linh Hư Yêu Vương), từng số
     expect(
       Object.fromEntries(Object.entries(t.t).filter(([, n]) => n <= DONG_BANG.t)),
       "T-01..04 của tờ 23/11",
     ).toEqual(DONG_BANG_T);
+    // quái thường: phần <= q_toi_da đúng 12 quái của tờ 23/11, từng số (sáu sói Hóa Thần và mọi quái sau nhận số Ở CUỐI, không chèn giữa)
+    expect(
+      Object.fromEntries(Object.entries(t.q).filter(([, n]) => n <= DONG_BANG.q)),
+      "Q-01..12 của tờ 23/11",
+    ).toEqual(DONG_BANG_Q);
+    // NPC: phần <= n_toi_da đúng 15 NPC của tờ 23/11, từng số (thợ rèn Tuyết Đao và mọi NPC sau nhận số Ở CUỐI, không chèn giữa)
+    expect(
+      Object.fromEntries(Object.entries(t.n).filter(([, n]) => n <= DONG_BANG.n)),
+      "NPC-01..15 của tờ 23/11",
+    ).toEqual(DONG_BANG_N);
     const frozen = (kind: "vp" | "hu", max: number) =>
       Object.entries(t[kind])
         .filter(([, n]) => n <= max)
@@ -206,10 +270,12 @@ describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.js
     const itemIds = new Set(ITEMS.map((i) => i.id));
     const skillIds = new Set(LEARNABLE_SKILLS.map((k) => k.id));
     const bossIds = new Set(MONSTERS.filter((m) => m.boss).map((m) => m.id));
+    const quaiIds = new Set(MONSTERS.filter((m) => !m.boss).map((m) => m.id));
     for (const [kind, known] of [
       ["vp", itemIds],
       ["hu", skillIds],
       ["t", bossIds],
+      ["q", quaiIds],
     ] as const) {
       const nums = Object.values(t[kind]).sort((a, b) => a - b);
       expect(nums, `${kind}: số liên tục từ 1`).toEqual(nums.map((_, i) => i + 1));
@@ -222,7 +288,7 @@ describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.js
     }
   });
 
-  it("mã T / VP / HU trong DUYET_TUNG_PHAN.md khớp bảng (cùng số = cùng trùm / vật phẩm / chiêu), nên tờ không bao giờ đổi nghĩa mã", () => {
+  it("mã Q / T / VP / HU trong DUYET_TUNG_PHAN.md khớp bảng (cùng số = cùng quái / trùm / vật phẩm / chiêu), nên tờ không bao giờ đổi nghĩa mã", () => {
     const t = maTable();
     const doc = fs.readFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), "utf8");
     const byNum = (kind: "vp" | "hu" | "t") =>
@@ -232,6 +298,8 @@ describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.js
     const items = new Map(ITEMS.map((i) => [i.id, i.name] as const));
     const skills = new Map(LEARNABLE_SKILLS.map((k) => [k.id, k.name] as const));
     const bosses = new Map(MONSTERS.filter((m) => m.boss).map((m) => [m.id, m.name] as const));
+    const quai = new Map(MONSTERS.filter((m) => !m.boss).map((m) => [m.id, m.name] as const));
+    const npcs = new Map(NPCS.map((n) => [n.id, `${n.name} — ${n.title}`] as const));
     let vpRows = 0;
     let huRows = 0;
     for (const m of doc.matchAll(/^\| (VP|HU)-(\d+) \| ([^|]*?) \|/gm)) {
@@ -251,6 +319,10 @@ describe("dung-bang-duyet.py: mã ỔN ĐỊNH của tờ duyệt (ma-co-dinh.js
     expect(huRows).toBeGreaterThanOrEqual(DONG_BANG.hu);
     expect(trumDocErrors(doc, t.t, DONG_BANG.t, bosses)).toEqual([]);
     expect((doc.match(/^\| T-\d+ \|/gm) ?? []).length).toBeGreaterThanOrEqual(DONG_BANG.t);
+    expect(trumDocErrors(doc, t.q, DONG_BANG.q, quai, "Q")).toEqual([]);
+    expect((doc.match(/^\| Q-\d+ \|/gm) ?? []).length).toBeGreaterThanOrEqual(DONG_BANG.q);
+    expect(trumDocErrors(doc, t.n, DONG_BANG.n, npcs, "NPC")).toEqual([]);
+    expect((doc.match(/^\| NPC-\d+ \|/gm) ?? []).length).toBeGreaterThanOrEqual(DONG_BANG.n);
   });
 
   it("trumDocErrors: hàng T MỚI tạm (trùm chưa vào bảng, số CUỐI, ghi MỚI) được chấp nhận; mọi kiểu lệch khác bị bắt", () => {
@@ -391,9 +463,19 @@ print(json.dumps([old["t"], MA.assign_codes(old["t"], ["x", "y"])]))`,
 
   it("generator CHỈ đọc bảng: group_trum / group_vp / group_hu cấp mã bằng MA.assign_codes, không còn bộ đếm tuần tự", () => {
     const body = (from: string, to: string) => code.slice(code.indexOf(from), code.indexOf(to));
+    const quaiFn = body("def group_quai(", "T_MAP = {");
     const trum = body("def group_trum(", "ELEMENT_ORDER = (");
     const vp = body("def group_vp(", "# Nền / màn tải / Hoàng Tuyền (nhóm 17");
     const hu = body("def group_hu(", "def group_ui(");
+    const npcFn = body("def group_npc(", "Q_MAP = {");
+    expect(npcFn.length).toBeGreaterThan(500);
+    expect(npcFn).toMatch(/MA\.assign_codes\(t\["n"\]/);
+    expect(npcFn).not.toMatch(/enumerate\(/); // mã NPC từng là `NPC-{i:02d}` theo chỉ số trong `NPCS`: thợ rèn Tuyết Đao chèn trước thủ môn làm NPC-13..15 nhích
+    expect(code).not.toMatch(/f"NPC-\{i:02d\}"/);
+    expect(quaiFn.length).toBeGreaterThan(500);
+    expect(quaiFn).toMatch(/MA\.assign_codes\(t\["q"\]/);
+    expect(quaiFn).not.toMatch(/enumerate\(/); // mã Q từng là `Q-{i:02d}` theo chỉ số trong danh sách quái thường: sáu sói chèn trước Rắn Con làm Q-11, Q-12 nhích
+    expect(code).not.toMatch(/f"Q-\{i:02d\}"/);
     expect(trum.length).toBeGreaterThan(500);
     expect(vp.length).toBeGreaterThan(500);
     expect(hu.length).toBeGreaterThan(500);
@@ -802,6 +884,219 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     const doc2 = fs.readFileSync(md2, "utf8");
     expect((doc2.match(/^\| T-\d+ \|/gm) ?? []).length).toBe(6 + themThat.length);
     expect(trumDocErrors(doc2, DONG_BANG_T, DONG_BANG.t, allBosses)).toEqual([]);
+  }, 120_000);
+
+  it("nhóm 12 (quái thường): chèn quái MỚI lên ĐẦU danh sách và đảo thứ tự quái cũ KHÔNG làm Q-01..12 đổi nghĩa; quái mới ở CUỐI, ghi MỚI; --ghi-ma ghi đúng số đã in (A và B chốt 28/11)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const tmp = fs.mkdtempSync(path.join(dir, "quai-"));
+    const names = JSON.parse(fs.readFileSync(namesFile, "utf8")) as {
+      mons: { id: string; name: string; boss: boolean }[];
+    };
+    const oldQuai = names.mons.filter((m) => !m.boss);
+    const bosses = names.mons.filter((m) => m.boss);
+    // hai quái mới ở ĐẦU danh sách (trước đây sẽ chiếm Q-01, Q-02 và đẩy Linh Thố... xuống), quái cũ đảo ngược thứ tự
+    const fresh = [
+      { id: "zz_quai_a", name: "Quái Z", boss: false },
+      { id: "aa_quai_b", name: "Quái A", boss: false },
+    ];
+    names.mons = [...fresh, ...[...oldQuai].reverse(), ...bosses];
+    const fake = path.join(tmp, "names.json");
+    const maFile = path.join(tmp, "ma.json");
+    const md = path.join(tmp, "doc.md");
+    fs.writeFileSync(fake, JSON.stringify(names));
+    fs.copyFileSync(MA_JSON, maFile);
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "12",
+        "--public",
+        path.join(tmp, "pub"),
+        "--private",
+        path.join(tmp, "priv"),
+        "--names",
+        fake,
+        "--ma",
+        maFile,
+        "--md",
+        md,
+        "--ghi-ma",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const rows: { n: number; shown: string; mới: boolean }[] = [];
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| Q-(\d+) \| ([^|]*?) \|/gm))
+      rows.push({
+        n: Number(m[1]),
+        shown: m[2].replace(/ · MỚI \(sau 23\/11\)$/, ""),
+        mới: / · MỚI \(sau 23\/11\)$/.test(m[2]),
+      });
+    const byId = new Map(MONSTERS.map((m) => [m.id, m.name] as const));
+    // mười hai quái của tờ 23/11: ĐÚNG số, ĐÚNG tên, không ghi MỚI, dù danh sách đảo và có quái chèn đầu
+    for (const [id, n] of Object.entries(DONG_BANG_Q)) {
+      const row = rows.find((x) => x.n === n);
+      expect(row?.shown, `Q-${n} (${id})`).toBe(byId.get(id));
+      expect(row?.mới, `Q-${n} không phải MỚI`).toBe(false);
+    }
+    // quái mới: số CUỐI (13, 14), theo thứ tự xuất hiện trong danh sách, ghi MỚI
+    const zz = rows.find((x) => x.shown === "Quái Z");
+    const aa = rows.find((x) => x.shown === "Quái A");
+    expect([zz?.n, zz?.mới, aa?.n, aa?.mới]).toEqual([13, true, 14, true]);
+    // quái THẬT chưa đóng băng (vd sáu sói Hóa Thần của Lang Hoang) nhận số sau hai quái giả, theo thứ tự xuất hiện trong danh sách (đã đảo): test KHÔNG viết cứng số quái hiện có
+    const themThat = [...oldQuai].reverse().filter((m) => !(m.id in DONG_BANG_Q));
+    expect(rows.map((x) => x.n)).toEqual(
+      Array.from({ length: 14 + themThat.length }, (_, i) => i + 1),
+    ); // tờ: hàng cũ theo số trước, hàng MỚI sau
+    // --ghi-ma: số ghi vào bảng == số in trên tờ; phần đóng băng không bị đụng
+    const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).q;
+    expect(written).toEqual({
+      ...DONG_BANG_Q,
+      zz_quai_a: 13,
+      aa_quai_b: 14,
+      ...Object.fromEntries(themThat.map((m, i) => [m.id, 15 + i])),
+    });
+
+    // luồng PR nội dung: dựng lại tờ bằng `--groups 12 --md` KHÔNG `--ghi-ma` => bảng không đổi, tờ có hàng MỚI tạm, và kiểm tài liệu chấp nhận đúng tờ này
+    const md2 = path.join(tmp, "doc-khong-ghi.md");
+    const ma2 = path.join(tmp, "ma-khong-ghi.json");
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md2);
+    fs.copyFileSync(MA_JSON, ma2);
+    const r2 = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "12",
+        "--public",
+        path.join(tmp, "pub2"),
+        "--private",
+        path.join(tmp, "priv2"),
+        "--names",
+        fake,
+        "--ma",
+        ma2,
+        "--md",
+        md2,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r2.status, String(r2.stderr)).toBe(0);
+    expect((JSON.parse(fs.readFileSync(ma2, "utf8")) as MaTable).q).toEqual(DONG_BANG_Q); // không --ghi-ma: bảng giữ nguyên
+    const allQuai = new Map(names.mons.filter((m) => !m.boss).map((m) => [m.id, m.name] as const));
+    const doc2 = fs.readFileSync(md2, "utf8");
+    expect((doc2.match(/^\| Q-\d+ \|/gm) ?? []).length).toBe(14 + themThat.length);
+    expect(trumDocErrors(doc2, DONG_BANG_Q, DONG_BANG.q, allQuai, "Q")).toEqual([]);
+  }, 120_000);
+
+  it("nhóm 11 (NPC): chèn NPC MỚI lên ĐẦU danh sách và đảo thứ tự NPC cũ KHÔNG làm NPC-01..15 đổi nghĩa; NPC mới ở CUỐI, ghi MỚI; --ghi-ma ghi đúng số đã in (A đóng băng 28/11)", () => {
+    const repo = path.join(here, "..", "..", "..");
+    const tmp = fs.mkdtempSync(path.join(dir, "npc-"));
+    const names = JSON.parse(fs.readFileSync(namesFile, "utf8")) as {
+      npcs: { id: string; name: string; title: string }[];
+    };
+    const oldNpcs = names.npcs;
+    // hai NPC mới ở ĐẦU danh sách (trước đây sẽ chiếm NPC-01, NPC-02 và đẩy Trưởng trấn... xuống), NPC cũ đảo ngược thứ tự
+    const fresh = [
+      { id: "zz_npc_a", name: "Người Z", title: "Khách Z" },
+      { id: "aa_npc_b", name: "Người A", title: "Khách A" },
+    ];
+    names.npcs = [...fresh, ...[...oldNpcs].reverse()];
+    const fake = path.join(tmp, "names.json");
+    const maFile = path.join(tmp, "ma.json");
+    const md = path.join(tmp, "doc.md");
+    fs.writeFileSync(fake, JSON.stringify(names));
+    fs.copyFileSync(MA_JSON, maFile);
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md);
+    const r = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "11",
+        "--public",
+        path.join(tmp, "pub"),
+        "--private",
+        path.join(tmp, "priv"),
+        "--names",
+        fake,
+        "--ma",
+        maFile,
+        "--md",
+        md,
+        "--ghi-ma",
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r.status, String(r.stderr)).toBe(0);
+    const rows: { n: number; shown: string; mới: boolean }[] = [];
+    for (const m of fs.readFileSync(md, "utf8").matchAll(/^\| NPC-(\d+) \| ([^|]*?) \|/gm))
+      rows.push({
+        n: Number(m[1]),
+        shown: m[2].replace(/ · MỚI \(sau 23\/11\)$/, ""),
+        mới: / · MỚI \(sau 23\/11\)$/.test(m[2]),
+      });
+    const byId = new Map(NPCS.map((n) => [n.id, `${n.name} — ${n.title}`] as const));
+    // mười lăm NPC của tờ 23/11: ĐÚNG số, ĐÚNG tên, không ghi MỚI, dù danh sách đảo và có NPC chèn đầu
+    for (const [id, n] of Object.entries(DONG_BANG_N)) {
+      const row = rows.find((x) => x.n === n);
+      expect(row?.shown, `NPC-${n} (${id})`).toBe(byId.get(id));
+      expect(row?.mới, `NPC-${n} không phải MỚI`).toBe(false);
+    }
+    // NPC mới: số CUỐI (16, 17), theo thứ tự xuất hiện trong danh sách, ghi MỚI
+    const zz = rows.find((x) => x.shown === "Người Z — Khách Z");
+    const aa = rows.find((x) => x.shown === "Người A — Khách A");
+    expect([zz?.n, zz?.mới, aa?.n, aa?.mới]).toEqual([16, true, 17, true]);
+    // NPC THẬT chưa đóng băng (vd ba NPC Tuyết Đao Quan) nhận số sau hai NPC giả, theo thứ tự xuất hiện trong danh sách (đã đảo): test KHÔNG viết cứng số NPC hiện có
+    const themThat = [...oldNpcs].reverse().filter((n) => !(n.id in DONG_BANG_N));
+    expect(rows.map((x) => x.n)).toEqual(
+      Array.from({ length: 17 + themThat.length }, (_, i) => i + 1),
+    ); // tờ: hàng cũ theo số trước, hàng MỚI sau
+    // --ghi-ma: số ghi vào bảng == số in trên tờ; phần đóng băng không bị đụng
+    const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).n;
+    expect(written).toEqual({
+      ...DONG_BANG_N,
+      zz_npc_a: 16,
+      aa_npc_b: 17,
+      ...Object.fromEntries(themThat.map((n, i) => [n.id, 18 + i])),
+    });
+
+    // luồng PR nội dung: dựng lại tờ bằng `--groups 11 --md` KHÔNG `--ghi-ma` => bảng không đổi, tờ có hàng MỚI tạm, và kiểm tài liệu chấp nhận đúng tờ này
+    const md2 = path.join(tmp, "doc-khong-ghi.md");
+    const ma2 = path.join(tmp, "ma-khong-ghi.json");
+    fs.copyFileSync(path.join(repo, "docs/art/huong-moi/DUYET_TUNG_PHAN.md"), md2);
+    fs.copyFileSync(MA_JSON, ma2);
+    const r2 = spawnSync(
+      "python3",
+      [
+        "-I",
+        SCRIPT,
+        "--groups",
+        "11",
+        "--public",
+        path.join(tmp, "pub2"),
+        "--private",
+        path.join(tmp, "priv2"),
+        "--names",
+        fake,
+        "--ma",
+        ma2,
+        "--md",
+        md2,
+      ],
+      { encoding: "utf8" },
+    );
+    expect(r2.status, String(r2.stderr)).toBe(0);
+    expect((JSON.parse(fs.readFileSync(ma2, "utf8")) as MaTable).n).toEqual(DONG_BANG_N); // không --ghi-ma: bảng giữ nguyên
+    const allNpcs = new Map(names.npcs.map((n) => [n.id, `${n.name} — ${n.title}`] as const));
+    const doc2 = fs.readFileSync(md2, "utf8");
+    expect((doc2.match(/^\| NPC-\d+ \|/gm) ?? []).length).toBe(17 + themThat.length);
+    expect(trumDocErrors(doc2, DONG_BANG_N, DONG_BANG.n, allNpcs, "NPC")).toEqual([]);
   }, 120_000);
 
   it("dựng đủ 4 nhóm: mỗi nhóm một tờ công khai + một tờ đầy đủ, đúng số mã", () => {
