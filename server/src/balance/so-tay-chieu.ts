@@ -41,13 +41,13 @@ function matrixRealms(defs: readonly SkillDef[]): number[] {
 const NPC_BY_ID = Object.fromEntries(NPCS.map((n) => [n.id, n]));
 
 /** Số phần trăm từ tỉ lệ (0,12 -> "12"; 0,006 -> "0,6"; 0,0035 -> "0,35"): bỏ số không đuôi, dấu phẩy theo tiếng Việt. */
-function pct(n: number): string {
+export function pct(n: number): string {
   const v = Math.round(n * 100_000) / 1000;
   return String(v).replace(".", ",");
 }
 
 /** Số giây từ ms, bỏ số không đuôi (2000 -> "2"; 750 -> "0,75"). */
-function secs(ms: number): string {
+export function secs(ms: number): string {
   const s = ms / 1000;
   return String(Math.round(s * 100) / 100).replace(".", ",");
 }
