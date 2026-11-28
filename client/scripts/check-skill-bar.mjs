@@ -203,6 +203,17 @@ try {
     return evalJs("window.__toasts.join(' | ')");
   };
   /**
+   * Bấm phím ô `n` rồi chờ toast; thỉnh thoảng (đo ~1 / 12 lượt ở khung 50 ms) một phím bị rơi, không toast nào hiện: chưa thấy toast sau 3 giây thì bấm lại, tối đa 3 lần. Chỉ dùng cho ô
+   * khoá / trống / thiếu linh lực, nơi bấm lại KHÔNG gửi `cast` nên vô hại; ca "không có toast" vẫn đỏ sau lần bấm thứ ba.
+   */
+  const pressForToast = async (n) => {
+    for (let k = 0; k < 3; k++) {
+      await clearCasts();
+      await press(n);
+      if (await waitUntilTrue(() => evalJs("window.__toasts.length > 0"), 3000, 100)) return;
+    }
+  };
+  /**
    * Dừng đồng hồ `performance.now()` của TRANG (hồi chiêu giả, choáng đều tính theo đồng hồ đó): kiểm "đang hồi chiêu / đang choáng" đúng nghĩa bất kể tốc độ máy, không phụ thuộc 3 giây
    * hồi chiêu hay 2,5 giây choáng chạy mất trong lúc các lệnh CDP chờ khung hình. Đồng hồ ảo = đồng hồ thật trừ thời gian đã dừng nên mở lại thì TIẾP TỤC từ chỗ dừng (không nhảy tới).
    */
@@ -397,9 +408,12 @@ try {
   console.log("--- choáng: cả thanh xám, KHÔNG gửi ---");
   await open("skills=mock&n=4");
   await waitReady(2); // ô 2 hết hồi chiêu (chờ theo điều kiện, không `sleep(3300)`)
-  // Choáng DÀI (10 phút): các kiểm "đang choáng" không phụ thuộc tốc độ máy (choáng 2,5 giây thì ở khung chậm đã hết trước khi kịp bấm). Dừng đồng hồ trang KHÔNG dùng được ở đây:
-  // thanh chiêu cập nhật định kỳ theo đồng hồ đó nên đứng yên thì không bao giờ vẽ lại ô choáng.
-  await evalJs(`window.__scene.room.emit("status", { list: [["stun", 600000]] }); 1`);
+  // Choáng tối đa 1 GIÂY (`maxMs` của trạng thái `stun` ở shared kẹp mọi giá trị lớn hơn): ở khung chậm 1 giây đã hết trước khi kịp bấm U. Dừng đồng hồ trang cho các kiểm "đang choáng" (choáng tính
+  // theo đồng hồ đó); thanh chiêu cập nhật định kỳ theo đồng hồ nên đứng yên thì không tự vẽ lại: phát lại sổ chiêu (`__mockSkills.emit`, `onSkills` đặt `nextSkillBarAt = 0`) để vẽ ngay.
+  await freezeClock();
+  await evalJs(
+    `window.__scene.room.emit("status", { list: [["stun", 1000]] }); window.__mockSkills.emit(); 1`,
+  );
   await waitUntilTrue(
     async () => (await slots4()).every((x) => x.cls === "sk slot k-stunned"),
     15000,
@@ -414,8 +428,7 @@ try {
   await press(3);
   check((await casts()).length === 0, "U khi choáng: 0 tin cast");
   await shot("n4-choang");
-  // Hết choáng THEO THỜI GIAN (đường hết hạn của bộ theo dõi trạng thái): đặt lại choáng 1,5 giây rồi chờ lớp k-ready (không `sleep`)
-  await evalJs(`window.__scene.room.emit("status", { list: [["stun", 1500]] }); 1`);
+  await thawClock(); // đồng hồ chạy tiếp: 1 giây choáng còn lại hết THẬT, chờ theo lớp k-ready (không `sleep`)
   check(await waitReady(3), "hết choáng: sẵn sàng lại");
 
   // ---------------------------------------------------------------- thiếu linh lực
@@ -423,8 +436,7 @@ try {
   await evalJs("window.__scene.me().mp = 1; 1");
   const noMp = await waitSlot(3, (v) => v.cls === "sk slot k-noMp", 10000);
   check(noMp.cls === "sk slot k-noMp", `ô 3: ${noMp.cls}`);
-  await clearCasts();
-  await press(3);
+  await pressForToast(3);
   check((await casts()).length === 0, "U khi thiếu linh lực: 0 tin cast");
   check(String(await toastText()).includes("Linh lực không đủ"), `toast: ${await toastText()}`);
   await shot("n4-thieu-linh-luc");
@@ -445,8 +457,7 @@ try {
     `aria ô 4: ${s[2].aria}`,
   );
   check(s[2].dis === "true", "ô khoá aria-disabled");
-  await clearCasts();
-  await press(4);
+  await pressForToast(4);
   check(
     (await casts()).length === 0 && String(await toastText()).includes("chưa mở"),
     `I (ô khoá): 0 cast, toast "${await toastText()}"`,
@@ -462,8 +473,7 @@ try {
     s.every((x) => x.cls === "sk slot k-empty"),
     `ô 2, 3: ${s.map((x) => x.cls).join(" | ")}`,
   );
-  await clearCasts();
-  await press(2);
+  await pressForToast(2);
   check(
     (await casts()).length === 0 && String(await toastText()).includes("còn trống"),
     `L (ô trống): 0 cast, toast "${await toastText()}"`,
