@@ -36,7 +36,7 @@ const CHAPTERS: readonly Chapter[] = [
   { mapId: "hac_phong", bossId: "mang" }, // chương 2: Mãng hoạn, Xích Mãng
   { mapId: "am_suong", bossId: "hac_giao" }, // chương 3: Đêm triều rút, Hắc Giao
   { mapId: "han_van", bossId: "thien_han_vuong" }, // chương 4: Hàn Vân, Thiên Hàn Vương
-  { mapId: "lang_hoang", bossId: "", chuaCoTruyen: true }, // chương 5 (chờ #1466 / #1465)
+  { mapId: "lang_hoang", bossId: "thien_lang_vuong" }, // chương 5: Đường máu, Thiên Lang Vương (#1465 giai đoạn 2 lát 2)
   { mapId: "uy_van", bossId: "", chuaCoTruyen: true }, // chương 6 (chờ #1466 / #1465)
 ];
 

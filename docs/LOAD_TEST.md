@@ -2444,7 +2444,7 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --bos
 | Bản đồ / Phòng | Loại | Số bot | Patch TB (byte/tick) | Ở trạm (byte/tick) | Vùng quái (byte/tick) | Băng thông (RX KB/s) |
 |---|---|---:|---:|---:|---:|---:|
 | Lạc Hà Trấn (`lac_ha`) | world | 4 | 90 | 116 | 64 | 1,76 |
-| Hắc Phong Cốc (`hac_phong`) | world | 4 | 13 | 9 | 16 | 0.25 |
+| Hắc Phong Cốc (`hac_phong`) | world | 4 | 13 | 9 | 16 | 0,25 |
 | Âm Sương Trạch (`am_suong`) | world | 4 | 7 | 6 | 9 | 0,14 |
 | Hàn Vân Lĩnh (`han_van`) | world | 4 | 6 | 5 | 7 | 0,11 |
 | **Lang Hoang** (`lang_hoang`) | world | 4 | **14** | **13** | **15** | **0,27** |

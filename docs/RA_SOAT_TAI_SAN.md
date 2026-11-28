@@ -24,7 +24,7 @@
 
 ---
 
-<!-- AUTO-RA-SOAT-HEADER:START -->## 2. Bảng thống kê chi tiết tài sản (185 tệp tĩnh; các mô-đun vẽ bằng mã ở mục 2c)<!-- AUTO-RA-SOAT-HEADER:END -->
+<!-- AUTO-RA-SOAT-HEADER:START -->## 2. Bảng thống kê chi tiết tài sản (186 tệp tĩnh; các mô-đun vẽ bằng mã ở mục 2c)<!-- AUTO-RA-SOAT-HEADER:END -->
 
 | STT | Đường dẫn tệp | Loại tài nguyên | Nguồn gốc / Tác giả | Giấy phép | Tình trạng |
 |:---:|---|---|---|:---:|:---:|
@@ -206,13 +206,14 @@
 | 175 | `client/public/assets/items/kinh_tam_kiem_vo_hinh.png` | Icon kinh quyển `kinh_tam_kiem_vo_hinh` | Do nhóm Tiên Giới sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 176 | `client/public/assets/items/kinh_thai_son_ap_dinh.png` | Icon kinh quyển `kinh_thai_son_ap_dinh` | Do nhóm Tiên Giới sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 | 177 | `client/public/assets/items/kinh_xich_luyen_doan_hon.png` | Icon kinh quyển `kinh_xich_luyen_doan_hon` | Do nhóm Tiên Giới sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
+| 178 | `client/public/assets/items/manh_ao_liet_duong.png` | Icon vật phẩm `manh_ao_liet_duong` | Do nhóm Tiên Giới sinh bằng `client/scripts/gen-assets.mjs` | **CC0 1.0** | ✓ Hợp lệ |
 <!-- AUTO-RA-SOAT-ITEM-ROWS:END -->
 
 > Hàng 2-3 (atlas) chứa toàn bộ khung nhân vật, quái, NPC, vật phẩm (xem 2b). Hàng 4-19 và các hàng từ 28 trở đi chứa biểu tượng vật phẩm và kinh quyển trong thế giới: 69 khớp 69 mặt hàng trong `ITEMS` của `shared/` (gồm 3 đan hộ đạo hàng 87-89, #763, vẽ SAU dữ liệu của Dev D, và 9 phù hàng 90-98, #817, vẽ SAU dữ liệu của Dev G) (mọi vật phẩm đều có icon riêng, không món nào dùng ảnh thay thế) + 12 icon Hàn Vân Lĩnh (hàng 69-80, M7.5 #506) + 6 icon kinh quyển đợt 2 (hàng 81-86, #654, A) vẽ TRƯỚC vật phẩm trong `shared/` + 6 icon kinh quyển Kim / Thổ (hàng 99-104, CT6 lát 1 #1051, A) + 6 icon chiêu dạng mới (hàng 105-110, CT9 lát 1 #1054, A) + 7 icon kinh quyển hệ Mộc/Thủy (hàng 111-117, CT7 #1052, E) + 6 icon kinh quyển Hỏa / Băng / Âm / Lôi / Phong (hàng 118-123, CT8 lát 1, A) và 5 icon kinh quyển Nguyên Anh (hàng 124-128, CT8 lát 2, A) và 5 icon kinh quyển vô sắc (hàng 129-133, CT8 lát 3, A) và 4 icon kinh quyển Kim / Thổ (hàng 134-137, CT17 lát 1, G) và 2 icon kinh quyển Mộc (hàng 138-139, CT17 lát 2, G) và 2 icon kinh quyển Lôi (hàng 140-141, CT15 đợt 2, #1185, D; B vẽ SAU dữ liệu) vẽ TRƯỚC dữ liệu (id chưa có trong `ITEMS` thì vô hại; A / Dev D / Dev E thêm dữ liệu sau).
 >
 > **Ấn kinh quyển (#1303, B):** quyển KHÔNG có dấu vẽ tay trong bảng `BOOKS` (`gen-assets.mjs`) tự có "ấn" 7 x 7 đối xứng sinh tất định từ id (`client/scripts/book-marks.mjs`; luật chống chữ Hán: không nét liền dài từ 4 điểm trở lên), nên quyển mới của G / D / E không phải vẽ tay. `client/scripts/book-marks.test.ts` giữ bất biến cho mọi quyển học được: không hai icon giống hệt, không cùng (bìa, viền, dấu), và hai quyển bìa + viền gần nhau phải khác nhau từ 10 điểm ảnh ở vùng dấu (trùng thì thêm `salt` ở phần tử thứ tư của mục `BOOKS`). Số khung atlas không đổi (mỗi quyển đã có khung).
 
-<!-- AUTO-RA-SOAT-ATLAS-HEADER:START -->### 2b. Khung atlas (tệp 2-3) sau NPC `tran_uy` (D7 #755, E): 622 khung, toàn bộ sinh bằng `gen-assets.mjs`<!-- AUTO-RA-SOAT-ATLAS-HEADER:END -->
+<!-- AUTO-RA-SOAT-ATLAS-HEADER:START -->### 2b. Khung atlas (tệp 2-3) sau NPC `tran_uy` (D7 #755, E): 625 khung, toàn bộ sinh bằng `gen-assets.mjs`<!-- AUTO-RA-SOAT-ATLAS-HEADER:END -->
 
 | Nhóm khung | Số khung | Nội dung |
 |---|:---:|---|
@@ -220,7 +221,7 @@
 | `robe-*` | 123 | Ba bộ pháp bào `tho_nhung_bao`, `hac_ho_bao`, `xich_lan_bao` (3 x 41 khung như trên) |
 | `mon-*` | 140 | **9 yêu thú x 10 khung** (đứng, đi 0-1, đánh `atk-0..1`, bị đánh `hurt`, gục `die-0..3`): `tho`, `lang`, `ho`, `mang` và **M6 #407** `suong_ho`, `thach_quy`, `doc_thiem`, `hac_giao`, `yeu_vuong` và **M7.5b #506** (B, vẽ TRƯỚC khi loài vào `shared/`) `han_lang` (sói băng), `phong_nha` (chim nanh thép), `cot_tuong` (voi xương), `doc_tuoc` (sẻ độc), `thien_han_vuong` (trùm sư tử băng): **14 loài x 10 khung** (không còn "9 yêu thú x 10") |
 | `npc-*` | 15 | `truong_tran`, `duoc_su`, `tho_ren`, `cao_thi`, `lai_buon`, `thu_mon` và **M6** `tram_truong`, `lai_buon_suong`, `tho_ren_suong` và **#763** `lao_dan` (Mộc Diên, lão đan sư ôm lò đan) và **#817** `lao_phu` (Tô Linh Ấn, lão phù sư giơ dải phù) và **D7 #755** `tran_uy` (trạm úy Hắc Phong, cầm thương) |
-<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->| `item-*` | 166 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:END -->
+<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:START -->| `item-*` | 167 | Biểu tượng vật phẩm trong thế giới (rơi trên đất), một khung cho mỗi icon ở bảng trên |<!-- AUTO-RA-SOAT-ATLAS-ITEM-ROW:END -->
 | `swordbeam`, `dot` | 1 + 1 | Kiếm khí, chấm nhỏ dùng chung |
 
 Tư thế đánh / bị đánh / gục của yêu thú và nhân vật suy từ khung đi / đứng bằng biến đổi + đổi màu NGAY trong script (không có ảnh ngoài).
@@ -296,7 +297,7 @@ Danh sách HIỆN HÀNH, lấy từ dữ liệu của `shared/` (bản M4 ghi id
 
 | Hạng mục | Kết quả |
 |---|---|
-<!-- AUTO-RA-SOAT-SUMMARY-ROW:START -->| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **185 tệp** (3 trong `assets/` + 6 ảnh AI `assets/ai/` (`login_bg.webp` + 5 thẻ bản đồ) + 166 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |<!-- AUTO-RA-SOAT-SUMMARY-ROW:END -->
+<!-- AUTO-RA-SOAT-SUMMARY-ROW:START -->| Tệp tĩnh quét (`client/public/assets`, `icons`, `fonts`) | **186 tệp** (3 trong `assets/` + 6 ảnh AI `assets/ai/` (`login_bg.webp` + 5 thẻ bản đồ) + 167 icon + 5 icon PWA + 5 phông), **0 tệp thiếu nguồn / tác giả / giấy phép** |<!-- AUTO-RA-SOAT-SUMMARY-ROW:END -->
 | Tài sản bên thứ ba có SHA-256 khớp `CREDITS.md` mục 6 | 5 / 5 (4 tệp `woff2` + `OFL.txt`) |
 | Giấy phép | CC0 1.0 (Tiên Giới tự tạo) cho 39 tệp; SIL OFL 1.1 cho 5 tệp phông (Noto Serif); không có CC-BY mới |
 | Mô-đun đồ hoạ / âm thanh vẽ bằng mã | 7 dòng (mô-đun hoặc nhóm mô-đun) ở 2c, không có tài sản ngoài |

@@ -816,6 +816,7 @@ export const QUESTS: QuestDef[] = [
       ],
     },
     minRealm: { realm: 4, tier: 1 },
+    next: "lang_hoang_vong_quan", // chương 5 (#1465 giai đoạn 2 lát 2): chuỗi chính nối tiếp lên Lang Hoang
     talk: {
       offer: [
         "Thiên Hàn Vương ngự nơi cao nhất, hàn khí đặc tới mức thở cũng thành sương. Hạ nó phải đội ba bốn người đồng tâm, ai cũng mang đủ đan.",
@@ -827,6 +828,91 @@ export const QUESTS: QuestDef[] = [
       complete: [
         "Thiên Hàn Vương đã ngã. Cả Hàn Vân Trạm sẽ nhớ tên đội ngươi.",
         "Băng nguyên này còn nhiều thứ chưa ai tới. Nhưng đó là chuyện của ngày khác.",
+      ],
+    },
+  },
+
+  // ---------- Chuỗi chính chương 5: Lang Hoang (#1465 giai đoạn 2 lát 2; `docs/KICH_BAN_CHUONG_5_6.md` mục 3.2) ----------
+  // Ba nhiệm vụ chính nối sau `thien_han_hoan`. Nhịp truyện: dã sử Lang tộc (lang con bị bắt, lang mẹ lần theo máu, đường máu dẫn về Liệt Dương Tông, KHÔNG phải Uy Vân Kinh).
+  // Thưởng tu vi MỘT lần theo sàn 5 % thanh bậc nhận (`kim-dan-world.test.ts`); chuỗi chương 6 nối sau (`uy_van_*`) sẽ dùng chung trần 10 % tổng thanh Hóa Thần.
+  {
+    id: "lang_hoang_vong_quan",
+    title: "Vọng Lang Quan",
+    giver: "tram_truong_han",
+    desc: "Đạt Hóa Thần sơ kỳ rồi quay lại gặp Thôi Tuyết Phong: ông tiễn ngươi lên Lang Hoang, nơi ải Tuyết Đao đang thiếu người.",
+    steps: [{ kind: "reachRealm", realm: 5, tier: 0 }],
+    rewards: { exp: 70000, items: [{ itemId: "thuong_hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 4, tier: 2 },
+    next: "lang_hoang_lang_con",
+    talk: {
+      offer: [
+        "Từ Vọng Lang Quan đi lên là đất Lang Hoang. Ải Tuyết Đao thiếu người từ khi lang con trong núi mất tích. Qua đó, đừng lấy kiếm làm lẽ phải.",
+        "Phải là Hóa Thần mới đứng vững được ở đó. Ngươi đạt Hóa Thần sơ kỳ rồi quay lại, ta tiễn ngươi lên bắc.",
+      ],
+      progress: ["Chưa tới Hóa Thần sơ kỳ. Gió bắc thảo nguyên không nể Nguyên Anh đâu."],
+      complete: [
+        "Hóa Thần rồi. Đi qua cổng bắc, tìm Quan úy Ngô Cự ở Tuyết Đao Quan. Ải ấy đang thiếu người.",
+        "Nhớ lời ta: qua đó, đừng lấy kiếm làm lẽ phải.",
+      ],
+    },
+  },
+  {
+    id: "lang_hoang_lang_con",
+    title: "Đàn lang con",
+    giver: "quan_uy_tuyet_dao",
+    desc: "Gặp Đoan Mộc Thu, hạ 30 Dã Lang, nghe Lạc Thanh Sơn rồi gánh 10 Da Lang Hoang về cho Quan úy Ngô Cự.",
+    steps: [
+      { kind: "talk", npcId: "doan_moc_thu" },
+      { kind: "kill", monster: "da_lang", count: 30 },
+      { kind: "talk", npcId: "lac_thanh_son" },
+      { kind: "collect", itemId: "bi_lang_hoang", count: 10 },
+    ],
+    rewards: { exp: 88000, items: [{ itemId: "thuong_hoi_huyet_dan", qty: 3 }] },
+    minRealm: { realm: 5, tier: 0 },
+    next: "lang_hoang_duong_mau",
+    talk: {
+      offer: [
+        "Thú triều chưa nổi, nhưng lang mẹ đã kéo tới chân ải ba đêm. Chúng không đánh. Chúng đứng nhìn về phía nam, rồi đào đất.",
+        "Ngươi sang hỏi Đoan Mộc Thu trên mái quán, rồi xuống bãi hạ ba mươi Dã Lang cho bầy lùi bớt. Xong thì gặp lão tiều phu ngồi nghỉ chân ở trạm.",
+      ],
+      progress: [
+        "Dã Lang đi từng đàn, kéo từng con ra rìa mà đánh. Da gánh về phải đủ mười tấm, thiếu một cũng không tính.",
+      ],
+      complete: [
+        "Mười tấm da, gánh về nguyên vẹn. Lang con mất, lang mẹ mới đứng chân ải: ta hiểu rồi. Cầm lấy đan này.",
+        "Còn đường máu ngoài bãi. Ngươi theo nó mà đi.",
+      ],
+    },
+  },
+  {
+    id: "lang_hoang_duong_mau",
+    title: "Đường máu",
+    giver: "quan_uy_tuyet_dao",
+    desc: "Hạ 20 Huyết Nguyệt Lang theo mùi máu, hạ Thiên Lang Vương (đội 3-4 người) và mang về 1 Mảnh áo Liệt Dương.",
+    steps: [
+      { kind: "kill", monster: "huyet_nguyet_lang", count: 20 },
+      { kind: "kill", monster: "thien_lang_vuong", count: 1 },
+      { kind: "collect", itemId: "manh_ao_liet_duong", count: 1 },
+    ],
+    rewards: {
+      exp: 100000,
+      items: [
+        { itemId: "thuong_hoi_huyet_dan", qty: 3 },
+        { itemId: "thuong_hoi_linh_dan", qty: 3 },
+      ],
+    },
+    minRealm: { realm: 5, tier: 1 },
+    talk: {
+      offer: [
+        "Máu rỏ từ trong núi xuống, dọc đường về phía ải. Đường máu ấy dài, và có kẻ rưới nó cố ý.",
+        "Hạ hai mươi Huyết Nguyệt Lang theo mùi máu, rồi tới Thiên Lang Vương đang chặn đường người đuổi con. Nó không phải thứ một người đối phó nổi: lập đội ba bốn người. Mang về mảnh áo nhặt từ xác.",
+      ],
+      progress: [
+        "Thiên Lang Vương gồng rồi lao, lại đập đất vòng rộng. Chia nhau chịu đòn, đừng để một người đứng mũi. Mảnh áo rơi từ xác nó.",
+      ],
+      complete: [
+        "Mảnh áo này cháy từ trong ra ngoài. Đường máu dẫn về cổng Liệt Dương Tông, chứ không phải Uy Vân Kinh.",
+        "Cổng bắc vẫn mở. Lên Uy Vân Kinh mà hỏi xem ai sợ đường máu này.",
       ],
     },
   },
