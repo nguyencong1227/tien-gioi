@@ -297,12 +297,13 @@ export async function measureFlakyTests(opts: MeasureOptions = {}): Promise<Batc
         tmpFilesToClean.push(file);
 
         const res = await runVitestInstance(pattern, file);
-        const summary = parseVitestJson(file, i, mode, res.durationMs);
+        const runIdx = prevRuns.length + i;
+        const summary = parseVitestJson(file, runIdx, mode, res.durationMs);
         runSummaries.push(summary);
 
         const icon = summary.success ? "✅" : "❌";
         console.log(
-          `[Lượt ${i}/${runs}] ${icon} ${summary.success ? "XANH" : "ĐỎ"} (${summary.totalSuites - summary.failedSuites}/${summary.totalSuites} tệp) | Thời gian: ${(res.durationMs / 1000).toFixed(1)}s`,
+          `[Lượt ${runIdx}/${prevRunsTarget + runs}] ${icon} ${summary.success ? "XANH" : "ĐỎ"} (${summary.totalSuites - summary.failedSuites}/${summary.totalSuites} tệp) | Thời gian: ${(res.durationMs / 1000).toFixed(1)}s`,
         );
 
         if (!summary.success) {
