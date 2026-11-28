@@ -371,18 +371,12 @@ try {
     "document.getElementById('limbo-btn-rebirth').click(); document.getElementById('limbo-btn-rebirth').click(); 1",
   );
   await confirmYes();
-  await evalJs(
-    "document.getElementById('limbo-btn-rebirth').click(); document.getElementById('limbo-btn-rebirth').click(); 1",
+  // Bấm thêm hai lần lúc ĐANG chờ máy chủ và đọc `aria-disabled` trong CÙNG MỘT lệnh: cửa sổ chờ chỉ 3 giây THẬT (`REBIRTH_BUSY_MS`), ở một lõi / khung chậm
+  // vài chục khung hình có thể dài hơn thế nên đọc lại SAU khi chờ khung sẽ thấy nút đã hết khoá (lượt đầu của lô 14 đỏ đúng chỗ này)
+  const ariaBusy = await evalJs(
+    "(() => { const b = document.getElementById('limbo-btn-rebirth'); b.click(); b.click(); return b.getAttribute('aria-disabled'); })()",
   ); // đang chờ máy chủ (aria-disabled): bấm thêm KHÔNG mở hộp, KHÔNG gửi thêm
-  await waitUntilTrue(
-    () =>
-      evalJs(
-        "document.getElementById('limbo-btn-rebirth').getAttribute('aria-disabled') === 'true'",
-      ),
-    10000,
-    50,
-  );
-  await frames(15); // kiểm PHỦ ĐỊNH (không mở hộp, không tin thứ hai): cho đủ khung để hiệu ứng muộn (nếu có) kịp lộ ra
+  await frames(15); // kiểm PHỦ ĐỊNH (không mở hộp, không tin thứ hai): cho đủ khung để hiệu ứng muộn (nếu có) kịp lộ ra; không phụ thuộc cửa sổ 3 giây
   check(
     (await evalJs("window.__ui.isActConfirmOpen()")) === false,
     "đã gửi: bấm thêm không mở hộp nữa",
@@ -391,10 +385,7 @@ try {
     (await J("window.__rebirthChoices")).length === 1,
     "hai lần bấm liền + bấm thêm lúc chờ: chỉ MỘT tin",
   );
-  const aria = await evalJs(
-    "document.getElementById('limbo-btn-rebirth').getAttribute('aria-disabled')",
-  );
-  check(aria === "true", "nút aria-disabled trong lúc chờ");
+  check(ariaBusy === "true", "nút aria-disabled trong lúc chờ");
   // hết cửa sổ chờ máy chủ (`REBIRTH_BUSY_MS` = 3000 ms THẬT): nút hết aria-disabled (thay `sleep(3200)`)
   await waitUntilTrue(
     () =>
