@@ -303,8 +303,8 @@ setInterval(() => {}, 1000);
     const markerFile = path.join(tmpDir, "attempt-marker-hang.txt");
     const pid1File = path.join(tmpDir, "pid1.txt");
 
-    // Lần 1: ghi pid1, giữ tiến trình sống nhưng mở cổng sau tận 3000ms (> timeoutMs 400ms).
-    // Lần 2: mở cổng ngay sau 50ms với URL khác biệt (/attempt-2).
+    // Lần 1: ghi pid1, giữ tiến trình sống nhưng mở cổng sau tận 3000ms (> timeoutMs 1000ms).
+    // Lần 2: mở cổng ngay sau 50ms (< timeoutMs 1000ms, có biên an toàn khi vitest chạy song song / CPU tải nặng).
     writeFileSync(
       fakeScript,
       `
@@ -348,7 +348,7 @@ setInterval(() => {}, 1000);
       userDataDir: path.join(tmpDir, "user-data"),
       executable: process.execPath,
       customArgs: (p) => [fakeScript, String(p)],
-      timeoutMs: 400,
+      timeoutMs: 1000,
       pollIntervalMs: 50,
       log: (m) => logs.push(m),
     });

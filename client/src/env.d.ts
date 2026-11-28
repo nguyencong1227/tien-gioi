@@ -210,6 +210,8 @@ declare module "*sync-asset-docs.mjs" {
     checkOnly?: boolean;
     extraCreditsContent?: string;
     extraRaSoatContent?: string;
+    creditsPath?: string;
+    raSoatPath?: string;
   }): {
     changed: boolean;
     errors: string[];
