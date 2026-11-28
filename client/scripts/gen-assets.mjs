@@ -819,6 +819,33 @@ function drawMonsterFrame(id, step) {
     s.circle(52, 72, 3.4, 0xffffff, 70);
     return s;
   }
+  if (id === "thanh_xa") {
+    // Thanh Xà (trùm CẦM ĐƯỜNG nhỏ ở Lạc Hà, CD5 #1065; 64x64): rắn XANH uốn chữ S, bụng vàng nhạt, KHÔNG sừng. Khác Xích Mãng (đỏ cuộn tháp, có sừng) để người chơi không lẫn
+    // hai trùm cùng họ rắn; màu thân khớp `MONSTERS.thanh_xa.color` (0x3a8c4a) và hạt hiệu ứng `MONSTER_FX_TINT.thanh_xa` (0x4fd06a).
+    const s = new Surface(64, 64);
+    s.ellipse(32, 56, 24, 6, 0x000000, 70);
+    // Thân: các đốt tròn dọc một đường lượn sóng từ đuôi (trái dưới) lên cổ (phải), to dần về phía đầu; vảy xen kẽ hai sắc xanh
+    for (let i = 0; i <= 22; i++) {
+      const t = i / 22;
+      const x = 7 + t * 40;
+      const y = 47 - t * 14 + Math.sin(t * Math.PI * 3) * 7 + shift * 0.4 * Math.sin(t * Math.PI);
+      const r = 3.2 + t * 3.4;
+      s.circle(x, y + 1.2, r, 0x1f5c2e);
+      s.circle(x, y, r - 0.6, i % 2 === 0 ? 0x3a8c4a : 0x4fa35e);
+      if (i % 3 === 1) s.circle(x, y + r * 0.4, 1.1, 0xe8e0a0);
+    }
+    // Đầu hình thoi nhọn + mõm, mắt hổ phách có đồng tử dọc, lưỡi chẻ đỏ
+    s.ellipse(52, 30 + shift, 9, 6.5, 0x3a8c4a);
+    s.ellipse(59, 32 + shift, 5.5, 3.6, 0x57b567);
+    s.tri(46, 26 + shift, 50, 20 + shift, 54, 26 + shift, 0x2f7a3f);
+    s.circle(55, 28 + shift, 2.2, 0xffd24a);
+    s.rect(55, 26.5 + shift, 1, 3, 0x1a1a1a);
+    s.line(62, 33 + shift, 64, 34 + shift, 0xe0455a, 1.2);
+    s.line(62, 33 + shift, 64, 32 + shift, 0xe0455a, 1);
+    // Vảy ngực vàng nhạt dưới cằm
+    s.ellipse(54, 36 + shift, 5, 1.6, 0xe8e0a0);
+    return s;
+  }
   if (id !== "mang") throw new Error(`Chưa có tranh quái: ${id}`);
   // Xích Mãng (Boss 64x64)
   const s = new Surface(64, 64);
@@ -1933,6 +1960,8 @@ function buildAtlas() {
     "cot_tuong",
     "doc_tuoc",
     "thien_han_vuong",
+    // Trùm CẦM ĐƯỜNG nhỏ của Lạc Hà (CD5 #1065): rắn xanh riêng (trước đó tái dùng ảnh Xích Mãng đỏ làm ảnh tạm)
+    "thanh_xa",
   ]) {
     const f0 = drawMonsterFrame(mId, 0);
     const f1 = drawMonsterFrame(mId, 1);
@@ -1941,13 +1970,6 @@ function buildAtlas() {
     push(`mon-${mId}-1`, f1);
     for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
-
-  // Thanh Xà (Lạc Hà trùm CẦM ĐƯỜNG, CD5 #1065): CHƯA có ảnh riêng — tái dùng ảnh Xích Mãng (cùng họ Rắn/mãng, kích thước trùm) làm ảnh tạm.
-  // B / C vẽ ảnh rắn xanh riêng thì thêm block `if (id === "thanh_xa")` trong drawMonsterFrame + XÓA khối tái dùng này.
-  push(`mon-thanh_xa`, drawMonsterFrame("mang", 0));
-  push(`mon-thanh_xa-0`, drawMonsterFrame("mang", 0));
-  push(`mon-thanh_xa-1`, drawMonsterFrame("mang", 1));
-  for (const pose of MONSTER_POSES) push(`mon-thanh_xa-${pose}`, drawMonsterPose("mang", pose));
 
   for (const npcId of [
     "truong_tran",
