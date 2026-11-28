@@ -206,6 +206,9 @@ describe("nội dung nhiệm vụ (#19)", () => {
         "lap_uy_bang_nguyen",
         "ren_trao_bach_kim",
         "luet_gio_han_van",
+        "lh_phi_qua_ai",
+        "lh_hang_lau",
+        "lh_linh_ai_sach_nhieu",
       ]),
     ).toEqual(new Set(QUESTS.filter((q) => !q.daily).map((q) => q.id)));
     expect(ids).not.toContain("mang_hoan");
@@ -255,6 +258,9 @@ describe("nội dung nhiệm vụ (#19)", () => {
       "lac_ha_nanh_kiem",
       "lac_ha_tru_ho",
       "lap_uy_bang_nguyen",
+      "lh_hang_lau",
+      "lh_linh_ai_sach_nhieu",
+      "lh_phi_qua_ai",
       "luet_gio_han_van",
       "mang_hoan",
       "ren_trao_bach_kim",

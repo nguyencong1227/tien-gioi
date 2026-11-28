@@ -247,7 +247,7 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     }
   });
 
-  it("perf-budget.json thật: có HAI trần (khởi động + tổng JS), khởi động nhỏ hơn tổng, tổng giữ 548 KB (#1088: 540; S3a #1206 nâng +8 cho tệp bản đồ Tiled nhận ở client)", () => {
+  it("perf-budget.json thật: có HAI trần (khởi động + tổng JS), khởi động nhỏ hơn tổng, tổng giữ 560 KB (#1088: 540; S3a #1206 nâng +8 cho tệp bản đồ Tiled nhận ở client; 28/11/2026 nâng +12 cho nội dung chương 5-6, #1465 / #1466)", () => {
     const budget = JSON.parse(
       fs.readFileSync(path.join(__dirname, "../perf-budget.json"), "utf-8"),
     ) as { static: Record<string, number> };
@@ -255,7 +255,7 @@ describe("M5.1: check-perf-budget (Kiểm tra ngân sách hiệu năng tĩnh)", 
     expect(typeof budget.static.totalJsGzipKb).toBe("number");
     expect(budget.static.startupGzipKb).toBeLessThan(budget.static.totalJsGzipKb!);
     expect(budget.static.startupGzipKb).toBeLessThanOrEqual(500);
-    expect(budget.static.totalJsGzipKb).toBeLessThanOrEqual(548);
+    expect(budget.static.totalJsGzipKb).toBeLessThanOrEqual(560);
     expect(budget.static.bundleGzipKb).toBeUndefined();
   });
 

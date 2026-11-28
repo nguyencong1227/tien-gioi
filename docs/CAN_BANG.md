@@ -797,13 +797,13 @@ Tính SỐNG từ `shared/` bằng mô hình ở trên. Sáu sói Lang Hoang (`d
 
 ### 2. Nhịp cả cảnh giới Hóa Thần (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
 
-Tổng: **4.3 giờ** solo; mục tiêu ~4,6 giờ theo mô hình khung (`docs/KHUNG_HOA_THAN.md` mục 3), ~4 giờ theo QUYET_DINH_M3 mục 30 (tu vi x2, máu x1,5). Mô hình bỏ qua nhiệm vụ lặp và thời gian đi lại.
+Tổng: **4.2 giờ** solo; mục tiêu ~4,6 giờ theo mô hình khung (`docs/KHUNG_HOA_THAN.md` mục 3), ~4 giờ theo QUYET_DINH_M3 mục 30 (tu vi x2, máu x1,5). Mô hình bỏ qua nhiệm vụ lặp và thời gian đi lại.
 
 | Bậc | Thanh | Nguồn tốt nhất | Phút |
 |---|---:|---|---:|
-| Hóa Thần Sơ kỳ | 1,728,000 | Hắc Phong Lang | 79.2 |
-| Hóa Thần Trung kỳ | 1,987,200 | Hắc Phong Lang | 81.7 |
-| Hóa Thần Hậu kỳ | 2,285,280 | Xích Diễm Lang | 94.9 |
+| Hóa Thần Sơ kỳ | 1,728,000 | Hắc Phong Lang | 77.4 |
+| Hóa Thần Trung kỳ | 1,987,200 | Hắc Phong Lang | 80.1 |
+| Hóa Thần Hậu kỳ | 2,285,280 | Xích Diễm Lang | 93.7 |
 
 ### 3. Kinh tế Hóa Thần: thu nhập so với phí rèn bộ V
 
@@ -811,9 +811,9 @@ Thu nhập theo nhịp mục 2 (săn solo, mỗi bậc nguồn tốt nhất): ti
 
 | Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Hóa Thần Sơ kỳ | Hắc Phong Lang | 79 | 52,353 | 69,084 | 111,059 | 79,800 | +31,259 |
-| Hóa Thần Trung kỳ | Hắc Phong Lang | 82 | 58,355 | 79,457 | 190,516 | 79,800 | +110,716 |
-| Hóa Thần Hậu kỳ | Xích Diễm Lang | 95 | 66,980 | 105,906 | 296,422 | 79,800 | +216,622 |
+| Hóa Thần Sơ kỳ | Hắc Phong Lang | 77 | 52,353 | 67,578 | 109,553 | 79,800 | +29,753 |
+| Hóa Thần Trung kỳ | Hắc Phong Lang | 80 | 58,355 | 77,951 | 187,504 | 79,800 | +107,704 |
+| Hóa Thần Hậu kỳ | Xích Diễm Lang | 94 | 66,980 | 104,629 | 292,133 | 79,800 | +212,333 |
 
 | Nguyên liệu bộ V | Cần | Cày ở | Phút cày solo |
 |---|---:|---|---:|
@@ -822,9 +822,9 @@ Thu nhập theo nhịp mục 2 (săn solo, mỗi bậc nguồn tốt nhất): ti
 | Da Lang Hoang | 18 | Dã Lang | 8.4 |
 | Cốt Lang Vương | 14 | Thương Nguyệt Lang | 15.1 |
 
-Tổng phí rèn bộ V **79,800** Linh thạch = **1.5 giờ** thu nhập Sơ kỳ; cày đủ nguyên liệu mất **53.4 phút** solo (**67%** thời gian Sơ kỳ).
+Tổng phí rèn bộ V **79,800** Linh thạch = **1.5 giờ** thu nhập Sơ kỳ; cày đủ nguyên liệu mất **53.4 phút** solo (**69%** thời gian Sơ kỳ).
 
-**Đọc bảng.** Bộ V trả đủ từ Hóa Thần Sơ kỳ (dư 31,259 cuối bậc). Số khởi đầu: lát B (trùm) và đo lại bằng bot / người chơi thật sẽ chỉnh tiếp.
+**Đọc bảng.** Bộ V trả đủ từ Hóa Thần Sơ kỳ (dư 29,753 cuối bậc). Số khởi đầu: lát B (trùm) và đo lại bằng bot / người chơi thật sẽ chỉnh tiếp.
 
 ## Tinh anh (M7.3, `systems/elite.ts`)
 
