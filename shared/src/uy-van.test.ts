@@ -67,7 +67,7 @@ describe("Uy Vân Kinh: đăng ký bản đồ thứ sáu (mục 75 / A2 lát 2)
     expect(uv.portals.map((p) => p.id)).toEqual(["uy_van_nam"]);
   });
 
-  it("quái tự nhiên CHỈ là sáu loài Hóa Thần (D1 #1466 lát A3 chương 6): `monsterCap` tổng 62, không rơi về MONSTER_CAP mặc định của Lạc Hà; chưa có trùm", () => {
+  it("quái tự nhiên CHỈ là sáu loài Hóa Thần (D1 #1466 lát A3 chương 6) + hai trùm (lát E): `monsterCap` tổng 64, không rơi về MONSTER_CAP mặc định của Lạc Hà", () => {
     const QUAI: Record<string, number> = {
       luyen_huyet_de_tu: 16,
       nga_quy: 12,
@@ -75,10 +75,12 @@ describe("Uy Vân Kinh: đăng ký bản đồ thứ sáu (mục 75 / A2 lát 2)
       huyet_mi: 10,
       huyet_anh: 8,
       huyet_sat_chan_truyen: 6,
+      huyet_hai_lao_ma: 1,
+      huyet_ma_ho_phap: 1,
     };
     expect(uv.def.monsterCap).toEqual(QUAI);
     expect(uv.monsterCap).toEqual(QUAI);
-    expect(Object.values(QUAI).reduce((a, b) => a + b, 0)).toBe(62);
+    expect(Object.values(QUAI).reduce((a, b) => a + b, 0)).toBe(64);
     for (const id of Object.keys(MONSTER_CAP)) expect(uv.monsterCapOf(id), id).toBe(QUAI[id] ?? 0);
   });
 

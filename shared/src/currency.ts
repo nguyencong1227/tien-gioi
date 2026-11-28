@@ -203,6 +203,9 @@ export const COIN_DROPS: Record<string, CoinDrop> = {
   cuong_thi: { chance: 0.8, min: 550, max: 900 },
   huyet_mi: { chance: 0.9, min: 560, max: 910 },
   huyet_sat_chan_truyen: { chance: 0.9, min: 850, max: 1300 },
+  // Trùm Uy Vân Kinh (D1 lát E chương 6): chia cho đội; giữ thứ tự theo `exp` (Hải Lão Ma 103.680 < Hộ Pháp 230.400), như hai trùm Lang Hoang
+  huyet_hai_lao_ma: { chance: 1, min: 1100, max: 1800 },
+  huyet_ma_ho_phap: { chance: 1, min: 2500, max: 4000 },
 };
 
 /** Tung rơi tiền. rng trả về số trong [0, 1) (truyền vào để test được). Quái không có bảng thì 0. */

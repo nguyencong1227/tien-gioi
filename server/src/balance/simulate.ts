@@ -65,6 +65,9 @@ export const ASSUME = {
     huyet_mi: 12,
     huyet_anh: 14,
     huyet_sat_chan_truyen: 14,
+    // Trùm Uy Vân Kinh (D1 lát E chương 6): như hai trùm Lang Hoang
+    huyet_hai_lao_ma: 90,
+    huyet_ma_ho_phap: 90,
     // Trùm Lang Hoang (D1 lát B): như Thiên Hàn Vương (trùm chỉ vài con cả bản đồ, đi tìm lâu)
     lang_vuong: 90,
     thien_lang_vuong: 90,

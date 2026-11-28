@@ -43,7 +43,7 @@ const BOSS_SITES: Array<{ map: GameMap; def: MonsterKind }> = [...MAPS, ...DUNGE
 );
 
 describe("chỗ sinh trùm trên bản đồ thật", () => {
-  it("có trùm ở các bản đồ thường đã có trùm (không bỏ sót bản đồ nào khi dữ liệu đổi): Lang Hoang có hai trùm (D1 #1466 lát B)", () => {
+  it("có trùm ở các bản đồ thường đã có trùm (không bỏ sót bản đồ nào khi dữ liệu đổi): Lang Hoang có hai trùm (D1 #1466 lát B), Uy Vân Kinh có hai trùm (lát E chương 6)", () => {
     expect(BOSS_SITES.map((s) => `${s.map.def.id}:${s.def.id}`).sort()).toEqual(
       [
         "am_suong:hac_giao",
@@ -52,6 +52,8 @@ describe("chỗ sinh trùm trên bản đồ thật", () => {
         "lac_ha:mang",
         "lang_hoang:lang_vuong",
         "lang_hoang:thien_lang_vuong",
+        "uy_van:huyet_hai_lao_ma",
+        "uy_van:huyet_ma_ho_phap",
       ].sort(),
     );
   });

@@ -2329,6 +2329,9 @@ function buildAtlas() {
     ["huyet_mi", "doc_tuoc"],
     ["huyet_anh", "phong_nha"],
     ["huyet_sat_chan_truyen", "doc_thiem"],
+    // Hai TRÙM Uy Vân Kinh (D1 lát E chương 6): Hộ Pháp (trùm chương, cỡ 88x80) mượn Thiên Hàn Vương, Hải Lão Ma (trùm nhỏ) mượn Hắc Giao (80x72, tối màu)
+    ["huyet_ma_ho_phap", "thien_han_vuong"],
+    ["huyet_hai_lao_ma", "hac_giao"],
   ])
     for (const suffix of monAliasSuffixes)
       pushAlias(`mon-${mId}${suffix}`, `mon-${target}${suffix}`);

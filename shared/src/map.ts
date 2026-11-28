@@ -738,7 +738,7 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
       },
     ],
     // Sáu loài quái Hóa Thần (D1 #1466 lát A3 chương 6; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 4 / 6): tổng 62, vùng sinh tăng dần theo `minDanger` (0,15 / 0,30 / 0,45 / 0,60 / 0,70 / 0,82, tăng cùng `exp`).
-    // CHƯA có trùm (Huyết Ma Hộ Pháp, Huyết Hải Lão Ma: lát sau, cộng 2 con thành 64), chưa có NPC giao việc. CHƯA có cổng bắc (đường bắc ở ô 76-77 hàng 2-4 sẵn cho bản đồ sau).
+    // Hai trùm (Huyết Hải Lão Ma `minDanger` 0,78, Huyết Ma Hộ Pháp 0,90; D1 lát E chương 6) cộng thành 64; chưa có NPC giao việc. CHƯA có cổng bắc (đường bắc ở ô 76-77 hàng 2-4 sẵn cho bản đồ sau).
     // Phải khớp thuộc tính `monsterCap` trong `shared/maps/uy_van.json` (test "sổ đăng ký khớp tệp").
     monsterCap: {
       luyen_huyet_de_tu: 16,
@@ -747,6 +747,8 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
       huyet_mi: 10,
       huyet_anh: 8,
       huyet_sat_chan_truyen: 6,
+      huyet_hai_lao_ma: 1,
+      huyet_ma_ho_phap: 1,
     },
   },
 ];

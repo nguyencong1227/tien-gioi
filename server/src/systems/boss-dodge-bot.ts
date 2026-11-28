@@ -268,6 +268,8 @@ function runDodgeBotInner(
   while (w.now < t0 + simMs) {
     w.now += TICK_MS;
     tickMonsters(w, TICK_MS / 1000);
+    // Giai đoạn CAO NHẤT trùm từng đạt: trùm đứng yên (tốc độ 0) mà máy chủ vẫn coi là 'kẹt không tới được người' có thể RÚT + reset (hồi đầy, giai đoạn 0) giữa chừng ở vài seed (vd Huyết Ma Hộ Pháp seed 4, D1 #1466 lát E); đó là cái bẫy của bộ đo, không phải của dữ liệu chiêu, nên chỉ đòi trùm ĐÃ vào giai đoạn cần kiểm
+    out.phase = Math.max(out.phase, mon.mc.boss!.phase);
     for (const q of w.mctrl.values()) {
       q.nextAttack = Number.MAX_SAFE_INTEGER; // kể cả quái con trùm gọi ra: không đánh thường
     }
@@ -383,7 +385,7 @@ function runDodgeBotInner(
         tally(t.shape, false);
       }
   }
-  out.phase = mon.mc.boss!.phase;
+  out.phase = Math.max(out.phase, mon.mc.boss!.phase);
   return out;
 }
 

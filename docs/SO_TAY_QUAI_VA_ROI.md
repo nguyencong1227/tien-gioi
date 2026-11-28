@@ -2,7 +2,7 @@
 
 > File này **SINH TỰ ĐỘNG** từ `server/src/balance/so-tay-quai.ts`, đọc dữ liệu thật ở `shared/` (`MONSTERS`, `DROP_TABLES`, `COIN_DROPS`, `ITEMS`, `MONSTER_REALM`, bản đồ).
 > Sau khi sửa số liệu quái / rơi đồ / bản đồ, chạy `npm run so-tay-quai -w server` để cập nhật; test `server/src/balance/so-tay-quai-sync.test.ts` bắt tài liệu lệch bản sinh.
-> Trạng thái: **31 quái**, **181 dòng rơi đồ**.
+> Trạng thái: **33 quái**, **185 dòng rơi đồ**.
 
 ---
 
@@ -41,7 +41,9 @@
 | **Huyết Sát Chân Truyền** | `huyet_sat_chan_truyen` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 850-1300 | Uy Vân Kinh |
 | **Ngân Nguyệt Lang** | `ngan_nguyet_lang` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 640-980 | Lang Hoang |
 | **Xích Diễm Lang** | `xich_diem_lang` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 410-680 | Lang Hoang |
+| **Huyết Hải Lão Ma** | `huyet_hai_lao_ma` | Trùm | Hóa Thần | 22 | 99500 | 190 | 103680 | 100% × 1100-1800 | Uy Vân Kinh |
 | **Lang Vương** | `lang_vuong` | Trùm | Hóa Thần | 22 | 99500 | 190 | 103680 | 100% × 1100-1800 | Lang Hoang |
+| **Huyết Ma Hộ Pháp** | `huyet_ma_ho_phap` | Trùm | Hóa Thần | 24 | 221030 | 422 | 230400 | 100% × 2500-4000 | Uy Vân Kinh |
 | **Thiên Lang Vương** | `thien_lang_vuong` | Trùm | Hóa Thần | 24 | 221030 | 422 | 230400 | 100% × 2500-4000 | Lang Hoang |
 
 ## Mục 2 — Vật phẩm rơi từ quái nào
@@ -73,8 +75,8 @@
 | **Cốt Lang Vương** | `cot_lang_vuong` | Nguyên liệu | Tiên phẩm | Thương Nguyệt Lang 50%, Ngân Nguyệt Lang 30%, Lang Vương 80%, Thiên Lang Vương 100% |
 | **Hồn Tinh Thiên Lang** | `hon_tinh_thien_lang` | Nguyên liệu | Thần phẩm | Thương Nguyệt Lang 10%, Lang Vương 30%, Thiên Lang Vương 100% |
 | **Mảnh áo Liệt Dương** | `manh_ao_liet_duong` | Nguyên liệu | Tiên phẩm | Thiên Lang Vương 100% |
-| **Thượng Hồi Huyết Đan** | `thuong_hoi_huyet_dan` | Đan dược | Tiên phẩm | Hàn Lang 3%, Cốt Tượng 4%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 6%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 7%, Xích Diễm Lang 8%, Thương Nguyệt Lang 10%, Ngân Nguyệt Lang 10%, Lang Vương 60%, Thiên Lang Vương 100%, Luyện Huyết Đệ Tử 6%, Ngạ Quỷ 6%, Cương Thi 8%, Huyết Mị 8%, Huyết Ảnh 7%, Huyết Sát Chân Truyền 10% |
-| **Thượng Hồi Linh Đan** | `thuong_hoi_linh_dan` | Đan dược | Tiên phẩm | Phong Nha 3%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 5%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 5%, Xích Diễm Lang 6%, Thương Nguyệt Lang 8%, Ngân Nguyệt Lang 8%, Lang Vương 50%, Thiên Lang Vương 100%, Luyện Huyết Đệ Tử 6%, Ngạ Quỷ 5%, Cương Thi 6%, Huyết Mị 6%, Huyết Ảnh 6%, Huyết Sát Chân Truyền 8% |
+| **Thượng Hồi Huyết Đan** | `thuong_hoi_huyet_dan` | Đan dược | Tiên phẩm | Hàn Lang 3%, Cốt Tượng 4%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 6%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 7%, Xích Diễm Lang 8%, Thương Nguyệt Lang 10%, Ngân Nguyệt Lang 10%, Lang Vương 60%, Thiên Lang Vương 100%, Luyện Huyết Đệ Tử 6%, Ngạ Quỷ 6%, Cương Thi 8%, Huyết Mị 8%, Huyết Ảnh 7%, Huyết Sát Chân Truyền 10%, Huyết Hải Lão Ma 60%, Huyết Ma Hộ Pháp 100% |
+| **Thượng Hồi Linh Đan** | `thuong_hoi_linh_dan` | Đan dược | Tiên phẩm | Phong Nha 3%, Độc Tước 5%, Thiên Hàn Vương 100%, Dã Lang 5%, Hắc Phong Lang 6%, Huyết Nguyệt Lang 5%, Xích Diễm Lang 6%, Thương Nguyệt Lang 8%, Ngân Nguyệt Lang 8%, Lang Vương 50%, Thiên Lang Vương 100%, Luyện Huyết Đệ Tử 6%, Ngạ Quỷ 5%, Cương Thi 6%, Huyết Mị 6%, Huyết Ảnh 6%, Huyết Sát Chân Truyền 8%, Huyết Hải Lão Ma 50%, Huyết Ma Hộ Pháp 100% |
 | **Hỏa Vân Kiếm Pháp** | `kinh_hoa_van_kiem` | Kinh quyển | Linh phẩm | Hắc Hổ 1,2% |
 | **Bôn Thạch Quyền** | `kinh_bon_thach_quyen` | Kinh quyển | Linh phẩm | Hắc Hổ 1,2% |
 | **Thanh Tùng Châm Quyết** | `kinh_thanh_tung_phi_cham` | Kinh quyển | Bảo phẩm | Xích Mãng 25%, Độc Thiềm 2%, Phong Nha 2% |

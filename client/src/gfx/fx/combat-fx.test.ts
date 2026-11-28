@@ -253,9 +253,11 @@ describe("gfx/fx: trùm và quái Kim Đan (M6 #409)", () => {
   const BOSSES = MONSTERS.filter((m) => m.boss).map((m) => m.id);
   const OLD_KINDS = ["tho", "lang", "ho"];
 
-  it("có đủ trùm trong game để kiểm (mang, thanh_xa, hac_giao, yeu_vuong, thien_han_vuong, lang_vuong, thien_lang_vuong)", () => {
+  it("có đủ trùm trong game để kiểm (mang, thanh_xa, hac_giao, yeu_vuong, thien_han_vuong, lang_vuong, thien_lang_vuong, huyet_hai_lao_ma, huyet_ma_ho_phap)", () => {
     expect(BOSSES.sort()).toEqual([
       "hac_giao",
+      "huyet_hai_lao_ma",
+      "huyet_ma_ho_phap",
       "lang_vuong",
       "mang",
       "thanh_xa",

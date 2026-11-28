@@ -33,7 +33,7 @@
   },
   {
    "name": "monsterCap",
-   "value": "{\"luyen_huyet_de_tu\":16,\"nga_quy\":12,\"cuong_thi\":10,\"huyet_mi\":10,\"huyet_anh\":8,\"huyet_sat_chan_truyen\":6}"
+   "value": "{\"luyen_huyet_de_tu\":16,\"nga_quy\":12,\"cuong_thi\":10,\"huyet_mi\":10,\"huyet_anh\":8,\"huyet_sat_chan_truyen\":6,\"huyet_hai_lao_ma\":1,\"huyet_ma_ho_phap\":1}"
   },
   {
    "name": "handEdited",
