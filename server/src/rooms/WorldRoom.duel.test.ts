@@ -61,6 +61,19 @@ async function waitFor<T>(
     await sleep(20);
   }
 }
+async function until<T>(
+  fn: () => Promise<T | undefined | false>,
+  ms = 4000,
+  what = "điều kiện",
+): Promise<T> {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ ${what}`);
+    await sleep(20);
+  }
+}
 let seq = 0;
 const secretOf = (name: string) => `secret-${name}-0123456789abcdef`;
 const serverRoom = (room: Room) => matchMaker.getLocalRoomById(room.roomId) as WorldRoom;
@@ -154,6 +167,7 @@ describe("thách đấu qua phòng thật", () => {
     // đang đếm ngược: đánh không trúng
     const hpB = serverState(b.room).players.get(sidOf(b))!.hp;
     a.room.send("attack", { angle: Math.atan2(0, 1) });
+    // Chờ âm: trong lúc đếm ngược, khẳng định đòn đánh không gây sát thương lên đối thủ
     await sleep(200);
     expect(serverState(b.room).players.get(sidOf(b))!.hp).toBe(hpB);
 
@@ -164,6 +178,7 @@ describe("thách đấu qua phòng thật", () => {
     sb.hp = 1; // gần KO: một đòn là xong
     for (let i = 0; i < 10 && a.ends.length === 0; i++) {
       a.room.send("attack", { angle: 0 }); // B đứng bên phải A
+      // Chờ đồng hồ: cooldown đòn đánh (~400 ms) giữa các lượt tấn công dứt điểm
       await sleep(450);
     }
     const ea = await waitFor(() => a.ends[0], 3000, "duelEnd của A");
@@ -178,13 +193,18 @@ describe("thách đấu qua phòng thật", () => {
       } | null>;
     };
     const key = (n: string) => n.normalize("NFC").toLowerCase();
-    let sa = await souls.get(key(a.name));
-    let sbSoul = await souls.get(key(b.name));
-    for (let i = 0; i < 40 && !(sa?.social?.pk.won === 1 && sbSoul?.social?.pk.lost === 1); i++) {
-      await sleep(100);
-      sa = await souls.get(key(a.name));
-      sbSoul = await souls.get(key(b.name));
-    }
+    // Chờ dương: chờ chân linh ghi nhận thống kê PK (pk.won và pk.lost) ngoài tick
+    const { sa, sbSoul } = await until(
+      async () => {
+        const aSoul = await souls.get(key(a.name));
+        const bSoul = await souls.get(key(b.name));
+        return aSoul?.social?.pk.won === 1 && bSoul?.social?.pk.lost === 1
+          ? { sa: aSoul, sbSoul: bSoul }
+          : undefined;
+      },
+      4000,
+      "chân linh ghi nhận thống kê pk.won và pk.lost",
+    );
     expect(sa?.social?.pk).toEqual({ won: 1, lost: 0 });
     expect(sa?.social?.counters).toMatchObject({ pk_won: 1 });
     expect(sbSoul?.social?.pk).toEqual({ won: 0, lost: 1 });
@@ -203,9 +223,12 @@ describe("thách đấu qua phòng thật", () => {
       "cờ duel tắt",
     );
     // không mất kiếp: hồ sơ lưu không có `limbo`, vẫn ở Lạc Hà (lưu khi rời phòng)
+    const bSid = sidOf(b);
+    const bServer = serverRoom(b.room);
     await b.room.leave(true);
     rooms.splice(rooms.indexOf(b.room), 1);
-    await sleep(300);
+    // Chờ dương: B hoàn tất rời phòng và lưu hồ sơ trước khi đọc file save
+    await waitFor(() => !bServer.state.players.has(bSid), 3000, "B hoàn tất rời phòng");
     const save = saveOf(b.name);
     expect(save.limbo).toBeUndefined();
     expect(save.mapId ?? DEFAULT_MAP_ID).toBe(DEFAULT_MAP_ID);
@@ -265,6 +288,7 @@ describe("thách đấu qua phòng thật", () => {
     // một con hổ ngay cạnh A
     const { addMonster } = await import("../systems/test-helpers");
     const mon = addMonster(w, "ho", sa.x + 10, sa.y);
+    // Chờ âm: khẳng định quái đứng sát cạnh không nhắm vào người đang đấu và không gây sát thương
     await sleep(1500);
     expect(sa.hp).toBe(5);
     expect(sa.dead).toBe(false);
@@ -289,6 +313,7 @@ describe("thách đấu qua phòng thật", () => {
       a.room.send(DUEL_MSG.challenge, bad as never);
     for (const bad of [undefined, null, {}, { from: 1 }, { from: "Nguoi La" }])
       b.room.send(DUEL_MSG.accept, bad as never);
+    // Chờ âm: khẳng định tin rác bị máy chủ bỏ qua, không gửi lời mời và không tạo trận
     await sleep(500);
     expect(b.invited).toHaveLength(0);
     expect(worldOf(a.room).duels.size).toBe(0);
