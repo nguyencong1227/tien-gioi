@@ -144,7 +144,7 @@ try {
     return last;
   };
   const isReady = (x) => x.cls === "sk slot k-ready";
-  /** Chờ ô `n` sẵn sàng (hồi chiêu giả 3 giây, choáng 2,5 giây: chờ theo điều kiện, trần 20 s) */
+  /** Chờ ô `n` sẵn sàng (hồi chiêu giả 3 giây, choáng 1 giây của script: chờ theo điều kiện, trần 20 s) */
   const waitReady = async (n) => isReady(await waitSlot(n, isReady));
 
   /** Mở trang mock (`query` = phần sau `?`), chờ cảnh có người chơi và đã nhận `skills` (mock gửi sau ~400 ms), đếm tin `cast`. */
@@ -215,7 +215,7 @@ try {
   };
   /**
    * Dừng đồng hồ `performance.now()` của TRANG (hồi chiêu giả, choáng đều tính theo đồng hồ đó): kiểm "đang hồi chiêu / đang choáng" đúng nghĩa bất kể tốc độ máy, không phụ thuộc 3 giây
-   * hồi chiêu hay 2,5 giây choáng chạy mất trong lúc các lệnh CDP chờ khung hình. Đồng hồ ảo = đồng hồ thật trừ thời gian đã dừng nên mở lại thì TIẾP TỤC từ chỗ dừng (không nhảy tới).
+   * hồi chiêu hay 1 giây choáng chạy mất trong lúc các lệnh CDP chờ khung hình. Đồng hồ ảo = đồng hồ thật trừ thời gian đã dừng nên mở lại thì TIẾP TỤC từ chỗ dừng (không nhảy tới).
    */
   const freezeClock = () =>
     evalJs(`(() => {
@@ -408,7 +408,7 @@ try {
   console.log("--- choáng: cả thanh xám, KHÔNG gửi ---");
   await open("skills=mock&n=4");
   await waitReady(2); // ô 2 hết hồi chiêu (chờ theo điều kiện, không `sleep(3300)`)
-  // Choáng tối đa 1 GIÂY (`maxMs` của trạng thái `stun` ở shared kẹp mọi giá trị lớn hơn): ở khung chậm 1 giây đã hết trước khi kịp bấm U. Dừng đồng hồ trang cho các kiểm "đang choáng" (choáng tính
+  // Choáng tối đa 1,2 giây (`STUN_MAX_MS` = 1200 ở shared kẹp mọi giá trị lớn hơn; script dùng 1000 ms, nằm DƯỚI trần nên không bị kẹp): ở khung chậm khoảng đó đã hết trước khi kịp bấm U. Dừng đồng hồ trang cho các kiểm "đang choáng" (choáng tính
   // theo đồng hồ đó); thanh chiêu cập nhật định kỳ theo đồng hồ nên đứng yên thì không tự vẽ lại: phát lại sổ chiêu (`__mockSkills.emit`, `onSkills` đặt `nextSkillBarAt = 0`) để vẽ ngay.
   await freezeClock();
   await evalJs(
@@ -428,7 +428,7 @@ try {
   await press(3);
   check((await casts()).length === 0, "U khi choáng: 0 tin cast");
   await shot("n4-choang");
-  await thawClock(); // đồng hồ chạy tiếp: 1 giây choáng còn lại hết THẬT, chờ theo lớp k-ready (không `sleep`)
+  await thawClock(); // đồng hồ chạy tiếp: phần choáng còn lại (1000 ms của script, dưới trần 1200 ms) hết THẬT, chờ theo lớp k-ready (không `sleep`)
   check(await waitReady(3), "hết choáng: sẵn sàng lại");
 
   // ---------------------------------------------------------------- thiếu linh lực
