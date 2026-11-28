@@ -742,17 +742,29 @@ async function main() {
 
       // ---- nhiệm vụ TÔNG MÔN trong sổ nhiệm vụ / HUD: không có NPC giao, trả ở bảng Tông môn ----
       await evalJs(`window.__ui.toggleSectModal(false); 1`);
-      // Nhiệm vụ lấy từ ảnh chụp mẫu (dữ liệu THẬT của game, E / D còn thay ở M8.7): không cứng id / tên của bảng khung. `step` lớn = đã xong mọi bước (sẵn sàng trả)
-      const hudQuest = await evalJs(
-        `(() => { const q = window.__sampleSectHall(2, Date.now()).quests[0]; return { questId: q.questId, title: q.title }; })()`,
+      // Nhiệm vụ lấy từ ảnh chụp mẫu (dữ liệu THẬT của game, E / D còn thay ở M8.7): không cứng id / tên của bảng khung. `step` lớn = đã xong mọi bước (sẵn sàng trả).
+      // KHÔNG lấy cứng `quests[0]` của ngày hôm nay: nhiệm vụ mẫu XOAY THEO NGÀY, và loại NỘP VẬT PHẨM (bước `collect`, vd "Nộp thú phàm") chỉ sẵn sàng khi TÚI đủ đồ (`questReady`),
+      // `step: 99` với túi rỗng báo "Cần đủ ...: 0/8" chứ không "ĐÃ ĐỦ" => cứ vài ngày (27/11/2026, rồi 30/11, 4/12...) nightly đỏ 12 kiểm dù mã không đổi (A, đọc log run 45929833792).
+      // Thử lần lượt nhiệm vụ của 8 ngày liền kề, lấy nhiệm vụ ĐẦU TIÊN mà HUD báo sẵn sàng với túi rỗng (không cứng id / loại: bảng nhiệm vụ còn đổi). Chọn theo kết quả này không nới kiểm bên dưới:
+      // vẫn đòi tên, huy hiệu 'Tông' và câu 'ĐÃ ĐỦ — mở bảng Tông môn > ...' đúng; không có nhiệm vụ nào sẵn sàng thì kiểm ĐỎ.
+      const readHudQuests = () =>
+        evalJs(
+          `[...document.querySelectorAll(".qt-item")].map((e) => ({ title: e.querySelector(".qt-title span")?.textContent ?? "", badge: e.querySelector(".qt-badge")?.textContent ?? "", step: e.querySelector(".qt-step")?.textContent ?? "", ready: e.classList.contains("ready") }))`,
+        );
+      const hudCandidates = await evalJs(
+        `(() => { const seen = new Set(); const out = []; for (let k = 0; k < 8; k++) for (const q of window.__sampleSectHall(2, Date.now() + k * 86400000).quests) { if (seen.has(q.questId)) continue; seen.add(q.questId); out.push({ questId: q.questId, title: q.title }); } return out; })()`,
       );
-      await evalJs(
-        `window.__ui.onQuests({ active: [{ id: ${JSON.stringify(hudQuest.questId)}, step: 99, count: 0 }], done: [], dailyDone: [] }); 1`,
-      );
-      await sleep(150);
-      const qt = await evalJs(
-        `[...document.querySelectorAll(".qt-item")].map((e) => ({ title: e.querySelector(".qt-title span")?.textContent ?? "", badge: e.querySelector(".qt-badge")?.textContent ?? "", step: e.querySelector(".qt-step")?.textContent ?? "", ready: e.classList.contains("ready") }))`,
-      );
+      let hudQuest = hudCandidates[0];
+      let qt = [];
+      for (const cand of hudCandidates) {
+        await evalJs(
+          `window.__ui.onQuests({ active: [{ id: ${JSON.stringify(cand.questId)}, step: 99, count: 0 }], done: [], dailyDone: [] }); 1`,
+        );
+        await sleep(150);
+        hudQuest = cand;
+        qt = await readHudQuests();
+        if (qt.length === 1 && qt[0].ready) break; // không có nhiệm vụ nào sẵn sàng thì dừng ở cái cuối: kiểm bên dưới ĐỎ
+      }
       check(
         qt.length === 1 &&
           qt[0].title === hudQuest.title &&

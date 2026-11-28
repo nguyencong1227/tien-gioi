@@ -18,7 +18,8 @@ import {
 const CJK = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
 
 /** Việc hằng ngày của trạm úy Thanh Lộ: tất cả do tran_uy giao. */
-const HP_DAILIES = QUESTS.filter((q) => q.giver === "tran_uy");
+// (tran_uy còn giao MỘT việc phụ không daily từ E1 #1450: `hac_phong_don_duong`, có test riêng ở hac-phong-sidequests.test.ts)
+const HP_DAILIES = QUESTS.filter((q) => q.giver === "tran_uy" && q.daily);
 
 describe("việc hằng ngày Hắc Phong (Trúc Cơ, D7 #755)", () => {
   it("đúng BA việc hằng ngày do tran_uy giao; mọi việc đều daily và trạm úy là NPC ở Hắc Phong", () => {
