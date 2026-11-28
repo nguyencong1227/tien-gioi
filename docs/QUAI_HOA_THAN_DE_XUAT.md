@@ -24,16 +24,16 @@ Giữ `attackCd`, `speed` (<= ~200), `radius`, `aggro` theo mẫu Nguyên Anh c�
 
 ## 3. Lang Hoang (bản đồ `lang_hoang`, chương 5; 64 quái ở `monsterCap`, trùm sinh sẵn 2)
 
-Hệ ghi theo `he` của nguồn; `MonsterKind.element` (kiểu `Element` ở `skills.ts`, có đủ phong / hỏa / kim / thổ / âm...) đặt thì chiêu của người chơi lên quái nhân khắc x1,3 / bị khắc x0,8 (`game.ts`): D chọn đặt hay để `none` cho từng loài, nhớ đo lại `huntFight` nếu đặt. `minDanger` tăng về phía bắc (như Hàn Vân 0,2 / 0,4 / 0,55 / 0,7 / 0,85); đề xuất `monsterCap` tổng **64**.
+Hệ ghi theo `he` của nguồn; `MonsterKind.element` (kiểu `Element` ở `skills.ts`, có đủ phong / hỏa / kim / thổ / âm...) đặt thì chiêu của người chơi lên quái nhân khắc x1,3 / bị khắc x0,8 (`game.ts`): D chọn đặt hay để `none` cho từng loài, nhớ đo lại `huntFight` nếu đặt. `minDanger` tăng về phía bắc CÙNG `exp` (như Hàn Vân 0,2 / 0,4 / 0,55 / 0,7 / 0,85; test `lang-hoang-quai.test.ts` canh thứ tự này); đề xuất `monsterCap` tổng **64**. **Lát A1 (PR #1573) đã khai báo sáu loài này, CHƯA sinh.**
 
 | id dự kiến | Tên (nguồn) | Hệ | Vai | Cấp | `minDanger` | Số | Nét chiến đấu (từ chiêu nguồn) | Khoá nguồn |
 | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |
 | `da_lang` | Dã Lang | (không) | Gồng lao x0,85 | 19 | 0,15 | 16 | đàn đông, cắn xé đơn giản, không chiêu | `enemy.da_lang` |
-| `xich_diem_lang` | Xích Diễm Lang | hỏa | Đòn nặng x0,9 | 20 | 0,30 | 12 | móng lửa (`chieu.xich_diem_trao`), vết cháy | `enemy.xich_diem_lang` |
-| `hac_phong_lang` | Hắc Phong Lang | phong | Bắn đạn x0,95 | 20 | 0,45 | 12 | chạy ngược gió, phát đao gió từ xa, hú gọi bầy (`lang_hu_goi_ban`) | `enemy.hac_phong_lang` |
-| `huyet_nguyet_lang` | Huyết Nguyệt Lang | hỏa + phong | Gồng lao x1,1 | 21 | 0,60 | 10 | xé nát (`lang_xe_nat`), trán có vệt trăng đỏ; mẫu nguồn là TINH ANH (Tiên Giới đã có `systems/elite.ts`: đừng nhân đôi, chỉ chọn hệ số vai cao) | `enemy.huyet_nguyet_lang` |
-| `ngan_nguyet_lang` | Ngân Nguyệt Lang | phong + hỏa | Đòn nặng x1,1 | 21 | 0,75 | 8 | xé nát + **Thiên Lang Khiếu** (khống chế ngắn, `lang_vuong_hu`), đàn theo sau | `enemy.ngan_nguyet_lang` |
-| `thuong_nguyet_lang` | Thương Nguyệt Lang | phong + hỏa | Dày x1,0 | 20 | 0,85 | 4 | sói già lông ngả xanh, đòn chậm, đập đất, máu rất dày; "Lang Vương ba đời đều đến xin nó một lời" | `enemy.thuong_nguyet_lang` |
+| `xich_diem_lang` | Xích Diễm Lang | hỏa | Đòn nặng x0,9 | 21 | 0,60 | 12 | móng lửa (`chieu.xich_diem_trao`), vết cháy | `enemy.xich_diem_lang` |
+| `hac_phong_lang` | Hắc Phong Lang | phong | Bắn đạn x0,95 | 20 | 0,30 | 12 | chạy ngược gió, phát đao gió từ xa, hú gọi bầy (`lang_hu_goi_ban`) | `enemy.hac_phong_lang` |
+| `huyet_nguyet_lang` | Huyết Nguyệt Lang | hỏa + phong | Gồng lao x1,1 | 21 | 0,45 | 10 | xé nát (`lang_xe_nat`), trán có vệt trăng đỏ; mẫu nguồn là TINH ANH (Tiên Giới đã có `systems/elite.ts`: đừng nhân đôi, chỉ chọn hệ số vai cao) | `enemy.huyet_nguyet_lang` |
+| `ngan_nguyet_lang` | Ngân Nguyệt Lang | phong + hỏa | Đòn nặng x1,1 | 21 | 0,85 | 8 | xé nát + **Thiên Lang Khiếu** (khống chế ngắn, `lang_vuong_hu`), đàn theo sau | `enemy.ngan_nguyet_lang` |
+| `thuong_nguyet_lang` | Thương Nguyệt Lang | phong + hỏa | Dày x1,0 | 20 | 0,72 | 4 | sói già lông ngả xanh, đòn chậm, đập đất, máu rất dày; "Lang Vương ba đời đều đến xin nó một lời" | `enemy.thuong_nguyet_lang` |
 
 **Trùm sinh sẵn (2):**
 
