@@ -1,9 +1,8 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, Buffer */
+/* global console, setTimeout, Buffer */
 /**
  * Kiểm hộp xác nhận BÁN đồ quý / trang bị ở cửa hàng (issue #779, docs/RA_SOAT_THAO_TAC.md hàng 2; `act-confirm.ts`: `sellPlan`) trong Chrome THẬT, chế độ mock (không cần máy chủ / Vite), 5 khung nhìn:
  *
- *   npm run build -w client && node client/scripts/check-sell-confirm.mjs [--shots <thư mục>] [--vp <khung>]
+ *   npm run build -w client && node client/scripts/check-sell-confirm.mjs [--shots <thư mục>] [--vp <khung>] [--slow-frame <ms>]
  *
  * Túi có đồ thường (Hồi Huyết Đan), đồ quý (Đại Hồi Huyết Đan) và trang bị (Lang Nha Kiếm); chạm / bấm nút "Bán (+N)" THẬT:
  *   - đồ thường: gửi `sell` ngay, KHÔNG hộp;
@@ -14,13 +13,14 @@ import { getChromeGpuFlags } from "./chrome-gpu.mjs";
  */
 import http from "node:http";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";
 import { freePort } from "./free-port.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const __filename = fileURLToPath(import.meta.url);
@@ -73,37 +73,15 @@ async function main() {
   });
   const HTTP_PORT = await freePort();
   await new Promise((r) => server.listen(HTTP_PORT, "127.0.0.1", r));
-  const CDP_PORT = await freePort();
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-sell-confirm-"));
-  const chrome = spawn(
-    "google-chrome",
-    [
-      "--headless=new",
-      "--no-sandbox",
-      ...getChromeGpuFlags(),
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${tmp}`,
-      "about:blank",
-    ],
-    { stdio: "ignore", detached: true }, // nhóm tiến trình riêng: dọn được cả tiến trình con của Chrome một lần
-  );
+  let launched = null;
   let failures = 0;
   const check = (ok, msg) => {
     console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
     if (!ok) failures++;
   };
   try {
-    let page = null;
-    for (let i = 0; i < 100 && !page; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-        page = (await res.json()).find((t) => t.type === "page") ?? null;
-      } catch {
-        // Chrome chưa mở cổng
-      }
-      if (!page) await sleep(150);
-    }
-    if (!page) throw new Error("Không tìm thấy Chrome page target.");
+    launched = await launchChrome({ name: "sell-confirm" });
+    const page = launched.page;
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await new Promise((res, rej) => {
       ws.onopen = res;
@@ -136,7 +114,8 @@ async function main() {
     await send("Page.enable");
     await send("Runtime.enable");
     await send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}`,
+      // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+      source: `try { localStorage.setItem('tg_newbie_guide_dismissed','1'); localStorage.setItem('tg_quality','low'); } catch (e) {}${slowFrameSource(slowFrameMs())}`,
     });
 
     for (const vp of VIEWPORTS) {
@@ -154,21 +133,33 @@ async function main() {
       await send("Page.navigate", {
         url: `http://127.0.0.1:${HTTP_PORT}/?dungeon=mock&debug=1&map=am_suong`,
       });
-      let ready = false;
-      for (let i = 0; i < 80 && !ready; i++) {
-        await sleep(200);
-        ready = Boolean(
-          await evalJs(
-            `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+      const ready = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `Boolean(!window.__isOldPage && window.__getMap && window.__scene && window.__ui && !document.getElementById("ui")?.hidden)`,
+            ),
           ),
-        );
-      }
+        60000,
+        200,
+      );
       if (!ready) {
         console.log("  ✗ cảnh không sẵn sàng (cần ?debug)");
         failures++;
         continue;
       }
-      await sleep(600);
+      // Chờ THEO ĐIỀU KIỆN thay `sleep(600)`: phông đã tải xong và `data-input` đã đặt lên <html>
+      const settled = await waitUntilTrue(
+        async () =>
+          Boolean(
+            await evalJs(
+              `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+            ),
+          ),
+        30000,
+        100,
+      );
+      if (!settled) throw new Error(`${vp.name}: phông chưa tải xong / thiếu data-input sau 30 s`);
       await evalJs(
         `["dungeon-mock-badge", "duel-mock-badge"].forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = true; })`,
       );
@@ -181,12 +172,28 @@ async function main() {
           Buffer.from(s.result.data, "base64"),
         );
       };
-      /** Tâm của phần tử (cuộn vào tầm nhìn) + phần tử TẠI điểm đó (biết có bị che không) */
+      /** Chờ giao diện YÊN thay `sleep` cố định: khung cửa hàng KHÔNG có thay đổi DOM nào trong 250 ms (đồng hồ thật, TRẦN 1,5 s vì HUD ngoài khung đổi liên tục) rồi thêm 2 khung hình. */
+      const settle = () =>
+        evalJs(`new Promise((resolve) => {
+          const root = document.getElementById("shop-modal") || document.body;
+          let t = 0, cap = 0, finished = false, mo = null;
+          const done = () => {
+            if (finished) return;
+            finished = true; clearTimeout(t); clearTimeout(cap); mo.disconnect();
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve(1)));
+          };
+          mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(done, 250); });
+          mo.observe(root, { subtree: true, childList: true, attributes: true, characterData: true });
+          t = setTimeout(done, 250);
+          cap = setTimeout(done, 1500);
+        })`);
+      /** Tâm của phần tử (cuộn vào tầm nhìn, chờ 2 khung hình cho cuộn xong rồi mới đo) + phần tử TẠI điểm đó (biết có bị che không) */
       const center = (sel, idx = 0) =>
-        evalJs(`(() => {
+        evalJs(`(async () => {
           const e = document.querySelectorAll(${JSON.stringify(sel)})[${idx}];
           if (!e) return null;
           e.scrollIntoView({ block: "center", inline: "center" });
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
           const r = e.getBoundingClientRect();
           const x = r.left + r.width / 2, y = r.top + r.height / 2;
           const top = document.elementFromPoint(x, y);
@@ -274,11 +281,11 @@ async function main() {
         await evalJs(
           `(() => { const sc = window.__scene, n = window.__craftData.NPC_BY_ID.lai_buon_suong; sc.predX = n.x; sc.predY = n.y; sc.cameras.main.centerOn(n.x, n.y); window.__ui.openShopModal("lai_buon_suong"); return 1; })()`,
         );
-        await sleep(300);
+        await settle();
         await evalJs(
           `document.getElementById("tab-shop-sell").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }))`,
         );
-        await sleep(300);
+        await settle();
       };
 
       console.log("  [1] đồ thường: bán thẳng, không hộp");
@@ -286,7 +293,7 @@ async function main() {
       let b = await sellBtnOf("Hồi Huyết Đan");
       check(b && b.hit, "nút Bán của Hồi Huyết Đan (đồ thường) bấm được");
       await tap(b.x, b.y);
-      await sleep(250);
+      await settle();
       let s1 = await sold();
       check(
         !(await box()).open && s1.length === 1 && s1[0].qty === 1,
@@ -306,12 +313,17 @@ async function main() {
           `#shop-sell-list .shop-card:nth-child(${iq + 1}) [data-nav$=":plus"]`,
         );
         await tap(plus.x, plus.y);
-        await sleep(300);
+        await settle();
       }
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       check(b && b.hit, "nút Bán của Đại Hồi Huyết Đan (đồ quý) bấm được");
-      await tap(b.x, b.y);
-      await sleep(100);
+      // click ma TẤT ĐỊNH (như check-act-confirm, #1477): mở hộp bằng `click` (nút Bán của thẻ nối `click`, `detail` 0 nên không bị chặn như click ma) VÀ bấm "Bán" trong hộp (nút trong hộp nối `pointerdown`) trong CÙNG MỘT lượt JS (độ trễ ~0 ms, không qua CDP),
+      // nên luôn nằm trong cửa sổ chống click ma 450 ms dù runner chậm (trước đây center() + tap() CDP chạy SAU khi mở hộp: ở khung chậm cú bấm trễ quá 450 ms nên được tính là thật).
+      // Mở hộp bằng cú chạm THẬT vẫn được kiểm ở ca [1] (đồ thường) và các ca [3]-[5] dưới.
+      await evalJs(
+        `(() => { const btn = document.querySelectorAll("#shop-sell-list .shop-card")[${iq}].querySelector(".shop-act-btn.sell"); btn.click(); document.getElementById("act-btn-yes").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, pointerType: "mouse", button: 0 })); return 1; })()`,
+      );
+      await settle();
       let st = await box();
       check(st.open, "đồ quý: hộp xác nhận mở");
       check(
@@ -327,16 +339,15 @@ async function main() {
         yesBtn.hit && (!vp.mobile || (yesBtn.w >= 44 && yesBtn.h >= 44)),
         `nút Bán trong hộp bấm được, không bị che (${Math.round(yesBtn.w)}x${Math.round(yesBtn.h)})`,
       );
-      await tap(yesBtn.x, yesBtn.y);
-      await sleep(200);
       check(
         (await box()).open && (await sold()).length === 0,
-        "bấm NGAY khi hộp vừa mở (click ma): bị bỏ qua",
+        "bấm NGAY khi hộp vừa mở (click ma, cùng lượt JS với lệnh mở): bị bỏ qua, hộp vẫn mở",
       );
       await shot("ban-do-quy"); // chụp SAU phép kiểm click ma (chụp ảnh tốn hơn cửa sổ chống click ma 450 ms)
-      await sleep(560);
-      await tap(yesBtn.x, yesBtn.y);
-      await sleep(250);
+      await sleep(560); // qua cửa sổ chống click ma (450 ms, đồng hồ thật: ngủ dài hơn chỉ an toàn hơn ở khung chậm)
+      const yes2 = await center("#act-btn-yes");
+      await tap(yes2.x, yes2.y);
+      await settle();
       let s2 = await sold();
       check(
         !(await box()).open &&
@@ -351,15 +362,15 @@ async function main() {
       await openShop();
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       await tap(b.x, b.y);
-      await sleep(300);
-      await sleep(300); // qua cửa sổ chống click ma (450 ms) của CẢ HAI nút trong hộp
+      await settle();
+      await sleep(560); // qua cửa sổ chống click ma (450 ms, đồng hồ thật) của CẢ HAI nút trong hộp
       const no = await center("#act-btn-no");
       await tap(no.x, no.y);
       await sleep(560); // qua cửa sổ chặn click ma sau khi hộp đóng, để bấm nút Bán lần nữa được tính
       check(!(await box()).open && (await sold()).length === 0, "'Giữ lại': hộp đóng, không bán");
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       await tap(b.x, b.y);
-      await sleep(300);
+      await settle();
       await key("Escape", "Escape", 27);
       await sleep(560); // qua cửa sổ chặn click ma sau khi hộp đóng, để bấm nút Bán lần nữa được tính
       check(
@@ -372,7 +383,7 @@ async function main() {
       );
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       await tap(b.x, b.y);
-      await sleep(300);
+      await settle();
       await key("KeyX", "x", 88);
       await sleep(560); // qua cửa sổ chặn click ma sau khi hộp đóng, để bấm nút Bán lần nữa được tính
       check(!(await box()).open && (await sold()).length === 0, "phím X: giữ lại");
@@ -383,7 +394,7 @@ async function main() {
       b = await sellBtnOf("Lang Nha Kiếm");
       check(b && b.hit, "nút Bán của Lang Nha Kiếm (trang bị) bấm được");
       await tap(b.x, b.y);
-      await sleep(300);
+      await settle();
       st = await box();
       check(
         st.open && /Bán Lang Nha Kiếm được \d+ Linh thạch\?/.test(st.text),
@@ -391,24 +402,24 @@ async function main() {
       );
       check(/Trang bị/.test(st.warn), `nhắc: "${st.warn}"`);
       await key("KeyX", "x", 88);
-      await sleep(200);
+      await settle();
 
       console.log("  [5] túi đổi giữa lúc hộp mở: xác nhận bị huỷ, không bán món khác");
       await evalJs(`window.__sent.length = 0`);
       await openShop();
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       await tap(b.x, b.y);
-      await sleep(600);
+      await settle();
       // ô đại hồi huyết đan vừa bị dùng hết (máy chủ gửi lại túi)
       await setBag([
         { itemId: "hoi_huyet_dan", qty: 20 },
         null,
         { itemId: "lang_nha_kiem", qty: 1 },
       ]);
-      await sleep(200);
+      await settle();
       const y5 = await center("#act-btn-yes");
       if (y5) await tap(y5.x, y5.y);
-      await sleep(300);
+      await settle();
       const toasts = await evalJs(
         `[...document.querySelectorAll("#toast p")].map((p) => p.textContent)`,
       );
@@ -423,28 +434,15 @@ async function main() {
       await openShop();
       b = await sellBtnOf("Đại Hồi Huyết Đan");
       await tap(b.x, b.y);
-      await sleep(300);
+      await settle();
       check((await box()).open, "hộp mở");
       await evalJs(`window.__ui.toggleShopModal(false)`);
-      await sleep(200);
+      await settle();
       check(!(await box()).open, "cửa hàng đóng: hộp xác nhận bán cũng đóng");
     }
   } finally {
-    try {
-      process.kill(-chrome.pid, "SIGKILL"); // cả nhóm
-    } catch {
-      chrome.kill("SIGKILL");
-    }
+    if (launched) await launched.close();
     server.close();
-    await new Promise((r) => {
-      chrome.once("exit", r);
-      setTimeout(r, 1500);
-    });
-    try {
-      fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // bỏ qua
-    }
   }
   console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
   process.exit(failures === 0 ? 0 : 1);
