@@ -52,7 +52,9 @@ describe("dữ liệu trang bị", () => {
         const prev = list[i - 1].equip!.stats;
         const cur = list[i].equip!.stats;
         for (const k of Object.keys(prev) as (keyof typeof prev)[]) {
-          expect(cur[k] ?? 0).toBeGreaterThan(prev[k] ?? 0);
+          // Tốc độ phù giữ +28 từ bộ IV (`docs/KHUNG_HOA_THAN.md` mục 4.2: tốc độ người chơi đã dừng ở 198, thêm nữa làm lệch dự đoán di chuyển): không tăng thêm, nhưng KHÔNG được giảm
+          if (k === "speed") expect(cur[k] ?? 0).toBeGreaterThanOrEqual(prev[k] ?? 0);
+          else expect(cur[k] ?? 0).toBeGreaterThan(prev[k] ?? 0);
         }
       }
     }

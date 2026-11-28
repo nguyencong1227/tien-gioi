@@ -252,7 +252,7 @@ Mô phỏng ở `server/src/balance/pk.ts`; test `pk.test.ts` giữ mục tiêu.
 | Trúc Cơ tầng 1 (bậc 10) | 32.0 | 30.8 - 33.6 |
 | Kim Đan tầng 1 (bậc 13) | 32.8 | 31.2 - 34.4 |
 | Nguyên Anh tầng 1 (bậc 16) | 34.0 | 32.4 - 35.2 |
-| Hóa Thần tầng 1 (bậc 19) | 34.4 | 33.2 - 35.6 |
+| Hóa Thần tầng 1 (bậc 19) | 34.4 | 33.6 - 36.0 |
 | Luyện Hư tầng 1 (bậc 22) | 35.2 | 34.4 - 36.8 |
 | Hợp Thể tầng 1 (bậc 25) | 36.0 | 34.8 - 37.6 |
 | Đại Thừa tầng 1 (bậc 28) | 37.2 | 35.6 - 38.4 |
