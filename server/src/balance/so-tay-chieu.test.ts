@@ -105,6 +105,50 @@ describe("Sổ tay chiêu thức: đủ mọi chiêu (không đọc tài liệu 
   });
 });
 
+describe("Sổ tay chiêu thức: ma trận mở rộng theo cảnh giới cao nhất (B ở #1550)", () => {
+  /** Hàng tiêu đề và hàng Tổng của ma trận mục 2. */
+  const matran = (md: string) => {
+    const m2 = mucCuaTaiLieu(md).m2;
+    return {
+      dau: cacO(m2.find((l) => l.startsWith("| Hệ"))!),
+      tong: cacO(m2.find((l) => l.startsWith("| **Tổng**"))!),
+      chuThich: m2.filter((l) => l.startsWith("> Cột")).join("\n"),
+    };
+  };
+
+  it("dữ liệu hiện có (tới Nguyên Anh): đúng năm cột cảnh giới, như trước", () => {
+    const { dau } = matran(renderSoTayChieuMarkdown());
+    expect(dau.slice(1, -1)).toEqual([
+      "Phàm Nhân",
+      "Luyện Khí",
+      "Trúc Cơ",
+      "Kim Đan",
+      "Nguyên Anh",
+    ]);
+  });
+
+  it("chiêu Hóa Thần (reqRealm 5) và Độ Kiếp (9) hiện thành cột riêng, vào tổng, không ra NaN", () => {
+    const hoaThan: SkillDef = {
+      ...chieuGia("chieu_gia_hoa_than", "Chiêu Giả Hóa Thần"),
+      reqRealm: 5,
+    };
+    const doKiep: SkillDef = { ...chieuGia("chieu_gia_do_kiep", "Chiêu Giả Độ Kiếp"), reqRealm: 9 };
+    const md = renderSoTayChieuMarkdown([...LEARNABLE_SKILLS, hoaThan, doKiep], NGUON_RONG);
+    expect(md).not.toContain("NaN");
+    const { dau, tong, chuThich } = matran(md);
+    expect(dau.slice(1, -1)).toHaveLength(10); // Phàm Nhân .. Độ Kiếp
+    expect(dau).toContain("Hóa Thần");
+    expect(dau).toContain("Độ Kiếp");
+    const cot = (ten: string) => Number(tong[dau.indexOf(ten)]);
+    expect(cot("Hóa Thần")).toBe(1);
+    expect(cot("Độ Kiếp")).toBe(1);
+    expect(Number(tong[tong.length - 1])).toBe(LEARNABLE_SKILLS.length + 2);
+    // cột trống (Luyện Hư, Hợp Thể, Đại Thừa) nằm ở dòng chú thích gộp, cột có chiêu thì không
+    expect(chuThich).toContain("Luyện Hư");
+    expect(chuThich).not.toContain("Hóa Thần");
+  });
+});
+
 describe("Sổ tay chiêu thức: Cách có được khớp bốn nguồn tính độc lập từ dữ liệu", () => {
   const rows = dongChieuMuc1(renderSoTayChieuMarkdown());
   const oCoDuoc = (id: string): string => {

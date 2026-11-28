@@ -28,8 +28,15 @@ import {
   type StatusKind,
 } from "@tien-gioi/shared";
 
-/** Cảnh giới hiển thị ở cột ma trận: 0 Phàm Nhân .. 4 Nguyên Anh (`skillViolations` chặn reqRealm > 4). */
-const MATRIX_REALMS = [0, 1, 2, 3, 4] as const;
+/**
+ * Cảnh giới hiển thị ở cột ma trận: LUÔN từ 0 Phàm Nhân tới 4 Nguyên Anh (bộ chiêu hiện có), và mở rộng tới `reqRealm` cao nhất của danh sách chiêu
+ * (`skillViolations` cho tới bậc 9 Độ Kiếp từ #1472): thêm chiêu Hóa Thần trở lên thì cột mới tự hiện, không rơi khỏi tổng.
+ */
+const MATRIX_MIN_REALM = 4;
+function matrixRealms(defs: readonly SkillDef[]): number[] {
+  const top = defs.reduce((m, s) => Math.max(m, s.reqRealm), MATRIX_MIN_REALM);
+  return Array.from({ length: Math.min(top, REALMS.length - 1) + 1 }, (_, i) => i);
+}
 
 const NPC_BY_ID = Object.fromEntries(NPCS.map((n) => [n.id, n]));
 
@@ -171,10 +178,11 @@ function byRealmThenId(a: SkillDef, b: SkillDef): number {
 
 /** Mục 2: ma trận độ phủ hệ × cảnh giới (số chiêu mỗi ô; ô trống in "–") + tổng hàng / cột. */
 function renderCoverageMatrix(defs: readonly SkillDef[]): string[] {
+  const MATRIX_REALMS = matrixRealms(defs);
   const count: Record<string, Record<number, number>> = {};
   for (const el of ELEMENTS) count[el.id] = Object.fromEntries(MATRIX_REALMS.map((r) => [r, 0]));
   for (const s of defs) {
-    if (count[s.element]) count[s.element][s.reqRealm] = count[s.element][s.reqRealm] + 1;
+    if (count[s.element] && s.reqRealm in count[s.element]) count[s.element][s.reqRealm]++;
   }
   const colTotals = MATRIX_REALMS.map(() => 0);
   let grand = 0;
