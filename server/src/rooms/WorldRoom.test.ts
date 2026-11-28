@@ -107,12 +107,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Đủ lâu để thấy nhân vật KHÔNG hồi sinh theo đồng hồ (RESPAWN_MS cũ là 5 giây): kiểm ngắn, đồng hồ giả ở test đơn vị lo phần còn lại */
 const RESPAWN_MS_TEST = 1200;
 
-async function waitFor<T>(fn: () => T | undefined | false, ms = 3000): Promise<T> {
+async function waitFor<T>(
+  fn: () => T | undefined | false | Promise<T | undefined | false>,
+  ms = 3000,
+  what = "điều kiện",
+): Promise<T> {
   const end = Date.now() + ms;
   for (;;) {
-    const v = fn();
+    const v = await fn();
     if (v) return v;
-    if (Date.now() > end) throw new Error("Hết thời gian chờ điều kiện");
+    if (Date.now() > end) throw new Error(`Hết thời gian chờ: ${what}`);
     await sleep(20);
   }
 }
@@ -2791,9 +2795,16 @@ describe("chân linh và bộ đếm kiếp (M3 bước 2)", () => {
     return path.join(dataDir, f);
   };
   const leave = async (a: { room: Room }) => {
+    const rId = a.room.roomId;
+    const sid = a.room.sessionId;
     await a.room.leave(true);
     rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(250);
+    // Chờ dương: người chơi dọn khỏi phòng Colyseus thật
+    await waitFor(
+      () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+      3000,
+      "người chơi đã dọn khỏi phòng",
+    );
   };
 
   it("vào game lần đầu: tạo chân linh (kiếp 1, 0 Duyên) trong DATA_DIR/souls; lifeId sinh một lần và giữ nguyên qua các lần vào", async () => {
@@ -2945,7 +2956,12 @@ describe("kho nhân vật thay được (M3 bước 3b): WorldRoom chỉ biết 
       expect(memory.get(key(name))).toMatchObject({ name, realm: 0 }); // tạo mới -> ghi vào kho giả
       await a.room.leave(true); // lưu lúc rời phòng
       rooms.splice(rooms.indexOf(a.room), 1);
-      await sleep(250);
+      // Chờ dương: lần lưu lúc rời phòng được ghi vào kho giả
+      await waitFor(
+        () => calls.filter((c) => c === `save:${key(name)}`).length >= 2,
+        3000,
+        "lưu lúc rời phòng vào kho giả",
+      );
       expect(calls.filter((c) => c === `save:${key(name)}`).length).toBeGreaterThanOrEqual(2);
       // vào lại: nạp từ kho giả (đúng mã), không tạo nhân vật mới
       const b = await join(name);
@@ -2953,7 +2969,12 @@ describe("kho nhân vật thay được (M3 bước 3b): WorldRoom chỉ biết 
       expect(b.me().name).toBe(name);
       await b.room.leave(true);
       rooms.splice(rooms.indexOf(b.room), 1);
-      await sleep(250);
+      // Chờ dương: lần lưu lúc b rời phòng được ghi vào kho giả và dọn khỏi phòng
+      await waitFor(
+        () => calls.filter((c) => c === `save:${key(name)}`).length >= 3,
+        3000,
+        "lưu lúc b rời phòng vào kho giả",
+      );
       // sai mã bí mật bị từ chối dựa trên dữ liệu của kho giả
       const client = new Client(`ws://localhost:${PORT}`);
       await expect(
@@ -2985,9 +3006,16 @@ describe("luân hồi: chết thật, Hoàng Tuyền, đầu thai (M3 bước 2)
     writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
   };
   const leave = async (a: { room: Room }) => {
+    const rId = a.room.roomId;
+    const sid = a.room.sessionId;
     await a.room.leave(true);
     rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(250);
+    // Chờ dương: người chơi dọn khỏi phòng Colyseus thật
+    await waitFor(
+      () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+      3000,
+      "người chơi đã dọn khỏi phòng",
+    );
   };
 
   /** Dựng người đã chơi tới Luyện Khí tầng 9 sau 48 phút, mang đồ, rồi cho quái đánh chết */
@@ -3479,9 +3507,16 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
     writeFileSync(full, JSON.stringify({ ...JSON.parse(readFileSync(full, "utf8")), ...patch }));
   };
   const leave = async (a: { room: Room }) => {
+    const rId = a.room.roomId;
+    const sid = a.room.sessionId;
     await a.room.leave(true);
     rooms.splice(rooms.indexOf(a.room), 1);
-    await sleep(250);
+    // Chờ dương: người chơi dọn khỏi phòng Colyseus thật
+    await waitFor(
+      () => !matchMaker.getLocalRoomById(rId)?.state.players.has(sid),
+      3000,
+      "người chơi đã dọn khỏi phòng",
+    );
   };
   /** Nghe tin `skills` TRƯỚC khi gửi `skillSlot` (tin gửi lúc vào phòng tới trước khi client đăng ký được). */
   const listen = (a: { room: Room }) => {
@@ -3527,6 +3562,7 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
       null,
     ])
       a.room.send("skillSlot", bad);
+    // Chờ âm: tin rác bị từ chối, không thay đổi sổ chiêu
     await sleep(300);
     expect(a.toasts.filter((t) => t.tone === "bad").length).toBeGreaterThanOrEqual(3);
     expect(msgs.slice(n).every((x) => x.slots.join() === "hoa_van_kiem,bon_thach_quyen,,")).toBe(
@@ -3534,7 +3570,19 @@ describe("sổ chiêu: lưu, nạp lại, gắn ô qua tin nhắn (M7.2a)", () =
     );
     // rời phòng: sổ được LƯU
     await leave(a);
-    expect(playerOf(name).skills).toEqual({
+    const saved = await waitFor(
+      () => {
+        try {
+          const raw = playerOf(name);
+          if (raw.skills?.slots?.[1] === "bon_thach_quyen") return raw;
+        } catch {
+          return undefined;
+        }
+      },
+      3000,
+      "sổ chiêu được lưu xuống đĩa",
+    );
+    expect(saved.skills).toEqual({
       learned: { hoa_van_kiem: 2, bon_thach_quyen: 1 },
       slots: ["hoa_van_kiem", "bon_thach_quyen", "", ""],
     });
