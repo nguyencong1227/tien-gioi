@@ -420,6 +420,256 @@ function drawCultivatorPose(robe, trim, hair, dir, pose) {
 
 // ---------------- 3. Vẽ 4 loại yêu thú (2 frame hoạt ảnh mỗi loại) ----------------
 
+/**
+ * Sói 48x44 dùng chung cho Hàn Lang và sáu sói Hóa Thần của Lang Hoang (D1 #1466): MỘT hình, loài nào khác loài nào ở BẢNG MÀU `p` (lông, bụng, đuôi,
+ * chân, mắt), dạng BỜM (`p.mane`: spike gai băng / flame lửa / wind lưỡi gió / tuft chỏm lông / none), DẤU trên trán (`p.mark`: crescent trăng khuyết) và
+ * hạt dưới chân (`p.ground`). `p.heavy` = sói già lớn (thân to, mõm xám, vết sẹo). Hình `han_lang` phải GIỮ NGUYÊN từng điểm ảnh so với bản trước
+ * khi tách hàm (test `client/src/wolf-palettes.test.ts` canh bảng, `npm run assets` không đổi `atlas.json`).
+ */
+const WOLF_PALETTES = {
+  han_lang: {
+    tail: 0x7ea3bd,
+    tailTip: 0xe6f6ff,
+    legD: 0x6f93ad,
+    legL: 0x86aac4,
+    body: 0x9fc4dc,
+    belly: 0xd6ecf7,
+    fur: 0xbfd9ec,
+    mane: "spike",
+    maneA: 0xe6f6ff,
+    maneB: 0xe6f6ff,
+    head: 0x9fc4dc,
+    muzzle: 0x86aac4,
+    ear: 0x6f93ad,
+    eyeGlow: 0x7fe8ff,
+    eyeCore: 0xdff9ff,
+    fang: 0xffffff,
+    ground: "frost",
+    groundColor: 0xffffff,
+    mark: null,
+    heavy: false,
+  },
+  // Dã Lang: sói đồng cỏ thường, lông nâu xám, chỉ có chỏm lông ngắn, mắt hổ phách
+  da_lang: {
+    tail: 0x8a7757,
+    tailTip: 0xc8b48a,
+    legD: 0x6e5e44,
+    legL: 0x84714f,
+    body: 0xa08c6a,
+    belly: 0xe3d6b8,
+    fur: 0xb8a37e,
+    mane: "tuft",
+    maneA: 0xc8b48a,
+    maneB: 0xc8b48a,
+    head: 0xa08c6a,
+    muzzle: 0x84714f,
+    ear: 0x6e5e44,
+    eyeGlow: 0xffc94c,
+    eyeCore: 0xfff1b0,
+    fang: 0xffffff,
+    ground: "dust",
+    groundColor: 0xd8c9a4,
+    mark: null,
+    heavy: false,
+  },
+  // Xích Diễm Lang: lông đỏ cam, bờm bốc lửa, tàn lửa dưới chân
+  xich_diem_lang: {
+    tail: 0xb8452a,
+    tailTip: 0xffb347,
+    legD: 0x8c3320,
+    legL: 0xa8452a,
+    body: 0xd0583a,
+    belly: 0xf5c08a,
+    fur: 0xe2744a,
+    mane: "flame",
+    maneA: 0xff9a3c,
+    maneB: 0xffd36b,
+    head: 0xd0583a,
+    muzzle: 0xa8452a,
+    ear: 0x8c3320,
+    eyeGlow: 0xffe066,
+    eyeCore: 0xffffff,
+    fang: 0xfff4d8,
+    ground: "ember",
+    groundColor: 0xff9a3c,
+    mark: null,
+    heavy: false,
+  },
+  // Hắc Phong Lang: lông xám xanh thẫm, bờm là những lưỡi gió dài rạp về sau, mắt lam nhạt
+  hac_phong_lang: {
+    tail: 0x4a5563,
+    tailTip: 0xc5d0dd,
+    legD: 0x464f5b,
+    legL: 0x586373,
+    body: 0x5f6b7a,
+    belly: 0x9aa7b8,
+    fur: 0x7a8798,
+    mane: "wind",
+    maneA: 0xdbe6f2,
+    maneB: 0xf2f7fb,
+    head: 0x5f6b7a,
+    muzzle: 0x464f5b,
+    ear: 0x3c4552,
+    eyeGlow: 0xa8f0ff,
+    eyeCore: 0xeafcff,
+    fang: 0xffffff,
+    ground: "wind",
+    groundColor: 0xdbe6f2,
+    mark: null,
+    heavy: false,
+  },
+  // Huyết Nguyệt Lang: lông nâu đỏ sẫm, vệt trăng khuyết đỏ máu trên trán, mắt đỏ, gai bờm đầu đỏ
+  huyet_nguyet_lang: {
+    tail: 0x3a1f25,
+    tailTip: 0xc03a3a,
+    legD: 0x331b20,
+    legL: 0x452329,
+    body: 0x4a2a30,
+    belly: 0x8a4a50,
+    fur: 0x6a3a40,
+    mane: "spike",
+    maneA: 0x8a2a2a,
+    maneB: 0xd24a4a,
+    head: 0x4a2a30,
+    muzzle: 0x331b20,
+    ear: 0x2a1519,
+    eyeGlow: 0xff4a4a,
+    eyeCore: 0xffd0d0,
+    fang: 0xfff0f0,
+    ground: "blood",
+    groundColor: 0x8a1f1f,
+    mark: { kind: "crescent", color: 0xff4a4a },
+    heavy: false,
+  },
+  // Ngân Nguyệt Lang: lông bạc ánh tím nhạt (khác hẳn Hàn Lang xanh băng), trăng khuyết tím lam trên trán, mắt tím nhạt
+  ngan_nguyet_lang: {
+    tail: 0xb8aed0,
+    tailTip: 0xffffff,
+    legD: 0xa89fc0,
+    legL: 0xc2b8d8,
+    body: 0xd6cde6,
+    belly: 0xfaf6fc,
+    fur: 0xe8e0f2,
+    mane: "spike",
+    maneA: 0xffffff,
+    maneB: 0xffffff,
+    head: 0xd6cde6,
+    muzzle: 0xb8aed0,
+    ear: 0x9a90b4,
+    eyeGlow: 0xc8b0ff,
+    eyeCore: 0xf4eeff,
+    fang: 0xffffff,
+    ground: "mote",
+    groundColor: 0xffffff,
+    mark: { kind: "crescent", color: 0x7a5ad0 },
+    heavy: false,
+  },
+  // Thương Nguyệt Lang: sói già to, lông ngả xanh ngọc, mõm xám, vết sẹo ngang mắt, bờm thấp bạc màu
+  thuong_nguyet_lang: {
+    tail: 0x5f9a8a,
+    tailTip: 0xd8efe6,
+    legD: 0x4f8a7a,
+    legL: 0x6aa090,
+    body: 0x7fb8a8,
+    belly: 0xcfe8de,
+    fur: 0x9fd8c8,
+    mane: "spike",
+    maneA: 0xb8d8cc,
+    maneB: 0xb8d8cc,
+    head: 0x7fb8a8,
+    muzzle: 0x8a9a96,
+    ear: 0x4f8a7a,
+    eyeGlow: 0xe8f4a0,
+    eyeCore: 0xffffff,
+    fang: 0xe8ece4,
+    ground: "mote",
+    groundColor: 0xe8f4ee,
+    mark: { kind: "scar", color: 0x3a5a52 },
+    heavy: true,
+  },
+};
+
+function drawWolf(shift, p) {
+  const s = new Surface(48, 44);
+  s.ellipse(24, 38, 16, 4, 0x000000, 65);
+  // Đuôi
+  s.tri(4, 20 - shift, 13, 24, 10, 31, p.tail);
+  s.tri(4, 20 - shift, 8, 14 - shift, 9, 22, p.tailTip);
+  // Chân
+  s.rect(13 + shift, 30, 4, 8, p.legD);
+  s.rect(19 - shift, 30, 4, 8, p.legL);
+  s.rect(28 + shift, 30, 4, 8, p.legD);
+  s.rect(33 - shift, 30, 4, 8, p.legL);
+  // Thân, bụng sáng (sói già: thân dày hơn)
+  s.ellipse(23, 25, p.heavy ? 14 : 13, p.heavy ? 9 : 8, p.body);
+  s.ellipse(24, 28, 9, 4, p.belly);
+  s.ellipse(29, 21, 8, 7, p.fur);
+  // Bờm
+  if (p.mane === "spike") {
+    for (let x = 12; x <= 30; x += 6)
+      s.tri(x, 19 + shift * 0.5, x + 3, (p.heavy ? 13 : 10) + shift, x + 6, 19, p.maneA);
+    if (p.maneB !== p.maneA)
+      for (let x = 12; x <= 30; x += 6)
+        s.tri(x + 1.5, 15 + shift, x + 3, 10 + shift, x + 4.5, 15 + shift, p.maneB); // chóp gai sáng màu
+  } else if (p.mane === "flame") {
+    // lưỡi lửa: ba cụm hai lớp, ngọn đung đưa ngược chiều chân
+    for (let x = 11; x <= 29; x += 6) {
+      s.tri(x, 19 + shift * 0.5, x + 3, 7 + shift, x + 6, 19, p.maneA);
+      s.tri(x + 1.2, 18 + shift * 0.5, x + 3, 11 + shift, x + 4.8, 18, p.maneB);
+    }
+  } else if (p.mane === "wind") {
+    // lưỡi gió: tam giác dài mảnh rạp về phía đuôi (đỉnh lệch trái)
+    for (let x = 14; x <= 32; x += 6) {
+      s.tri(x, 19 + shift * 0.5, x - 7, 11 + shift, x + 5, 19, p.maneA);
+      s.line(x - 6, 12 + shift, x + 1, 18, p.maneB, 1);
+    }
+  } else if (p.mane === "tuft") {
+    for (let x = 12; x <= 30; x += 6)
+      s.tri(x, 19 + shift * 0.5, x + 3, 15 + shift, x + 6, 19, p.maneA);
+  }
+  // Đầu, mõm, tai
+  s.ellipse(35, 17 + shift * 0.5, p.heavy ? 8 : 7, p.heavy ? 7 : 6, p.head);
+  s.tri(37, 15, 46, 19, 37, 21, p.muzzle);
+  s.tri(30, 12, 32, 4, 36, 12, p.ear);
+  s.tri(35, 11, 38, 3, 40, 12, p.ear);
+  // Dấu trên trán
+  if (p.mark && p.mark.kind === "crescent") {
+    s.circle(34.5, 11.5 + shift * 0.5, 2.7, p.mark.color);
+    s.circle(35.6, 11, 2.3, p.head); // khoét lệch thành trăng khuyết
+  } else if (p.mark && p.mark.kind === "scar") {
+    s.line(33, 12 + shift * 0.5, 40, 18 + shift * 0.5, p.mark.color, 1);
+  }
+  // Mắt phát sáng + nanh
+  s.circle(38, 15, 3, p.eyeGlow, 70);
+  s.rect(37, 14, 3, 2, p.eyeCore);
+  s.tri(41, 21, 43, 26, 39, 22, p.fang);
+  // Hạt dưới chân theo loài (sương lạnh / bụi / tàn lửa / vệt gió / giọt máu / hạt sáng)
+  if (p.ground === "frost") {
+    s.circle(14, 38, 2.2, p.groundColor, 80);
+    s.circle(30, 39, 2.6, p.groundColor, 70);
+  } else if (p.ground === "dust") {
+    s.circle(12, 39, 1.8, p.groundColor, 90);
+    s.circle(21, 40, 1.4, p.groundColor, 80);
+    s.circle(33, 39, 1.8, p.groundColor, 90);
+  } else if (p.ground === "ember") {
+    s.set(14, 36 - shift, p.groundColor);
+    s.set(26, 35 + shift, 0xffd36b);
+    s.circle(32, 38, 1.5, p.groundColor, 140);
+    s.set(20, 37, 0xffd36b);
+  } else if (p.ground === "wind") {
+    s.line(6, 33, 14, 33, p.groundColor, 1, 150);
+    s.line(2, 37, 10, 37, p.groundColor, 1, 110);
+  } else if (p.ground === "blood") {
+    s.circle(15, 39, 1.2, p.groundColor, 200);
+    s.circle(27, 40, 1.6, p.groundColor, 190);
+    s.set(33, 38, p.groundColor);
+  } else if (p.ground === "mote") {
+    s.circle(14, 39, 1.2, p.groundColor, 120);
+    s.circle(30, 40, 1.6, p.groundColor, 100);
+  }
+  return s;
+}
+
 function drawMonsterFrame(id, step) {
   const shift = step % 2 === 1 ? -1 : 1;
   if (id === "tho") {
@@ -636,38 +886,10 @@ function drawMonsterFrame(id, step) {
     return s;
   }
   // ---- Quái Nguyên Anh của Hàn Vân Lĩnh (M7.5b #506): tranh vẽ TRƯỚC khi loài vào `shared/` (id chưa có trong MONSTERS thì vô hại) ----
-  if (id === "han_lang") {
-    // Hàn Lang (48x44): sói băng to hơn Hôi Lang, lông xanh nhạt, bờm và gai lưng bằng tinh thể băng, mắt lam phát sáng
-    const s = new Surface(48, 44);
-    s.ellipse(24, 38, 16, 4, 0x000000, 65);
-    // Đuôi
-    s.tri(4, 20 - shift, 13, 24, 10, 31, 0x7ea3bd);
-    s.tri(4, 20 - shift, 8, 14 - shift, 9, 22, 0xe6f6ff);
-    // Chân
-    s.rect(13 + shift, 30, 4, 8, 0x6f93ad);
-    s.rect(19 - shift, 30, 4, 8, 0x86aac4);
-    s.rect(28 + shift, 30, 4, 8, 0x6f93ad);
-    s.rect(33 - shift, 30, 4, 8, 0x86aac4);
-    // Thân, bụng sáng, bờm băng
-    s.ellipse(23, 25, 13, 8, 0x9fc4dc);
-    s.ellipse(24, 28, 9, 4, 0xd6ecf7);
-    s.ellipse(29, 21, 8, 7, 0xbfd9ec);
-    for (let x = 12; x <= 30; x += 6)
-      s.tri(x, 19 + shift * 0.5, x + 3, 10 + shift, x + 6, 19, 0xe6f6ff);
-    // Đầu, mõm, tai
-    s.ellipse(35, 17 + shift * 0.5, 7, 6, 0x9fc4dc);
-    s.tri(37, 15, 46, 19, 37, 21, 0x86aac4);
-    s.tri(30, 12, 32, 4, 36, 12, 0x6f93ad);
-    s.tri(35, 11, 38, 3, 40, 12, 0x6f93ad);
-    // Mắt lam phát sáng + nanh băng
-    s.circle(38, 15, 3, 0x7fe8ff, 70);
-    s.rect(37, 14, 3, 2, 0xdff9ff);
-    s.tri(41, 21, 43, 26, 39, 22, 0xffffff);
-    // Sương lạnh quanh chân
-    s.circle(14, 38, 2.2, 0xffffff, 80);
-    s.circle(30, 39, 2.6, 0xffffff, 70);
-    return s;
-  }
+  if (id === "han_lang") return drawWolf(shift, WOLF_PALETTES.han_lang);
+  // Sói Hóa Thần của Lang Hoang (D1 #1466 lát A1): CÙNG hình Hàn Lang (48x44), mỗi loài một bảng màu + dạng bờm + dấu riêng
+  if (Object.prototype.hasOwnProperty.call(WOLF_PALETTES, id))
+    return drawWolf(shift, WOLF_PALETTES[id]);
   if (id === "phong_nha") {
     // Phong Nha (44x44): chim săn nanh thép, lông bạc xám, cánh dựng như lưỡi dao, mỏ và vuốt vàng kim (hệ kim, bắn đạn)
     const s = new Surface(44, 44);
@@ -2048,6 +2270,14 @@ function buildAtlas() {
     "thien_han_vuong",
     // Trùm CẦM ĐƯỜNG nhỏ của Lạc Hà (CD5 #1065): rắn xanh riêng (trước đó tái dùng ảnh Xích Mãng đỏ làm ảnh tạm)
     "thanh_xa",
+    // Sói Hóa Thần của Lang Hoang (D1 #1466 lát A1): MỘT hình sói (`drawWolf`, 48x44 như Hàn Lang), mỗi loài một bảng màu / bờm / dấu riêng
+    // (trước đó tái dùng ảnh Hàn Lang làm ảnh tạm)
+    "da_lang",
+    "hac_phong_lang",
+    "huyet_nguyet_lang",
+    "xich_diem_lang",
+    "thuong_nguyet_lang",
+    "ngan_nguyet_lang",
   ]) {
     const f0 = drawMonsterFrame(mId, 0);
     const f1 = drawMonsterFrame(mId, 1);
@@ -2057,17 +2287,11 @@ function buildAtlas() {
     for (const pose of MONSTER_POSES) push(`mon-${mId}-${pose}`, drawMonsterPose(mId, pose));
   }
 
-  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1 / B): CHƯA có ảnh riêng; dùng BÍ DANH tới khung Hàn Lang (sói băng xanh, cùng họ, cùng cỡ; trùm nhỏ cũng vậy) và Thiên Hàn Vương (trùm cùng cỡ 88x80),
-  // KHÔNG thêm điểm ảnh (tiền lệ Thanh Xà ở #1559 chép khung nên atlas phình). B vẽ riêng từng loài thì thêm block `if (id === "<loài>")` trong `drawMonsterFrame`, chuyển loài đó sang danh sách chính ở trên
-  // và GỠ khỏi khối bí danh này.
+  // Hai TRÙM Lang Hoang (D1 #1466 lát B): CHƯA có ảnh riêng; dùng BÍ DANH tới khung Hàn Lang (sói băng xanh, cùng họ, cùng cỡ; trùm nhỏ) và Thiên Hàn Vương (trùm cùng cỡ 88x80),
+  // KHÔNG thêm điểm ảnh (tiền lệ Thanh Xà ở #1559 chép khung nên atlas phình). Sáu sói thường đã có tranh riêng (`drawWolf`, B #1579) nên KHÔNG ở đây. B vẽ riêng từng trùm thì thêm block
+  // `if (id === "<loài>")` trong `drawMonsterFrame`, chuyển loài đó sang danh sách chính ở trên và GỠ khỏi khối bí danh này.
   const monAliasSuffixes = ["", "-0", "-1", ...MONSTER_POSES.map((pose) => `-${pose}`)];
   for (const [mId, target] of [
-    ["da_lang", "han_lang"],
-    ["hac_phong_lang", "han_lang"],
-    ["huyet_nguyet_lang", "han_lang"],
-    ["xich_diem_lang", "han_lang"],
-    ["thuong_nguyet_lang", "han_lang"],
-    ["ngan_nguyet_lang", "han_lang"],
     ["lang_vuong", "han_lang"],
     ["thien_lang_vuong", "thien_han_vuong"],
   ])

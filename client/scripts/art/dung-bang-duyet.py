@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 _spec = importlib.util.spec_from_file_location("ma_co_dinh", os.path.join(HERE, "ma-co-dinh.py"))
 MA = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (T / VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
+_spec.loader.exec_module(MA)  # mã ỔN ĐỊNH (Q / T / VP / HU): xem ma-co-dinh.py; `python3 -I` không thêm thư mục script vào sys.path nên nạp bằng importlib
 MA_PATH = os.path.join(ROOT, "docs/art/huong-moi/ma-co-dinh.json")
 CODES = None  # bảng mã đã nạp (main() đặt; mã gọi trực tiếp thì `codes()` nạp từ MA_PATH)
 NEW_TAG = " · MỚI (sau 23/11)"  # đánh dấu hàng có mã vượt mốc đóng băng
@@ -455,16 +455,25 @@ Q_MAP = {  # id -> (Xianxia mob, (nhóm, đơn vị Wuxia, hướng) | None, Sun
 }
 
 
+def quai_order(names):
+    """THỨ TỰ quái thường của nhóm 12 (dùng chung cho `group_quai` và `--ghi-ma`): theo `MONSTERS`. Mã KHÔNG phụ thuộc thứ tự này (lấy từ bảng ỔN ĐỊNH); thứ tự chỉ quyết định số cấp cho quái MỚI chưa có trong bảng."""
+    return [m for m in names["mons"] if not m["boss"]]
+
+
 def group_quai(L, names):
+    """Quái thường (nhóm 12). Mã Q lấy từ bảng ỔN ĐỊNH `ma-co-dinh.json` (Q-01..Q-12 của tờ 23/11 giữ nguyên, quái mới nhận số ở CUỐI): trước đây `Q-{i:02d}` theo chỉ số trong danh sách nên sáu sói Hóa Thần chèn TRƯỚC Rắn Con làm Q-11, Q-12 nhích thành Q-17, Q-18. Hàng cũ theo số trước, hàng MỚI (đánh dấu) sau."""
+    t = codes()
+    mons = quai_order(names)
+    num = MA.assign_codes(t["q"], [m["id"] for m in mons])
     rows = []
-    mons = [m for m in names["mons"] if not m["boss"]]
-    for i, m in enumerate(mons, 1):
+    for m in sorted(mons, key=lambda m: num[m["id"]]):
+        n = num[m["id"]]
         xm, wu, sn = Q_MAP.get(m["id"], (None, None, None))
         a = cell(L, "A", "xian", lambda x=xm: L.xian(x, "idle"), f"{xm[3:] if xm else ''} NHÌN NGANG", 32) if xm else Cell("A", "xian", [], "", 32)
         b = cell(L, "B", "wuxia", lambda w=wu: L.wuxia(w[0], w[1], "Idle", w[2]), f"{wu[1]} top-down" if wu else "", 32) if wu else (
             cell(L, "B", "sunny", lambda s=sn: L.sunny_strip(s[0], s[1]), "Sunnyside, 16 px", 32) if sn and len(sn) == 2 else Cell("B", "sunny", [], "", 32))
         rec = "A (tô màu theo hệ nếu cần)" if xm else ("B" if wu else "KHÔNG nguồn nào có: giữ hiện tại / ảnh AI")
-        rows.append(dict(code=f"Q-{i:02d}", name=m["name"], rec=rec, cur=cell(L, "", "cur", lambda mid=m["id"]: L.cur(f"mon-{mid}"), "hiện tại 32x32", 32), opts=[a, b, Cell("C", "ninja", [], "", 32)]))
+        rows.append(dict(code=MA.label("q", n), name=m["name"] + (NEW_TAG if MA.is_new(t, "q", n) else ""), rec=rec, cur=cell(L, "", "cur", lambda mid=m["id"]: L.cur(f"mon-{mid}"), "hiện tại 32x32", 32), opts=[a, b, Cell("C", "ninja", [], "", 32)]))
     return "12-quai", "Nhóm 12 — Quái thường (Q)", rows
 
 
@@ -1033,8 +1042,8 @@ def main():
     ap.add_argument("--md", default=None, help="ghi các bảng markdown của các nhóm đã dựng vào tệp này (nối vào cuối)")
     ap.add_argument("--json", default=None, help="xuất duyet.json (mục 74: dữ liệu cho trang web duyệt) cho các nhóm đã dựng, vd docs/art/huong-moi/duyet.json; kèm ảnh cắt riêng từng ô vào --anh-dir")
     ap.add_argument("--anh-dir", default="/mnt/data/assets-private/preview", help="thư mục preview RIÊNG chứa ảnh cắt riêng (duyet/<mã>/<hien-tai|A|B|C>.png) khi có --json; ngoài repo")
-    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 13 / 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
-    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 13 / 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
+    ap.add_argument("--ma", default=MA_PATH, help="bảng mã ỔN ĐỊNH (id -> số) cho nhóm 12 / 13 / 14 / 15; mặc định docs/art/huong-moi/ma-co-dinh.json")
+    ap.add_argument("--ghi-ma", action="store_true", help="sau khi dựng nhóm 12 / 13 / 14 / 15, GHI các số mới cấp (ở CUỐI) vào bảng mã: chỉ dùng ở lần dựng lại có chủ ý (lúc duyệt), không dùng ở PR nội dung")
     a = ap.parse_args()
     import json
 
@@ -1072,6 +1081,8 @@ def main():
         print(f"ĐÃ XUẤT {a.json}: {n_ma} mã, {n_img} ảnh cắt riêng -> {os.path.join(a.anh_dir, 'duyet')}")
     if a.ghi_ma:
         t = CODES
+        if "12" in built:
+            t = MA.extended(t, "q", MA.assign_codes(t["q"], [m["id"] for m in quai_order(names)]))
         if "13" in built:
             t = MA.extended(t, "t", MA.assign_codes(t["t"], [m["id"] for m in boss_order(names)]))
         if "14" in built:
@@ -1079,7 +1090,7 @@ def main():
         if "15" in built:
             t = MA.extended(t, "hu", MA.assign_codes(t["hu"], [sk["id"] for sk in hu_order(names)[1]]))
         MA.save(a.ma, t)
-        print(f"ĐÃ GHI bảng mã: T {len(t['t'])}, VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
+        print(f"ĐÃ GHI bảng mã: Q {len(t['q'])}, T {len(t['t'])}, VP {len(t['vp'])}, HU {len(t['hu'])} -> {a.ma}")
 
 
 if __name__ == "__main__":
