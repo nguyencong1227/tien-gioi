@@ -35,6 +35,7 @@ beforeAll(async () => {
 afterEach(async () => {
   WorldRoomCls.leaderboards = null;
   await Promise.all(rooms.splice(0).map((r) => r.connection.isOpen && r.leave(true)));
+  // Chờ đồng hồ: dọn dẹp kết nối socket harness giữa các ca kiểm
   await sleep(100);
 });
 afterAll(async () => {
@@ -109,6 +110,7 @@ describe("boardsGet / boards qua phòng thật", () => {
     expect(m.rows.map((r) => r.name)).toEqual(["Nguoi Dau", a.name, "Nguoi Ba"]);
     expect(m.mine).toMatchObject({ rank: 2, row: { name: a.name } });
     expect(m.ageMs).toBeGreaterThanOrEqual(0);
+    // Chờ âm: khẳng định tin nhắn bản chụp chỉ gửi riêng cho người hỏi, người khác (b) không nhận
     await sleep(200);
     expect(b.boards.length).toBe(0); // người khác không nhận
     // mỗi bảng đều trả lời được
@@ -144,7 +146,8 @@ describe("boardsGet / boards qua phòng thật", () => {
       [],
     ])
       a.room.send(SOCIAL_MSG.boardsGet, bad as never);
-    await sleep(900); // đồng thời cho xô giới hạn tần suất (burst 6, 2/giây) hồi lại sau đợt tin rác
+    // Chờ âm & đồng hồ: khẳng định tin rác bị bỏ (không gửi boards, không tới dịch vụ) và xô giới hạn tần suất (burst 6, 2/giây) hồi lại
+    await sleep(900);
     expect(a.boards.length).toBe(0);
     expect(looked).toBe(0); // tin rác không bao giờ tới dịch vụ
     a.room.send(SOCIAL_MSG.boardsGet, { board: "tuvi" }); // phòng còn sống
@@ -164,7 +167,10 @@ describe("boardsGet / boards qua phòng thật", () => {
     WorldRoomCls.leaderboards = service([a.name]);
     await WorldRoomCls.leaderboards.refresh();
     for (let i = 0; i < 40; i++) a.room.send(SOCIAL_MSG.boardsGet, { board: "tuvi" });
-    await sleep(700);
+    // Chờ dương: máy chủ Colyseus thật tiếp nhận và gửi về các tin boards đầu tiên
+    await waitFor(() => a.boards.length > 0, 3000, "nhận tin boards đầu tiên");
+    // Chờ đồng hồ: chờ tiến trình Colyseus xử lý xong đợt spam để kiểm tra giới hạn burst
+    await sleep(500);
     expect(a.boards.length).toBeGreaterThan(0);
     expect(a.boards.length).toBeLessThan(15); // burst 6 + vài tin hồi lại
   });
