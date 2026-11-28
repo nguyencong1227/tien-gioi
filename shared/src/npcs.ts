@@ -34,7 +34,8 @@ export const NPCS: NpcDef[] = [
       "Lạc Hà Trấn nằm dưới chân Vân Mộng Sơn, linh khí tuy mỏng nhưng đủ cho kẻ có lòng.",
       "Ngoài kia yêu thú mỗi ngày một nhiều. Có việc gì cứ tới tìm ta.",
       "Tu sĩ trẻ vào trấn đông hơn xưa, ta mừng mà cũng lo, ít ai trụ nổi qua mùa đông đầu.",
-      "Vân Mộng Sơn che chở cho chúng ta bao đời, đổi lại ta phải giữ cho trấn được bình yên.",
+      // Móc truyện chương 1 (#1464): lời sấm chính sử, phàm nhân đem đặt tên con (lore.thien_mon_loi_sam)
+      'Phàm nhân trong trấn đem lời sấm "Ba nghìn năm phong thiên, cửa trời tự hiện" đặt tên cho con. Năm nay là kỳ hạn, nên người lạ đổ về.',
       "Hà lão bên tiệm đan giỏi chữa thương, Thiết Ngưu bên lò rèn giỏi tạo tác, cứ đến mà nhờ.",
     ],
     color: 0x7a5c3e,
@@ -50,7 +51,8 @@ export const NPCS: NpcDef[] = [
       "Mang da lông yêu thú tới, lão phu luyện cho ngươi vài viên.",
       "Vào sâu mà không dự phòng đan dược thì đừng trách số mình hẩm hiu.",
       "Mai rùa từ đầm Âm Sương cho dược liệu bổ huyết tốt nhất, hiếm mà quý.",
-      "Ngươi mà thương nặng thì chạy sang đây gấp, lửa lò lão đang nhóm sẵn.",
+      // Móc truyện chương 1 (#1464): bia không chữ đếm năm (lore.thien_mon_bia_dem_nam)
+      "Lão từng áp tay lên một tấm bia không chữ, cỏ chẳng mọc quanh chân. Bia thì thầm đếm năm, mà chưa tới số cuối.",
     ],
     color: 0x4f8a5b,
   },
@@ -96,7 +98,8 @@ export const NPCS: NpcDef[] = [
       "Thanh Lộ Trạm dựng sát cổng cho kẻ vượt Hắc Phong Cốc dừng chân. Gió ngoài kia rát, thú cũng dữ hơn dưới Lạc Hà.",
       "Thu được gì cứ bán cho ta, đỡ phải gánh về trấn dưới. Đan dược ta cũng có sẵn.",
       "Hắc Phong Cốc là con đường duy nhất lên Âm Sương, mà cũng là nơi chôn biết bao kẻ tham lam.",
-      "Gió ở đây cắt da, ngươi lên đường thì mua đủ đan dược phòng thân đã.",
+      // Móc truyện chương 2 (#1464): mũi kiếm gãy Đoạn Thiên (lore.doan_thien_kiem_vu)
+      "Dân săn kể từng mổ bụng Xích Mãng, thấy một mũi kiếm gãy cổ xưa. Kiếm ngày Đoạn Thiên thanh nào cũng gãy ở mũi, như đâm vào thứ cứng hơn trời.",
       "Ta đi buôn qua bao trạm, nhưng thú dữ như dưới Cốc này thì ít nơi nào sánh bằng.",
     ],
     color: 0x6b4f8a,
@@ -115,7 +118,8 @@ export const NPCS: NpcDef[] = [
       "Gió đen thổi suốt ngày đêm, bầy Hôi Lang và Hắc Hổ càng nhiều, đạo hữu vào sâu phải cẩn trọng.",
       "Yêu thú quấy phá đường vận chuyển, hạ chúng mang da răng về trạm, ta trả công bằng đan dược và tu vi.",
       "Lái buôn Mạc Thông bên kia trạm thu mua đồ, ngươi có gì cứ mang sang bán, hắn trả giá không tệ.",
-      "Ta săn thú từ thuở còn non trẻ, nên biết rõ con đường nào an toàn và con thú nào nên tránh.",
+      // Móc truyện chương 2 (#1464): Mộ Dung Triệt thách tỉ thí bằng lời (npc.mo_dung_triet)
+      "Có thiếu niên áo trắng đeo kiếm dài ghé trạm, xưng Mộ Dung Triệt, thách ai dám tỉ thí. Hắn bảo mong kẻ nhận lời đừng hữu danh vô thực.",
     ],
     color: 0x4a6b3a,
   },
@@ -130,9 +134,11 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Vọng Sương Trạm dựng giữa đầm, đèn đêm nào cũng thắp để kẻ lạc đường tìm về. Ra khỏi vòng đèn là sương nuốt tiếng bước chân.",
       "Kim Đan mới dám đi sâu. Đầm này nuôi sương hồ, rùa đá, cóc độc, và ở nơi sâu nhất là Hắc Giao. Có việc thì nói với ta.",
-      "Sương đầm dày đến mức giữa ban ngày cũng tối như đêm, kẻ mất phương cứ theo đèn mà về.",
+      // Móc truyện chương 3 (#1464): đêm triều rút (lore.trung_chau_trieu_khu)
+      "Dân chài ven biển kể cứ vài chục năm có một đêm nước rút xa mất bóng, lộ mái điện dưới đáy. Đêm ấy họ không thả lưới.",
       "Hắc Giao là trùm của đầm, to bằng cả cái chòi, một mình mà đụng phải thì chỉ có chuồn.",
-      "Ta giữ trạm này bao năm, thấy bao tu sĩ vào sâu, kẻ trở về mang đồ, kẻ thì không.",
+      // Móc truyện chương 3 (#1464): Ninh Tam Sinh dưới gốc hòe (npc.ninh_tam_sinh)
+      "Hôm kia có nữ tu đứng dưới gốc hòe ngoài trạm như đã đợi ai từ rất lâu. Nàng cười, tự xưng Ninh Tam Sinh, rồi hỏi ta đã gặp ngươi chưa.",
     ],
     color: 0x4a6b78,
   },
@@ -147,7 +153,8 @@ export const NPCS: NpcDef[] = [
       "Thu được gì từ đầm cứ bán cho ta, đỡ phải gánh ngược qua Hắc Phong Cốc. Đại hồi đan ta cũng có sẵn.",
       "Đan hồi phục quý hơn vàng khi ngươi đứng trước cóc độc. Mua đủ rồi hẵng vào sâu.",
       "Sương hồ cho lông quý, rùa đá cho mai bổ, bán hết cho ta, ta trả giá công bằng.",
-      "Kẻ buôn như ta chẳng sợ nguy hiểm, chỉ sợ hàng tồn kho, nên cứ bán nhanh cho gọn.",
+      // Móc truyện chương 3 (#1464): Ôn Như Ngọc hái thuốc, không bội khế ước (npc.on_nhu_ngoc)
+      "Có nữ tu áo xanh nhạt ghé đầm hái thuốc, xưng Ôn Như Ngọc, Đan Hà Cốc: giá cả dễ nói, nhưng đã nói thì phải giữ lời.",
       "Lên Hàn Vân thì tìm Kỳ Thiên Lộc, hắn ta mua bán trên băng giỏi không kém ta dưới đầm.",
     ],
     color: 0x7a5f8c,
@@ -163,7 +170,8 @@ export const NPCS: NpcDef[] = [
       "Mai rùa, lông sương, vảy giao: nguyên liệu trong đầm này rèn ra đồ ra hồn nhất. Mang tới đây, thêm chút Linh thạch tiền than.",
       "Đồ tốt kén người: chưa tới Kim Đan thì mặc vào cũng chẳng chịu nổi.",
       "Vảy giao long cho ta rèn được giáp chịu đòn, nhưng đòi đội đủ ba bốn người mới hạ nổi con.",
-      "Lửa lò ta nhóm giữa đầm sương, than phải chở từ dưới Lạc Hà lên, đắt mà hiếm.",
+      // Móc truyện chương 3 (#1464): Minh Độ và chiếc vảy rắn (npc.minh_do)
+      "Một tiểu tăng đi ngang xin chén nước, tay áo lấp ló vật óng ánh như vảy rắn. Sư chắp tay: bần tăng Minh Độ, Kim Cương Tự.",
       "Rùa đá già cho mai dày nhất, ngươi vào sâu thì nhớ tìm những con tuổi thọ cao.",
     ],
     color: 0x9a4a30,
@@ -179,9 +187,11 @@ export const NPCS: NpcDef[] = [
     dialog: [
       "Hàn Vân Trạm dựng trên sườn băng, lò than nào cũng nhóm suốt đêm. Ra khỏi vòng lửa là gió tuyết cắt da.",
       "Nguyên Anh mới dám lên đây. Bầy sói băng, chim nanh thép, voi xương, sẻ độc, và ở nơi cao nhất là Thiên Hàn Vương. Có việc thì nói với ta.",
-      "Gió tuyết ở đây lạnh đến mức đan dược cũng đông cứng, ngươi dự trữ đủ rồi hãy lên cao.",
+      // Móc truyện chương 4 (#1464): Thác Bạt Sương chắn giữa đường tuyết (npc.thac_bat_suong)
+      "Có thiếu nữ áo lông đen đứng chắn giữa đường tuyết, nhìn ta rất lâu rồi chỉ nói: Thác Bạt Sương, Huyền Vũ Môn. Nói xong là thôi.",
       "Thiên Hàn Vương là chúa tể băng nguyên, một con đã đủ quét sạch cả một đội tu sĩ.",
-      "Ta giữ trạm trên băng bao mùa đông, kẻ nào thiếu chuẩn bị đều không sống qua đêm đầu.",
+      // Móc truyện chương 4 (#1464): bằng già chờ người nhà quay lại (lore.doan_thien_bang_ky)
+      "Trên mỏm đá phía bắc có con bằng già đứng quay mặt về bắc suốt bao năm. Người Tuyết Bằng bảo nó chờ một người nhà sẽ quay lại.",
     ],
     color: 0x4a7aa8,
   },
@@ -196,7 +206,8 @@ export const NPCS: NpcDef[] = [
       "Thu được gì trên băng cứ bán cho ta, đỡ phải gánh ngược xuống Âm Sương. Thượng hồi đan ta có sẵn.",
       "Đứng trước độc tước mà hết đan thì hối cũng không kịp. Mua đủ rồi hẵng lên cao.",
       "Hàn Lang cho lông bền, voi xương cho ngà quý, bán hết cho ta, ta trả giá xứng đáng.",
-      "Buôn trên băng nguy hơn dưới đầm: thú dữ, đường xa, mà giặc cướp cũng thường rình.",
+      // Móc truyện chương 4 (#1464): lần đầu nghe tên Tầm Thiên Hội (lore.thien_mon_tam_thien)
+      "Nghe nói có hội không sơn môn, chỉ có người, gọi là Tầm Thiên Hội, tin cửa trời mở thì hồn được lên trên. Ta chỉ lo buôn, không dính vào.",
       "Xuống Âm Sương thì tìm Phó Quang, hắn mua bán dưới đầm giỏi không kém ta trên này.",
     ],
     color: 0x6a8cb8,
@@ -212,8 +223,10 @@ export const NPCS: NpcDef[] = [
       "Lông Hàn Lang, xương voi, vũ Phong Nha, châu Thiên Hàn: băng nguyên này cho nguyên liệu rèn ra đồ ra hồn nhất. Mang tới đây, thêm chút Linh thạch tiền than.",
       "Đồ tốt kén người: chưa tới Nguyên Anh thì mặc vào cũng chẳng chịu nổi.",
       "Châu Thiên Hàn là nguyên liệu quý nhất ta từng rèn qua, nhưng đòi cả đội mới lấy được.",
-      "Lửa lò ta phải nhóm mạnh hơn dưới Lạc Hà mới chịu được cái lạnh trên này.",
-      "Vũ Phong Nha chim nanh thép cho ta rèn được phủ sắc lạnh, chém đâu đứt đó.",
+      // Móc truyện chương 4 (#1464): Bằng Thất sà xuống từ vách núi (npc.bang_that)
+      "Một bóng trắng sà xuống từ vách núi, hóa thiếu niên tóc bạc mắt vàng. Hắn xưng Bằng Thất, bảo ta đứng trên đất tộc hắn mà không biết sợ.",
+      // Móc truyện chương 4 (#1464): Yến Bắc Quy ghé lò xem kiếm (npc.yen_bac_quy)
+      "Một thanh niên tuấn tú phe phẩy quạt ghé lò xem kiếm, xưng Yến Bắc Quy, bảo kẻ có mắt tốt sớm muộn cũng cần một tri kỷ như hắn.",
     ],
     color: 0x5a3a6a,
   },

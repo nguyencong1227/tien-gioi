@@ -183,7 +183,7 @@ Lời sấm: đến kỳ, "người đời sau phải chọn lại: phong tiếp
 | A3 | Thiết kế Vô Nhai Uyên (bí cảnh nhiều tầng) | A | đợt sau |
 | G1 | **Gỡ từ cấm Vạn Kiếp:** `shared/src/glossary-banned.ts` (+ test, `TU_DIEN_TIEN_GIOI.md` mục từ cấm) chỉ còn cấm tên của game / truyện KHÁC; thêm địa danh và nhân vật mới vào Từ điển | G (PR riêng `shared/`, thêm một dev xem) | chặn `check:content` cho nội dung mới |
 | G2 | Sổ lore chọn lọc theo chương: bảng địa danh / nhân vật / sự kiện từ nguồn, mỗi mục kèm khoá nguồn, để E / D lấy | G | tài liệu |
-| E1 | Gắn móc truyện vào chương 1-4 | E | dữ liệu + test |
+| E1 | Gắn móc truyện vào chương 1-4 | E | dữ liệu + test. **Lát 1 XONG (A, #1464): 13 móc bằng lời thoại NPC có sẵn** (lời sấm, bia không chữ, mũi kiếm gãy, Mộ Dung Triệt, đêm triều rút, Ninh Tam Sinh, Ôn Như Ngọc, Minh Độ, Thác Bạt Sương, bằng già, Tầm Thiên Hội, Bằng Thất, Yến Bắc Quy), khoá bằng `shared/src/moc-truyen.test.ts`. **Còn:** việc phụ "Bia không chữ" / "Mũi kiếm gãy" (Lạc Hà và Hắc Phong hết chỗ dưới trần việc phụ: cần chốt nâng `QUEST_EXP_CAP_SIDE`, xem comment A ở #1464), giấc mơ về bến sông ở màn Hoàng Tuyền (client), Ninh Tam Sinh / thiên kiêu làm NPC đứng được (cần sprite) |
 | E2 | Chương 5-6 (Lang Hoang, Uy Vân Kinh): kịch bản, nhiệm vụ chính + phụ, NPC, hội thoại | E | kịch bản trước (tài liệu), dữ liệu sau khi có map + quái |
 | D1 | Quái + trùm + vật phẩm + sách chiêu Hóa Thần (Lang Hoang, Uy Vân Kinh) | D | sau A1 |
 | B1 | Bản đồ Tiled Lang Hoang và Uy Vân Kinh (+ cổng) | B | sau #1330 / cây (mục 73) |
