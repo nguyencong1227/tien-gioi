@@ -312,9 +312,13 @@ describe("Nguyên Anh: chuỗi nhiệm vụ (M7.5c bước 2)", () => {
 
   it("tám nhiệm vụ chính nối nhau từ `kim_dan_hau_ky` tới trùm; ba nhiệm vụ lặp không nằm trong chuỗi; chuỗi KHÔNG đi qua Hắc Giao (đội) nên làm được một mình", () => {
     const walk: string[] = [];
-    for (let id: string | undefined = "kim_dan_hau_ky"; id; id = QUEST_BY_ID[id].next)
+    // Chuỗi chính còn đi tiếp lên Lang Hoang (`thien_han_hoan.next`, #1465 giai đoạn 2 lát 2): chỉ xét đoạn Nguyên Anh, dừng ở trùm Hàn Vân
+    for (let id: string | undefined = "kim_dan_hau_ky"; id; id = QUEST_BY_ID[id].next) {
       walk.push(id);
+      if (id === "thien_han_hoan") break;
+    }
     expect(walk).toEqual(["kim_dan_hau_ky", ...CHAIN]);
+    expect(QUEST_BY_ID.thien_han_hoan.next).toBe("lang_hoang_vong_quan");
     expect(walk).not.toContain("giao_hoan");
     for (const id of DAILY) {
       expect(QUEST_BY_ID[id].daily, id).toBe(true);
@@ -322,8 +326,8 @@ describe("Nguyên Anh: chuỗi nhiệm vụ (M7.5c bước 2)", () => {
       expect(QUEST_BY_ID[id].giver, id).toBe("tram_truong_han");
       expect(walk, id).not.toContain(id);
     }
-    // 7 nhiệm vụ chính + 3 nhiệm vụ lặp + 1 việc phụ (lap_uy_bang_nguyen, #725)
-    expect(QUESTS.filter((q) => q.giver === "tram_truong_han")).toHaveLength(7 + 3 + 1);
+    // 7 nhiệm vụ chính + 3 nhiệm vụ lặp + 1 việc phụ (lap_uy_bang_nguyen, #725) + `lang_hoang_vong_quan` (nhiệm vụ nối lên Lang Hoang, #1465 giai đoạn 2 lát 2)
+    expect(QUESTS.filter((q) => q.giver === "tram_truong_han")).toHaveLength(7 + 3 + 1 + 1);
   });
 
   it("mọi bước trỏ tới thứ kiếm được ở Hàn Vân: quái chỉ sinh ở Hàn Vân, vật phẩm rơi từ quái Nguyên Anh, NPC thật; nhiệm vụ nối nói chuyện với trạm trưởng Hàn Vân", () => {

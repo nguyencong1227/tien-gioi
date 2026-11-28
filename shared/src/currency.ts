@@ -77,6 +77,8 @@ export const ITEM_VALUE: Record<string, number> = {
   nanh_nguyet: 380,
   cot_lang_vuong: 500,
   hon_tinh_thien_lang: 5000,
+  // Vật phẩm CỐT TRUYỆN chương 5 (#1465 lát 2): giá trị 0 = KHÔNG bán được (sellPrice 0), không sinh Linh thạch; nhiệm vụ `lang_hoang_duong_mau` lấy đi lúc trả
+  manh_ao_liet_duong: 0,
   // Bộ V Hóa Thần (D1 lát A2): ~x2,8 bộ IV, luôn thấp hơn phí rèn + nguyên liệu
   kiem_nanh_nguyet: 42000,
   bao_huyet_nguyet: 33600,

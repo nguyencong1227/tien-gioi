@@ -116,8 +116,8 @@ describe("chuỗi nhiệm vụ chính qua bốn bản đồ", () => {
       expect(back.c.quests.done, `${id}: trả ở phòng của ${def.giver}`).toContain(id);
       done.push(id);
     }
-    expect(done).toHaveLength(23);
-    expect(done.slice(-13)).toEqual([
+    expect(done).toHaveLength(26); // 23 tới Thiên Hàn Vương + ba nhiệm vụ chương 5 (#1465 giai đoạn 2 lát 2)
+    expect(done.slice(-16)).toEqual([
       "vong_suong",
       "suong_ho_hoan",
       "thach_quy_giap",
@@ -131,9 +131,12 @@ describe("chuỗi nhiệm vụ chính qua bốn bản đồ", () => {
       "doc_tuoc_nang_cb",
       "nguyen_anh_hau_ky",
       "thien_han_hoan",
+      "lang_hoang_vong_quan",
+      "lang_hoang_lang_con",
+      "lang_hoang_duong_mau",
     ]);
-    // người chơi cuối chuỗi đã là Nguyên Anh hậu kỳ (các bước reachRealm đẩy bậc lên đúng thang)
-    expect(stepOf(all[0].p.realm, all[0].p.tier)).toBeGreaterThanOrEqual(stepOf(4, 2));
+    // người chơi cuối chuỗi đã là Hóa Thần trung kỳ (`lang_hoang_vong_quan` đẩy lên sơ kỳ bằng `reachRealm`, `lang_hoang_duong_mau` đòi từ trung kỳ); các bước reachRealm đẩy bậc lên đúng thang
+    expect(stepOf(all[0].p.realm, all[0].p.tier)).toBeGreaterThanOrEqual(stepOf(5, 1));
     expect(expToNext(4, 2)).toBe(Math.round(288000 * Math.pow(1.15, 2)));
     // nhiệm vụ nối `lang_han_quan` giao ở Âm Sương nhưng bước nói chuyện ở Hàn Vân: hai NPC ở hai phòng khác nhau
     expect(NPC_BY_ID[QUEST_BY_ID.lang_han_quan.giver].mapId).toBe(AM_SUONG_ID);

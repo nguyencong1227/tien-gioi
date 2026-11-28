@@ -185,9 +185,9 @@ describe("nội dung nhiệm vụ (#19)", () => {
     return out;
   };
 
-  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ các việc phụ mang_hoan, giao_hoan (trùm theo đội), ba việc phụ ở Hàn Vân (#725), ba việc phụ ở Âm Sương (#756) và ba việc phụ ở Hắc Phong (#1450); Luyện Khí kết thúc ở tầng 9", () => {
+  it("chuỗi chính: Luyện Khí (8 nhiệm vụ) -> Trúc Cơ (2) -> Kim Đan (5) -> Nguyên Anh (8) -> Hóa Thần chương 5 (3); mọi nhiệm vụ không lặp nằm trong chuỗi, trừ các việc phụ mang_hoan, giao_hoan (trùm theo đội), ba việc phụ ở Hàn Vân (#725), ba việc phụ ở Âm Sương (#756) và ba việc phụ ở Hắc Phong (#1450); Luyện Khí kết thúc ở tầng 9", () => {
     const ids = chain();
-    expect(ids).toHaveLength(23);
+    expect(ids).toHaveLength(26); // 23 tới `thien_han_hoan` + ba nhiệm vụ chương 5 (#1465 giai đoạn 2 lát 2)
     // Việc phụ không có người đứng trước và không nằm trong chuỗi: hạ Xích Mãng (không an toàn khi solo) KHÔNG được chặn chuỗi chính
     expect(
       new Set([
@@ -240,6 +240,9 @@ describe("nội dung nhiệm vụ (#19)", () => {
       "doc_tuoc_nang_cb",
       "nguyen_anh_hau_ky",
       "thien_han_hoan",
+      "lang_hoang_vong_quan",
+      "lang_hoang_lang_con",
+      "lang_hoang_duong_mau",
     ]);
   });
 

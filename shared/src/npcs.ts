@@ -305,6 +305,40 @@ export const NPCS: NpcDef[] = [
     ],
     color: 0x6a8a5a,
   },
+  // Hai cao nhân của chuỗi chính chương 5 (#1465 giai đoạn 2 lát 2; `docs/KICH_BAN_CHUONG_5_6.md` mục 3.1): Đoan Mộc Thu ngồi trên mái quán ải, Lạc Thanh Sơn nghỉ chân gánh củi ở trạm.
+  // Nhân vật NGUỒN (`npc.quan_ky_chan_quan`, `npc.phu_son_lao_nhan`): tên, nét và lời gặp NGUYÊN VĂN làm dòng giới thiệu, bỏ tên riêng ngoài phạm vi mục 75. Ảnh TẠM (B vẽ riêng sau).
+  {
+    id: "doan_moc_thu",
+    mapId: LANG_HOANG_ID,
+    name: "Đoan Mộc Thu",
+    title: "Người xem cờ",
+    x: 2148,
+    y: 3076,
+    dialog: [
+      "Ngươi đi nước này, ta cược ngươi thua. Đừng nhìn vỏ hạt dưa dưới chân, nhìn bãi cờ ngoài ải kia kìa.",
+      "Sử chép thú triều tràn từ Lang Lĩnh xuống. Ta ngồi trên mái quán này ba trăm năm, chưa thấy lang nào đánh ải bao giờ.",
+      "Lang mẹ không đánh ải. Chúng lần theo máu. Máu của ai thì ngươi tự đi hỏi, ta chỉ xem cờ.",
+      "Ba trăm năm trước ta ra tay một lần, cứu nhầm một kẻ về sau thành ma đầu. Từ đó ta chỉ ngồi xem.",
+      "Muốn nghe nước cờ kế thì xuống bãi hạ vài chục Dã Lang, rồi sang hỏi lão tiều phu ngồi nghỉ chân kia.",
+    ],
+    color: 0x4a8a8a,
+  },
+  {
+    id: "lac_thanh_son",
+    mapId: LANG_HOANG_ID,
+    name: "Lạc Thanh Sơn",
+    title: "Lão tiều phu",
+    x: 2098,
+    y: 3236,
+    dialog: [
+      "Đường dài, gánh nặng. Đi cùng một quãng chứ? Ngươi gánh thử một đoạn, gánh rồi mới biết đường xa thế nào.",
+      "Ta tu bằng gánh củi mà lên tới đỉnh, tạp linh căn, chẳng ai coi ra gì. Củi nặng thì vai biết, đạo nặng thì lòng biết.",
+      "Lang con ở bãi này bị bắt từng lứa, nhốt lồng mà đi. Gánh củi còn thấy mỏi, ngươi thử nghĩ kẻ yếu bị bắt phải đi bao xa.",
+      "Ta ghét nhất kẻ cậy mạnh hiếp yếu. Ai chặn đường ta thì ta cho gánh thử một lần, gánh xong thì chừa.",
+      "Ngươi gánh thử mười tấm da sói ngoài bãi về cho Quan úy, đừng bỏ giữa đường. Gánh xong sẽ thấy điều người cậy mạnh chẳng bao giờ thấy.",
+    ],
+    color: 0x7a6a4a,
+  },
   {
     // Cổng vào bí cảnh (docs/THIET_KE_BI_CANH.md): chỉ đội trưởng mở được, nút do server dựng theo điều kiện của đội
     id: "thu_mon",

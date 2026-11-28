@@ -1605,6 +1605,18 @@ function drawItemIcon(id) {
     s.tri(12, 6, 9, 12, 15, 12, 0xffffff, 200);
     s.line(12, 0.5, 12, 3, 0xffffff, 1);
     s.line(12, 21, 12, 23.5, 0xffffff, 1);
+  } else if (id === "manh_ao_liet_duong") {
+    // Mảnh áo Liệt Dương (#1465 lát 2, ẢNH TẠM): mảnh vải đỏ sẫm rách mép, viền cháy đen, nửa vầng mặt trời vàng ở vạt dưới
+    s.tri(4, 20, 4, 5, 20, 3, 0xa8483a);
+    s.tri(4, 20, 20, 3, 21, 19, 0x8e3a2e);
+    s.line(4, 5, 20, 3, 0x2a1a16, 1.4);
+    s.line(4, 5, 4, 20, 0x2a1a16, 1.4);
+    s.line(4, 20, 21, 19, 0x2a1a16, 1.4);
+    s.circle(13, 17, 3.6, 0xf0c25a);
+    s.rect(9, 17, 9, 4, 0x8e3a2e);
+    for (const x of [10, 13, 16]) s.line(x, 12, x, 13.6, 0xf0c25a, 1);
+    s.set(8, 8, 0x2a1a16);
+    s.set(12, 7, 0x2a1a16);
   } else if (id === "han_lang_mao") {
     // Hàn Lang Mao (M7.5c): nhúm lông sói băng cứng, đầu lông kết tinh, sao tuyết nhỏ
     s.line(6, 19, 8, 8, 0x86aac4, 2);
@@ -2118,6 +2130,21 @@ function drawNpcSprite(id) {
       beard: false,
       prop: "staff",
     },
+    // Hai cao nhân chuỗi chính chương 5 (#1465 giai đoạn 2 lát 2): ẢNH TẠM theo tông áo của `NpcDef.color` (B vẽ riêng sau)
+    doan_moc_thu: {
+      robe: 0x4a8a8a,
+      trim: 0xdfe6f0,
+      hair: 0x2b2623,
+      beard: false,
+      prop: "talisman",
+    },
+    lac_thanh_son: {
+      robe: 0x7a6a4a,
+      trim: 0xc9b592,
+      hair: 0xd8d8d8,
+      beard: true,
+      prop: "staff",
+    },
     tho_ren_han: { robe: 0x6a3f4a, trim: 0x9fd0ea, hair: 0x2c3a4a, beard: true, prop: "hammer" },
   }[id];
   if (!cfg) throw new Error(`Chưa có tranh NPC: ${id}`);
@@ -2315,6 +2342,8 @@ function buildAtlas() {
     "quan_uy_tuyet_dao",
     "lai_buon_tuyet_dao",
     "do_thap_tam_nuong",
+    "doan_moc_thu",
+    "lac_thanh_son",
     "lao_dan",
     "tran_uy",
     "lao_phu",
@@ -2376,6 +2405,7 @@ function buildAtlas() {
     "nanh_nguyet",
     "cot_lang_vuong",
     "hon_tinh_thien_lang",
+    "manh_ao_liet_duong",
     "kiem_nanh_nguyet",
     "bao_huyet_nguyet",
     "phu_hon_thien_lang",

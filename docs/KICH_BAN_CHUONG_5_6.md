@@ -2,7 +2,7 @@
 
 > Giai đoạn 1 của issue **#1465** [75-E2] (mục 75, `docs/COT_TRUYEN.md` mục 5 và 6.1-6.2): **chỉ tài liệu**, chưa có dòng dữ liệu nào. Dev A viết thay Dev E (Ornith đang tắt, 28/11/2026). Giai đoạn 2 (nhập `quests*.ts`, `npcs.ts`, cửa hàng, test) làm SAU khi D1 (#1466) có quái và vật phẩm Hóa Thần trên `main`; người làm giai đoạn 2 đọc mục 1 (số thật) và mục 6 (việc phải làm) trước.
 > Nguồn: chỉ bản sao `~/TT/van-kiep-tu-tien-clone` (tiếng Việt, không `ten_han`). Mọi mẩu lấy từ nguồn ghi khoá ở cột "Nguồn"; khi nhập dữ liệu mỗi mẩu một dòng ở `docs/NGUON_NOI_DUNG.md` mục 3 (`su_kien` cho lore / encounter, `du_lieu` cho nhân vật, như PR #1566).
-> **Trạng thái: bản 1, chờ A review lại sau khi D1 chốt tên quái** (các id quái / vật phẩm ở đây là DỰ KIẾN).
+> **Trạng thái (28/11/2026): bản 2.** D1 đã chốt id quái Lang Hoang (`da_lang`, `huyet_nguyet_lang`, `thien_lang_vuong`... ở `game.ts`). **Giai đoạn 2 chương 5 ĐÃ VÀO dữ liệu:** lát 1 (#1582: ba NPC + ba việc phụ), lát 2 (ĐỀ NGHỊ: hai cao nhân Đoan Mộc Thu, Lạc Thanh Sơn + ba nhiệm vụ chính `lang_hoang_vong_quan` / `lang_hoang_lang_con` / `lang_hoang_duong_mau` + vật phẩm `manh_ao_liet_duong`; test `shared/src/lang-hoang-chuoi.test.ts`). Chương 6 (Uy Vân Kinh) còn chờ quái / bản đồ của lát sau; id quái / vật phẩm chương 6 ở đây vẫn là DỰ KIẾN.
 
 ## 1. Ràng buộc kỹ thuật (số thật, đo từ mã ngày 28/11/2026)
 
@@ -48,15 +48,16 @@ Chính sử mà người chơi đã nghe trước đó (Đại Ung / Bắc Minh)
 | `lac_thanh_son` | **Lạc Thanh Sơn** | lão tiều phu gánh củi nghỉ chân ở trạm, "gánh thử một lần" | `/content/npc/cao_nhan.yaml` `npc.phu_son_lao_nhan` |
 | `do_thap_tam_nuong` | **Đỗ Thập Tam Nương** | tán tu lém lỉnh, giao hai việc phụ | `/content/npc/thien_kieu.yaml` `npc.do_thap_tam_nuong` |
 
-### 3.2. Chuỗi chính (3 nhiệm vụ, 88.000 tu vi mỗi nhiệm vụ, minRealm tier 0: tổng chuỗi 264.000)
+### 3.2. Chuỗi chính (3 nhiệm vụ; bản 2: 70.000 + 88.000 + 100.000 = tổng chuỗi 258.000)
 
 | # | id dự kiến | Tên / giao | minRealm | Bước (tuần tự) | Nhịp truyện | Thưởng |
 | --- | --- | --- | --- | --- | --- | --- |
-| 5.1 | `lang_hoang_vong_quan` | **Vọng Lang Quan** / Thôi Tuyết Phong (`tram_truong_han`, nối từ `thien_han_hoan`) | {4,2} | `reachRealm {5,0}` | Thôi Tuyết Phong tiễn lên bắc: ải Tuyết Đao thiếu người, nghe tin lang con mất tích | 88.000 + đan hồi bậc Hóa Thần x3 (D1) |
+| 5.1 | `lang_hoang_vong_quan` | **Vọng Lang Quan** / Thôi Tuyết Phong (`tram_truong_han`, nối từ `thien_han_hoan`) | {4,2} | `reachRealm {5,0}` | Thôi Tuyết Phong tiễn lên bắc: ải Tuyết Đao thiếu người, nghe tin lang con mất tích | **70.000** (bản 2: sàn của bậc nhận {4,2} chỉ 19.044; dành chỗ trần cho 5.3) + Thượng Hồi Huyết Đan x3 |
 | 5.2 | `lang_hoang_lang_con` | **Đàn lang con** / Quan úy Ngô Cự | {5,0} | `talk doan_moc_thu` -> `kill` Dã Lang x30 -> `talk lac_thanh_son` -> `collect` vật phẩm bãi sơ cấp x10 | Quan úy kể lứa lang con mất tích, lang mẹ kéo tới chân ải; Đoan Mộc Thu cược người chơi thua và hé rằng lang mẹ không đánh ải mà lần theo máu; Lạc Thanh Sơn bắt gánh thử một lần (người cậy mạnh không thấy được điều này) | 88.000 + đan hồi x3 |
-| 5.3 | `lang_hoang_duong_mau` | **Đường máu** / Quan úy Ngô Cự | {5,0} | `kill` Huyết Nguyệt Lang x20 -> `kill` Thiên Lang Vương x1 -> `collect` `manh_ao_liet_duong` x1 -> trả | theo mùi máu lên Huyết Lang Động; Thiên Lang Vương chặn đường người đuổi con, không giết người ở ải; thứ nhặt từ xác là mảnh áo choàng cháy xém; kết: đường máu dẫn tới cổng **Liệt Dương Tông**, không phải Uy Vân Kinh | 88.000 + đan hồi x3 + 1 kinh quyển Hóa Thần nếu D1 có sách hợp bậc (độ hiếm theo `book-drop-realm.test.ts`) |
+| 5.3 | `lang_hoang_duong_mau` | **Đường máu** / Quan úy Ngô Cự | **{5,1}** (bản 2: Huyết Nguyệt Lang an toàn từ Trung kỳ như `lh_linh_ai_sach_nhieu`; Thiên Lang Vương đội 3-4 người như Thiên Hàn Vương) | `kill` Huyết Nguyệt Lang x20 -> `kill` Thiên Lang Vương x1 -> `collect` `manh_ao_liet_duong` x1 -> trả | theo mùi máu lên Huyết Lang Động; Thiên Lang Vương chặn đường người đuổi con, không giết người ở ải; thứ nhặt từ xác là mảnh áo choàng cháy xém; kết: đường máu dẫn tới cổng **Liệt Dương Tông**, không phải Uy Vân Kinh | **100.000** (bản 2: sàn 5 % thanh {5,1} = 99.360) + Thượng Hồi Huyết Đan x3 + Thượng Hồi Linh Đan x3; KHÔNG thưởng sách (Thiên Lang Vương đã rơi cả ba quyển Hóa Thần 20 % mỗi quyển) |
 
-Tổng chuỗi 5: **264.000 / 600.048** (4,4 % tổng thanh Hóa Thần). Nhiệm vụ 6.1 là `next` của 5.3 (giao ở Uy Vân Kinh).
+Tổng chuỗi 5: **258.000 / 600.048** (4,3 % tổng thanh Hóa Thần). Nhiệm vụ 6.1 là `next` của 5.3 (giao ở Uy Vân Kinh).
+Vật phẩm cốt truyện `manh_ao_liet_duong`: Thiên Lang Vương rơi CHẮC 3-4 mảnh (đội 3-4 người mỗi người cần một mảnh; một mảnh chỉ đủ cho một người), `ITEM_VALUE` 0 (không bán được). Lời thoại của Đoan Mộc Thu / Lạc Thanh Sơn nằm ở `dialog` của NPC (nhiệm vụ chỉ có bước `talk` tới họ, game hiện dòng thoại của NPC), nên tên các dòng ở mục 3.4 là ý, câu chữ thật ở `shared/src/npcs.ts`.
 
 ### 3.3. Việc phụ (3; "Việc phụ (không bắt buộc)" ở đầu `desc`, như các việc phụ đã có)
 
@@ -97,7 +98,7 @@ Tổng chuỗi 5: **264.000 / 600.048** (4,4 % tổng thanh Hóa Thần). Nhiệ
 | 6.2 | `uy_van_so_tran` | **Sổ huyết trận** / Đạo cô Thanh Tố | {5,1} | `collect` `manh_so_tran` x6 (nối tiếp, từ Huyết Mị) -> `talk co_tan` -> `kill` Huyết Sát Chân Truyền x15 -> trả | ghép mảnh sổ: trận khắc xong trước thú triều ba tháng, số máu tế đủ ba nghìn người, không ai mặc áo Huyết Sát, dấu Phong chủ; Cố Tẫn mài đao, nói "Đừng đứng đó nhìn", mơ mặt trời cháy | 100.000 + 1 kinh quyển Hóa Thần (nếu có) |
 | 6.3 | `uy_van_phong_chu` | **Phong chủ** / Đô úy Lỗ Trọng | {5,2} | `talk phong_chu` -> `kill` Huyết Ma Hộ Pháp x1 -> `talk co_tan` -> trả | Phong chủ không chối ("Ta ghi sổ. Ta không bảo ai tế."); hạ Hộ Pháp giữ điện; Cố Tẫn nhìn thấy mặt trời cháy, nhớ ra mình là Liệt Dương Chân Nhân chuyển thế; **cảnh chứng kiến** (không lưu lựa chọn) | 115.000 + đan hồi x4 |
 
-Tổng chuỗi 6: **315.000**; **cả hai chương 579.000 / 600.048 (9,65 %)**, còn dư ~21.000 cho điều chỉnh. Cuối 6.3 KHÔNG có `next` (chương 7 Triều Khư là đợt 2: cần bản đồ + cổng bắc Uy Vân Kinh trước).
+Tổng chuỗi 6: **315.000**; **cả hai chương (bản 2) 258.000 + 315.000 = 573.000 / 600.048 (9,55 %)**, còn dư ~27.000 cho điều chỉnh. Cuối 6.3 KHÔNG có `next` (chương 7 Triều Khư là đợt 2: cần bản đồ + cổng bắc Uy Vân Kinh trước).
 
 ### 4.3. Việc phụ (2)
 

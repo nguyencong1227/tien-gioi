@@ -400,6 +400,17 @@ export const ITEMS: ItemDef[] = [
     desc: "Hồn sói già kết thành viên tinh thể xanh trắng như sao Thiên Lang; đêm không trăng nó tự phát sáng.",
     color: 0xcfeee8,
   },
+  // Vật phẩm CỐT TRUYỆN chương 5 (#1465 giai đoạn 2 lát 2, `docs/KICH_BAN_CHUONG_5_6.md` mục 6.2): nhiệm vụ `lang_hoang_duong_mau` lấy đi lúc trả. KHÔNG vào ITEM_VALUE
+  // (sellPrice = 0): mảnh áo này là bằng chứng, không phải hàng hoá. Rơi CHẮC từ Thiên Lang Vương, đủ mảnh cho cả đội 3-4 người (`DROP_TABLES`).
+  {
+    id: "manh_ao_liet_duong",
+    name: "Mảnh áo Liệt Dương",
+    type: "material",
+    stack: 99,
+    rarity: 3,
+    desc: "Mảnh áo choàng đỏ sẫm cháy từ trong ra ngoài, nhặt bên một xác sói; vạt còn lại thêu nửa vầng mặt trời.",
+    color: 0xa8483a,
+  },
   // Đan cấp 3 (M7.5c): cùng hiệu ứng với đan cấp 2, hồi nhiều hơn (hồi huyết 40 -> 70 -> 90 %); độ hiếm 3 (tiên phẩm, ◆◆◆) để phân biệt với đan cấp 2 (bảo phẩm, ◆◆) trong túi (nit B, M7.9)
   {
     id: "thuong_hoi_huyet_dan",
@@ -1201,6 +1212,8 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "hon_tinh_thien_lang", chance: 1, min: 1, max: 2 },
     { itemId: "bi_lang_hoang", chance: 0.8, min: 1, max: 2 },
     { itemId: "nanh_nguyet", chance: 0.8, min: 1, max: 2 },
+    // Vật phẩm cốt truyện (nhiệm vụ 5.3 đòi một mảnh mỗi người): rơi CHẮC 3-4 mảnh để cả đội 3-4 người nhặt đủ sau một lượt hạ trùm
+    { itemId: "manh_ao_liet_duong", chance: 1, min: 3, max: 4 },
     { itemId: "thuong_hoi_huyet_dan", chance: 1, min: 1, max: 2 },
     { itemId: "thuong_hoi_linh_dan", chance: 1, min: 1, max: 2 },
     // Trùm chương rơi CẢ BA kinh quyển Hóa Thần của lát C (như Thiên Hàn Vương rơi Liệt Hỏa Kiếm 25 %, đội 3-4 người chia nhau): 20 % mỗi quyển
