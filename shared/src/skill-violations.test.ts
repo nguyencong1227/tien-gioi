@@ -28,6 +28,7 @@ import { SKILLS_MOC_THUY } from "./skills-moc-thuy";
 import { SKILLS_HOA } from "./skills-hoa";
 import { SKILLS_KHAC } from "./skills-khac";
 import { SKILLS_DANG_MOI } from "./skills-dang-moi";
+import { SKILLS_HOA_THAN } from "./skills-hoa-than";
 import { SKILL_BOOK_ITEMS } from "./books";
 
 // chữ Hán dựng bằng mã (no-cjk.test.ts cấm chữ Hán trực tiếp trong mã nguồn, kể cả test)
@@ -36,7 +37,7 @@ const base = (): SkillDef => ({ ...SKILLS_M7.find((s) => s.id === "hoa_van_kiem"
 const withDef = (o: Partial<SkillDef>): SkillDef => ({ ...base(), ...o });
 
 describe("LEARNABLE_SKILLS: gom 18 chiêu gốc + các tệp dữ liệu theo nhóm", () => {
-  it("bằng SKILLS_M7 + năm tệp nhóm theo thứ tự; id duy nhất; tra cứu và kinh quyển đọc từ đây", () => {
+  it("bằng SKILLS_M7 + sáu tệp nhóm theo thứ tự (Hóa Thần: D1 #1466 lát C); id duy nhất; tra cứu và kinh quyển đọc từ đây", () => {
     expect(LEARNABLE_SKILLS).toEqual([
       ...SKILLS_M7,
       ...SKILLS_KIM_THO,
@@ -44,6 +45,7 @@ describe("LEARNABLE_SKILLS: gom 18 chiêu gốc + các tệp dữ liệu theo nh
       ...SKILLS_HOA,
       ...SKILLS_KHAC,
       ...SKILLS_DANG_MOI,
+      ...SKILLS_HOA_THAN,
     ]);
     expect(SKILLS_M7.length).toBe(18); // 18 chiêu gốc không đổi
     expect(new Set(LEARNABLE_SKILLS.map((s) => s.id)).size).toBe(LEARNABLE_SKILLS.length);

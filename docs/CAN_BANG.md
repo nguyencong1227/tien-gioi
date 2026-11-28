@@ -780,19 +780,19 @@ Tính SỐNG từ `shared/` bằng mô hình ở trên. Sáu sói Lang Hoang (`d
 | Hóa Thần Sơ kỳ | Hắc Phong Lang | 1,309,500 | 71,714 | 151 | 47% |
 | Hóa Thần Sơ kỳ | Huyết Nguyệt Lang | không an toàn solo (56% khí huyết / trận) | – | – | – |
 | Hóa Thần Sơ kỳ | Xích Diễm Lang | không an toàn solo (78% khí huyết / trận) | – | – | – |
-| Hóa Thần Sơ kỳ | Thương Nguyệt Lang | 1,146,341 | 77,975 | 74 | 49% |
+| Hóa Thần Sơ kỳ | Thương Nguyệt Lang | 1,146,341 | 78,335 | 74 | 49% |
 | Hóa Thần Sơ kỳ | Ngân Nguyệt Lang | không an toàn solo (126% khí huyết / trận) | – | – | – |
 | Hóa Thần Trung kỳ | Dã Lang | 1,262,105 | 87,729 | 187 | 26% |
 | Hóa Thần Trung kỳ | Hắc Phong Lang | 1,459,450 | 79,936 | 168 | 37% |
-| Hóa Thần Trung kỳ | Huyết Nguyệt Lang | 1,227,633 | 69,987 | 141 | 43% |
+| Hóa Thần Trung kỳ | Huyết Nguyệt Lang | 1,227,633 | 70,219 | 141 | 43% |
 | Hóa Thần Trung kỳ | Xích Diễm Lang | không an toàn solo (61% khí huyết / trận) | – | – | – |
-| Hóa Thần Trung kỳ | Thương Nguyệt Lang | 1,274,152 | 86,676 | 82 | 38% |
+| Hóa Thần Trung kỳ | Thương Nguyệt Lang | 1,274,152 | 87,076 | 82 | 38% |
 | Hóa Thần Trung kỳ | Ngân Nguyệt Lang | không an toàn solo (97% khí huyết / trận) | – | – | – |
 | Hóa Thần Hậu kỳ | Dã Lang | 1,376,112 | 95,664 | 204 | 20% |
 | Hóa Thần Hậu kỳ | Hắc Phong Lang | 1,614,371 | 88,432 | 186 | 28% |
-| Hóa Thần Hậu kỳ | Huyết Nguyệt Lang | 1,357,198 | 77,385 | 156 | 33% |
-| Hóa Thần Hậu kỳ | Xích Diễm Lang | 1,975,264 | 83,597 | 132 | 47% |
-| Hóa Thần Hậu kỳ | Thương Nguyệt Lang | 1,412,767 | 96,112 | 91 | 29% |
+| Hóa Thần Hậu kỳ | Huyết Nguyệt Lang | 1,357,198 | 77,642 | 156 | 33% |
+| Hóa Thần Hậu kỳ | Xích Diễm Lang | 1,975,264 | 83,961 | 132 | 47% |
+| Hóa Thần Hậu kỳ | Thương Nguyệt Lang | 1,412,767 | 96,556 | 91 | 29% |
 | Hóa Thần Hậu kỳ | Ngân Nguyệt Lang | không an toàn solo (75% khí huyết / trận) | – | – | – |
 
 ### 2. Nhịp cả cảnh giới Hóa Thần (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
@@ -813,7 +813,7 @@ Thu nhập theo nhịp mục 2 (săn solo, mỗi bậc nguồn tốt nhất): ti
 |---|---|---:|---:|---:|---:|---:|---:|
 | Hóa Thần Sơ kỳ | Hắc Phong Lang | 79 | 52,353 | 69,084 | 111,059 | 79,800 | +31,259 |
 | Hóa Thần Trung kỳ | Hắc Phong Lang | 82 | 58,355 | 79,457 | 190,516 | 79,800 | +110,716 |
-| Hóa Thần Hậu kỳ | Xích Diễm Lang | 95 | 66,616 | 105,330 | 295,846 | 79,800 | +216,046 |
+| Hóa Thần Hậu kỳ | Xích Diễm Lang | 95 | 66,980 | 105,906 | 296,422 | 79,800 | +216,622 |
 
 | Nguyên liệu bộ V | Cần | Cày ở | Phút cày solo |
 |---|---:|---|---:|
@@ -1305,3 +1305,12 @@ Chiêu gây sát thương: trung vị **1.13×**, cao nhất **1.20×** (1 mục
 | **Phá Sơn Nhất Kích** | tho | ground | khống chế | 9.0s | 0.022 | 1.17× | 1.51× |
 
 Chiêu gây sát thương: trung vị **1.17×**, cao nhất **1.40×** (1 mục tiêu).
+
+### Hóa Thần (3 chiêu)
+| Chiêu | Hệ | Hình | Vai | Hồi chiêu | Linh lực / giây | Tỉ lệ (1 mục tiêu) | Tỉ lệ (3 mục tiêu) |
+|---|---|---|---|---:|---:|---:|---:|
+| **Xích Luyện Đoạn Hồn** | hoa | cone | sát thương | 5.5s | 0.025 | 1.24× | 1.49× |
+| **Tâm Kiếm Vô Hình** | kim | line | sát thương | 4.5s | 0.027 | 1.32× | 1.31× |
+| **Thái Sơn Áp Đỉnh** | tho | ground | khống chế | 7.5s | 0.020 | 1.16× | 1.19× |
+
+Chiêu gây sát thương: trung vị **1.24×**, cao nhất **1.32×** (1 mục tiêu).

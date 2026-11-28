@@ -1159,23 +1159,31 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemId: "nanh_nguyet", chance: 0.5, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.07, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
+    { itemId: bookIdOf("xich_luyen_doan_hon"), chance: 0.006, min: 1, max: 1 },
   ],
   xich_diem_lang: [
     { itemId: "bi_lang_hoang", chance: 0.45, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+    // Sách chiêu Hóa Thần (D1 lát C): Xích Luyện Đoạn Hồn (hỏa, đao) rơi hiếm từ sói lửa
+    { itemId: bookIdOf("xich_luyen_doan_hon"), chance: 0.01, min: 1, max: 1 },
   ],
   thuong_nguyet_lang: [
     { itemId: "cot_lang_vuong", chance: 0.5, min: 1, max: 2 },
     { itemId: "hon_tinh_thien_lang", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+    // Thái Sơn Áp Đỉnh (thổ, khống chế) rơi hiếm từ sói già dày nhất; Tâm Kiếm Vô Hình ít hơn
+    { itemId: bookIdOf("thai_son_ap_dinh"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("tam_kiem_vo_hinh"), chance: 0.006, min: 1, max: 1 },
   ],
   ngan_nguyet_lang: [
     { itemId: "cot_lang_vuong", chance: 0.3, min: 1, max: 1 },
     { itemId: "nanh_nguyet", chance: 0.3, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+    // Tâm Kiếm Vô Hình (kim, kiếm) rơi hiếm từ sói bạc
+    { itemId: bookIdOf("tam_kiem_vo_hinh"), chance: 0.01, min: 1, max: 1 },
   ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).

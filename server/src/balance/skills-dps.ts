@@ -147,6 +147,7 @@ const REALM_NAMES: Readonly<Record<number, string>> = {
   2: "Trúc Cơ",
   3: "Kim Đan",
   4: "Nguyên Anh",
+  5: "Hóa Thần",
 };
 const ROLE_LABEL: Readonly<Record<SkillRole, string>> = {
   sat_thuong: "sát thương",
@@ -164,7 +165,7 @@ export function renderSkillDpsMarkdown(rows: readonly SkillDpsRow[] = measureAll
     `> Chạy trong \`World\` thật (\`cast\` + \`tickWorld\`: bẫy / vùng / tượng / đạn bay / chiêu vận đúng như máy chủ), ${DPS_SECONDS} giây mỗi lần đo, người chơi đúng cảnh giới yêu cầu của chiêu, linh lực hồi ${MP_REGEN_PER_SEC}/giây, bù nhìn "lang" đứng yên cách ${DUMMY_DIST} px (một, hoặc ba dàn hàng ngang cách ${DUMMY_GAP} px). **Tỉ lệ** = sát thương bù nhìn mất khi luân phiên chiêu so với CHỈ chém thường cùng bố trí (chiêu thủ / hồi / tăng ích ~1 hoặc thấp hơn vì mất lượt chém). Số có hạt giống, ổn định. Mã: \`server/src/balance/skills-dps.ts\`.`,
     "",
   ];
-  for (const realm of [1, 2, 3, 4]) {
+  for (const realm of [1, 2, 3, 4, 5]) {
     const rs = rows.filter((r) => r.reqRealm === realm);
     if (rs.length === 0) continue;
     L.push(

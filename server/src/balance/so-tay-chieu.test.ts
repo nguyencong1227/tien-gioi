@@ -116,7 +116,7 @@ describe("Sổ tay chiêu thức: ma trận mở rộng theo cảnh giới cao n
     };
   };
 
-  it("dữ liệu hiện có (tới Nguyên Anh): đúng năm cột cảnh giới, như trước", () => {
+  it("dữ liệu hiện có (tới Hóa Thần, từ D1 #1466 lát C): đúng sáu cột cảnh giới", () => {
     const { dau } = matran(renderSoTayChieuMarkdown());
     expect(dau.slice(1, -1)).toEqual([
       "Phàm Nhân",
@@ -124,6 +124,7 @@ describe("Sổ tay chiêu thức: ma trận mở rộng theo cảnh giới cao n
       "Trúc Cơ",
       "Kim Đan",
       "Nguyên Anh",
+      "Hóa Thần",
     ]);
   });
 
@@ -140,7 +141,8 @@ describe("Sổ tay chiêu thức: ma trận mở rộng theo cảnh giới cao n
     expect(dau).toContain("Hóa Thần");
     expect(dau).toContain("Độ Kiếp");
     const cot = (ten: string) => Number(tong[dau.indexOf(ten)]);
-    expect(cot("Hóa Thần")).toBe(1);
+    // chiêu Hóa Thần THẬT (D1 lát C) cộng một chiêu giả
+    expect(cot("Hóa Thần")).toBe(LEARNABLE_SKILLS.filter((s) => s.reqRealm === 5).length + 1);
     expect(cot("Độ Kiếp")).toBe(1);
     expect(Number(tong[tong.length - 1])).toBe(LEARNABLE_SKILLS.length + 2);
     // cột trống (Luyện Hư, Hợp Thể, Đại Thừa) nằm ở dòng chú thích gộp, cột có chiêu thì không
