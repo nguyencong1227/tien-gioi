@@ -58,6 +58,13 @@ export const ASSUME = {
     xich_diem_lang: 12,
     thuong_nguyet_lang: 14,
     ngan_nguyet_lang: 14,
+    // Quái Hóa Thần của Uy Vân Kinh (D1 #1466 lát A3 chương 6): cùng cỡ bản đồ (128 x 112) và cùng 62 con như Lang Hoang; loài đông (16 / 12) tìm nhanh, loài thưa (8 / 6) tìm lâu. Chưa đo bằng `search-check.ts`.
+    luyen_huyet_de_tu: 10,
+    nga_quy: 10,
+    cuong_thi: 12,
+    huyet_mi: 12,
+    huyet_anh: 14,
+    huyet_sat_chan_truyen: 14,
     // Trùm Lang Hoang (D1 lát B): như Thiên Hàn Vương (trùm chỉ vài con cả bản đồ, đi tìm lâu)
     lang_vuong: 90,
     thien_lang_vuong: 90,

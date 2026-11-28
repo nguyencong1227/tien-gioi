@@ -1,6 +1,6 @@
 // Quái Hóa Thần của Uy Vân Kinh, lát A1 chương 6 của D1 (#1466, mục 75; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 4, khung `docs/KHUNG_HOA_THAN.md` mục 4.1).
-// Sáu loài thường khai báo ở lát A1 và CHƯA SINH (cho sinh ở lát sau: `monsterCap` của `uy_van`). Test canh: số liệu bám vai của khung, hành vi theo vai,
-// cấp trong trần chặn đường Hóa Thần, thứ tự `minDanger` theo `exp`, bậc `MONSTER_REALM` 5, bảng rơi + tiền, KHÔNG sinh ở đâu, ảnh tạm là bí danh, và dòng nguồn.
+// Sáu loài thường khai báo ở lát A1 và cho SINH ở lát A3 (`monsterCap` của `uy_van`, tổng 62). Test canh: số liệu bám vai của khung, hành vi theo vai,
+// cấp trong trần chặn đường Hóa Thần, thứ tự `minDanger` theo `exp`, bậc `MONSTER_REALM` 5, bảng rơi + tiền, chỉ sinh ở Uy Vân Kinh đúng `monsterCap`, ảnh tạm là bí danh, và dòng nguồn.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -111,15 +111,26 @@ describe("quái Hóa Thần Uy Vân Kinh (D1 #1466 lát A1 chương 6)", () => {
     }
   });
 
-  it("CHƯA SINH ở đâu: `MONSTER_CAP` 0, ngoài `WILD_MONSTERS`, không bản đồ nào (kể cả `uy_van`) có `monsterCap` cho chúng (cho sinh là lát sau)", () => {
+  it("SINH đúng `monsterCap` của uy_van (D1 lát A3 chương 6: 16 / 12 / 10 / 10 / 8 / 6) và CHỈ ở đó: `MONSTER_CAP` mặc định 0, ngoài `WILD_MONSTERS` của bản đồ mặc định, không bản đồ nào khác sinh", () => {
+    const CAP: Record<string, number> = {
+      luyen_huyet_de_tu: 16,
+      nga_quy: 12,
+      cuong_thi: 10,
+      huyet_mi: 10,
+      huyet_anh: 8,
+      huyet_sat_chan_truyen: 6,
+    };
     for (const l of LOAI) {
       expect(MONSTER_CAP[l.id], `${l.id}: MONSTER_CAP mặc định`).toBe(0);
+      // `WILD_MONSTERS` = loài sinh ở bản đồ MẶC ĐỊNH (Lạc Hà): quái Uy Vân không có ở đó; phòng Uy Vân lấy từ `monsterCap` của chính bản đồ
       expect(
         WILD_MONSTERS.some((m) => m.id === l.id),
-        `${l.id}: WILD_MONSTERS`,
+        `${l.id}: WILD_MONSTERS (bản đồ mặc định)`,
       ).toBe(false);
       for (const map of MAPS)
-        expect(getMap(map.id)!.monsterCapOf(l.id), `${l.id} @ ${map.id}`).toBe(0);
+        expect(getMap(map.id)!.monsterCapOf(l.id), `${l.id} @ ${map.id}`).toBe(
+          map.id === "uy_van" ? CAP[l.id] : 0,
+        );
     }
   });
 
