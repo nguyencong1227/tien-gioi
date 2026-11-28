@@ -1,18 +1,17 @@
-import { getChromeGpuFlags } from "./chrome-gpu.mjs";
-/* global console, setTimeout, fetch, process, Buffer */
+/* global console, setTimeout, process, Buffer */
 // Kiểm CỤM CHIÊU CẢM ỨNG (M7.6, #507, docs/THIET_KE_THANH_CHIEU.md mục 5 phương án A) bằng Chrome THẬT giả lập cảm ứng, chế độ `?skills=mock&n=1|2|4` (không cần máy chủ):
 // ở 4 khung nhìn (360x640, 390x844, 844x390, 768x1024) và 3 số chiêu, mỗi nút chiêu: hiện (chỉ chiêu đã gắn), >= 56 px, nằm trọn trong màn hình, KHÔNG chồng và cách
 // >= 8 px mọi nút / khung khác đang hiện (kể cả ba nút ngữ cảnh ép hiện cùng lúc, khung chat, bản đồ nhỏ, cột HUD); 1-2 chiêu nằm bên TRÁI nút Mục tiêu, 3-4 chiêu nằm
 // TRÊN nút Mục tiêu; chạm thật vào nút -> đúng một tin `cast`; ô khoá / trống không có nút. Có thể chụp ảnh: `--shots <thư mục>`.
 // Mặc định tự dựng Vite của cây này trên cổng trống (tự tắt khi xong); `--url` để dùng client đang chạy sẵn.
-//   node client/scripts/check-skill-touch.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--shots /tmp/tg-b-shots]
+//   node client/scripts/check-skill-touch.mjs [--url <client đang chạy sẵn, tuỳ chọn>] [--slow-frame <ms>] [--shots /tmp/tg-b-shots]
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import WebSocket from "ws";
-import { freePort } from "./free-port.mjs";
 import { resolveClientUrl } from "./client-url.mjs";
+import { launchChrome } from "./chrome-launch.mjs";
+import { waitUntilTrue } from "./chrome-wait.mjs";
+import { slowFrameMs, slowFrameSource } from "./slow-frame.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const argOf = (name, dflt) => {
@@ -33,39 +32,15 @@ const VIEWPORTS = ALL_VIEWPORTS.filter((v) => !ONLY || v.name === ONLY);
 const COUNTS = [1, 2, 4];
 // `--scheme dpad`: kiểu điều khiển D-pad (Cài đặt -> Điều khiển di chuyển, khoá `tg_touch_scheme`); mặc định joystick nổi
 const SCHEME = argOf("--scheme", "joystick");
-const CDP_PORT = await freePort();
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tg-check-skill-touch-"));
-const chrome = spawn(
-  "google-chrome",
-  [
-    "--headless=new",
-    "--no-sandbox",
-    ...getChromeGpuFlags(),
-    `--remote-debugging-port=${CDP_PORT}`,
-    `--user-data-dir=${tmpDir}`,
-    "about:blank",
-  ],
-  { stdio: "ignore" },
-);
+let launched = null;
 let failures = 0;
 const check = (ok, msg) => {
   console.log(`  ${ok ? "✓" : "✗"} ${msg}`);
   if (!ok) failures++;
 };
 try {
-  let targets = [];
-  for (let k = 0; k < 40; k++) {
-    try {
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      if (res.ok) {
-        targets = await res.json();
-        break;
-      }
-    } catch {
-      await sleep(150);
-    }
-  }
-  const page = targets.find((t) => t.type === "page");
+  launched = await launchChrome({ name: "skill-touch" });
+  const page = launched.page;
   if (!page) throw new Error("Không tìm thấy Chrome page target.");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => {
@@ -99,11 +74,28 @@ try {
     return r.result?.result?.value;
   };
   const J = async (expression) => JSON.parse(await evalJs(`JSON.stringify(${expression})`));
+  /** Chờ một giá trị đọc được ĐỨNG YÊN (`samples` mẫu liên tiếp cách `gap` ms giống hệt nhau): ở khung chậm bố cục HUD áp dụng muộn sau khi tải, nên `sleep` cố định đo / chạm giữa chừng. */
+  const calm = async (read, samples = 6, gap = 100) => {
+    let last = "";
+    let same = 0;
+    const ok = await waitUntilTrue(
+      async () => {
+        const cur = JSON.stringify(await read());
+        same = cur === last ? same + 1 : 0;
+        last = cur;
+        return same >= samples;
+      },
+      30000,
+      gap,
+    );
+    if (!ok) throw new Error(`không đứng yên sau 30 s: ${last}`);
+  };
 
   await send("Runtime.enable");
   await send("Page.enable");
   await send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.setItem('tg_touch_scheme','${SCHEME}')}catch(e){}`,
+    // `--slow-frame <ms>` (hoặc `TG_SLOW_FRAME_MS`): giả lập runner khung chậm, xem `slow-frame.mjs`
+    source: `try{localStorage.setItem('tg_newbie_guide_dismissed','1');localStorage.setItem('tg_quality','high');localStorage.setItem('tg_touch_scheme','${SCHEME}')}catch(e){}${slowFrameSource(slowFrameMs())}`,
   });
   // Bật giả lập cảm ứng TRƯỚC khi mở trang để (pointer: coarse) đúng ngay từ đầu (như điện thoại thật)
   await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
@@ -115,19 +107,39 @@ try {
       deviceScaleFactor: 1,
       mobile: true,
     });
+    // Đánh dấu tài liệu CŨ rồi mới điều hướng: điều kiện sẵn sàng KHÔNG được đúng trên tài liệu cũ (chưa kịp đổi trang)
+    await evalJs("window.__isOldPage = true");
     await send("Page.navigate", { url: `${BASE_URL}/?${query}&debug=1` });
-    for (let k = 0; k < 50; k++) {
-      await sleep(300);
-      if (await evalJs("Boolean(window.__scene && window.__scene.me && window.__scene.me())"))
-        break;
-    }
-    await sleep(1200);
+    const ready = await waitUntilTrue(
+      () =>
+        evalJs(
+          "Boolean(!window.__isOldPage && window.__scene && window.__scene.me && window.__scene.me())",
+        ),
+      60000,
+      300,
+    );
+    if (!ready) throw new Error(`cảnh mock không sẵn sàng sau 60 s`);
+    // Chờ THEO ĐIỀU KIỆN thay `sleep(1200)`: phông Noto Serif đã tải xong (đo chữ bằng phông dự phòng sẽ sai) và `data-input` đã đặt lên <html>
+    const settled = await waitUntilTrue(
+      () =>
+        evalJs(
+          `document.fonts.status === "loaded" && Boolean(document.documentElement.dataset.input)`,
+        ),
+      30000,
+      100,
+    );
+    if (!settled) throw new Error(`phông chưa tải xong / thiếu data-input sau 30 s`);
     await evalJs(`(() => { const sc = window.__scene; window.__casts = [];
       const orig = sc.room.send.bind(sc.room);
       sc.room.send = (t, d) => { if (t === "cast") window.__casts.push(d); return orig(t, d); };
       const st = document.createElement('style'); st.textContent = '#btn-pickup[hidden],#btn-talk[hidden],#btn-portal[hidden]{display:grid !important}'; document.head.append(st);
       return 1; })()`);
-    await sleep(300);
+    // bố cục HUD (cụm chiêu, nút Mục tiêu, thanh nhanh) áp dụng muộn ở khung chậm: chờ ĐỨNG YÊN thay `sleep(300)`
+    await calm(() =>
+      evalJs(
+        `[...document.querySelectorAll('#skill-slots .sk.slot, #btn-target, #quickbar, #skill-slots')].map((e) => { const r = e.getBoundingClientRect(); return [e.id, r.x, r.y, r.width, r.height].join(","); }).join("|") + "|" + document.documentElement.dataset.form + document.documentElement.dataset.orient`,
+      ),
+    );
   };
 
   /** Mọi phần tử tương tác / khung đang hiện (trừ chính cụm chiêu): hộp để so chồng nhau */
@@ -227,27 +239,27 @@ try {
       // chạm thật vào nút đầu tiên -> một tin cast
       const first = shown[0];
       if (first) {
-        const cx = first.x + first.w / 2;
-        const cy = first.y + first.h / 2;
-        await evalJs("window.__casts.length = 0; 1");
-        await send("Input.dispatchTouchEvent", {
-          type: "touchStart",
-          touchPoints: [{ id: 1, x: cx, y: cy }],
-        });
-        await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-        await sleep(200);
-        const casts = await J("window.__casts");
-        // ô 2 của mock đang hồi chiêu 3 s lúc mở: chờ hết rồi chạm lại nếu chưa có cast
-        let got = casts;
-        if (got.length === 0) {
-          await sleep(3300);
+        // đo tâm nút SAU KHI vị trí đã đứng yên (cú chạm trúng chỗ cũ của nút nếu bố cục còn xê dịch), chạm, rồi chờ THEO ĐIỀU KIỆN có tin cast (thay `sleep(200)`)
+        const rectOf = `(() => { const r = document.getElementById(${JSON.stringify(first.id)}).getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; })()`;
+        const tapFirst = async (waitMs) => {
+          await calm(() => J(rectOf));
+          const r = await J(rectOf);
+          await evalJs("window.__casts.length = 0; 1");
           await send("Input.dispatchTouchEvent", {
             type: "touchStart",
-            touchPoints: [{ id: 1, x: cx, y: cy }],
+            touchPoints: [{ id: 1, x: r.x + r.w / 2, y: r.y + r.h / 2 }],
           });
           await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-          await sleep(200);
-          got = await J("window.__casts");
+          await waitUntilTrue(async () => (await J("window.__casts.length")) >= 1, waitMs, 50);
+          // có cast rồi thì chờ số tin ĐỨNG YÊN (một cú chạm không được sinh thêm cast thừa)
+          await calm(() => J("window.__casts.length"), 4, 100);
+          return J("window.__casts");
+        };
+        let got = await tapFirst(3000);
+        // ô 2 của mock đang hồi chiêu 3 s lúc mở: chờ hết (đồng hồ thật, khung chậm chỉ làm trôi lâu hơn) rồi chạm lại nếu chưa có cast
+        if (got.length === 0) {
+          await sleep(3300);
+          got = await tapFirst(10000);
         }
         check(
           got.length === 1 && got[0].slot >= 2 && got[0].slot <= 5,
@@ -262,14 +274,7 @@ try {
   console.error(err);
   failures++;
 } finally {
-  const exited = new Promise((res) => chrome.once("exit", res));
-  chrome.kill();
-  await Promise.race([exited, sleep(3000)]);
-  try {
-    fs.rmSync(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  } catch {
-    /* bỏ qua */
-  }
+  if (launched) await launched.close();
 }
 console.log(failures === 0 ? "\nTẤT CẢ ĐẠT" : `\n${failures} LỖI`);
 process.exit(failures === 0 ? 0 : 1);

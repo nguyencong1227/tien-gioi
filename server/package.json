@@ -78,6 +78,7 @@
     "e2e:bag-names": "node ../client/scripts/check-bag-names.mjs",
     "e2e:rarity": "node ../client/scripts/check-rarity.mjs",
     "e2e:chuot-thap": "node ../client/scripts/check-chuot-thap.mjs",
+    "e2e:skill-touch": "node ../client/scripts/check-skill-touch.mjs",
     "e2e:newbie-guide": "node ../client/scripts/check-newbie-guide.mjs",
     "e2e:book-bag": "node ../client/scripts/check-book-bag.mjs",
     "e2e:status-speed": "node ../client/scripts/check-status-speed.mjs",
