@@ -28,6 +28,5 @@ export const LIMBO_DREAM_LINES: readonly LimboDreamLine[] = [
 
 /** Dòng mơ của kiếp vừa khép lại `kiep`; `undefined` nếu không có (kiếp lạ, không nguyên, hoặc kiếp 2 trở đi chưa có lời). */
 export function limboDreamOf(kiep: unknown): string | undefined {
-  if (typeof kiep !== "number" || !Number.isInteger(kiep)) return undefined;
-  return LIMBO_DREAM_LINES.find((l) => l.kiep === kiep)?.text;
+  return LIMBO_DREAM_LINES.find((l) => l.kiep === kiep)?.text; // so khớp chặt (===) nên kiểu / số lạ đều ra undefined
 }

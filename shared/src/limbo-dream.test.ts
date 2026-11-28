@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { KIEP_CAP, LIMBO_DREAM_LINES, limboDreamOf } from "./index";
 
-const CJK = /[㐀-䶿一-鿿豈-﫿]/;
+const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
 const here = dirname(fileURLToPath(import.meta.url));
 const NGUON_DOC = readFileSync(resolve(here, "../../docs/NGUON_NOI_DUNG.md"), "utf8");
 
