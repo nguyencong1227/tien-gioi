@@ -535,6 +535,73 @@ Toàn bộ nhật ký chi tiết từng kịch bản và bảng tổng kết Mar
 
 ---
 
+### 10.4. Bảng phân loại `client/scripts/check-*.mjs` CHƯA nối nightly (#1458, 28/11/2026, đầu `main` `af567f44`)
+
+Nightly `e2e:all` chỉ chạy các kịch bản có lệnh `e2e:<tên>` ở `server/package.json`. Có 70 tệp `check-*.mjs`: 38 đã nối (lô 1-12), **32 chưa nối**. Bảng này xếp 32 tệp thành: (a) đã chạy ở nơi khác, (b) nên nối ở lô sau (ưu tiên cao / thấp), (c) phải sửa trước khi nối. **Không tệp nào được chọn "không nối có chủ ý"**: cả 27 tệp chạy được đều còn giá trị (kiểm chữ / bố cục / hiệu ứng mà test đơn vị không thấy); nếu cần bớt thì ứng viên là nhóm (b2) có phần trùng với E2E máy chủ thật `e2e:chieu-moi` / `e2e:chieu-dau` / `e2e:chieu-vo-sac` (xem cuối mục).
+
+**Cách đo cột "Chạy cục bộ 1 lần":** `CI=true node client/scripts/<tệp>` một lần trên máy dev nhiều lõi, `client/dist` dựng từ `main` (`af567f44`), tuần tự; tổng ~22 phút cho 29 tệp. KHÔNG phải ma trận `--slow-frame` / một lõi: đó là việc của từng lô khi nối (xem điều kiện nối bên dưới).
+
+**(a) Đã chạy ở nơi khác (3 tệp, không cần nối nightly):**
+
+| Tệp | Chạy ở đâu |
+|---|---|
+| `check-credits.mjs` | `npm run check:credits`; hàm của nó được `client/src/credits.test.ts` gọi nên chạy trong `npm test` ở CI MỌI PR |
+| `check-perf-budget.mjs` | `npm run check:budget` ở `.github/workflows/ci.yml` (MỌI PR, sau `npm run build`) |
+| `check-limbo-dream.mjs` | PR #1572 (lô 13) đang chờ LGTM; 5 / 5 lượt CI xanh |
+
+**(b1) Nối lô sau, ƯU TIÊN CAO (13 tệp): kiểm bố cục / hành vi người chơi chạm trực tiếp** (đúng mục đích #1458: chữ bị cắt, bố cục vỡ, bàn phím / chạm bị chặn lọt lặng lẽ). Đều ĐẠT cục bộ:
+
+| Tệp | Kiểm gì | Dòng | Dựng trang | `sleep` cố định | Chạy cục bộ 1 lần |
+|---|---|---:|---|---:|---|
+| `check-aim-cursor.mjs` | HƯỚNG ĐÁNH theo mục 29 (`aim-order.ts`): chuột / cảm ứng, 2 kiểu khung | 498 | dist tĩnh | 20 | ĐẠT (30 s) |
+| `check-aim-mode.mjs` | CHẾ ĐỘ NHẮM theo mục 26 (`auto-target.ts`): mặc định Tự động, tự nhắm quái gần nhất | 504 | dist tĩnh | 26 | ĐẠT (38 s) |
+| `check-ambush.mjs` | hộp thoại Gặp chặn đường (mục 52): hiện, bàn phím bị giữ, tin gửi đi | 1163 | Vite | 56 | ĐẠT (111 s) |
+| `check-boss-bar.mjs` | thanh máu trùm + vùng cảnh báo vành khuyên (mục 42, T4 #873), 5 khung nhìn | 653 | dist tĩnh | 22 | ĐẠT (147 s) |
+| `check-boss-card.mjs` | thẻ trùm trên thanh máu trùm (gói tải theo nhu cầu `art:trum`, qua đường tải thật; tệp lỗi thì ẩn ảnh) | 477 | dist tĩnh | 7 | ĐẠT (22 s) |
+| `check-elite-badge.mjs` | huy hiệu tinh anh trên đầu quái (DOM + điểm ảnh thật) | 382 | Vite | 18 | ĐẠT (52 s) |
+| `check-limbo-confirm.mjs` | hộp xác nhận mở khoá / đầu thai ở màn Hoàng Tuyền (#779), 5 khung nhìn, chuột + cảm ứng + bàn phím | 546 | dist tĩnh | 43 | ĐẠT (138 s) |
+| `check-limbo-engrave.mjs` | bộ chọn Khắc chân linh ở Hoàng Tuyền | 477 | Vite | 16 | ĐẠT (18 s) |
+| `check-monster-status.mjs` | huy hiệu trạng thái có hại trên đầu quái (điểm ảnh thật) | 348 | Vite | 14 | ĐẠT (13 s) |
+| `check-move-stop.mjs` | dừng ngay + đối chiếu mượt (mục 41: di chuyển 'trôi'), đo độ trễ nhiều lần | 377 | dist tĩnh | 13 | ĐẠT (33 s) |
+| `check-net-shield.mjs` | hộ thể 3 giây sau khi nối lại / được tha chết vì mạng (mục 33, `net-shield.ts`), 5 khung nhìn | 296 | dist tĩnh | 11 | ĐẠT (29 s) |
+| `check-sheet-swipe.mjs` | vuốt tiêu đề để đóng tấm (cảm ứng thật qua CDP) | 344 | Vite | 17 | ĐẠT (185 s) |
+| `check-status-badges.mjs` | hàng huy hiệu trạng thái của chính mình (HUD) | 326 | Vite | 15 | ĐẠT (20 s) |
+
+**(b2) Nối lô sau, ưu tiên thấp (14 tệp): đo hiệu ứng (hạt, emitter, hoạt ảnh, âm thanh).** Đều ĐẠT cục bộ nhưng đo `__fx.stats()` / hạt Phaser / CSS theo đồng hồ nên dễ lệch ở khung chậm: mỗi tệp cần ma trận `--slow-frame` TRƯỚC khi nối, làm sau nhóm (b1):
+
+| Tệp | Kiểm gì | Dòng | Dựng trang | `sleep` cố định | Chạy cục bộ 1 lần |
+|---|---|---:|---|---:|---|
+| `check-anim.mjs` | hoạt ảnh người chơi bị đánh / gục | 272 | Vite | 10 | ĐẠT (8 s) |
+| `check-cast-fx.mjs` | hiệu ứng dùng chiêu (12 chiêu: hạt, ngân sách emitter) | 286 | Vite | 8 | ĐẠT (45 s) |
+| `check-combat-fx.mjs` | hạt, rung, chữ bay, hồi máu, quái tan | 622 | Vite | 27 | ĐẠT (56 s) |
+| `check-ct2-fx.mjs` | chuỗi tia + dấu hệ (hạt thật) | 275 | Vite | 13 | ĐẠT (31 s) |
+| `check-cultivation-fx.mjs` | hiệu ứng tu luyện (lên cấp, đột phá) | 333 | Vite | 16 | ĐẠT (28 s) |
+| `check-limbo-fx.mjs` | hồn lửa Hoàng Tuyền, Tam Sinh Thạch (CSS) | 240 | Vite | 11 | ĐẠT (11 s) |
+| `check-lod.mjs` | mức chi tiết theo hồ sơ chất lượng | 296 | Vite | 12 | ĐẠT (14 s) |
+| `check-sfx.mjs` | âm thanh hiệu ứng (đếm dao động của AudioContext) | 255 | Vite | 7 | ĐẠT (7 s) |
+| `check-skill-fx.mjs` | hiệu ứng công pháp (kiếm khí, tia lửa) | 322 | Vite | 13 | ĐẠT (28 s) |
+| `check-transition.mjs` | chuyển cảnh qua cổng (mống mắt, giảm chuyển động) | 270 | Vite | 14 | ĐẠT (11 s) |
+| `check-tween.mjs` | tween nhẹ (nhấp nhô, co giãn) | 314 | Vite | 10 | ĐẠT (15 s) |
+| `check-warn-bolt-fx.mjs` | báo trước đòn và đạn tầm xa của quái (điểm ảnh thật) | 619 | Vite | 13 | ĐẠT (73 s) |
+| `check-windup-fx.mjs` | chiêu vận (vòng tụ khí, hạt) | 339 | Vite | 17 | ĐẠT (36 s) |
+| `check-world-fx.mjs` | đồ rơi theo độ hiếm, nhặt đồ, cổng truyền tống | 350 | Vite | 12 | ĐẠT (45 s) |
+
+**(c) SỬA TRƯỚC KHI NỐI (2 tệp): đỏ hoặc chập chờn cục bộ:**
+
+| Tệp | Kiểm gì | Dòng | Dựng trang | `sleep` cố định | Chạy cục bộ 1 lần |
+|---|---|---:|---|---:|---|
+| `check-pbolt-fx.mjs` | đạn bay của người chơi (hình đạn, hạt cuối đoạn) | 324 | Vite | 13 | ĐỎ (30 s) |
+| `check-persist-fx.mjs` | vật thể bền zone / trap / totem / aura + fxEnd | 397 | Vite | 23 | ĐỎ (47 s) |
+
+- `check-pbolt-fx.mjs`: **chập chờn**. Cục bộ nhiều lõi 1 / 3 lượt đạt (lượt đỏ: 'bụi ở cuối đoạn có hạt thật (nhận 0 điểm)', 'đạn ngoài tầm nhìn không vẽ', 'đoạn nảy nối tiếp đoạn trước'), một lõi đỏ (đạn xuất phát lệch điểm bắn 100 px, giữa chặng chưa bay xa). Do đo hình đạn theo `sleep` cố định so với đồng hồ cảnh: cần viết lại chờ THEO ĐIỀU KIỆN như lô 12 / 13.
+- `check-persist-fx.mjs`: **đỏ ổn định**, 0 / 4 lượt (3 nhiều lõi + 1 một lõi), kiểm 'thân bẫy tắt nhanh khi nổ' luôn đỏ; một lõi đỏ thêm 'mới dựng thì hiện dần (alpha 1.00)' và 'cuối đời mờ dần (chưa gỡ)'. Hàm thuần `persistAlpha` / `persistPopProgress` (`client/src/gfx/fx/persist-fx.ts`, thân bẫy tắt trong `PERSIST_POP_BODY_MS` = 90 ms) có test đơn vị nên **nghi do kiểm** (đo `alpha` sau `sleep(120)` thật nhưng vòng đời tính theo đồng hồ cảnh), CHƯA kết luận có phải lỗi trò chơi: cần điều tra một việc riêng trước khi nối.
+
+**Điều kiện nối một tệp (lấy từ lô 8-13):** (1) `launchChrome` (`chrome-launch.mjs`) thay `spawn("google-chrome")` + vòng chờ riêng; (2) phục vụ `client/dist` bằng máy chủ tĩnh của chính script (như `check-skill-bar.mjs`, `check-limbo-dream.mjs`) thay vì dựng Vite; (3) thay mọi `sleep` cố định bằng `waitUntilTrue` / `frames(n)` (cột `sleep` cố định ở trên = số chỗ phải sửa); (4) nhận `--slow-frame <ms>` (`slow-frame.mjs`); (5) ma trận `CI=true taskset -c 0` và `--slow-frame 25 / 36 / 50` x >= 3 lượt xanh; (6) >= 5 lượt `gh workflow run e2e.yml -f only=<tên> -f no_retry=true` tuần tự XANH (quy tắc (6) ở mục 10.3); (7) đột biến chứng minh kiểm có răng; (8) thêm `e2e:<tên>` ở `server/package.json` + `server/scripts/e2e-all.test.ts` + `CHANGELOG.md`. Mỗi lô MỘT tệp (hoặc hai tệp cùng họ).
+
+**Rủi ro thời gian ở nightly (hạn 300 s mỗi kịch bản, `IN_TIMEOUT`):** năm tệp chậm nhất cục bộ là `check-sheet-swipe.mjs` 185 s, `check-boss-bar.mjs` 147 s, `check-limbo-confirm.mjs` 138 s, `check-ambush.mjs` 111 s, `check-warn-bolt-fx.mjs` 73 s. Runner CI chậm hơn máy dev ~1,5-2 lần (lô 13: 20-52 s trên CI so với ~7 s cục bộ), nên `check-sheet-swipe.mjs` (185 s) có thể chạm hạn 300 s: cắt `sleep` trước khi nối, hoặc chia nhỏ kịch bản.
+
+**Trùng một phần với E2E máy chủ thật:** `e2e:chieu-moi` (máy chủ thật + Chrome + phím thật, hình mới có vẽ đúng và tắt đúng giờ), `e2e:chieu-dau`, `e2e:chieu-vo-sac` phủ phần lớn việc của `check-cast-fx`, `check-ct2-fx`, `check-windup-fx`, `check-persist-fx`, `check-pbolt-fx` ở mức 'có hình, đúng giờ'; các script `check-*` đo chi tiết hạt / ngân sách emitter bằng chế độ giả lập. Nếu cần bớt việc, năm tệp này là ứng viên "không nối" (cần A hoặc người dùng chốt).
+
 ## 11. Hệ số tu vi THỬ NGHIỆM cho một nhân vật (`TEST_EXP_MULT`, `QUYET_DINH_M3.md` mục 34)
 
 Để chính người dùng thử game (vd nhân vật `Han` tu vi x5) mà KHÔNG đụng người chơi khác. Chỉ nhân **tu vi**; không đổi rơi đồ, Linh thạch, sát thương.
