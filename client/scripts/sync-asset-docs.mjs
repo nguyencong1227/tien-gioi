@@ -267,10 +267,12 @@ export function generateRaSoatItemRows(
 
 /**
  * Đồng bộ nội dung vào CREDITS.md và docs/RA_SOAT_TAI_SAN.md
- * @param {{ checkOnly?: boolean, extraCreditsContent?: string, extraRaSoatContent?: string }} options
+ * @param {{ checkOnly?: boolean, extraCreditsContent?: string, extraRaSoatContent?: string, creditsPath?: string, raSoatPath?: string }} options
  * @returns {{ changed: boolean, errors: string[], stats: object }}
  */
 export function syncAssetDocs(options = {}) {
+  const creditsFile = options.creditsPath || CREDITS_FILE;
+  const raSoatFile = options.raSoatPath || RA_SOAT_FILE;
   const extraCredits = resolveTheirsContent(
     options.extraCreditsContent,
     "THEIRS_CREDITS_FILE",
@@ -286,11 +288,11 @@ export function syncAssetDocs(options = {}) {
   let anyChanged = false;
 
   // 1. Kiểm tra dấu xung đột git trước tiên
-  let credits = fs.readFileSync(CREDITS_FILE, "utf8");
+  let credits = fs.readFileSync(creditsFile, "utf8");
   const conflictCredits = checkConflictMarkers(credits, "CREDITS.md");
   if (conflictCredits) errors.push(conflictCredits);
 
-  let raSoat = fs.readFileSync(RA_SOAT_FILE, "utf8");
+  let raSoat = fs.readFileSync(raSoatFile, "utf8");
   const conflictRaSoat = checkConflictMarkers(raSoat, "docs/RA_SOAT_TAI_SAN.md");
   if (conflictRaSoat) errors.push(conflictRaSoat);
 
@@ -356,7 +358,7 @@ export function syncAssetDocs(options = {}) {
   if (credits !== origCredits) {
     anyChanged = true;
     if (!options.checkOnly) {
-      fs.writeFileSync(CREDITS_FILE, credits, "utf8");
+      fs.writeFileSync(creditsFile, credits, "utf8");
     } else {
       errors.push("CREDITS.md chưa khớp bản sinh tài sản tự động.");
     }
@@ -365,7 +367,7 @@ export function syncAssetDocs(options = {}) {
   if (raSoat !== origRaSoat) {
     anyChanged = true;
     if (!options.checkOnly) {
-      fs.writeFileSync(RA_SOAT_FILE, raSoat, "utf8");
+      fs.writeFileSync(raSoatFile, raSoat, "utf8");
     } else {
       errors.push("docs/RA_SOAT_TAI_SAN.md chưa khớp bản sinh tài sản tự động.");
     }

@@ -2,7 +2,7 @@
 
 > File này **SINH TỰ ĐỘNG** từ `server/src/balance/so-tay-quai.ts`, đọc dữ liệu thật ở `shared/` (`MONSTERS`, `DROP_TABLES`, `COIN_DROPS`, `ITEMS`, `MONSTER_REALM`, bản đồ).
 > Sau khi sửa số liệu quái / rơi đồ / bản đồ, chạy `npm run so-tay-quai -w server` để cập nhật; test `server/src/balance/so-tay-quai-sync.test.ts` bắt tài liệu lệch bản sinh.
-> Trạng thái: **25 quái**, **159 dòng rơi đồ**.
+> Trạng thái: **25 quái**, **168 dòng rơi đồ**.
 
 ---
 
@@ -137,6 +137,9 @@
 | **Liên Châu Lôi Kinh** | `kinh_loi_lien_chau` | Kinh quyển | Bảo phẩm | Thạch Quy 0,8% |
 | **Hồn Phiên Trận Kinh** | `kinh_hon_phien_tuong` | Kinh quyển | Tiên phẩm | Hàn Lang 0,6% |
 | **Phá Sơn Quyền Kinh** | `kinh_pha_son_nhat_kich` | Kinh quyển | Tiên phẩm | Cốt Tượng 0,6% |
+| **Xích Luyện Ma Đao** | `kinh_xich_luyen_doan_hon` | Kinh quyển | Tiên phẩm | Huyết Nguyệt Lang 0,6%, Xích Diễm Lang 1%, Lang Vương 5%, Thiên Lang Vương 20% |
+| **Tâm Kiếm Quyết** | `kinh_tam_kiem_vo_hinh` | Kinh quyển | Tiên phẩm | Thương Nguyệt Lang 0,6%, Ngân Nguyệt Lang 1%, Thiên Lang Vương 20% |
+| **Thái Sơn Áp Đỉnh** | `kinh_thai_son_ap_dinh` | Kinh quyển | Tiên phẩm | Thương Nguyệt Lang 1,2%, Thiên Lang Vương 20% |
 
 ## Mục 3 — Sách chiêu rơi từ đâu, và soát luật bậc quái
 
@@ -213,6 +216,9 @@
 | **Vạn Thú Triều Phong** | Bách Thú Khiếu Phong (`bach_thu_khieu_phong`) | Nguyên Anh | Tiên phẩm | Phong Nha [Nguyên Anh] 0,6% |
 | **Liệt Hỏa Kiếm Quyết** | Liệt Hỏa Kiếm (`liet_hoa_kiem`) | Nguyên Anh | Tiên phẩm | Độc Tước [Nguyên Anh] 1,8%; Thiên Hàn Vương [Nguyên Anh] 25% |
 | **Vân Hành Bộ** | Vân Hành Bộ (`van_hanh_bo`) | Nguyên Anh | Bảo phẩm | Cốt Tượng [Nguyên Anh] 1,5%; Độc Tước [Nguyên Anh] 1,2% |
+| **Tâm Kiếm Quyết** | Tâm Kiếm Vô Hình (`tam_kiem_vo_hinh`) | Hóa Thần | Tiên phẩm | Thương Nguyệt Lang [Hóa Thần] 0,6%; Ngân Nguyệt Lang [Hóa Thần] 1%; Thiên Lang Vương [Hóa Thần] 20% |
+| **Thái Sơn Áp Đỉnh** | Thái Sơn Áp Đỉnh (`thai_son_ap_dinh`) | Hóa Thần | Tiên phẩm | Thương Nguyệt Lang [Hóa Thần] 1,2%; Thiên Lang Vương [Hóa Thần] 20% |
+| **Xích Luyện Ma Đao** | Xích Luyện Đoạn Hồn (`xich_luyen_doan_hon`) | Hóa Thần | Tiên phẩm | Huyết Nguyệt Lang [Hóa Thần] 0,6%; Xích Diễm Lang [Hóa Thần] 1%; Lang Vương [Hóa Thần] 5%; Thiên Lang Vương [Hóa Thần] 20% |
 
 ### Vi phạm luật bậc quái
 

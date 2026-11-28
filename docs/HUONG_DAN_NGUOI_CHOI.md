@@ -77,7 +77,7 @@ Trò chơi có hai đòn mặc định và các ô chiêu thức bạn tự gắ
 - **Kiếm khí** (K): nhát kiếm tầm xa, mạnh hơn, tốn linh lực và có thời gian hồi chiêu. Dùng để đánh từ xa hoặc bổ sung sát thương.
 - **Ô chiêu thức 2–5** (L / U / I / O): bốn ô bạn gắn chiêu đã học. Mở bảng **Công pháp (Shift + K)** để gắn hoặc gỡ chiêu vào ô. Ô còn trống thì bấm sẽ báo lý do, không làm gì.
 
-> **Sổ tay chiêu thức:** danh sách đầy đủ **87 chiêu** học được — hệ, cảnh giới yêu cầu, phẩm, hình đòn, hồi chiêu, hiệu ứng và **cách có được** (bán ở cửa hàng nào và giá Linh thạch; rơi từ quái nào, tỉ lệ %; đổi ở Tàng Kinh Các tông môn; hoặc thưởng nhiệm vụ nào), kèm ma trận độ phủ hệ × cảnh giới: xem [`docs/SO_TAY_CHIEU_THUC.md`](SO_TAY_CHIEU_THUC.md).
+> **Sổ tay chiêu thức:** danh sách đầy đủ **90 chiêu** học được — hệ, cảnh giới yêu cầu, phẩm, hình đòn, hồi chiêu, hiệu ứng và **cách có được** (bán ở cửa hàng nào và giá Linh thạch; rơi từ quái nào, tỉ lệ %; đổi ở Tàng Kinh Các tông môn; hoặc thưởng nhiệm vụ nào), kèm ma trận độ phủ hệ × cảnh giới: xem [`docs/SO_TAY_CHIEU_THUC.md`](SO_TAY_CHIEU_THUC.md).
 
 ### Hệ (ngũ hành) và tương khắc
 

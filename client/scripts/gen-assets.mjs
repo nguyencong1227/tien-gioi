@@ -1041,6 +1041,10 @@ const BOOKS = {
   kinh_bach_thu_khieu_phong: [0x5fb89a, 0xe6fff6],
   kinh_minh_vu_lac_hon: [0x3f2a5e, 0xc9a8e6],
   kinh_phuong_minh_cau_hoang: [0xd9433b, 0xffe0a8],
+  // Hóa Thần (D1 #1466 lát C): sách của sói Lang Hoang; hình tạm theo bảng màu (hỏa đỏ cam, kim bạc, thổ vàng đất)
+  kinh_xich_luyen_doan_hon: [0xc8452f, 0xffd9a8],
+  kinh_tam_kiem_vo_hinh: [0xaab4c4, 0xf4f8ff],
+  kinh_thai_son_ap_dinh: [0xa8803a, 0xf0d9a0],
   // Vô sắc (CT8 lát 3, A): bìa xám trắng, không dấu
   kinh_huyet_anh_xuyen_tam: [0x8a8f98, 0xe8ecf2],
   kinh_su_tu_hong: [0x9a9288, 0xf0e8d8],

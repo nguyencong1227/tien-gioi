@@ -1,17 +1,17 @@
 {
   "mode": "parallel",
-  "timestamp": "2026-11-16T15:39:27.488Z",
-  "runsTarget": 2,
-  "runsCompleted": 4,
-  "avgRunDurationSec": 92.3,
-  "flakySuitesCount": 3,
-  "stableSuitesCount": 278,
+  "timestamp": "2026-11-28T11:14:10.741Z",
+  "runsTarget": 10,
+  "runsCompleted": 20,
+  "avgRunDurationSec": 139.9,
+  "flakySuitesCount": 5,
+  "stableSuitesCount": 482,
   "suiteStats": [
     {
       "suiteFile": "server/src/systems/perf.test.ts",
-      "totalRuns": 4,
+      "totalRuns": 20,
       "failedRuns": 2,
-      "failureRatePct": 50,
+      "failureRatePct": 10,
       "avgDurationMs": 0,
       "failedTestTitles": {
         "kịch bản hiệu năng chiêu thức (M7.10 #511) > người chơi Nguyên Anh (realm 4, tier 0..2) thi triển đủ 6 chiêu đợt 2 quanh bãi quái Hàn Vân (#722, #515): tick < 10 ms, byte/tick < 520 mỗi client": 2
@@ -21,10 +21,25 @@
       }
     },
     {
+      "suiteFile": "client/src/assets-sync.test.ts",
+      "totalRuns": 20,
+      "failedRuns": 2,
+      "failureRatePct": 10,
+      "avgDurationMs": 0,
+      "failedTestTitles": {
+        "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi": 2,
+        "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: phát hiện dấu xung đột git chưa giải quyết (<<<<<<< / ======= / >>>>>>>) hoặc marker lặp": 1
+      },
+      "sampleErrors": {
+        "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi": "AssertionError: expected 'CREDITS.md chưa khớp bản sinh tài sản…' to contain 'docs/RA_SOAT_TAI_SAN.md'\n    at /home/nguyencong/TT/tien-gioi-c/client/src/assets-sync.test.ts:105:30\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promi",
+        "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: phát hiện dấu xung đột git chưa giải quyết (<<<<<<< / ======= / >>>>>>>) hoặc marker lặp": "AssertionError: expected false to be true // Object.is equality\n    at /home/nguyencong/TT/tien-gioi-c/client/src/assets-sync.test.ts:144:9\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout ("
+      }
+    },
+    {
       "suiteFile": "client/scripts/comfy-scripts.test.ts",
-      "totalRuns": 4,
+      "totalRuns": 20,
       "failedRuns": 1,
-      "failureRatePct": 25,
+      "failureRatePct": 5,
       "avgDurationMs": 0,
       "failedTestTitles": {
         "Dây chuyền đồ họa nháp ComfyUI + SDXL (Mục 16.2 & 17.3 QUYET_DINH_M3, G1 #486) > tích hợp chrome-gpu: detectGpu tự động nhường GPU khi có khóa và tg-comfy active": 1
@@ -35,15 +50,28 @@
     },
     {
       "suiteFile": "server/src/rooms/WorldRoom.sect.test.ts",
-      "totalRuns": 4,
+      "totalRuns": 20,
       "failedRuns": 1,
-      "failureRatePct": 25,
+      "failureRatePct": 5,
       "avgDurationMs": 0,
       "failedTestTitles": {
         "tông môn: kho đồ qua server Colyseus thật (mục 27) > Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì": 1
       },
       "sampleErrors": {
         "tông môn: kho đồ qua server Colyseus thật (mục 27) > Đệ tử góp, Tông chủ nhận ảnh chụp kho; Đệ tử rút có hạn mức (lượt 4 bị từ chối); túi + hồ sơ + tệp tông môn khớp, tổng đồ không đổi; tin rác không làm gì": "Error: Hết thời gian chờ lượt 2\n    at waitFor (/home/nguyencong/TT/tien-gioi-c/server/src/rooms/WorldRoom.sect.test.ts:63:33)\n    at /home/nguyencong/TT/tien-gioi-c/server/src/rooms/WorldRoom.sect.test.ts:387:7\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20"
+      }
+    },
+    {
+      "suiteFile": "client/scripts/chrome-wait.test.ts",
+      "totalRuns": 20,
+      "failedRuns": 1,
+      "failureRatePct": 5,
+      "avgDurationMs": 0,
+      "failedTestTitles": {
+        "chrome-wait: chờ Chrome sẵn sàng cho check-*.mjs ở nightly (#1458) > waitPageTarget: JSON hỏng / không phải mảng không làm sập, hết hạn thì trả null": 1
+      },
+      "sampleErrors": {
+        "chrome-wait: chờ Chrome sẵn sàng cho check-*.mjs ở nightly (#1458) > waitPageTarget: JSON hỏng / không phải mảng không làm sập, hết hạn thì trả null": "Error: STACK_TRACE_ERROR\n    at task (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:638:27)\n    at Object.<anonymous> (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:662:16)\n    at Object.<anonymous> (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:458:28)\n    at chain (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:369:14)\n    at /home/n"
       }
     }
   ],
@@ -118,6 +146,208 @@
           "durationMs": 182.15391200000067
         }
       ]
+    },
+    {
+      "runIndex": 5,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 156549,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 6,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 156176,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 7,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 140001,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 8,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 140337,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 9,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 144021,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 10,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 144452,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 11,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 144448,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 12,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 144460,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 13,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 150394,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 14,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 150383,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 15,
+      "mode": "parallel",
+      "success": false,
+      "durationMs": 164109,
+      "totalSuites": 487,
+      "failedSuites": 1,
+      "totalTests": 9063,
+      "failedTests": 1,
+      "failures": [
+        {
+          "suiteFile": "client/src/assets-sync.test.ts",
+          "testTitle": "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi",
+          "errorMessage": "AssertionError: expected 'CREDITS.md chưa khớp bản sinh tài sản…' to contain 'docs/RA_SOAT_TAI_SAN.md'\n    at /home/nguyencong/TT/tien-gioi-c/client/src/assets-sync.test.ts:105:30\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promi",
+          "durationMs": 19.884666999998444
+        }
+      ]
+    },
+    {
+      "runIndex": 16,
+      "mode": "parallel",
+      "success": false,
+      "durationMs": 163537,
+      "totalSuites": 487,
+      "failedSuites": 2,
+      "totalTests": 9063,
+      "failedTests": 3,
+      "failures": [
+        {
+          "suiteFile": "client/scripts/chrome-wait.test.ts",
+          "testTitle": "chrome-wait: chờ Chrome sẵn sàng cho check-*.mjs ở nightly (#1458) > waitPageTarget: JSON hỏng / không phải mảng không làm sập, hết hạn thì trả null",
+          "errorMessage": "Error: STACK_TRACE_ERROR\n    at task (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:638:27)\n    at Object.<anonymous> (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:662:16)\n    at Object.<anonymous> (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:458:28)\n    at chain (file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:369:14)\n    at /home/n",
+          "durationMs": 15013.745764000003
+        },
+        {
+          "suiteFile": "client/src/assets-sync.test.ts",
+          "testTitle": "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: sửa sai số đếm hoặc thiếu marker trong CREDITS.md / RA_SOAT_TAI_SAN.md làm sync báo lỗi",
+          "errorMessage": "AssertionError: expected '# Nguồn tài nguyên (Credits & License…' not to be '# Nguồn tài nguyên (Credits & License…' // Object.is equality\n    at /home/nguyencong/TT/tien-gioi-c/client/src/assets-sync.test.ts:89:34\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chun",
+          "durationMs": 19.697172000000137
+        },
+        {
+          "suiteFile": "client/src/assets-sync.test.ts",
+          "testTitle": "Đồng bộ tài liệu tài sản tự động (#1368, #1371, mẫu can-bang-sync) > đột biến: phát hiện dấu xung đột git chưa giải quyết (<<<<<<< / ======= / >>>>>>>) hoặc marker lặp",
+          "errorMessage": "AssertionError: expected false to be true // Object.is equality\n    at /home/nguyencong/TT/tien-gioi-c/client/src/assets-sync.test.ts:144:9\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26\n    at file:///home/nguyencong/TT/tien-gioi-c/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (",
+          "durationMs": 13.500151999996888
+        }
+      ]
+    },
+    {
+      "runIndex": 17,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 164154,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 18,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 164356,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 19,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 150995,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
+    },
+    {
+      "runIndex": 20,
+      "mode": "parallel",
+      "success": true,
+      "durationMs": 150471,
+      "totalSuites": 487,
+      "failedSuites": 0,
+      "totalTests": 9063,
+      "failedTests": 0,
+      "failures": []
     }
   ]
 }
