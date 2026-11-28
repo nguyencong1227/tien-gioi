@@ -940,6 +940,11 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Hỏa Trúc Cơ, Huyền phẩm (lô 2 Hỏa #1186, E; A #1424: dời từ Yêu Vương — trùm bí cảnh 3-4 người, 0,5 % ≈ 200 lượt mới ra, thực tế không ai kiếm được — sang Xích Mãng trùm Trúc Cơ 0,6 % như các rr2 Trúc Cơ khác): rơi hiếm từ Xích Mãng (trùm Trúc Cơ, hợp chủ đề ma trảo máu), KHÔNG từ Hắc Hổ (giữ balance/dungeon.test.ts)
     { itemId: bookIdOf("ma_trao_phe_huyet"), chance: 0.006, min: 1, max: 1 },
   ],
+  // Thanh Xà: trùm CẦM ĐƯỜNG Lạc Hà bậc Luyện Khí (CD5 #1065). Ambush-only, thưởng chính là payRewards của cảnh chặn đường; rơi phụ đan thường khi hạ
+  thanh_xa: [
+    { itemId: "hoi_huyet_dan", chance: 1, min: 1, max: 2 },
+    { itemId: "tu_khi_dan", chance: 0.3, min: 1, max: 1 },
+  ],
   // Quái Kim Đan (M6, #403; số đo ở docs/CAN_BANG.md): mỗi loài rơi nguyên liệu của mình + chút đan
   suong_ho: [
     { itemId: "suong_mao", chance: 0.5, min: 1, max: 2 },

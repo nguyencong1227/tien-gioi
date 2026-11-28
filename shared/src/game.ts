@@ -168,6 +168,25 @@ export const MONSTERS: MonsterKind[] = [
     color: 0xb3262a,
     boss: true,
   },
+  // Thanh Xà (Lạc Hà, trùm CẦM ĐƯỜNG cấp Luyện Khí; CD5 #1065). Trùm nhỏ bậc thấp: cấp 7 (<= trần Luyện Khí `AMBUSH_FOE_LEVEL_CAP`),
+  // KHÔNG sinh ngoài hoang (`MONSTER_CAP` 0, ngoài `WILD_MONSTERS`), chỉ xuất hiện làm kẻ cầm đầu bầy chặn đường Lạc Hà (AMBUSH_FOES `lac_ha`).
+  // Số là ĐỀ XUẤT khởi đầu, đo bằng `chan-duong.ts` (docs/CAN_BANG.md mục "Chặn đường"): người đúng bậc `minStep` mặc đồ tốt nhất thắng >= 60%, chết <= 5%.
+  {
+    id: "thanh_xa",
+    name: "Thanh Xà",
+    minDanger: 0.55,
+    hp: 2600,
+    atk: 26,
+    speed: 125,
+    radius: 22,
+    aggro: 240,
+    attackRange: 46,
+    attackCd: 1500,
+    exp: 650,
+    level: 7,
+    color: 0x3a8c4a,
+    boss: true,
+  },
   // Quái Kim Đan của Âm Sương Trạch (M6, #403; docs/PHAN_CONG_M6.md). Số đo bằng mô hình ở docs/CAN_BANG.md: bãi "đúng bậc" ~20-35k tu vi / giờ
   // solo (gần Xích Mãng ~30k, không vượt 1,5x), KHÔNG an toàn cho người Trúc Cơ hậu kỳ (mất > 50% khí huyết / trận: không cày sớm được).
   // Chỉ sinh ở bản đồ khai báo trong `MapDef.monsterCap` (`MONSTER_CAP` = 0 ở bản đồ mặc định). Cùng cơ chế cận chiến, khác nhau ở chỉ số.
@@ -430,6 +449,8 @@ export const MONSTER_CAP: Record<string, number> = {
   lang: 30,
   ho: 16,
   mang: 2,
+  // Thanh Xà: trùm CẦM ĐƯỜNG Lạc Hà (CD5 #1065), KHÔNG sinh ngoài hoang — chỉ kẻ cầm đầu bầy chặn đường `lac_ha`
+  thanh_xa: 0,
   yeu_vuong: 0, // trùm bí cảnh: không sinh ở bản đồ thường
   // Quái con do trùm triệu hồi (#887): KHÔNG sinh tự nhiên ở bản đồ nào; chỉ `summonAdds` dựng
   ran_con: 0,

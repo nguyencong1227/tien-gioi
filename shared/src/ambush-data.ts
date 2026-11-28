@@ -119,6 +119,13 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
     tiers: ["elite"],
     source: "/content/encounters/treo_thuong/ta_dao.yaml#ev.tt_ma_tu",
   },
+  {
+    id: "lac_ha_thanh_xa_lac_dan",
+    text: "Vân Mộng Sơn chiều nặng bóng, một con Thanh Xà rút lui về rừng sâu, sườn còn cắm nửa mũi tên của lính canh. Bị thương nên càng dữ, nó chắn ngay lối ngươi đi, vảy xanh lấp lánh, đuôi quật vỡ đá, gầm trầm không chịu tránh.",
+    mapIds: ["lac_ha"],
+    tiers: ["leader"],
+    source: "/content/encounters/bien_co/the_cuc.yaml#ev.bc_tt_thu_lac_dan",
+  },
   // === HẮC PHONG (Hắc Phong Cốc): hẻm núi, ải băng, bãi tha ma — Trúc Cơ / Kim Đan ===
   {
     id: "hac_phong_ai_bang_thu_phi",
@@ -316,7 +323,7 @@ export const AMBUSH_SCENES: readonly AmbushScene[] = [
  * Bảng kẻ chặn đường thật (CD5b #1065; A nhập vì D / E / G chưa kịp, chọn từ THỰC ĐƠN do `server/src/balance/chan-duong.ts` đo: người chơi đúng bậc `minStep` mặc đồ tốt nhất chỉ đánh thường, thắng
  * >= 90% (thường) / 80% (tinh anh) / 60% (cầm đầu); thiết kế `docs/THIET_KE_CHAN_DUONG.md` mục 9). Mọi bầy đều YẾU hơn trần cấp `AMBUSH_FOE_LEVEL_CAP` (bị hạ = chết thật, mục 53) và khoảng `minStep..maxStep`
  * hẹp (`payRewards` chưa giảm tu vi theo chênh bậc). Tinh anh Kim Đan / Nguyên Anh dùng loài cấp THẤP (`lang`, `ho`) vì loài cùng cấp tinh anh không đạt 80% ở bậc nào (Thạch Quy tinh anh đạt từ bậc 16 nhưng một trận ~99 giây thật, sát hạn 120 giây: bỏ); kẻ cầm đầu là Xích Mãng (`mang`, trùm
- * duy nhất đạt 60% một mình, từ bậc 11). Lạc Hà chưa có cảnh cầm đầu nên chưa có bầy cầm đầu. CHỌN LOÀI THEO CẢNH: văn mẫu (bản đồ, mức) chọn theo `mapIds` + `tiers`, không ghép theo loài nên đôi chỗ loài
+ * duy nhất đạt 60% một mình, từ bậc 11); Thanh Xà (`thanh_xa`, trùm CẦM ĐƯỜNG nhỏ bậc Luyện Khí bậc 7, đo lại cân bằng CD5 #1065). CHỌN LOÀI THEO CẢNH: văn mẫu (bản đồ, mức) chọn theo `mapIds` + `tiers`, không ghép theo loài nên đôi chỗ loài
  * không khớp chữ trong cảnh (B nhắc ở review #1240): D / E tinh chỉnh ghép loài - cảnh sau, miễn qua `ambushViolations` + `chan-duong.test.ts`.
  */
 export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [
@@ -383,6 +390,15 @@ export const AMBUSH_FOES: readonly AmbushFoeGroup[] = [
     maxStep: 11,
     tier: "elite",
     foes: [{ kind: "lang", count: 2 }],
+  },
+  {
+    id: "lac_ha_thanh_xa_chan_loi",
+    name: "Thanh Xà Chắn Đường",
+    mapId: "lac_ha",
+    minStep: 7,
+    maxStep: 9,
+    tier: "leader",
+    foes: [{ kind: "thanh_xa", count: 1 }],
   },
   // === HẮC PHONG (Hắc Phong Cốc): Trúc Cơ / Kim Đan ===
   {

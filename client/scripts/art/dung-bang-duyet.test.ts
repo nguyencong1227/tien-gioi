@@ -757,10 +757,19 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     const zz = rows.find((x) => x.shown === "Trùm Z");
     const aa = rows.find((x) => x.shown === "Trùm A");
     expect([zz?.n, zz?.mới, aa?.n, aa?.mới]).toEqual([5, true, 6, true]);
-    expect(rows.map((x) => x.n)).toEqual([1, 2, 3, 4, 5, 6]); // tờ: hàng cũ theo số trước, hàng MỚI sau
+    // trùm THẬT chưa đóng băng (vd Thanh Xà của #1445, CD5 #1065) nhận số sau hai trùm giả, theo thứ tự xuất hiện trong danh sách (đã đảo): test KHÔNG viết cứng số trùm hiện có
+    const themThat = [...oldBosses].reverse().filter((m) => !(m.id in DONG_BANG_T));
+    expect(rows.map((x) => x.n)).toEqual(
+      Array.from({ length: 6 + themThat.length }, (_, i) => i + 1),
+    ); // tờ: hàng cũ theo số trước, hàng MỚI sau
     // --ghi-ma: số ghi vào bảng == số in trên tờ; phần đóng băng không bị đụng
     const written = (JSON.parse(fs.readFileSync(maFile, "utf8")) as MaTable).t;
-    expect(written).toEqual({ ...DONG_BANG_T, zz_trum_a: 5, aa_trum_b: 6 });
+    expect(written).toEqual({
+      ...DONG_BANG_T,
+      zz_trum_a: 5,
+      aa_trum_b: 6,
+      ...Object.fromEntries(themThat.map((m, i) => [m.id, 7 + i])),
+    });
 
     // luồng PR nội dung (#1445): dựng lại tờ bằng `--groups 13 --md` KHÔNG `--ghi-ma` => bảng không đổi, tờ có hàng MỚI tạm, và kiểm tài liệu chấp nhận đúng tờ này
     const md2 = path.join(tmp, "doc-khong-ghi.md");
@@ -791,7 +800,7 @@ describe.skipIf(!can)("dung-bang-duyet.py: dựng thật (nhóm 10-17)", () => {
     expect((JSON.parse(fs.readFileSync(ma2, "utf8")) as MaTable).t).toEqual(DONG_BANG_T); // không --ghi-ma: bảng giữ nguyên
     const allBosses = new Map(names.mons.filter((m) => m.boss).map((m) => [m.id, m.name] as const));
     const doc2 = fs.readFileSync(md2, "utf8");
-    expect((doc2.match(/^\| T-\d+ \|/gm) ?? []).length).toBe(6);
+    expect((doc2.match(/^\| T-\d+ \|/gm) ?? []).length).toBe(6 + themThat.length);
     expect(trumDocErrors(doc2, DONG_BANG_T, DONG_BANG.t, allBosses)).toEqual([]);
   }, 120_000);
 
@@ -1124,10 +1133,8 @@ describe("dung-bang-duyet.py: duyet.json DỰNG THẬT (cần Pillow + gói ở 
         "NV-02",
         "NV-03",
         "NV-04",
-        "T-01",
-        "T-02",
-        "T-03",
-        "T-04",
+        // một mã T-nn cho MỖI trùm hiện có (không viết cứng số trùm: Thanh Xà của #1445 là T-05)
+        ...MONSTERS.filter((m) => m.boss).map((_, i) => `T-${String(i + 1).padStart(2, "0")}`),
       ]);
       for (const m of freshItems) expect(m, m.ma).toEqual(byCode.get(m.ma));
       // ô của gói riêng (Wuxia RTS ở NV-01 B): CÓ ảnh cắt riêng trong thư mục preview, và KHÔNG có trong tờ / thư mục công khai

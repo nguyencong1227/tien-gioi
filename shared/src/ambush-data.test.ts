@@ -45,11 +45,9 @@ describe("dữ liệu chặn đường: khung", () => {
 });
 
 describe("dữ liệu chặn đường THẬT: bầy kẻ chặn đường (CD5b #1065)", () => {
-  it("24 bầy; độ phủ chỉ còn thiếu cảnh + bầy CẦM ĐẦU của Lạc Hà và cảnh + bầy cả ba bậc của Lang Hoang và Uy Vân Kinh (bản đồ mới của mục 75; E / D bổ sung rồi sửa dòng này)", () => {
-    expect(AMBUSH_FOES.length).toBe(24);
+  it("25 bầy; độ phủ chỉ còn thiếu cảnh + bầy cả ba bậc của Lang Hoang và Uy Vân Kinh (bản đồ mới của mục 75; E / D bổ sung rồi sửa dòng này); CẦM ĐẦU của Lạc Hà đã đủ (G bổ sung Thanh Xà, CD5 #1065)", () => {
+    expect(AMBUSH_FOES.length).toBe(25);
     expect(ambushCoverageViolations()).toEqual([
-      "lac_ha / leader: thiếu cảnh",
-      "lac_ha / leader: thiếu bầy",
       "lang_hoang / normal: thiếu cảnh",
       "lang_hoang / normal: thiếu bầy",
       "lang_hoang / elite: thiếu cảnh",
@@ -69,10 +67,15 @@ describe("dữ liệu chặn đường THẬT: bầy kẻ chặn đường (CD5b
     for (const g of AMBUSH_FOES) expect(g.maxStep - g.minStep, g.id).toBeLessThanOrEqual(5);
   });
 
-  it("kẻ cầm đầu là Xích Mãng đúng 1 con (trùm duy nhất thắng >= 60% một mình ở bậc >= 11); mọi bầy tinh anh / thường KHÔNG có trùm", () => {
+  it("kẻ cầm đầu đúng 1 con trùm, KHÔNG có lính: Xích Mãng (mang, các bản đồ khác) từ bậc >= 11; Thanh Xà (thanh_xa, Lạc Hà) từ bậc >= 7; mọi bầy tinh anh / thường KHÔNG có trùm", () => {
     for (const g of AMBUSH_FOES.filter((x) => x.tier === "leader")) {
-      expect(g.foes, g.id).toEqual([{ kind: "mang", count: 1 }]);
-      expect(g.minStep, g.id).toBeGreaterThanOrEqual(11);
+      expect(g.foes.length, g.id).toBe(1);
+      const f = g.foes[0]!;
+      expect(f.count, g.id).toBe(1);
+      expect(MONSTER_BY_ID[f.kind]!.boss ?? false, g.id).toBe(true);
+      // mang: trùm duy nhất đạt >= 60% một mình, từ bậc 11 (thực đơn A). thanh_xa: trùm CẦM ĐƯỜNG nhỏ bậc Luyện Khí, từ bậc 7 (đo CD5 #1065).
+      if (f.kind === "thanh_xa") expect(g.minStep, g.id).toBeGreaterThanOrEqual(7);
+      else expect(g.minStep, g.id).toBeGreaterThanOrEqual(11);
     }
     for (const g of AMBUSH_FOES.filter((x) => x.tier !== "leader"))
       for (const f of g.foes) expect(MONSTER_BY_ID[f.kind]!.boss ?? false, g.id).toBe(false);
