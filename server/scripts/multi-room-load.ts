@@ -22,7 +22,7 @@ import { Client, type Room } from "colyseus.js";
 import { Server, matchMaker } from "colyseus";
 import { listenWithRetry } from "../src/test-port.js";
 import { ambushOf, rollAmbush } from "../src/systems/ambush.js";
-import { defineRooms } from "../src/rooms/WorldRoom.js";
+import { WorldRoom, defineRooms } from "../src/rooms/WorldRoom.js";
 import { hashSecret, savePlayer } from "../src/store.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -43,6 +43,33 @@ function byteLengthOf(data: unknown): number {
   if (typeof (data as any)?.byteLength === "number") return (data as any).byteLength;
   if (typeof data === "string") return Buffer.byteLength(data);
   return 0;
+}
+
+function hookBotClient(room: Room, name: string, mapId: string, isTown: boolean): BotClient {
+  const botState: BotClient = {
+    name,
+    mapId,
+    isTown,
+    room,
+    receivedBytes: 0,
+    lastMessageTime: Date.now(),
+  };
+
+  const ws = (room.connection as any)?.transport?.ws ?? (room.connection as any)?.ws;
+  if (ws) {
+    if (typeof ws.on === "function") {
+      ws.on("message", (data: any) => {
+        botState.receivedBytes += byteLengthOf(data);
+      });
+    } else if ("onmessage" in ws) {
+      const orig = ws.onmessage;
+      ws.onmessage = (ev: any) => {
+        botState.receivedBytes += byteLengthOf(ev.data);
+        if (orig) orig.call(ws, ev);
+      };
+    }
+  }
+  return botState;
 }
 
 export interface MultiRoomReport {
@@ -70,6 +97,21 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
   const dataDir = mkdtempSync(path.join(tmpdir(), "tien-gioi-multi-room-"));
   process.env.DATA_DIR = dataDir;
   process.env.AMBUSH = "on";
+
+  // Bọc update của WorldRoom để đo thời gian tick THẬT của từng phòng trong lúc đo
+  const tickDurationSamples: number[] = [];
+  let isMeasuring = false;
+  const origUpdate = (WorldRoom.prototype as any).update;
+  (WorldRoom.prototype as any).update = function (dtMs: number) {
+    const t0 = performance.now();
+    try {
+      return origUpdate.call(this, dtMs);
+    } finally {
+      if (isMeasuring) {
+        tickDurationSamples.push(performance.now() - t0);
+      }
+    }
+  };
 
   const server = new Server({ transport: new WebSocketTransport(), gracefullyShutdown: false });
   defineRooms(server);
@@ -117,30 +159,7 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
         connectedRooms.push(room);
 
         const isTown = b <= 2;
-        const botState: BotClient = {
-          name: botName,
-          mapId,
-          isTown,
-          room,
-          receivedBytes: 0,
-          lastMessageTime: Date.now(),
-        };
-
-        // Đo byte nhận được từ socket
-        const ws = (room.connection as any)?.transport?.ws ?? (room.connection as any)?.ws;
-        if (ws) {
-          if (typeof ws.on === "function") {
-            ws.on("message", (data: any) => {
-              botState.receivedBytes += byteLengthOf(data);
-            });
-          } else if ("onmessage" in ws) {
-            const orig = ws.onmessage;
-            ws.onmessage = (ev: any) => {
-              botState.receivedBytes += byteLengthOf(ev.data);
-              if (orig) orig.call(ws, ev);
-            };
-          }
-        }
+        const botState = hookBotClient(room, botName, mapId, isTown);
         botClients.push(botState);
       }
       console.log(`  ✓ Đã mở phòng world: ${rName} (4 bot)`);
@@ -152,24 +171,30 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
       `[RAM] Sau khi mở 6 phòng thế giới thường: ${rss6RoomsMb} MB (tăng ${rss6RoomsMb - rssBaseMb} MB)`,
     );
 
-    // 2. Mở 4 phòng đấu trường (arena) qua cơ chế ambush
+    // 2. Mở 4 phòng đấu trường (arena) qua cơ chế ambush trên 4 map khác nhau
     console.log(
       `\n>>> GIAI ĐOẠN 2: Mở 4 phòng đấu trường (arena_lac_ha, arena_hac_phong, arena_am_suong, arena_han_van)...`,
     );
-    const arenaHosts = ["ArenaHost 1", "ArenaHost 2", "ArenaHost 3", "ArenaHost 4"];
+    const arenaHosts = [
+      { name: "ArenaHost 1", mapId: "lac_ha" },
+      { name: "ArenaHost 2", mapId: "hac_phong" },
+      { name: "ArenaHost 3", mapId: "am_suong" },
+      { name: "ArenaHost 4", mapId: "han_van" },
+    ];
     for (let a = 0; a < arenaHosts.length; a++) {
-      const hostName = arenaHosts[a];
+      const hostMap = arenaHosts[a].mapId;
+      const hostName = arenaHosts[a].name;
       await savePlayer({
         name: hostName,
         secretHash: hashSecret(secretOf(hostName)),
         realm: 1,
         tier: 0,
         exp: 0,
-        mapId: DEFAULT_MAP_ID,
+        mapId: hostMap,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      const worldRoom = await client.joinOrCreate(roomNameOf(DEFAULT_MAP_ID), {
+      const worldRoom = await client.joinOrCreate(roomNameOf(hostMap), {
         v: PROTOCOL_VERSION,
         name: hostName,
         secret: secretOf(hostName),
@@ -185,7 +210,7 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
           {
             id: `sc_${a}`,
             text: "Chặn đường",
-            mapIds: [DEFAULT_MAP_ID],
+            mapIds: [hostMap],
             tiers: ["normal"],
             source: "test",
           },
@@ -194,7 +219,7 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
           {
             id: `foe_${a}`,
             name: `Kẻ địch ${a}`,
-            mapId: DEFAULT_MAP_ID,
+            mapId: hostMap,
             minStep: 0,
             maxStep: 100,
             tier: "normal",
@@ -208,9 +233,15 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
         const p = w.state.players.get(sid);
         const c = w.ctrl.get(sid);
         if (p && c) {
-          p.x = w.map.townPx.x + w.map.townPx.r + 500;
+          p.x = w.map.townPx.x + w.map.townPx.r + 60;
           p.y = w.map.townPx.y;
+          p.hp = p.maxHp = 100_000;
           c.coin = 5000;
+          c.lastHitAt = 0;
+          c.lastDealtAt = undefined;
+          for (const mc of w.mctrl.values()) {
+            if (mc.target === sid) mc.target = undefined;
+          }
           ambushOf(w, c).cooldownUntil = 0;
 
           let arenaTravelRoomId: string | undefined;
@@ -218,7 +249,7 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
             worldRoom.send(AMBUSH_MSG.seen, { id: offer.id });
             setTimeout(() => {
               worldRoom.send(AMBUSH_MSG.choose, { id: offer.id, choice: "fight" });
-            }, AMBUSH_ARM_MS + 20);
+            }, AMBUSH_ARM_MS + 80);
           });
 
           worldRoom.onMessage("travelTo", (t: { mapId: string; roomId?: string }) => {
@@ -228,7 +259,7 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
           rollAmbush(w, sid, p, c);
 
           // Chờ nhận travelTo và vào phòng arena
-          for (let wait = 0; wait < 30 && !arenaTravelRoomId; wait++) {
+          for (let wait = 0; wait < 50 && !arenaTravelRoomId; wait++) {
             await sleep(100);
           }
 
@@ -239,6 +270,8 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
               secret: secretOf(hostName),
             });
             connectedRooms.push(arenaRoom);
+            const arenaBotState = hookBotClient(arenaRoom, hostName, "arena_lac_ha", false);
+            botClients.push(arenaBotState);
             console.log(
               `  ✓ Đã mở phòng đấu trường ${a + 1}: ${arenaRoom.roomId} (${arenaTravelRoomId})`,
             );
@@ -299,6 +332,8 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
         secret: secretOf(dungeonHostName),
       });
       connectedRooms.push(dunRoom);
+      const dunBotState = hookBotClient(dunRoom, dungeonHostName, "bi_canh_linh_hu", false);
+      botClients.push(dunBotState);
       console.log(`  ✓ Đã mở phòng bí cảnh: ${dunRoom.roomId} (Linh Hư Bí Cảnh)`);
     }
 
@@ -312,10 +347,12 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
 
     // 4. Đo đạc ổn định trong durationSec
     console.log(
-      `\n>>> GIAI ĐOẠN 4: Đo đạc ổn định trong ${durationSec}s với 10+ phòng hoạt động...`,
+      `\n>>> GIAI ĐOẠN 4: Đo đạc ổn định trong ${durationSec}s với ${activeRoomsCount} phòng hoạt động...`,
     );
-    // Reset bộ đếm byte
+    // Reset bộ đếm byte và tick
     for (const b of botClients) b.receivedBytes = 0;
+    tickDurationSamples.length = 0;
+    isMeasuring = true;
     const t0 = performance.now();
 
     // Gửi input nhẹ nhàng để các phòng có hoạt động di chuyển
@@ -327,54 +364,64 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
       }
       await sleep(1000);
     }
+    isMeasuring = false;
     const elapsedSec = (performance.now() - t0) / 1000;
 
-    // Tính toán số liệu từng phòng
+    // Tính toán thời gian tick THẬT từ mẫu
+    let tickAvgMs = 0;
+    let tickP95Ms = 0;
+    let tickMaxMs = 0;
+    if (tickDurationSamples.length > 0) {
+      const sorted = [...tickDurationSamples].sort((a, b) => a - b);
+      tickAvgMs = Number((sorted.reduce((s, x) => s + x, 0) / sorted.length).toFixed(2));
+      tickP95Ms = Number(sorted[Math.floor(sorted.length * 0.95)].toFixed(2));
+      tickMaxMs = Number(sorted[sorted.length - 1].toFixed(2));
+    }
+
+    // Tính toán số liệu từng phòng THẬT từ botClients (gồm cả world, arena, dungeon)
     const roomReportList: MultiRoomReport["rooms"] = [];
-    for (const mapId of worldMapIds) {
-      const botsInMap = botClients.filter((b) => b.mapId === mapId);
+    const allTrackedMaps: { id: string; name: string; type: "world" | "arena" | "dungeon" }[] = [
+      ...worldMapIds.map((id) => ({
+        id,
+        name: getMap(id)?.def.name ?? id,
+        type: "world" as const,
+      })),
+      { id: "bi_canh_linh_hu", name: "Linh Hư Bí Cảnh", type: "dungeon" as const },
+      { id: "arena_lac_ha", name: "Đấu Trường (4 phòng)", type: "arena" as const },
+    ];
+
+    for (const item of allTrackedMaps) {
+      const botsInMap = botClients.filter((b) => b.mapId === item.id);
       const totalBytes = botsInMap.reduce((s, b) => s + b.receivedBytes, 0);
       const botCount = botsInMap.length;
-      const rxKbPerSec = botCount > 0 ? totalBytes / botCount / elapsedSec / 1024 : 0;
-      const avgBytePerTick = botCount > 0 ? totalBytes / botCount / (elapsedSec * 20) : 0;
+      const rxKbPerSec =
+        botCount > 0 && elapsedSec > 0 ? totalBytes / botCount / elapsedSec / 1024 : 0;
+      const avgBytePerTick =
+        botCount > 0 && elapsedSec > 0 ? totalBytes / botCount / (elapsedSec * 20) : 0;
       const botsTown = botsInMap.filter((b) => b.isTown);
       const botsWild = botsInMap.filter((b) => !b.isTown);
       const townBytes = botsTown.reduce((s, b) => s + b.receivedBytes, 0);
       const wildBytes = botsWild.reduce((s, b) => s + b.receivedBytes, 0);
       const townBytePerTick =
-        botsTown.length > 0 ? townBytes / botsTown.length / (elapsedSec * 20) : 0;
+        botsTown.length > 0 && elapsedSec > 0
+          ? townBytes / botsTown.length / (elapsedSec * 20)
+          : undefined;
       const wildBytePerTick =
-        botsWild.length > 0 ? wildBytes / botsWild.length / (elapsedSec * 20) : 0;
-      const mDef = getMap(mapId)?.def;
+        botsWild.length > 0 && elapsedSec > 0
+          ? wildBytes / botsWild.length / (elapsedSec * 20)
+          : undefined;
+
       roomReportList.push({
-        mapId,
-        name: mDef?.name ?? mapId,
-        type: "world",
+        mapId: item.id,
+        name: item.name,
+        type: item.type,
         botsCount: botCount,
         avgBytePerTick: Math.round(avgBytePerTick),
-        townBytePerTick: Math.round(townBytePerTick),
-        wildBytePerTick: Math.round(wildBytePerTick),
+        townBytePerTick: townBytePerTick !== undefined ? Math.round(townBytePerTick) : undefined,
+        wildBytePerTick: wildBytePerTick !== undefined ? Math.round(wildBytePerTick) : undefined,
         rxKbPerSec: Number(rxKbPerSec.toFixed(2)),
       });
     }
-
-    // Thêm đại diện bí cảnh và đấu trường
-    roomReportList.push({
-      mapId: "bi_canh_linh_hu",
-      name: "Linh Hư Bí Cảnh",
-      type: "dungeon",
-      botsCount: 1,
-      avgBytePerTick: 140,
-      rxKbPerSec: 2.73,
-    });
-    roomReportList.push({
-      mapId: "arena_lac_ha",
-      name: "Đấu Trường (4 phòng)",
-      type: "arena",
-      botsCount: 4,
-      avgBytePerTick: 110,
-      rxKbPerSec: 2.15,
-    });
 
     return {
       timestamp: new Date().toISOString(),
@@ -382,13 +429,14 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
       rssBaseMb,
       rss6RoomsMb,
       rss11RoomsMb,
-      tickAvgMs: 3.85,
-      tickP95Ms: 6.95,
-      tickMaxMs: 14.1,
+      tickAvgMs,
+      tickP95Ms,
+      tickMaxMs,
       rooms: roomReportList,
     };
   } finally {
-    // Dọn dẹp
+    // Dọn dẹp và khôi phục hàm update gốc
+    (WorldRoom.prototype as any).update = origUpdate;
     await Promise.all(connectedRooms.map((r) => r.connection.isOpen && r.leave(true)));
     await server.gracefullyShutdown(false);
     delete process.env.AMBUSH;
