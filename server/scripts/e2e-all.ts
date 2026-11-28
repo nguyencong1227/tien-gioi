@@ -70,6 +70,8 @@ export interface ScriptResult {
  * inv-select đo 133,6-173,9 s -> sàn 480 s (trước đó 300 s, tỷ lệ 58,0%). Cả hai hạn thực 480 s <= 600 s nên vẫn được thử lại.
  * Lưu ý: cả chuyen-canh và inv-select cùng nằm Shard 3 nên sàn giữ 480 s để nếu một script treo + thử lại không vượt trần 30 phút của shard.
  * hud (lô 6, #1522) đo 61,5-103,8 s trên CI (5 lượt `only=hud,equip-six,skill-book`, runs 45762380754 ... 45763947053 ngày 26/11): 3 x 103,8 = 311 s > 300 -> sàn 360 s (A, nhận xét ở #1522); cùng nằm Shard 3 nên 360 <= các sàn khác, không đổi trần 30 phút của shard.
+ * skill-touch (lô 7, #1524) đo 130,2-138,3 s trên CI (runs 45765623259, 45766212473, 45766891291 ngày 26/11): 3 x 138,3 = 415 s > 300 -> sàn 420 s (<= 600 s nên vẫn được thử lại).
+ * shop-qty (nit #1530, `settle()` thay `sleep`) đo 100,3-158,3 s trên CI (runs 46127581294 ... 46128986171 ngày 28/11): 3 x 158,3 = 475 s > 300 -> sàn 480 s (<= 600 s nên vẫn được thử lại).
  * Kịch bản có 3 x thời gian CI <= 300 s không cần dòng ở đây. Thêm kịch bản chậm mới thì thêm vào đây theo số đo CI, đừng nâng `--timeout` chung.
  */
 export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
@@ -81,6 +83,8 @@ export const SCRIPT_TIMEOUT_SEC: Readonly<Record<string, number>> = {
   "e2e:chuyen-canh": 480,
   "e2e:inv-select": 480,
   "e2e:hud": 360,
+  "e2e:skill-touch": 420,
+  "e2e:shop-qty": 480,
 };
 
 /** Kịch bản có hạn chờ thực LỚN HƠN ngưỡng này KHÔNG được thử lại: một lần treo + thử lại sẽ ăn quá `timeout-minutes` của cả shard (A ở #1458). */
