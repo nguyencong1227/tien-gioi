@@ -2423,47 +2423,48 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --bos
 
 | Mốc trạng thái phòng | Số phòng đồng thời | RAM VmRSS (MB) | Mức tăng so với cơ sở | Mức tăng trung bình / phòng |
 |---|---:|---:|---:|---:|
-| Cơ sở (server mới khởi động, 0 phòng) | 0 | **151 MB** | 0 MB | — |
-| 6 phòng thế giới thường (`MAPS`) | 6 | **182 MB** | +31 MB | ~5,2 MB / phòng |
-| 11 phòng đầy đủ (6 world + 1 bí cảnh + 4 đấu trường) | **11** | **185 MB** | **+34 MB** | **~3,1 MB / phòng** |
+| Cơ sở (server mới khởi động, 0 phòng) | 0 | **141 MB** | 0 MB | — |
+| 6 phòng thế giới thường (`MAPS`) | 6 | **176 MB** | +35 MB | ~5,8 MB / phòng |
+| 11 phòng đầy đủ (6 world + 1 bí cảnh + 4 đấu trường) | **11** | **181 MB** | **+40 MB** | **~3,6 MB / phòng** |
 
 > **Nhận xét về bộ nhớ:**
-> - 6 phòng thế giới thường nạp bản đồ dạng tile grid và các hệ thống state chiếm thêm ~31 MB (trung bình ~5,2 MB/phòng).
-> - Khi mở thêm 1 phòng bí cảnh (`bi_canh_linh_hu`) và 4 phòng đấu trường (`arena_*`), VmRSS chỉ tăng thêm 3 MB (từ 182 MB lên 185 MB, trung bình ~0,6 MB/phòng phụ trợ). Các phòng tạm này có kích thước nhỏ và vòng đời ngắn, chi phí RAM cực kỳ nhẹ và không gây áp lực bộ nhớ.
+> - 6 phòng thế giới thường nạp bản đồ dạng tile grid và các hệ thống state chiếm thêm ~35 MB (trung bình ~5,8 MB/phòng).
+> - Khi mở thêm 1 phòng bí cảnh (`bi_canh_linh_hu`) và 4 phòng đấu trường (`arena_*`), VmRSS chỉ tăng thêm 5 MB (từ 176 MB lên 181 MB, trung bình ~1,0 MB/phòng phụ trợ). Các phòng tạm này có kích thước nhỏ và vòng đời ngắn, chi phí RAM cực kỳ nhẹ và không gây áp lực bộ nhớ.
 
 ### 43.3. Thời gian xử lý tick tổng của máy chủ (11 phòng, 20 Hz - Mẫu đo thật)
 
 | Chỉ số thời gian tick phòng | Kết quả đo lường thật | Ngân sách cho phép | Đánh giá |
 |---|---:|---:|:---:|
-| Trung bình (TB) | **0,08 ms** | < 10,0 ms | **ĐẠT** |
-| Phân vị 95 (p95) | **0,16 ms** | < 10,0 ms | **ĐẠT** |
-| Đỉnh cao nhất (Max) | **1,04 ms** | < 50,0 ms (không trễ nhịp) | **ĐẠT** |
+| Trung bình (TB) | **0,10 ms** | < 10,0 ms | **ĐẠT** |
+| Phân vị 95 (p95) | **0,21 ms** | < 10,0 ms | **ĐẠT** |
+| Đỉnh cao nhất (Max) | **0,69 ms** | < 50,0 ms (không trễ nhịp) | **ĐẠT** |
 
 ### 43.4. Bảng đo chi tiết lượng patch byte/tick và băng thông từng bản đồ (Đo từ WebSocket thật)
 
 | Bản đồ / Phòng | Loại | Số bot | Patch TB (byte/tick) | Ở trạm (byte/tick) | Vùng quái (byte/tick) | Băng thông (RX KB/s) |
 |---|---|---:|---:|---:|---:|---:|
-| Lạc Hà Trấn (`lac_ha`) | world | 4 | 90 | 116 | 64 | 1,76 |
-| Hắc Phong Cốc (`hac_phong`) | world | 4 | 13 | 9 | 16 | 0,25 |
-| Âm Sương Trạch (`am_suong`) | world | 4 | 7 | 6 | 9 | 0,14 |
-| Hàn Vân Lĩnh (`han_van`) | world | 4 | 6 | 5 | 7 | 0,11 |
-| **Lang Hoang** (`lang_hoang`) | world | 4 | **14** | **13** | **15** | **0,27** |
-| **Uy Vân Kinh** (`uy_van`) | world | 4 | **2** | **2** | **2** | **0,04** |
-| Linh Hư Bí Cảnh (`bi_canh_linh_hu`) | dungeon | 1 | 24 | — | 24 | 0,47 |
+| Lạc Hà Trấn (`lac_ha`) | world | 4 | 85 | 100 | 70 | 1,65 |
+| Hắc Phong Cốc (`hac_phong`) | world | 4 | 14 | 12 | 15 | 0,27 |
+| Âm Sương Trạch (`am_suong`) | world | 4 | 2 | 2 | 1 | 0,03 |
+| Hàn Vân Lĩnh (`han_van`) | world | 4 | 3 | 2 | 4 | 0,06 |
+| **Lang Hoang** (`lang_hoang`) | world | 4 | **9** | **8** | **9** | **0,17** |
+| **Uy Vân Kinh** (`uy_van`) | world | 4 | **7** | **3** | **11** | **0,14** |
+| Linh Hư Bí Cảnh (`bi_canh_linh_hu`) | dungeon | 1 | 16 | — | 16 | 0,31 |
 | Đấu Trường (4 phòng) (`arena_lac_ha`) | arena | 4 | 9 | — | 9 | 0,17 |
 
 ### 43.5. Nhận xét, Giới hạn thực nghiệm & Kết luận
 1. **Bản đồ mới Lang Hoang và Uy Vân Kinh:**
    - **Lang Hoang (sau lát A3 & lát B - 64 quái Hóa Thần sinh thật):**
-     * Khi đã sinh đầy đủ 64 quái Hóa Thần (62 sói thường thuộc 6 loài + 2 trùm Lang Vương và Thiên Lang Vương, PR #1580 và #1583), lượng patch byte/tick đo được đạt **14 byte/tick** (ở trạm 13 B/tick, ngoài dã ngoại vùng quái 15 B/tick), băng thông mạng đạt **0,27 KB/s**.
-     * Mức tăng từ 1 byte/tick (khi chưa có quái) lên 14 byte/tick phản ánh đúng hoạt động tuần tra, kiểm tra tầm nhìn `StateView` và đồng bộ nhị phân `@colyseus/schema`. Mức 14 byte/tick là cực kỳ tiết kiệm (chỉ chiếm ~2,3% ngân sách trần 600 B/tick).
-   - **Uy Vân Kinh:** Hiện tại là bản đồ thành thị / trạm mới, chưa có quái dã ngoại sinh (`monsterCap` rỗng chờ lát D-F), tiếp tục duy trì mức chi phí khung nền cực thấp: **2 byte/tick** (RX 0,04 KB/s).
+     * Khi đã sinh đầy đủ 64 quái Hóa Thần (62 sói thường thuộc 6 loài + 2 trùm Lang Vương và Thiên Lang Vương, PR #1580 và #1583), lượng patch byte/tick đo được ổn định ở **9–14 byte/tick** (ở trạm 8–13 B/tick, ngoài dã ngoại vùng quái 9–15 B/tick), băng thông mạng đạt **0,17–0,27 KB/s** (chỉ chiếm ~2,3% ngân sách trần 600 B/tick).
+   - **Uy Vân Kinh (sau lát A3 chương 6 - 62 quái Hóa Thần sinh thật):**
+     * Sau khi PR #1590 cho 62 quái Hóa Thần sinh thật (16 Luyện Huyết Đệ Tử, 12 Ngạ Quỷ, 10 Cương Thi, 10 Huyết Mị, 8 Huyết Ảnh, 6 Huyết Sát Chân Truyền), lượng patch byte/tick đo được đạt **7 byte/tick** (ở trạm Hồi Lang Quan 3 B/tick do quái ngoài tầm nhìn StateView, ngoài dã ngoại Huyết Trận Uy Vân 11 B/tick), băng thông RX đạt **0,14 KB/s** (chỉ chiếm ~1,2% ngân sách trần 600 B/tick).
+     * Mức tăng từ 2 byte/tick (nền khi chưa có quái) lên 7 byte/tick (TB) và 11 byte/tick (dã ngoại) phản ánh đúng hoạt động tuần tra của 62 quái Hóa Thần và đồng bộ tầm nhìn StateView.
 2. **Khả năng chịu tải đa phòng (11 phòng đồng thời):**
-   - Vòng lặp 20 Hz xử lý tick tổng của cả 11 phòng Colyseus chỉ tốn TB **0,08 ms/tick** (p95 **0,16 ms/tick**, max **1,04 ms** $\ll$ 10,0 ms ngân sách).
+   - Vòng lặp 20 Hz xử lý tick tổng của cả 11 phòng Colyseus chỉ tốn TB **0,10 ms/tick** (p95 **0,21 ms/tick**, max **0,69 ms** $\ll$ 10,0 ms ngân sách).
    - *Giới hạn thực nghiệm:* 4 bot/phòng chỉ là tải cơ bản để kiểm tra việc quản lý đồng thời 11 phòng hoạt động (không xung đột vòng lặp, không rò rỉ socket). Kịch bản đông người dồn vào một phòng vẫn được kiểm chứng bởi `npm run bench -w server -- --crowd`.
-   - VmRSS cho 11 phòng dừng ở mức **185 MB** (tăng 34 MB so với khi chưa mở phòng, trung bình ~3,1 MB/phòng), hoàn toàn nhẹ nhàng trên máy chủ.
+   - VmRSS cho 11 phòng dừng ở mức **181 MB** (tăng 40 MB so với cơ sở 141 MB, trung bình ~3,6 MB/phòng), hoàn toàn nhẹ nhàng trên máy chủ.
 3. **Kiểm chứng phản ứng với tải qua kiểm thử tự động:**
-   - Bộ test `server/scripts/multi-room-load.test.ts` đã chứng minh tính phản ứng thật của hệ thống đo: khi chèn tải chậm trễ giả lập 5 ms vào `WorldRoom.prototype.update`, chỉ số `tickP95Ms` tăng vọt từ 0,16 ms lên $\ge 4,5$ ms, chứng minh số liệu hoàn toàn không phải hằng số viết cứng.
+   - Bộ test `server/scripts/multi-room-load.test.ts` đã chứng minh tính phản ứng thật của hệ thống đo: khi chèn tải chậm trễ giả lập 5 ms vào `WorldRoom.prototype.update`, chỉ số `tickP95Ms` tăng vọt từ 0,21 ms lên $\ge 4,5$ ms, chứng minh số liệu hoàn toàn không phải hằng số viết cứng.
 
 
 

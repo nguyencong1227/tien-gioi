@@ -137,8 +137,9 @@ export async function runMultiRoomLoadTest(durationSec = 10): Promise<MultiRoomR
       const mapShort = mapId.replace(/_/g, "").slice(0, 4);
       for (let b = 1; b <= 4; b++) {
         const botName = `Bot ${mapShort} ${b}`;
-        const spawnX = (getMap(mapId)?.townPx.x ?? 1000) + (b > 2 ? 800 : 0);
-        const spawnY = getMap(mapId)?.townPx.y ?? 1000;
+        const isUyVan = mapId === "uy_van";
+        const spawnX = (getMap(mapId)?.townPx.x ?? 1000) + (b > 2 && !isUyVan ? 800 : 0);
+        const spawnY = (getMap(mapId)?.townPx.y ?? 1000) - (b > 2 && isUyVan ? 800 : 0);
         await savePlayer({
           name: botName,
           secretHash: hashSecret(secretOf(botName)),
