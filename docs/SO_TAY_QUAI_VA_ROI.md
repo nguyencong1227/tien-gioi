@@ -2,7 +2,7 @@
 
 > File này **SINH TỰ ĐỘNG** từ `server/src/balance/so-tay-quai.ts`, đọc dữ liệu thật ở `shared/` (`MONSTERS`, `DROP_TABLES`, `COIN_DROPS`, `ITEMS`, `MONSTER_REALM`, bản đồ).
 > Sau khi sửa số liệu quái / rơi đồ / bản đồ, chạy `npm run so-tay-quai -w server` để cập nhật; test `server/src/balance/so-tay-quai-sync.test.ts` bắt tài liệu lệch bản sinh.
-> Trạng thái: **16 quái**, **126 dòng rơi đồ**.
+> Trạng thái: **17 quái**, **128 dòng rơi đồ**.
 
 ---
 
@@ -14,6 +14,7 @@
 |---|---|---|---|---:|---:|---:|---:|---|---|
 | **Linh Thố** | `tho` | Thường | Luyện Khí | 0 | 40 | 4 | 4 | 60% × 1-3 | Lạc Hà Trấn |
 | **Hôi Lang** | `lang` | Thường | Luyện Khí | 1 | 140 | 14 | 10 | 70% × 2-6 | Lạc Hà Trấn, Hắc Phong Cốc, Linh Hư Bí Cảnh |
+| **Thanh Xà** | `thanh_xa` | Trùm | Luyện Khí | 7 | 2600 | 26 | 650 | 100% × 100-200 | — |
 | **Hắc Hổ** | `ho` | Thường | Trúc Cơ | 7 | 600 | 42 | 35 | 80% × 8-20 | Lạc Hà Trấn, Hắc Phong Cốc, Linh Hư Bí Cảnh |
 | **Xích Mãng** | `mang` | Trùm | Trúc Cơ | 12 | 4000 | 140 | 900 | 100% × 150-300 | Lạc Hà Trấn, Hắc Phong Cốc |
 | **Rắn Con** | `ran_con` | Thường | Trúc Cơ | 12 | 320 | 42 | 0 | — | — |
@@ -35,9 +36,9 @@
 
 | Vật phẩm | ID | Loại | Phẩm | Rơi từ |
 |---|---|---|---|---|
-| **Hồi Huyết Đan** | `hoi_huyet_dan` | Đan dược | Phàm phẩm | Linh Thố 8%, Hôi Lang 12%, Hắc Hổ 20%, Xích Mãng 100%, Sương Hồ 10%, Linh Hư Yêu Vương 100% |
+| **Hồi Huyết Đan** | `hoi_huyet_dan` | Đan dược | Phàm phẩm | Linh Thố 8%, Hôi Lang 12%, Hắc Hổ 20%, Xích Mãng 100%, Thanh Xà 100%, Sương Hồ 10%, Linh Hư Yêu Vương 100% |
 | **Hồi Linh Đan** | `hoi_linh_dan` | Đan dược | Phàm phẩm | Hôi Lang 8%, Hắc Hổ 15%, Thạch Quy 10% |
-| **Tụ Khí Đan** | `tu_khi_dan` | Đan dược | Linh phẩm | Hắc Hổ 1%, Xích Mãng 30%, Hắc Giao 50%, Thiên Hàn Vương 60%, Linh Hư Yêu Vương 80% |
+| **Tụ Khí Đan** | `tu_khi_dan` | Đan dược | Linh phẩm | Hắc Hổ 1%, Xích Mãng 30%, Thanh Xà 30%, Hắc Giao 50%, Thiên Hàn Vương 60%, Linh Hư Yêu Vương 80% |
 | **Đại Hồi Huyết Đan** | `dai_hoi_huyet_dan` | Đan dược | Bảo phẩm | Sương Hồ 4%, Độc Thiềm 6%, Hắc Giao 100%, Hàn Lang 8% |
 | **Đại Hồi Linh Đan** | `dai_hoi_linh_dan` | Đan dược | Bảo phẩm | Thạch Quy 4%, Độc Thiềm 6%, Phong Nha 8%, Cốt Tượng 10% |
 | **Lông thỏ** | `long_tho` | Nguyên liệu | Phàm phẩm | Linh Thố 50% |

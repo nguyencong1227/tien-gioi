@@ -12,6 +12,8 @@ export const MONSTER_REALM: Readonly<Record<string, number>> = {
   lang: 1,
   ho: 2,
   mang: 2,
+  // Thanh Xà: trùm CẦM ĐƯỜNG Lạc Hà (cấp 7, bậc Luyện Khí; CD5 #1065), không rơi sách chiêu: khai bậc để sổ tay quái (#1420) có đủ mọi quái
+  thanh_xa: 1,
   yeu_vuong: 2,
   ran_con: 2,
   phan_than_yeu_vuong: 2,

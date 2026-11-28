@@ -291,7 +291,7 @@ Chi tiết thiết kế: [docs/THIET_KE_BI_CANH.md](THIET_KE_BI_CANH.md).
 
 ## Trùm nhiều chiêu: học né
 
-Từ bản 0.4.0, bốn con trùm (**Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh) không còn chỉ đứng đánh: mỗi con có **bộ chiêu** riêng, đổi chiêu theo thanh máu. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
+Từ bản 0.4.0, các con trùm không còn chỉ đứng đánh: mỗi con có **bộ chiêu** riêng, đổi chiêu theo thanh máu. Hiện có năm con trùm như vậy: **Xích Mãng**, **Hắc Giao**, **Thiên Hàn Vương**, **Linh Hư Yêu Vương** ở bí cảnh, và **Thanh Xà**, kẻ cầm đầu bầy chặn đường nhỏ ở Lạc Hà. Chết do trùm ở bản đồ thường vẫn là **mất một kiếp**, nên đây là phần cần học kỹ.
 
 ### Đọc vùng cảnh báo
 
