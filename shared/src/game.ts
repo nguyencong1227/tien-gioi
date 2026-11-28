@@ -478,6 +478,50 @@ export const MONSTERS: MonsterKind[] = [
     element: "phong",
     // Sói lông bạc, đòn nặng (nguồn có thêm Thiên Lang Khiếu khống chế ngắn: chiêu khống chế là việc của bộ chiêu trùm, loài thường chưa có cơ chế đó)
   },
+  // Trùm Lang Hoang (D1 #1466 lát B; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3): bãi của đội 3-4 người như Thiên Hàn Vương. Số theo hàng "Trùm" của KHUNG mục 4.1 (221.030 / 422 / 230.400 / cấp 24);
+  // Lang Vương (trùm nhỏ, thủ lĩnh Lang Lĩnh đứng trước Thiên Lang Vương) ~ 45 %. Bộ chiêu ở `bosses.ts`; khi `BOSS_MOVES` tắt trùm chạy như cũ (lao + đập đất).
+  {
+    id: "lang_vuong",
+    name: "Lang Vương",
+    minDanger: 0.78,
+    hp: 99500,
+    atk: 190,
+    speed: 125,
+    radius: 28,
+    aggro: 300,
+    attackRange: 56,
+    attackCd: 1500,
+    exp: 103680,
+    level: 22,
+    color: 0xd97a4a,
+    boss: true,
+    element: "hoa",
+    // Thủ lĩnh Lang Lĩnh: lao thẳng và đập đất vòng vừa (gồng 1,1 s, vòng 120 px, x1,8 công)
+    behavior: "charger",
+    windupMs: 800,
+    slam: { windupMs: 1100, radius: 120, mult: 1.8, cdMs: 7000 },
+  },
+  {
+    id: "thien_lang_vuong",
+    name: "Thiên Lang Vương",
+    minDanger: 0.9,
+    hp: 221030,
+    atk: 422,
+    speed: 120,
+    radius: 32,
+    aggro: 320,
+    attackRange: 62,
+    attackCd: 1600,
+    exp: 230400,
+    level: 24,
+    color: 0xe8f0ff,
+    boss: true,
+    element: "phong",
+    // Chúa Lang Hoang: lao thẳng + đập đất (khi `BOSS_MOVES` bật thì dùng bộ chiêu ở `bosses.ts`)
+    behavior: "charger",
+    windupMs: 900,
+    slam: { windupMs: 1200, radius: 140, mult: 1.8, cdMs: 7000 },
+  },
   // Trùm của bí cảnh Linh Hư (docs/THIET_KE_BI_CANH.md). Không sinh ngoài hoang: `MONSTER_CAP.yeu_vuong = 0` và các bản đồ
   // thường không khai báo loại này. Số liệu cân bằng ở 4c-2 (`server/src/balance/dungeon.ts`, docs/CAN_BANG.md mục "Bí cảnh"):
   // đội 3 người ở ngưỡng `minStep` hạ trùm trong ~6 phút (không ai chết ở ca mô phỏng khó: đứng yên, không né), đội 2 người
@@ -586,6 +630,8 @@ export const MONSTER_CAP: Record<string, number> = {
   xich_diem_lang: 0,
   thuong_nguyet_lang: 0,
   ngan_nguyet_lang: 0,
+  lang_vuong: 0,
+  thien_lang_vuong: 0,
 };
 /**
  * Loài quái CHỈ do trùm triệu hồi (#887): không sinh ngoài hoang, `exp` 0, không bảng rơi đồ / Linh thạch (`DROP_TABLES` / `COIN_DROPS` KHÔNG có mục), không nhiệm vụ / kiếp

@@ -58,7 +58,8 @@ describe("ba chiêu Hóa Thần (D1 #1466 lát C)", () => {
     }
   });
 
-  it("sách dựng tự động (kinh_<id>) và rơi từ sói Lang Hoang (quái bậc 5 = đúng bậc của chiêu), 0,6-1,2 % mỗi nơi, KHÔNG rơi từ quái thấp bậc", () => {
+  it("sách dựng tự động (kinh_<id>) và rơi từ quái bậc 5 của Lang Hoang: sói thường 0,6-1,2 %, trùm 5-25 % (Thiên Lang Vương rơi cả ba); KHÔNG rơi từ quái thấp bậc", () => {
+    const TRUM = ["lang_vuong", "thien_lang_vuong"];
     for (const id of IDS) {
       const book = ITEM_BY_ID[bookIdOf(id)];
       expect(book, id).toBeDefined();
@@ -66,15 +67,26 @@ describe("ba chiêu Hóa Thần (D1 #1466 lát C)", () => {
         rows.some((d) => d.itemId === bookIdOf(id)),
       );
       expect(nguon.length, `${id}: có nơi rơi`).toBeGreaterThan(0);
+      // mỗi chiêu rơi từ ít nhất một sói thường (người chơi đơn lẻ cũng kiếm được) và từ Thiên Lang Vương
+      expect(
+        nguon.some(([mon]) => (SOI as readonly string[]).includes(mon)),
+        `${id}: có sói thường rơi`,
+      ).toBe(true);
+      expect(
+        nguon.some(([mon]) => mon === "thien_lang_vuong"),
+        `${id}: Thiên Lang Vương rơi`,
+      ).toBe(true);
       for (const [mon, rows] of nguon) {
         expect(MONSTER_REALM[mon], `${id} <- ${mon}`).toBeGreaterThanOrEqual(5);
-        expect(SOI as readonly string[], `${id} <- ${mon}: chỉ sói Lang Hoang ở lát C`).toContain(
-          mon,
-        );
+        const laTrum = TRUM.includes(mon);
+        expect(
+          [...SOI, ...TRUM] as readonly string[],
+          `${id} <- ${mon}: chỉ quái Lang Hoang`,
+        ).toContain(mon);
         const d = rows.find((x) => x.itemId === bookIdOf(id))!;
-        expect(d.chance, `${id} <- ${mon}`).toBeGreaterThanOrEqual(0.006);
-        expect(d.chance, `${id} <- ${mon}`).toBeLessThanOrEqual(0.012);
-        expect(MONSTER_BY_ID[mon].boss, mon).toBeFalsy();
+        expect(d.chance, `${id} <- ${mon}`).toBeGreaterThanOrEqual(laTrum ? 0.05 : 0.006);
+        expect(d.chance, `${id} <- ${mon}`).toBeLessThanOrEqual(laTrum ? 0.25 : 0.012);
+        expect(!!MONSTER_BY_ID[mon].boss, mon).toBe(laTrum);
       }
     }
   });

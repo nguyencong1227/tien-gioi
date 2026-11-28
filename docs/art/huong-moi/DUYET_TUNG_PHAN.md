@@ -85,9 +85,10 @@ Tờ ảnh: `11-npc.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-
 | NPC-10 | Thôi Tuyết Phong — Trạm trưởng Hàn Vân | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'general' (hộp thoại) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; thân Swordsman (bản đồ) | — | A cho chân dung + B cho thân |
 | NPC-11 | Kỳ Thiên Lộc — Lái buôn Hàn Vân | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'peddler' (hộp thoại) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; thân Farmer (bản đồ) | — | A cho chân dung + B cho thân |
 | NPC-12 | Lô Băng Thiết — Thợ rèn Hàn Vân | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'blacksmith' (hộp thoại) | — | — | A cho chân dung |
-| NPC-13 | Huyền Cơ — Thủ môn bí cảnh | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'taoist' (hộp thoại) | — | — | A cho chân dung |
-| NPC-14 | Mộc Diên — Lão đan sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'alchemist' (hộp thoại) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; thân Herbalist (bản đồ) | — | A cho chân dung + B cho thân |
-| NPC-15 | Tô Linh Ấn — Lão phù sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'fortune' (hộp thoại) | — | — | A cho chân dung |
+| NPC-13 | Đồng Lão Thiết — Thợ rèn Tuyết Đao | hiện tại 36x42 | — | — | — | giữ hiện tại (vật trang trí) |
+| NPC-14 | Huyền Cơ — Thủ môn bí cảnh | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'taoist' (hộp thoại) | — | — | A cho chân dung |
+| NPC-15 | Mộc Diên — Lão đan sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'alchemist' (hộp thoại) | Wuxia RTS Lite (DQYYY) (**gói riêng**, riêng: cấm phân phối lại / huấn luyện AI); top-down 8 hướng; thân Herbalist (bản đồ) | — | A cho chân dung + B cho thân |
+| NPC-16 | Tô Linh Ấn — Lão phù sư | hiện tại 36x42 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); chân dung 'fortune' (hộp thoại) | — | — | A cho chân dung |
 
 <!-- /NHOM 11 -->
 
@@ -108,8 +109,14 @@ Tờ ảnh: `12-quai.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | Q-08 | Phong Nha | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_bat NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
 | Q-09 | Cốt Tượng | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_skeleton NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
 | Q-10 | Độc Tước | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_thunderbird NHÌN NGANG | Sunnyside World Free (**gói riêng**, riêng: cấm đóng gói lại / huấn luyện AI); nhìn ngang, 16 px; Sunnyside, 16 px | — | A (tô màu theo hệ nếu cần) |
-| Q-11 | Rắn Con | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_snake NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
-| Q-12 | Phân Thân Yêu Vương | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_ghost NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
+| Q-11 | Dã Lang | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-12 | Hắc Phong Lang | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-13 | Huyết Nguyệt Lang | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-14 | Xích Diễm Lang | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-15 | Thương Nguyệt Lang | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-16 | Ngân Nguyệt Lang | hiện tại 32x32 | — | — | — | KHÔNG nguồn nào có: giữ hiện tại / ảnh AI |
+| Q-17 | Rắn Con | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_snake NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
+| Q-18 | Phân Thân Yêu Vương | hiện tại 32x32 | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); mob_ghost NHÌN NGANG | — | — | A (tô màu theo hệ nếu cần) |
 
 <!-- /NHOM 12 -->
 
@@ -125,6 +132,8 @@ Tờ ảnh: `13-trum.png` (công khai: hiện tại + CC0) và `/mnt/data/assets
 | T-03 | Thiên Hàn Vương | hiện tại (thân) + thẻ ảnh AI | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); boss fallenimmortal (tiên sa ngã) | — | — | A (cần xem kỹ) / ảnh AI |
 | T-04 | Linh Hư Yêu Vương | hiện tại (thân) + thẻ ảnh AI | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); boss ninetail (cửu vĩ hồ) | — | — | A |
 | T-05 | Thanh Xà · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
+| T-06 | Lang Vương · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
+| T-07 | Thiên Lang Vương · MỚI (sau 23/11) | hiện tại (thân) + thẻ ảnh AI | — | — | — | A (cần xem kỹ) / ảnh AI |
 
 <!-- /NHOM 13 -->
 
@@ -314,6 +323,16 @@ Tờ ảnh: `14-vat-pham-trang-bi-2.png` (công khai: hiện tại + CC0) và `/
 | VP-114 | Tuyết Hành Ngoa | hiện tại (Thần phẩm) | — | — | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Crimson Lotus Dancer - Boots (Sect Heirloom) [WA24_T5_boots] | C (giày 5 bậc, 8 họ; gói công khai KHÔNG có giày) hoặc giữ hiện tại |
 | VP-115 | Định Tâm Chung | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Crimson Lotus Dancer - Ring (Sect Heirloom) [WR24_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
 
+## Nhóm 14 — Vật phẩm (VP), trang bị — MỚI sau 23/11: VP-157 .. VP-159
+
+Tờ ảnh: `14-vat-pham-trang-bi-moi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-trang-bi-moi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| VP-157 | Bào Huyết Nguyệt · MỚI (sau 23/11) | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Crimson Lotus Dancer - Ring (Sect Heirloom) [WR24_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
+| VP-158 | Kiếm Nanh Trăng · MỚI (sau 23/11) | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; White Crane Martial Sect - Ring (Sect Heirloom) [WR33_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
+| VP-159 | Phù Hồn Thiên Lang · MỚI (sau 23/11) | hiện tại (Thần phẩm) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 2, phẩm 4 (CC0) | Xianxia Pixel Pack (willYEE) (CC0); NHÌN NGANG (2D cuộn ngang); Xianxia: pháp khí loại 1, phẩm 4 (CC0) | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; White Crane Martial Sect - Ring (Sect Heirloom) [WR33_T5_ring] | A (6 phẩm tăng dần) hoặc C (nhẫn 5 bậc) |
+
 ## Nhóm 14 — Vật phẩm (VP), nguyên liệu: VP-116 .. VP-128
 
 Tờ ảnh: `14-vat-pham-nguyen-lieu.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-nguyen-lieu-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
@@ -333,6 +352,17 @@ Tờ ảnh: `14-vat-pham-nguyen-lieu.png` (công khai: hiện tại + CC0) và `
 | VP-126 | Tượng cốt | hiện tại (Bảo phẩm) | — | — | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Mountain Roc Wing Bone [LS-HNT-076] | C (hình hợp nghĩa) |
 | VP-127 | Độc tước nang | hiện tại (Bảo phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 | VP-128 | Thiên Hàn châu | hiện tại (Thần phẩm) | — | — | HOANTDZ Wuxia Pixel Icons (mẫu miễn phí) (**gói riêng**, riêng: cấm bán lại / phân phối lại / huấn luyện AI); icon 32 px, 5 bậc; Blood-Veined Dragon Jade [LS-MIN-071] | C (hình hợp nghĩa) |
+
+## Nhóm 14 — Vật phẩm (VP), nguyên liệu — MỚI sau 23/11: VP-160 .. VP-163
+
+Tờ ảnh: `14-vat-pham-nguyen-lieu-moi.png` (công khai: hiện tại + CC0) và `/mnt/data/assets-private/preview/14-vat-pham-nguyen-lieu-moi-day-du.png` (đủ cả gói riêng, KHÔNG lên GitHub).
+
+| Mã | Đối tượng | Hiện tại | A | B | C | Khuyến nghị |
+|---|---|---|---|---|---|---|
+| VP-160 | Da Lang Hoang · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-161 | Nanh Trăng · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-162 | Cốt Lang Vương · MỚI (sau 23/11) | hiện tại (Tiên phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
+| VP-163 | Hồn Tinh Thiên Lang · MỚI (sau 23/11) | hiện tại (Thần phẩm) | — | — | — | KHÔNG nguồn nào có: giữ hiện tại |
 
 <!-- /NHOM 14 -->
 

@@ -33,7 +33,7 @@
   },
   {
    "name": "monsterCap",
-   "value": "{\"da_lang\":16,\"hac_phong_lang\":12,\"huyet_nguyet_lang\":10,\"xich_diem_lang\":12,\"thuong_nguyet_lang\":4,\"ngan_nguyet_lang\":8}"
+   "value": "{\"da_lang\":16,\"hac_phong_lang\":12,\"huyet_nguyet_lang\":10,\"xich_diem_lang\":12,\"thuong_nguyet_lang\":4,\"ngan_nguyet_lang\":8,\"lang_vuong\":1,\"thien_lang_vuong\":1}"
   },
   {
    "name": "handEdited",

@@ -1161,7 +1161,7 @@ describe("Sáu bản đồ: Lạc Hà <-> Hắc Phong <-> Âm Sương <-> Hàn V
     const ok = await joinRoom(name, secretOf(name), LANG_HOANG_ID);
     const sr = serverRoom(ok.room);
     expect(sr.mapId).toBe(LANG_HOANG_ID);
-    expect(sr.state.monsters.size).toBe(62); // `monsterCap` Lang Hoang: sáu loài sói Hóa Thần, tổng 62 (D1 #1466 lát A3)
+    expect(sr.state.monsters.size).toBe(64); // `monsterCap` Lang Hoang: sáu loài sói Hóa Thần (62) + hai trùm (D1 #1466 lát A3 / B)
     expect(ok.me().x).toBeCloseTo(spawn.x, 0);
     expect(ok.me().y).toBeCloseTo(spawn.y, 0);
   }, 35_000);

@@ -698,8 +698,8 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
         toPortal: "uy_van_nam",
       },
     ],
-    // Sáu loài sói Hóa Thần (D1 #1466 lát A3; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3 / 6): tổng 62, vùng sinh tăng dần theo `minDanger` (0,15 / 0,30 / 0,45 / 0,60 / 0,72 / 0,85, tăng cùng `exp`).
-    // CHƯA có trùm (Thiên Lang Vương, Lang Vương: lát B, cộng 2 con thành 64) và chưa có NPC giao việc (E2). Phải khớp thuộc tính `monsterCap` trong `shared/maps/lang_hoang.json` (test "sổ đăng ký khớp tệp").
+    // Sáu loài sói Hóa Thần (D1 #1466 lát A3; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3 / 6): tổng 62 quái thường + 2 trùm (Lang Vương `minDanger` 0,78, Thiên Lang Vương 0,90; lát B) = 64, vùng sinh tăng dần theo `minDanger` (0,15 / 0,30 / 0,45 / 0,60 / 0,72 / 0,85, tăng cùng `exp`).
+    // Chưa có NPC giao việc (E2). Phải khớp thuộc tính `monsterCap` trong `shared/maps/lang_hoang.json` (test "sổ đăng ký khớp tệp").
     monsterCap: {
       da_lang: 16,
       hac_phong_lang: 12,
@@ -707,6 +707,8 @@ export const PROCEDURAL_MAPS: readonly MapDef[] = [
       xich_diem_lang: 12,
       thuong_nguyet_lang: 4,
       ngan_nguyet_lang: 8,
+      lang_vuong: 1,
+      thien_lang_vuong: 1,
     },
   },
   {

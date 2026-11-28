@@ -164,7 +164,14 @@
     "kinh_phat_hoa_hang_ma": 153,
     "kinh_huyet_mang_pha_giap": 154,
     "kinh_quy_anh_me_tung": 155,
-    "kinh_am_phong_quyen_hon": 156
+    "kinh_am_phong_quyen_hon": 156,
+    "bao_huyet_nguyet": 157,
+    "kiem_nanh_nguyet": 158,
+    "phu_hon_thien_lang": 159,
+    "bi_lang_hoang": 160,
+    "nanh_nguyet": 161,
+    "cot_lang_vuong": 162,
+    "hon_tinh_thien_lang": 163
   },
   "hu": {
     "ung_trao": 1,
