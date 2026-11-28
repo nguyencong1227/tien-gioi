@@ -81,12 +81,14 @@ describe("chuyển bản đồ: hợp đồng (M3 bước 1)", () => {
       "lai_buon_han",
       "tho_ren_han",
     ]);
-    // Lang Hoang: thợ rèn Tuyết Đao (bộ V Hóa Thần, D1 #1466 lát A2) + ba NPC giao việc phụ (#1465 giai đoạn 2 lát 1); Uy Vân Kinh chưa có NPC
+    // Lang Hoang: thợ rèn Tuyết Đao (bộ V Hóa Thần, D1 #1466 lát A2) + ba NPC giao việc phụ (#1465 giai đoạn 2 lát 1) + hai cao nhân chuỗi chính (lát 2); Uy Vân Kinh chưa có NPC
     expect(npcsOfMap(LANG_HOANG_ID).map((n) => n.id)).toEqual([
       "tho_ren_tuyet_dao",
       "quan_uy_tuyet_dao",
       "lai_buon_tuyet_dao",
       "do_thap_tam_nuong",
+      "doan_moc_thu",
+      "lac_thanh_son",
     ]);
     expect(npcsOfMap(UY_VAN_ID)).toEqual([]);
     // mọi NPC thuộc đúng một bản đồ có thật

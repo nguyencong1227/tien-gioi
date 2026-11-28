@@ -46,6 +46,11 @@ const ORIG_INTROS: Record<string, string> = {
     "Ta buôn qua lại Hàn Vân và Kinh Đô nhiều năm rồi, năm nào phí qua ải cũng tăng.",
   do_thap_tam_nuong:
     "Đỗ Thập Tam Nương. Con thứ mười ba nhà thợ săn. Ngươi có rượu không? Không có thì ta mời.",
+  // Hai cao nhân chuỗi chính chương 5 (#1465 giai đoạn 2 lát 2): chốt chặn giữ dòng giới thiệu (lời gặp nguyên văn của nguồn)
+  doan_moc_thu:
+    "Ngươi đi nước này, ta cược ngươi thua. Đừng nhìn vỏ hạt dưa dưới chân, nhìn bãi cờ ngoài ải kia kìa.",
+  lac_thanh_son:
+    "Đường dài, gánh nặng. Đi cùng một quãng chứ? Ngươi gánh thử một đoạn, gánh rồi mới biết đường xa thế nào.",
   // Bàn phù (nghề nhỏ lát 2, #817): chốt chặn giữ dòng giới thiệu của NPC mới không đổi khi mở rộng lời thoại
   lao_phu:
     "Bàn phù ta nhóm hương trầm cả ngày, vẽ phù trấn yêu cho kẻ qua lại. Mang nguyên liệu yêu thú tới, ta chế phù cho đạo hữu.",

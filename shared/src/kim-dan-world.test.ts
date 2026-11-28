@@ -239,7 +239,8 @@ describe("nhiệm vụ Trúc Cơ / Kim Đan làm được từ đầu tới cu�
       const realm = reach?.kind === "reachRealm" ? reach.realm : (q.minRealm?.realm ?? 1);
       sums.set(realm, (sums.get(realm) ?? 0) + q.rewards.exp);
     }
-    for (const realm of [2, 3, 4]) {
+    // Hóa Thần (5): chuỗi chương 5 (#1465 giai đoạn 2 lát 2) 70.000 + 88.000 + 100.000 = 258.000 / 6.000.480 = 4,3 %; kế hoạch cả hai chương 573.000 (9,55 %).
+    for (const realm of [2, 3, 4, 5]) {
       const bars = [0, 1, 2].reduce((a, t) => a + expToNext(realm, t), 0);
       expect(sums.get(realm)!, `cảnh giới ${realm}`).toBeGreaterThan(0);
       expect(sums.get(realm)! / bars, `cảnh giới ${realm}`).toBeLessThanOrEqual(QUEST_EXP_CAP_MAIN);

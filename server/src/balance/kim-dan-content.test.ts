@@ -246,19 +246,28 @@ describe("đi theo đội ở Kim Đan (#406 mục 5): số đo, không đổi q
 });
 
 describe("chuỗi nhiệm vụ chính làm được MỘT MÌNH (không chặn người chơi không có đội)", () => {
-  it("mọi bước kill của chuỗi chính, trừ nhiệm vụ cuối (trùm theo đội), Độc Thiềm, Độc Tước và Phong Nha Sơ kỳ (mục 30: cần đội 2), là loài an toàn solo ở bậc người chơi đang có", () => {
+  it("mọi bước kill của chuỗi chính, trừ hai trùm theo đội (Thiên Hàn Vương, Thiên Lang Vương), Độc Thiềm, Độc Tước và Phong Nha Sơ kỳ (mục 30: cần đội 2), là loài an toàn solo ở bậc người chơi đang có", () => {
     const chain: string[] = [];
     for (let id: string | undefined = MAIN_QUEST_START; id; id = QUEST_BY_ID[id].next)
       chain.push(id);
     expect(chain.length).toBeGreaterThan(10);
     let cur = 0; // bậc người chơi đang có khi tới từng bước (nhiệm vụ minRealm / reachRealm đẩy bậc lên)
-    for (const id of chain.slice(0, -1)) {
+    // Trùm theo đội nằm trong chuỗi chính từ M7.5c (Thiên Hàn Vương, Hàn Vân) và từ #1465 giai đoạn 2 lát 2 (Thiên Lang Vương, Lang Hoang; chuỗi đi tiếp qua Hàn Vân): solo KHÔNG an toàn, đúng thiết kế
+    const TEAM_BOSSES = ["thien_han_vuong", "thien_lang_vuong"];
+    for (const id of chain) {
       const q = QUEST_BY_ID[id];
       if (q.minRealm) cur = Math.max(cur, stepOf(q.minRealm.realm, q.minRealm.tier));
       for (const st of q.steps) {
         if (st.kind === "reachRealm") cur = Math.max(cur, stepOf(st.realm, st.tier));
         if (st.kind !== "kill") continue;
         const { realm: r, tier: t } = realmTierOfStep(cur);
+        if (TEAM_BOSSES.includes(st.monster)) {
+          expect(
+            huntRate(MONSTER_BY_ID[st.monster], r, t, 1),
+            `${id}: ${st.monster} là trùm theo đội, solo phải KHÔNG an toàn`,
+          ).toBeNull();
+          continue;
+        }
         // NGOẠI LỆ GHI CÓ CHỦ Ý (mục 30, QUYET_DINH_M3 16/11; người dùng giữ nguyên số ở mục 54): Độc Thiềm máu x1,5 không còn an toàn solo ở mọi bậc Kim Đan nên bước hạ Độc Thiềm
         // của `doc_thiem_nang` (và `phong_nha_cham` ở Sơ kỳ Nguyên Anh) cần ĐỘI 2 (danh sách ngoại lệ dưới đây; thêm loài khác vào đây thì test này mất ý nghĩa). Nếu sau này muốn khôi phục "chuỗi chính làm được một mình":
         // máu Độc Thiềm <= ~3.250 (x1,25) hoặc đổi mục tiêu bước (xem questions.md, A / B / C).
@@ -272,11 +281,16 @@ describe("chuỗi nhiệm vụ chính làm được MỘT MÌNH (không chặn n
           expect(huntRate(MONSTER_BY_ID[st.monster], r, t, 1), `${id}: Độc Thiềm solo`).toBeNull();
       }
     }
-    // nhiệm vụ cuối là trùm theo đội (từ M7.5c: Thiên Hàn Vương ở Hàn Vân): solo không an toàn ở mọi bậc Nguyên Anh, đúng thiết kế
+    // nhiệm vụ cuối là trùm theo đội (từ #1465 giai đoạn 2 lát 2: Thiên Lang Vương ở Lang Hoang; trước đó Thiên Hàn Vương ở Hàn Vân là nhiệm vụ cuối): solo không an toàn, đúng thiết kế
     const last = QUEST_BY_ID[chain.at(-1)!];
-    expect(last.steps.some((st) => st.kind === "kill" && st.monster === "thien_han_vuong")).toBe(
+    expect(last.steps.some((st) => st.kind === "kill" && st.monster === "thien_lang_vuong")).toBe(
       true,
     );
+    expect(
+      QUEST_BY_ID.thien_han_hoan.steps.some(
+        (st) => st.kind === "kill" && st.monster === "thien_han_vuong",
+      ),
+    ).toBe(true);
     for (const tier of [0, 1, 2])
       expect(huntRate(MONSTER_BY_ID.thien_han_vuong, 4, tier), `Nguyên Anh bậc ${tier}`).toBeNull();
     // Hắc Giao (trùm Kim Đan, theo đội) là việc PHỤ `giao_hoan`, không còn nằm trong chuỗi chính: chuỗi không chặn người chơi không có đội
