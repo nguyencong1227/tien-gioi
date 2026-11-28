@@ -102,6 +102,8 @@ export async function launchChrome(opts: LaunchChromeOptions): Promise<LaunchedC
       : [
           "--headless=new",
           "--no-sandbox",
+          // Không hỏi keyring hệ thống qua DBus (keyring khoá làm Chrome treo ở bước điều hướng, 28/11/2026): xem `client/scripts/chrome-launch.mjs`.
+          "--password-store=basic",
           ...getChromeGpuFlags(),
           `--remote-debugging-port=${currentPort}`,
           `--user-data-dir=${opts.userDataDir}`,
