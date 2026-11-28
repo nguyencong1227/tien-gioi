@@ -1,6 +1,6 @@
 // Quái Hóa Thần của Lang Hoang, lát A1 của D1 (#1466, mục 75; `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3, khung `docs/KHUNG_HOA_THAN.md` mục 4.1).
-// Sáu loài thường đã KHAI BÁO nhưng CHƯA CHO SINH (lát A3 khai `monsterCap` của `lang_hoang` rồi sửa ca "chưa sinh" ở đây). Test canh: số liệu bám vai của khung,
-// hành vi theo vai, cấp trong trần chặn đường Hóa Thần, thứ tự `minDanger` theo `exp`, bậc `MONSTER_REALM` 5, bảng rơi + tiền, và đúng là chưa sinh ở đâu.
+// Sáu loài thường khai báo ở lát A1 và cho SINH ở lát A3 (`monsterCap` của `lang_hoang`, tổng 62). Test canh: số liệu bám vai của khung,
+// hành vi theo vai, cấp trong trần chặn đường Hóa Thần, thứ tự `minDanger` theo `exp`, bậc `MONSTER_REALM` 5, bảng rơi + tiền, và chỉ sinh ở Lang Hoang đúng `monsterCap`.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -112,15 +112,26 @@ describe("quái Hóa Thần Lang Hoang (D1 #1466 lát A1)", () => {
     }
   });
 
-  it("CHƯA SINH ở đâu (lát A3 khai `monsterCap` của lang_hoang): `MONSTER_CAP` 0, ngoài `WILD_MONSTERS`, không bản đồ nào sinh", () => {
+  it("SINH đúng `monsterCap` của lang_hoang (D1 lát A3: 16 / 12 / 10 / 12 / 4 / 8) và CHỈ ở đó: `MONSTER_CAP` mặc định 0, ngoài `WILD_MONSTERS` của bản đồ mặc định, không bản đồ nào khác sinh", () => {
+    const CAP: Record<string, number> = {
+      da_lang: 16,
+      hac_phong_lang: 12,
+      huyet_nguyet_lang: 10,
+      xich_diem_lang: 12,
+      thuong_nguyet_lang: 4,
+      ngan_nguyet_lang: 8,
+    };
     for (const l of LOAI) {
-      expect(MONSTER_CAP[l.id], `${l.id}: MONSTER_CAP`).toBe(0);
+      expect(MONSTER_CAP[l.id], `${l.id}: MONSTER_CAP mặc định`).toBe(0);
+      // `WILD_MONSTERS` = loài sinh ở bản đồ MẶC ĐỊNH (Lạc Hà): sói Lang Hoang không có ở đó (như loài Hàn Vân); phòng Lang Hoang lấy từ `monsterCap` của chính bản đồ
       expect(
         WILD_MONSTERS.some((m) => m.id === l.id),
-        `${l.id}: WILD_MONSTERS`,
+        `${l.id}: WILD_MONSTERS (bản đồ mặc định)`,
       ).toBe(false);
       for (const map of MAPS)
-        expect(getMap(map.id)!.monsterCapOf(l.id), `${l.id} @ ${map.id}`).toBe(0);
+        expect(getMap(map.id)!.monsterCapOf(l.id), `${l.id} @ ${map.id}`).toBe(
+          map.id === "lang_hoang" ? CAP[l.id] : 0,
+        );
     }
   });
 

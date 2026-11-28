@@ -32,7 +32,7 @@ Bảng trên dừng ở hết Trúc Cơ (quái và đồ gốc: Linh Thố, Hôi
 - Mỗi bậc, người chơi chọn nguồn tu vi nhanh nhất mà an toàn: săn một loại quái, hoặc chỉ đả tọa.
 - Săn quái: chỉ dùng Kiếm chém (có tính bạo kích trung bình ×1.08), quái đánh trúng 80% số đòn,
   bỏ qua loại quái mà mỗi trận mất quá 50% khí huyết. Sau mỗi trận đả tọa hồi khí huyết (vẫn được tu vi đả tọa).
-- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s, han_lang 10s, phong_nha 10s, cot_tuong 12s, doc_tuoc 14s, thien_han_vuong 90s.
+- Thời gian tìm quái kế tiếp: tho 6s, lang 8s, ho 12s, mang 90s, suong_ho 10s, thach_quy 12s, doc_thiem 14s, hac_giao 90s, han_lang 10s, phong_nha 10s, cot_tuong 12s, doc_tuoc 14s, thien_han_vuong 90s, da_lang 10s, hac_phong_lang 10s, huyet_nguyet_lang 12s, xich_diem_lang 12s, thuong_nguyet_lang 14s, ngan_nguyet_lang 14s.
 - Thưởng tu vi của chuỗi nhiệm vụ chính chia đều cho các bậc của cảnh giới tương ứng; đi lại + nói chuyện cả chuỗi: 8 phút.
 - Đột phá thất bại mất 30% thanh tu vi, tính theo số lần thất bại kỳ vọng.
 - Trang bị: mặc món tốt nhất đủ cảnh giới ở mỗi ô (giả định đã rèn kịp; nguyên liệu rơi trong lúc săn, không tính thời gian đi rèn). Không mặc gì thì chậm hơn khoảng 10%.
@@ -766,6 +766,65 @@ Mọi mục trên đo với `useOwnerGear = false`: người chơi chỉ mặc b
 | Khí huyết mất / trận, solo Độc Tước Hậu kỳ Nguyên Anh (%) | 58 | 50 |
 
 Đọc bảng: có đồ ô riêng thì nhịp nhanh hơn 1 phút (Trúc Cơ), 0.4 giờ (Kim Đan), 0.5 giờ (Nguyên Anh) và solo bớt 9 / 8 điểm phần trăm khí huyết: mô hình lệch NHỎ. Độ lệch nằm ở các ngưỡng cứng. **Thử bật cờ (A, 15/11/2026): 10 ca đỏ**, chia ba nhóm: (1) mô hình: nhịp Nguyên Anh xuống dưới 6 giờ, Thiên Hàn Vương Sơ kỳ đội 3 đã hạ được (test ghim đội 4), Trúc Cơ cộng dồn lệch 1 phút so với số ghim; (2) mã server thật: bí cảnh (một người hạ được trùm ở bậc 11, thêm đan thì đỡ hơn mức test ghim), `hunt-check` trùm theo đội (Hắc Giao, Thiên Hàn Vương); (3) `search-check`: thợ săn seed 2 không hạ được con nào ở Âm Sương khi tốc độ đổi (thợ săn nhạy với tốc độ, chưa phải lỗi của đồ). Vì vậy giữ cờ **TẮT** (giả định bảo thủ: người mới chưa rèn kịp hài / ngọc bội / pháp bảo); bật thì phải chỉnh cùng lúc số trùm (công / máu), dải bậc bí cảnh và ngưỡng nhịp, chưa làm vì cần số đo bot thật của C để biết người chơi thật mặc bao nhiêu đồ ô riêng ở từng bậc.
+
+
+## Hóa Thần sau nội dung (D1 #1466 lát A3)
+
+Tính SỐNG từ `shared/` bằng mô hình ở trên. Sáu sói Lang Hoang (`docs/QUAI_HOA_THAN_DE_XUAT.md` mục 3): Dã Lang (cấp 19, gồng lao), Hắc Phong Lang (20, bắn đạn), Huyết Nguyệt Lang (21, gồng lao nhanh), Xích Diễm Lang (21, đòn nặng), Thương Nguyệt Lang (20, dày, đập đất), Ngân Nguyệt Lang (21, đòn nặng nhất). Người chơi mặc bộ V (kiếm / bào / phù, `docs/KHUNG_HOA_THAN.md` mục 4.2). Chưa có trùm (lát B) nên chưa có mục trùm theo đội.
+
+### 1. Săn solo (tu vi / giờ, Linh thạch / giờ gồm bán đồ rơi, con / giờ, khí huyết mất / trận)
+
+| Bậc | Loài | Tu vi / giờ | Linh thạch / giờ | Con / giờ | Khí huyết mất |
+|---|---|---:|---:|---:|---:|
+| Hóa Thần Sơ kỳ | Dã Lang | 1,149,414 | 79,886 | 171 | 33% |
+| Hóa Thần Sơ kỳ | Hắc Phong Lang | 1,309,500 | 71,714 | 151 | 47% |
+| Hóa Thần Sơ kỳ | Huyết Nguyệt Lang | không an toàn solo (56% khí huyết / trận) | – | – | – |
+| Hóa Thần Sơ kỳ | Xích Diễm Lang | không an toàn solo (78% khí huyết / trận) | – | – | – |
+| Hóa Thần Sơ kỳ | Thương Nguyệt Lang | 1,146,341 | 77,975 | 74 | 49% |
+| Hóa Thần Sơ kỳ | Ngân Nguyệt Lang | không an toàn solo (126% khí huyết / trận) | – | – | – |
+| Hóa Thần Trung kỳ | Dã Lang | 1,262,105 | 87,729 | 187 | 26% |
+| Hóa Thần Trung kỳ | Hắc Phong Lang | 1,459,450 | 79,936 | 168 | 37% |
+| Hóa Thần Trung kỳ | Huyết Nguyệt Lang | 1,227,633 | 69,987 | 141 | 43% |
+| Hóa Thần Trung kỳ | Xích Diễm Lang | không an toàn solo (61% khí huyết / trận) | – | – | – |
+| Hóa Thần Trung kỳ | Thương Nguyệt Lang | 1,274,152 | 86,676 | 82 | 38% |
+| Hóa Thần Trung kỳ | Ngân Nguyệt Lang | không an toàn solo (97% khí huyết / trận) | – | – | – |
+| Hóa Thần Hậu kỳ | Dã Lang | 1,376,112 | 95,664 | 204 | 20% |
+| Hóa Thần Hậu kỳ | Hắc Phong Lang | 1,614,371 | 88,432 | 186 | 28% |
+| Hóa Thần Hậu kỳ | Huyết Nguyệt Lang | 1,357,198 | 77,385 | 156 | 33% |
+| Hóa Thần Hậu kỳ | Xích Diễm Lang | 1,975,264 | 83,597 | 132 | 47% |
+| Hóa Thần Hậu kỳ | Thương Nguyệt Lang | 1,412,767 | 96,112 | 91 | 29% |
+| Hóa Thần Hậu kỳ | Ngân Nguyệt Lang | không an toàn solo (75% khí huyết / trận) | – | – | – |
+
+### 2. Nhịp cả cảnh giới Hóa Thần (phút; có chuỗi nhiệm vụ hiện có, có đột phá thất bại)
+
+Tổng: **4.3 giờ** solo; mục tiêu ~4,6 giờ theo mô hình khung (`docs/KHUNG_HOA_THAN.md` mục 3), ~4 giờ theo QUYET_DINH_M3 mục 30 (tu vi x2, máu x1,5). Mô hình bỏ qua nhiệm vụ lặp và thời gian đi lại.
+
+| Bậc | Thanh | Nguồn tốt nhất | Phút |
+|---|---:|---|---:|
+| Hóa Thần Sơ kỳ | 1,728,000 | Hắc Phong Lang | 79.2 |
+| Hóa Thần Trung kỳ | 1,987,200 | Hắc Phong Lang | 81.7 |
+| Hóa Thần Hậu kỳ | 2,285,280 | Xích Diễm Lang | 94.9 |
+
+### 3. Kinh tế Hóa Thần: thu nhập so với phí rèn bộ V
+
+Thu nhập theo nhịp mục 2 (săn solo, mỗi bậc nguồn tốt nhất): tiền rơi cộng bán đồ rơi, TRỪ nguyên liệu bộ V (người chơi giữ lại để rèn). Ví mang vào Hóa Thần = phần dư cuối Nguyên Anh (**41,974** Linh thạch). Cả ba món bộ V mặc được từ Sơ kỳ nên toàn bộ phí đáo hạn ở bậc đầu.
+
+| Bậc | Nguồn | Phút | Linh thạch / giờ (khả dụng) | Kiếm trong bậc | Cộng dồn | Phí rèn cộng dồn | Dư / thiếu |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Hóa Thần Sơ kỳ | Hắc Phong Lang | 79 | 52,353 | 69,084 | 111,059 | 79,800 | +31,259 |
+| Hóa Thần Trung kỳ | Hắc Phong Lang | 82 | 58,355 | 79,457 | 190,516 | 79,800 | +110,716 |
+| Hóa Thần Hậu kỳ | Xích Diễm Lang | 95 | 66,616 | 105,330 | 295,846 | 79,800 | +216,046 |
+
+| Nguyên liệu bộ V | Cần | Cày ở | Phút cày solo |
+|---|---:|---|---:|
+| Nanh Trăng | 24 | Huyết Nguyệt Lang | 13.6 |
+| Hồn Tinh Thiên Lang | 2 | Thương Nguyệt Lang | 16.2 |
+| Da Lang Hoang | 18 | Dã Lang | 8.4 |
+| Cốt Lang Vương | 14 | Thương Nguyệt Lang | 15.1 |
+
+Tổng phí rèn bộ V **79,800** Linh thạch = **1.5 giờ** thu nhập Sơ kỳ; cày đủ nguyên liệu mất **53.4 phút** solo (**67%** thời gian Sơ kỳ).
+
+**Đọc bảng.** Bộ V trả đủ từ Hóa Thần Sơ kỳ (dư 31,259 cuối bậc). Số khởi đầu: lát B (trùm) và đo lại bằng bot / người chơi thật sẽ chỉnh tiếp.
 
 ## Tinh anh (M7.3, `systems/elite.ts`)
 

@@ -29,12 +29,12 @@
 | **Phong Nha** | `phong_nha` | Thường | Nguyên Anh | 17 | 4200 | 309 | 1520 | 80% × 85-185 | Hàn Vân Lĩnh |
 | **Độc Tước** | `doc_tuoc` | Thường | Nguyên Anh | 18 | 7050 | 512 | 2760 | 90% × 230-430 | Hàn Vân Lĩnh |
 | **Thiên Hàn Vương** | `thien_han_vuong` | Trùm | Nguyên Anh | 21 | 123000 | 240 | 38400 | 100% × 900-1470 | Hàn Vân Lĩnh |
-| **Dã Lang** | `da_lang` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 330-720 | — |
-| **Hắc Phong Lang** | `hac_phong_lang` | Thường | Hóa Thần | 20 | 7170 | 516 | 8664 | 80% × 360-760 | — |
-| **Thương Nguyệt Lang** | `thuong_nguyet_lang` | Thường | Hóa Thần | 20 | 31807 | 216 | 15480 | 80% × 800-1200 | — |
-| **Huyết Nguyệt Lang** | `huyet_nguyet_lang` | Thường | Hóa Thần | 21 | 8599 | 510 | 8712 | 80% × 370-770 | — |
-| **Ngân Nguyệt Lang** | `ngan_nguyet_lang` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 850-1300 | — |
-| **Xích Diễm Lang** | `xich_diem_lang` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 550-900 | — |
+| **Dã Lang** | `da_lang` | Thường | Hóa Thần | 19 | 6644 | 394 | 6732 | 80% × 250-540 | Lang Hoang |
+| **Hắc Phong Lang** | `hac_phong_lang` | Thường | Hóa Thần | 20 | 7170 | 516 | 8664 | 80% × 270-570 | Lang Hoang |
+| **Thương Nguyệt Lang** | `thuong_nguyet_lang` | Thường | Hóa Thần | 20 | 31807 | 216 | 15480 | 80% × 600-900 | Lang Hoang |
+| **Huyết Nguyệt Lang** | `huyet_nguyet_lang` | Thường | Hóa Thần | 21 | 8599 | 510 | 8712 | 80% × 280-580 | Lang Hoang |
+| **Ngân Nguyệt Lang** | `ngan_nguyet_lang` | Thường | Hóa Thần | 21 | 13936 | 989 | 18216 | 90% × 640-980 | Lang Hoang |
+| **Xích Diễm Lang** | `xich_diem_lang` | Thường | Hóa Thần | 21 | 11402 | 809 | 14904 | 90% × 410-680 | Lang Hoang |
 
 ## Mục 2 — Vật phẩm rơi từ quái nào
 

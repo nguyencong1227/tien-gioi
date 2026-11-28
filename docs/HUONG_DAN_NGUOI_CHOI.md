@@ -157,7 +157,7 @@ Thang cảnh giới (từ thấp đến cao):
 | Đại Thừa | Sơ – Trung – Hậu kỳ |
 | Độ Kiếp | Sơ – Trung – Hậu kỳ |
 
-Hiện tại nội dung chơi được (bản đồ, quái, nhiệm vụ, chiêu) đi tới **Nguyên Anh**. Các cảnh giới từ **Hóa Thần** trở đi đã có tên trong thang nhưng chưa có nội dung — đừng vội lo, đó là đường phía trước.
+Hiện tại nội dung chơi được đi tới **Hóa Thần**: bản đồ Lang Hoang có quái Hóa Thần và thợ rèn đồ Hóa Thần (nhiệm vụ và chiêu thức Hóa Thần chưa có). Các cảnh giới từ **Luyện Hư** trở đi đã có tên trong thang nhưng chưa có nội dung — đừng vội lo, đó là đường phía trước.
 
 ### Thanh tu vi
 
@@ -436,6 +436,12 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Cốt Tượng | Băng nguyên Hàn Vân | Máu rất dày, đập đất |
 | Độc Tước | Băng nguyên Hàn Vân (sâu) | Đạn độc, công cao máu mỏng |
 | Thiên Hàn Vương (trùm) | Đỉnh băng | Trùm Nguyên Anh, đội 3–4 người |
+| Dã Lang | Thảo nguyên Lang Hoang | Lao thẳng, đi bầy |
+| Hắc Phong Lang | Thảo nguyên Lang Hoang | Phóng đao gió từ xa |
+| Huyết Nguyệt Lang | Thảo nguyên Lang Hoang | Lao nhanh, trán có vệt trăng đỏ |
+| Xích Diễm Lang | Thảo nguyên Lang Hoang (sâu) | Đòn nặng, công cao |
+| Thương Nguyệt Lang | Thảo nguyên Lang Hoang (sâu) | Máu rất dày, chậm, đập đất |
+| Ngân Nguyệt Lang | Thảo nguyên Lang Hoang (sâu nhất) | Đòn nặng, công cao nhất bãi |
 
 ### Bản đồ
 
@@ -445,7 +451,7 @@ Nếu bảng Xã hội gặp lỗi ở máy bạn, thêm `?social=0` vào cuối
 | Hắc Phong Cốc | 128 × 96 | Thanh Lộ Trạm (nam) |
 | Âm Sương Trạch | 128 × 112 | Vọng Sương Trạm |
 | Hàn Vân Lĩnh | 128 × 128 | Hàn Vân Trạm |
-| Lang Hoang | 128 × 112 | Tuyết Đao Quan (nam) — *Đang xây dựng* |
+| Lang Hoang | 128 × 112 | Tuyết Đao Quan (nam), thợ rèn đồ Hóa Thần |
 | Uy Vân Kinh | 128 × 112 | Uy Vân Kinh (nam) — *Đang xây dựng* |
 | Linh Hư Bí Cảnh | 64 × 64 | Bí cảnh (vào qua Thủ môn) |
 
@@ -460,7 +466,7 @@ Các bản đồ ngoài hoang được kết nối liên tục thành một chu�
 4. **Hàn Vân Lĩnh** (Vọng Lang Quan) ↔ **Lang Hoang** (Hồi Tuyết Quan)
 5. **Lang Hoang** (Vọng Kinh Quan) ↔ **Uy Vân Kinh** (Hồi Lang Quan)
 
-> **Lưu ý:** Hai bản đồ mới **Lang Hoang** và **Uy Vân Kinh** hiện đang trong giai đoạn xây dựng (chưa có quái vật và NPC nhiệm vụ). Người chơi có thể tự do qua lại khám phá cảnh quan và các trạm dịch chuyển an toàn.
+> **Lưu ý:** **Lang Hoang** đã có quái Hóa Thần (sáu loài sói, chưa có trùm) và thợ rèn ở Tuyết Đao Quan, nhưng chưa có NPC nhiệm vụ. **Uy Vân Kinh** vẫn đang trong giai đoạn xây dựng (chưa có quái vật và NPC nhiệm vụ): người chơi có thể tự do qua lại khám phá cảnh quan và trạm dịch chuyển an toàn. Lang Hoang nguy hiểm cho người dưới Hóa Thần: loài ở đây mạnh hơn mọi loài Hàn Vân, đừng vào sâu khi chưa đủ cảnh giới và đồ.
 
 ---
 
