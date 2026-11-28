@@ -79,7 +79,7 @@
 | **Bôn Thạch Quyền** | `bon_thach_quyen` | Luyện Khí | Hoàng | Quạt trước mặt | 3,5s | — | Bán ở Hà lão, Mạc Thông (60 Linh thạch); Rơi từ Hắc Hổ 1,2%; Đổi ở Tàng Kinh Các tông môn (12 cống hiến, từ cấp tông 2) |
 | **Thiết Sa Chưởng** | `thiet_sa_chuong` | Luyện Khí | Hoàng | Quạt trước mặt | 3s | Vỡ giáp 3s (nhận thêm 10% sát thương), xác suất 40% | Bán ở Hà lão, Mạc Thông (140 Linh thạch) |
 | **Trọng Nhạc Trảm** | `trong_nhac_tram` | Luyện Khí | Hoàng | Quạt trước mặt | 3s | Chảy máu 3s (12% sát thương gốc mỗi giây), xác suất 30% | Bán ở Hà lão, Mạc Thông (80 Linh thạch); Đổi ở Tàng Kinh Các tông môn (16 cống hiến, từ cấp tông 2) |
-| **Bàn Thạch Hộ Thể** | `ban_thach_ho_the` | Trúc Cơ | Huyền | Hộ thể quanh mình | 9s | Hộ thể 4,5s (chắn 25% khí huyết tối đa), cho bản thân | Rơi từ Hắc Hổ 1% |
+| **Bàn Thạch Hộ Thể** | `ban_thach_ho_the` | Trúc Cơ | Huyền | Hộ thể quanh mình | 9s | Hộ thể 4,5s (chắn 25% khí huyết tối đa), cho bản thân | Rơi từ Hắc Hổ 1%; Thưởng nhiệm vụ "Dọn đường trạm" |
 | **Cửu Cung Khốn Sát** | `cuu_cung_khon_sat` | Trúc Cơ | Huyền | Vùng đặt xuống đất | 7s | Choáng 1,05s, xác suất 70%; Vỡ giáp 3s (nhận thêm 10% sát thương), xác suất 50% | Rơi từ Xích Mãng 25%, Thạch Quy 2%, Cốt Tượng 2%; Đổi ở Tàng Kinh Các tông môn (60 cống hiến, từ cấp tông 4) |
 | **Liệt Địa Nhất Quyền** | `liet_dia_nhat_quyen` | Kim Đan | Huyền | Vùng đặt xuống đất | 5s | Cường Lực 3s (tăng 30% sát thương mọi chiêu), cho bản thân | Rơi từ Thạch Quy 1,2% |
 | **Phân Nhạc Trảm** | `phan_nhac_tram` | Kim Đan | Huyền | Quạt trước mặt | 5s | Chảy máu 3s (20% sát thương gốc mỗi giây), xác suất 40% | Rơi từ Thạch Quy 1,2% |
