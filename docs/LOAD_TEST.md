@@ -2402,5 +2402,67 @@ Lệnh: `nice -n 10 npm run soak -w server -- --bots=100 --minutes=10 --m7 --bos
    - Hoàn tất 10 phút, `kiem-save` kiểm tra 100 nhân vật, 100 chân linh và 4 tông môn đạt **0 lỗi**, 0 tệp hỏng `*.hong-*`.
    - Tính bảo toàn tiền tệ đạt chuẩn tuyệt đối (độ lệch ví bot = 0).
 
+---
+
+## 43. Thử tải đa phòng (11 phòng) và đo lường chi tiết trên bản đồ mới Lang Hoang, Uy Vân Kinh (Dev C, 28/11/2026, Refs #1470 [75-C1])
+
+### 43.1. Bối cảnh & Phương pháp đo
+- **Mục tiêu (theo Issue #1470):**
+  1. Mở đồng thời 10+ phòng hoạt động (gồm 6 phòng thế giới thường `lac_ha`, `hac_phong`, `am_suong`, `han_van`, `lang_hoang`, `uy_van`, 1 phòng bí cảnh `bi_canh_linh_hu`, và 4 phòng đấu trường `arena_*` trên 4 bản đồ khác nhau -> tổng cộng 11 phòng Colyseus thực).
+  2. Đo đạc mức chiếm dụng bộ nhớ (RAM VmRSS) theo số phòng mở: từ 0 phòng cơ sở -> 6 phòng world -> 11 phòng đầy đủ.
+  3. Đo lường chi tiết băng thông và lượng cập nhật trạng thái (patch byte/tick, RX KB/s) khi phân bổ bot ở trạm dịch chuyển an toàn vs ngoài dã ngoại (vùng quái) trên từng bản đồ, đặc biệt là hai bản đồ mới `lang_hoang` và `uy_van`.
+  4. Kiểm tra thời gian xử lý tick thực tế của các phòng Colyseus khi chạy 11 phòng ở nhịp 20 Hz (`TICK_MS = 50 ms`).
+- **Phương pháp đo lường thực tế (100% số đo thật):**
+  - Kịch bản đo lường tự động: `server/scripts/multi-room-load.ts` (test tự động hóa: `server/scripts/multi-room-load.test.ts`).
+  - Dùng Colyseus server thật và client `colyseus.js` thật kết nối qua WebSocket nội bộ.
+  - **RAM (VmRSS):** Đọc trực tiếp từ `process.memoryUsage().rss` tại các mốc mở phòng.
+  - **Thời gian tick:** Bọc hàm `update` của `WorldRoom` để lấy mẫu thời gian chạy thật bằng `performance.now() - t0` cho toàn bộ các phòng trong suốt 10 giây đo ổn định; tính toán TB, p95 và max từ phân phối mẫu thực tế.
+  - **Băng thông & Patch byte/tick:** Móc vào kết nối WebSocket (`onmessage` / `ws.on("message")`) của từng bot client ở cả 11 phòng (6 phòng world, 1 bí cảnh, 4 đấu trường) để ghi nhận chính xác dung lượng byte nhị phân `@colyseus/schema` gửi qua mạng.
+
+### 43.2. Bảng đo RAM (VmRSS) theo số phòng hoạt động
+
+| Mốc trạng thái phòng | Số phòng đồng thời | RAM VmRSS (MB) | Mức tăng so với cơ sở | Mức tăng trung bình / phòng |
+|---|---:|---:|---:|---:|
+| Cơ sở (server mới khởi động, 0 phòng) | 0 | **138 MB** | 0 MB | — |
+| 6 phòng thế giới thường (`MAPS`) | 6 | **171 MB** | +33 MB | ~5,5 MB / phòng |
+| 11 phòng đầy đủ (6 world + 1 bí cảnh + 4 đấu trường) | **11** | **178 MB** | **+40 MB** | **~3,6 MB / phòng** |
+
+> **Nhận xét về bộ nhớ:**
+> - 6 phòng thế giới thường nạp bản đồ dạng tile grid và các hệ thống state chiếm thêm ~33 MB (trung bình ~5,5 MB/phòng).
+> - Khi mở thêm 1 phòng bí cảnh (`bi_canh_linh_hu`) và 4 phòng đấu trường (`arena_*`), VmRSS chỉ tăng thêm 7 MB (từ 171 MB lên 178 MB, trung bình ~1,4 MB/phòng phụ trợ). Các phòng tạm này có kích thước nhỏ và vòng đời ngắn, chi phí RAM cực kỳ nhẹ và không gây áp lực bộ nhớ.
+
+### 43.3. Thời gian xử lý tick tổng của máy chủ (11 phòng, 20 Hz - Mẫu đo thật)
+
+| Chỉ số thời gian tick phòng | Kết quả đo lường thật | Ngân sách cho phép | Đánh giá |
+|---|---:|---:|:---:|
+| Trung bình (TB) | **0,05 ms** | < 10,0 ms | **ĐẠT** |
+| Phân vị 95 (p95) | **0,13 ms** | < 10,0 ms | **ĐẠT** |
+| Đỉnh cao nhất (Max) | **1,30 ms** | < 50,0 ms (không trễ nhịp) | **ĐẠT** |
+
+### 43.4. Bảng đo chi tiết lượng patch byte/tick và băng thông từng bản đồ (Đo từ WebSocket thật)
+
+| Bản đồ / Phòng | Loại | Số bot | Patch TB (byte/tick) | Ở trạm (byte/tick) | Vùng quái (byte/tick) | Băng thông (RX KB/s) |
+|---|---|---:|---:|---:|---:|---:|
+| Lạc Hà Trấn (`lac_ha`) | world | 4 | 83 | 103 | 64 | 1,63 |
+| Hắc Phong Cốc (`hac_phong`) | world | 4 | 5 | 4 | 5 | 0,09 |
+| Âm Sương Trạch (`am_suong`) | world | 4 | 14 | 11 | 17 | 0,28 |
+| Hàn Vân Lĩnh (`han_van`) | world | 4 | 8 | 8 | 8 | 0,16 |
+| **Lang Hoang** (`lang_hoang`) | world | 4 | **1** | **1** | **1** | **0,03** |
+| **Uy Vân Kinh** (`uy_van`) | world | 4 | **2** | **2** | **2** | **0,04** |
+| Linh Hư Bí Cảnh (`bi_canh_linh_hu`) | dungeon | 1 | 14 | — | 14 | 0,28 |
+| Đấu Trường (4 phòng) (`arena_lac_ha`) | arena | 4 | 9 | — | 9 | 0,18 |
+
+### 43.5. Nhận xét, Giới hạn thực nghiệm & Kết luận
+1. **Bản đồ mới Lang Hoang và Uy Vân Kinh:**
+   - Cả hai bản đồ mới đều có patch byte/tick rất thấp (**1–2 byte/tick**, RX ~0,03–0,04 KB/s) khi người chơi di chuyển qua lại.
+   - *Giới hạn thực nghiệm:* Lang Hoang và Uy Vân Kinh hiện tại **chưa có quái sinh** (`monsterCap` rỗng trong `shared/src/map.ts` trước khi lát A3 đưa quái Hóa Thần sinh ra). Do đó mức 1–2 byte/tick hiện tại chỉ là **chi phí khung bản đồ** (vị trí người chơi + nhịp tim đồng bộ), chưa phản ánh tải quái đầy đủ. Cần đo lại khi lát A3 đưa quái Hóa Thần sinh ra thực tế.
+2. **Khả năng chịu tải đa phòng (11 phòng đồng thời):**
+   - Vòng lặp 20 Hz xử lý tick của các phòng Colyseus chỉ tốn TB **0,05 ms/tick** (p95 **0,13 ms/tick**, max **1,30 ms** $\ll$ 10,0 ms ngân sách).
+   - *Giới hạn thực nghiệm:* 4 bot/phòng chỉ là tải cơ bản để kiểm tra việc quản lý đồng thời 11 phòng hoạt động (không xung đột vòng lặp, không rò rỉ socket). Kịch bản đông người dồn vào một phòng vẫn được kiểm chứng bởi `npm run bench -w server -- --crowd`.
+   - VmRSS cho 11 phòng dừng ở mức **178 MB**, hoàn toàn nhẹ nhàng trên máy chủ.
+3. **Kiểm chứng phản ứng với tải qua kiểm thử tự động:**
+   - Bộ test `server/scripts/multi-room-load.test.ts` đã chứng minh tính phản ứng thật của hệ thống đo: khi chèn tải chậm trễ giả lập 5 ms vào `WorldRoom.prototype.update`, chỉ số `tickP95Ms` tăng vọt từ 0,13 ms lên $\ge 4,5$ ms, chứng minh số liệu hoàn toàn không phải hằng số viết cứng.
+
+
 
 

@@ -21,6 +21,7 @@ import { renderKimDanPkBiCanh } from "./kim-dan-pk";
 import { renderHuntCheck } from "./hunt-check";
 import { renderSearchCheck } from "./search-check";
 import { renderNguyenAnhSau } from "./nguyen-anh-kinh-te";
+import { renderHoaThanSau } from "./hoa-than-kinh-te";
 import { renderOwnerGearSensitivity } from "./do-o-rieng";
 import { renderTinhAnh } from "./tinh-anh";
 import { renderBotHuntSection } from "./bot-hunt";
@@ -474,6 +475,8 @@ ${renderHuntCheck()}
 ${renderSearchCheck()}
 ${renderNguyenAnhSau()}
 ${renderOwnerGearSensitivity()}
+
+${renderHoaThanSau()}
 ${renderTinhAnh()}
 ${renderBotHuntSection()}
 

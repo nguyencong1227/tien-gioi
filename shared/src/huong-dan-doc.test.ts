@@ -93,6 +93,7 @@ import {
   PARTY_EXP_BONUS,
   PARTY_INVITE_TTL_MS,
   PARTY_MAX,
+  QUESTS,
   RARITY_NAMES,
   REALMS,
   SECT_CREATE_COST,
@@ -334,13 +335,22 @@ describe("docs/HUONG_DAN_NGUOI_CHOI.md: số liệu khớp dữ liệu thật (#
         );
       }
     const xay = ["lang_hoang", "uy_van"];
-    const coNoiDung =
-      MONSTERS.some((q) => xay.some((id) => (getMap(id)?.monsterCapOf(q.id) ?? 0) > 0)) ||
-      NPCS.some((n) => n.mapId !== undefined && xay.includes(n.mapId));
+    // Một bản đồ "có nội dung" khi có quái SINH ở đó hoặc có NPC GIAO VIỆC (thợ rèn / lái buôn một mình chưa phải nội dung chơi: D1 #1466 lát A2)
+    const coNoiDung = (id: string) =>
+      MONSTERS.some((q) => (getMap(id)?.monsterCapOf(q.id) ?? 0) > 0) ||
+      NPCS.some((n) => n.mapId === id && QUESTS.some((q) => q.giver === n.id));
+    for (const id of xay) {
+      const ten = MAPS.find((m) => m.id === id)!.name;
+      const dong = doc.split("\n").find((l) => l.startsWith(`| ${ten} |`)) ?? "";
+      expect(
+        dong.includes("Đang xây dựng"),
+        `${ten}: nhãn 'Đang xây dựng' ở bảng bản đồ có đúng khi bản đồ chưa có quái sinh / NPC giao việc, và bỏ khi đã có`,
+      ).toBe(!coNoiDung(id));
+    }
     expect(
-      doc.includes("Đang xây dựng"),
-      "Lang Hoang / Uy Vân Kinh đã có quái hoặc NPC thì bỏ nhãn 'Đang xây dựng' và câu 'chưa có quái vật và NPC nhiệm vụ'; còn chưa có thì giữ",
-    ).toBe(!coNoiDung);
+      doc.includes("chưa có quái vật và NPC nhiệm vụ"),
+      "câu 'chưa có quái vật và NPC nhiệm vụ' chỉ còn khi ít nhất một trong hai bản đồ chưa có nội dung",
+    ).toBe(xay.some((id) => !coNoiDung(id)));
   });
 
   it("bản đồ và quái ở Phụ lục khớp dữ liệu", () => {

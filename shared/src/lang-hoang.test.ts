@@ -86,9 +86,18 @@ describe("Lang Hoang: đăng ký bản đồ thứ năm (mục 75 / A2)", () => 
     expect(lh.portals.map((p) => p.id)).toEqual(["lang_hoang_nam", "lang_hoang_bac"]);
   });
 
-  it("CHƯA có quái tự nhiên: `monsterCap` rỗng (không rơi về MONSTER_CAP mặc định của Lạc Hà); loài Hóa Thần do D1 (#1466) thêm rồi sửa ca này", () => {
-    expect(lh.def.monsterCap).toEqual({});
-    expect(lh.monsterCap).toEqual({});
-    for (const id of Object.keys(MONSTER_CAP)) expect(lh.monsterCapOf(id), id).toBe(0);
+  it("quái tự nhiên CHỈ là sáu loài sói Hóa Thần (D1 #1466 lát A3): `monsterCap` tổng 62, không rơi về MONSTER_CAP mặc định của Lạc Hà; chưa có trùm (lát B)", () => {
+    const SOI: Record<string, number> = {
+      da_lang: 16,
+      hac_phong_lang: 12,
+      huyet_nguyet_lang: 10,
+      xich_diem_lang: 12,
+      thuong_nguyet_lang: 4,
+      ngan_nguyet_lang: 8,
+    };
+    expect(lh.def.monsterCap).toEqual(SOI);
+    expect(lh.monsterCap).toEqual(SOI);
+    expect(Object.values(SOI).reduce((a, b) => a + b, 0)).toBe(62);
+    for (const id of Object.keys(MONSTER_CAP)) expect(lh.monsterCapOf(id), id).toBe(SOI[id] ?? 0);
   });
 });

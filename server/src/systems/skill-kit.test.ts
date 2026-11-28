@@ -26,10 +26,10 @@ const dmgOf = (dmgs: ReturnType<typeof makeWorld>["dmgs"], id: string) =>
   dmgs.filter((d) => d.target === id).map((d) => d.amount);
 
 /**
- * Player Hóa Thần tầng cao: cả bốn ô chiêu đã mở, đủ điều kiện dùng MỌI chiêu trong `LEARNABLE_SKILLS`
- * (reqRealm <= 4, reqTier <= 2). Đầy linh lực, đứng ngoài trấn.
+ * Player Hóa Thần (bậc 5, chiêu Hóa Thần của D1 #1466 lát C cần `reqRealm` 5) tầng cao: cả bốn ô chiêu đã mở, đủ điều kiện dùng MỌI chiêu trong `LEARNABLE_SKILLS`
+ * (reqRealm <= 5, reqTier <= 2). Đầy linh lực, đứng ngoài trấn.
  */
-function setup(realm = 4, tier = 2) {
+function setup(realm = 5, tier = 2) {
   const t = makeWorld();
   const a = addPlayer(t.w, "a", realm, tier);
   a.p.mp = a.p.maxMp;

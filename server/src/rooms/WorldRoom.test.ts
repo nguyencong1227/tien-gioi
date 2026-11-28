@@ -2535,8 +2535,8 @@ describe("đi qua cổng giữa hai bản đồ (M3 bước 1)", () => {
       (await waitFor(() => b.invs[0])).slots.find((s) => s?.itemId === "han_lang_mao")?.qty,
     ).toBe(5);
     expect(fileOf(name).mapId).toBe(LANG_HOANG_ID);
-    // bản đồ trống: không có quái nào được sinh ở phòng mới (monsterCap rỗng, không rơi về quái Lạc Hà)
-    expect(serverState(b.room).monsters.size).toBe(0);
+    // phòng mới chỉ sinh quái theo `monsterCap` của Lang Hoang (sáu loài sói Hóa Thần, tổng 62; D1 #1466 lát A3), không rơi về quái Lạc Hà
+    expect(serverState(b.room).monsters.size).toBe(62);
     const gotB = listenTravel(b.room);
 
     // Bước 2: Lang Hoang -> Uy Vân Kinh (cổng bắc)

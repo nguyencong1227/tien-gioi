@@ -167,6 +167,28 @@ export const NGUYEN_ANH_RECIPES: RecipeDef[] = [
   ]),
 ];
 
+// Bộ V Hóa Thần (D1 #1466 lát A2): rèn ở thợ rèn Tuyết Đao Quan (`tho_ren_tuyet_dao`, bản đồ `lang_hoang`), nguyên liệu từ chính sáu loài sói Lang Hoang (hồn tinh Thiên Lang chỉ từ Thương Nguyệt Lang,
+// sói già nhất bãi). Phí Linh thạch ~x2,8 phí bộ IV. Hài / ngọc bội cùng bộ và nguyên liệu Uy Vân Kinh (Huyết Ảnh Tinh, Tủy Phi Cương) ở lát sau.
+const rh = (id: string, output: string, coin: number, inputs: [string, number][]): RecipeDef => ({
+  ...r(id, output, inputs),
+  npcId: "tho_ren_tuyet_dao",
+  coin,
+});
+export const HOA_THAN_RECIPES: RecipeDef[] = [
+  rh("ren_kiem_nanh_nguyet", "kiem_nanh_nguyet", 25200, [
+    ["nanh_nguyet", 14],
+    ["hon_tinh_thien_lang", 2],
+  ]),
+  rh("ren_bao_huyet_nguyet", "bao_huyet_nguyet", 33600, [
+    ["bi_lang_hoang", 18],
+    ["cot_lang_vuong", 8],
+  ]),
+  rh("ren_phu_hon_thien_lang", "phu_hon_thien_lang", 21000, [
+    ["nanh_nguyet", 10],
+    ["cot_lang_vuong", 6],
+  ]),
+];
+
 // Đan hộ đạo (nghề nhỏ lát 1, #514/#763): luyện ở Lò đan (`lao_dan`, trạm alchemy) ở Lạc Hà. Nguyên liệu là đồ quái rơi ĐÃ CÓ,
 // theo vùng săn của mỗi lần đột phá: LK (quái Lạc Hà) / TC (Xích Mãng, boss Lạc Hà) / KD (Âm Sương). Phí Linh thạch là chỗ xả tiền.
 // Số liệu EV (tại sao `coin` và nguyên liệu này): docs/NGHE_NHO_KINH_TE.md. `forRealm` của mỗi đan tăng dần theo `coin` (test giữ).
@@ -284,6 +306,7 @@ export const RECIPES: RecipeDef[] = [
   ...KIM_DAN_RECIPES,
   ...OWNER_GEAR_RECIPES,
   ...NGUYEN_ANH_RECIPES,
+  ...HOA_THAN_RECIPES,
   ...PHU_RECIPES,
 ];
 

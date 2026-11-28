@@ -1,5 +1,12 @@
 // NPC trong Lạc Hà Trấn và giao dịch đổi đồ: hợp đồng giữa client và server (Sprint 2).
-import { AM_SUONG_ID, DEFAULT_MAP_ID, HAC_PHONG_ID, HAN_VAN_ID, TOWN_PX } from "./map";
+import {
+  AM_SUONG_ID,
+  DEFAULT_MAP_ID,
+  HAC_PHONG_ID,
+  HAN_VAN_ID,
+  LANG_HOANG_ID,
+  TOWN_PX,
+} from "./map";
 import type { CraftStation } from "./craft-station";
 
 export interface NpcDef {
@@ -229,6 +236,24 @@ export const NPCS: NpcDef[] = [
       "Một thanh niên tuấn tú phe phẩy quạt ghé lò xem kiếm, xưng Yến Bắc Quy, bảo kẻ có mắt tốt sớm muộn cũng cần một tri kỷ như hắn.",
     ],
     color: 0x5a3a6a,
+  },
+  // Tuyết Đao Quan (Lang Hoang, D1 #1466 lát A2): thợ rèn bộ V. Tâm trạm (2048, 3136), r 160 px; đứng bên phải tâm (+130, +30) như thợ rèn Lạc Hà (ô đi lại được, trong trạm: `data-integrity.test.ts` giữ).
+  // Nhân vật GỐC Tiên Giới (`docs/KICH_BAN_CHUONG_5_6.md` mục 3.1); ảnh TẠM tái dùng ảnh thợ rèn Hàn Vân (B vẽ riêng sau).
+  {
+    id: "tho_ren_tuyet_dao",
+    mapId: LANG_HOANG_ID,
+    name: "Đồng Lão Thiết",
+    title: "Thợ rèn Tuyết Đao",
+    x: 2178,
+    y: 3166,
+    dialog: [
+      "Lò Tuyết Đao Quan nhóm lửa giữa gió thảo nguyên. Da Lang Hoang, nanh trăng, cốt Lang Vương: mang tới đây, thêm chút Linh thạch tiền than, ta rèn đồ Hóa Thần.",
+      "Đồ tốt kén người: chưa tới Hóa Thần thì mặc vào cũng chẳng chịu nổi.",
+      "Hồn tinh Thiên Lang chỉ có ở sói già nhất bãi. Hạ được con ấy là có thứ ta cần nhất để rèn một thanh kiếm ra hồn.",
+      "Lửa lò ta phải nhóm gấp đôi dưới Hàn Vân mới chịu được gió bắc thảo nguyên này.",
+      "Sói ở đây không như sói dưới Hàn Vân: đòn nặng, chạy nhanh, hú một tiếng là cả bầy kéo tới. Mặc đủ đồ rồi hẵng đi sâu.",
+    ],
+    color: 0x6a4a3a,
   },
   {
     // Cổng vào bí cảnh (docs/THIET_KE_BI_CANH.md): chỉ đội trưởng mở được, nút do server dựng theo điều kiện của đội

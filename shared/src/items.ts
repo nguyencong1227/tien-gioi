@@ -362,6 +362,44 @@ export const ITEMS: ItemDef[] = [
     desc: "Viên châu băng kết tinh từ hàn khí của Thiên Hàn Vương, lạnh tới tận linh hồn.",
     color: 0x4a9ed8,
   },
+  // Nguyên liệu Hóa Thần của Lang Hoang (D1 #1466 lát A2, `docs/QUAI_HOA_THAN_DE_XUAT.md` mục 5.1): bốn món từ sáu loài sói; nguồn ý: Yêu Bì, Lang Nha, Lang Vương Cốt, Thiên Lang Hồn Tinh (`NGUON_NOI_DUNG.md` mục 3).
+  // Độ hiếm 3 (Nguyên Anh 2): hồn tinh và cốt chỉ rơi từ sói già, hiếm hơn.
+  {
+    id: "bi_lang_hoang",
+    name: "Da Lang Hoang",
+    type: "material",
+    stack: 99,
+    rarity: 3,
+    desc: "Da sói thảo nguyên, dày và dai, vương mùi gió khô.",
+    color: 0xb09a7a,
+  },
+  {
+    id: "nanh_nguyet",
+    name: "Nanh Trăng",
+    type: "material",
+    stack: 99,
+    rarity: 3,
+    desc: "Nanh sói ánh bạc như vành trăng non, cứng hơn thép tôi.",
+    color: 0xdfe6f0,
+  },
+  {
+    id: "cot_lang_vuong",
+    name: "Cốt Lang Vương",
+    type: "material",
+    stack: 99,
+    rarity: 3,
+    desc: "Xương sống sói già, mỗi đốt khắc sẵn vân như chữ cổ; đêm trăng cả khúc xương tỏa ánh xanh.",
+    color: 0x9fd8c8,
+  },
+  {
+    id: "hon_tinh_thien_lang",
+    name: "Hồn Tinh Thiên Lang",
+    type: "material",
+    stack: 99,
+    rarity: 4,
+    desc: "Hồn sói già kết thành viên tinh thể xanh trắng như sao Thiên Lang; đêm không trăng nó tự phát sáng.",
+    color: 0xcfeee8,
+  },
   // Đan cấp 3 (M7.5c): cùng hiệu ứng với đan cấp 2, hồi nhiều hơn (hồi huyết 40 -> 70 -> 90 %); độ hiếm 3 (tiên phẩm, ◆◆◆) để phân biệt với đan cấp 2 (bảo phẩm, ◆◆) trong túi (nit B, M7.9)
   {
     id: "thuong_hoi_huyet_dan",
@@ -747,6 +785,38 @@ export const ITEMS: ItemDef[] = [
     equip: { slot: "talisman", stats: { mp: 170, speed: 28 }, reqRealm: 4, reqTier: 0 },
     color: 0xa8aebd,
   },
+  // Bộ V, Hóa Thần sơ kỳ (D1 #1466 lát A2; `docs/KHUNG_HOA_THAN.md` mục 4.2: kiếm công 98, bào máu 1.168, phù linh lực 262 + tốc độ 28 = ~29 % chỉ số gốc ở bậc đầu như bộ IV); độ hiếm 4; rèn ở thợ rèn
+  // Tuyết Đao Quan (`tho_ren_tuyet_dao`). Tên gốc Tiên Giới. Hài / ngọc bội cùng bộ ở `owner-gear.ts` (lát sau).
+  {
+    id: "kiem_nanh_nguyet",
+    name: "Kiếm Nanh Trăng",
+    type: "equip",
+    stack: 1,
+    rarity: 4,
+    desc: "Kiếm rèn từ nanh trăng và hồn tinh sói già, mỗi nhát chém vẽ một vành trăng bạc.",
+    equip: { slot: "weapon", stats: { atk: 98 }, reqRealm: 5, reqTier: 0 },
+    color: 0xcfd8e8,
+  },
+  {
+    id: "bao_huyet_nguyet",
+    name: "Bào Huyết Nguyệt",
+    type: "equip",
+    stack: 1,
+    rarity: 4,
+    desc: "Áo may bằng da Lang Hoang và cốt sói già, gió thảo nguyên và nanh vuốt đều khó xuyên.",
+    equip: { slot: "robe", stats: { hp: 1168 }, reqRealm: 5, reqTier: 0 },
+    color: 0xa85a4a,
+  },
+  {
+    id: "phu_hon_thien_lang",
+    name: "Phù Hồn Thiên Lang",
+    type: "equip",
+    stack: 1,
+    rarity: 4,
+    desc: "Bùa cài mảnh hồn tinh Thiên Lang, bước chân nhẹ như sói chạy ngược gió.",
+    equip: { slot: "talisman", stats: { mp: 262, speed: 28 }, reqRealm: 5, reqTier: 0 },
+    color: 0x9fd8c8,
+  },
   // Đồ cho ba ô riêng của chủ (M7.4): hài, ngọc bội, pháp bảo (`owner-gear.ts`)
   ...OWNER_GEAR_ITEMS,
   // Kinh quyển của 12 chiêu (M7.4): dựng từ `SKILLS_M7` (`books.ts`)
@@ -1073,31 +1143,47 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     // Trùm rơi kinh quyển chiêu cao cấp nhất (M7.9, #654): Liệt Hỏa Kiếm, hiếm nhưng là phần thưởng hạ trùm
     { itemId: bookIdOf("liet_hoa_kiem"), chance: 0.25, min: 1, max: 1 },
   ],
-  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): CHƯA sinh ngoài hoang. Bảng TẠM chỉ dùng đan có sẵn (đủ để mọi quái có bảng rơi và có kỳ vọng đồ bán được > 0); lát A2 thay bằng
-  // nguyên liệu Hóa Thần riêng (`docs/QUAI_HOA_THAN_DE_XUAT.md` mục 5.1) + bộ V, lát C thêm sách chiêu `reqRealm` 5.
+  // Quái Hóa Thần của Lang Hoang (D1 #1466 lát A1): CHƯA sinh ngoài hoang. Lát A2: nguyên liệu Hóa Thần riêng (`docs/QUAI_HOA_THAN_DE_XUAT.md` mục 5.1) + đan cấp 3 có sẵn;
+  // lát C thêm sách chiêu `reqRealm` 5, lát B thêm trùm (cốt Lang Vương / hồn tinh rơi chắc từ Thiên Lang Vương).
   da_lang: [
+    { itemId: "bi_lang_hoang", chance: 0.5, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
   ],
   hac_phong_lang: [
+    { itemId: "nanh_nguyet", chance: 0.45, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.06, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
   ],
   huyet_nguyet_lang: [
+    { itemId: "nanh_nguyet", chance: 0.5, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.07, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.05, min: 1, max: 1 },
+    { itemId: bookIdOf("xich_luyen_doan_hon"), chance: 0.006, min: 1, max: 1 },
   ],
   xich_diem_lang: [
+    { itemId: "bi_lang_hoang", chance: 0.45, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.08, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.06, min: 1, max: 1 },
+    // Sách chiêu Hóa Thần (D1 lát C): Xích Luyện Đoạn Hồn (hỏa, đao) rơi hiếm từ sói lửa
+    { itemId: bookIdOf("xich_luyen_doan_hon"), chance: 0.01, min: 1, max: 1 },
   ],
   thuong_nguyet_lang: [
+    { itemId: "cot_lang_vuong", chance: 0.5, min: 1, max: 2 },
+    { itemId: "hon_tinh_thien_lang", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+    // Thái Sơn Áp Đỉnh (thổ, khống chế) rơi hiếm từ sói già dày nhất; Tâm Kiếm Vô Hình ít hơn
+    { itemId: bookIdOf("thai_son_ap_dinh"), chance: 0.012, min: 1, max: 1 },
+    { itemId: bookIdOf("tam_kiem_vo_hinh"), chance: 0.006, min: 1, max: 1 },
   ],
   ngan_nguyet_lang: [
+    { itemId: "cot_lang_vuong", chance: 0.3, min: 1, max: 1 },
+    { itemId: "nanh_nguyet", chance: 0.3, min: 1, max: 2 },
     { itemId: "thuong_hoi_huyet_dan", chance: 0.1, min: 1, max: 1 },
     { itemId: "thuong_hoi_linh_dan", chance: 0.08, min: 1, max: 1 },
+    // Tâm Kiếm Vô Hình (kim, kiếm) rơi hiếm từ sói bạc
+    { itemId: bookIdOf("tam_kiem_vo_hinh"), chance: 0.01, min: 1, max: 1 },
   ],
   // Trùm bí cảnh (docs/THIET_KE_BI_CANH.md): đồ rơi như quái thường (chủ đồ theo đội); thưởng hoàn thành riêng ở `DUNGEONS`.
   // Đã tính vào cân bằng 4c-2 (`server/src/balance/dungeon.ts`).
