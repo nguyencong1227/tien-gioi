@@ -302,6 +302,84 @@ export const QUESTS: QuestDef[] = [
       ],
     },
   },
+  // ---------- Việc phụ Hắc Phong Cốc (Trúc Cơ, E1 #1450): Mạc Thông giao hai việc, Lôi Báo một việc; mỗi việc một tầng (0/1/2), KHÔNG thuộc chuỗi chính ----------
+  // Việc phụ KHÔNG bắt buộc, KHÔNG daily. Chỉ kill / collect quái và vật phẩm có thật ở Hắc Phong (Hôi Lang, Hắc Hổ; nanh sói, da hổ); Xích Mãng (theo đội) đã có `mang_hoan`.
+  // exp đặt sát sàn 2% thanh bậc nhận (kim-dan-world.test.ts): 90 / 102 / 117; cộng với `mang_hoan` (300) = 609 <= trần 4% tổng thanh Trúc Cơ (611). Tối đa một kinh quyển rarity <= 2 mỗi việc.
+  {
+    id: "hac_phong_nanh_soi",
+    title: "Nanh sói đổi hàng",
+    giver: "lai_buon",
+    desc: "Việc phụ (không bắt buộc): Mạc Thông thu nanh sói cho đoàn buôn đi Âm Sương. Hạ 10 Hôi Lang, mang về 6 chiếc nanh.",
+    steps: [
+      { kind: "kill", monster: "lang", count: 10 },
+      { kind: "collect", itemId: "nanh_soi", count: 6 },
+    ],
+    rewards: { exp: 90, items: [{ itemId: "hoi_huyet_dan", qty: 4 }] },
+    minRealm: { realm: 2, tier: 0 },
+    talk: {
+      offer: [
+        "Đoàn buôn lên Âm Sương hay hỏi mua nanh sói làm vật hộ thân, ta đang thiếu hàng. Ngươi vừa Trúc Cơ thì ra bìa cốc hạ mười con Hôi Lang, mang sáu chiếc nanh về đây.",
+      ],
+      progress: [
+        "Hôi Lang sống thành bầy, đánh một con rồi lùi ra, đừng để cả đàn vây. Nanh rơi ngay chỗ nó ngã.",
+      ],
+      complete: [
+        "Nanh còn mới, đủ chắc, đoàn buôn có hàng để chia rồi. Cầm mấy viên đan này, đỡ tốn tiền mua.",
+      ],
+    },
+  },
+  {
+    id: "hac_phong_da_ho_ao",
+    title: "Da hổ may áo gió",
+    giver: "lai_buon",
+    desc: "Việc phụ (không bắt buộc): Mạc Thông cần da hổ may áo chắn gió cho người trong đoàn buôn. Đạt Trúc Cơ trung kỳ, hạ 8 Hắc Hổ, mang về 5 tấm da.",
+    steps: [
+      { kind: "kill", monster: "ho", count: 8 },
+      { kind: "collect", itemId: "da_ho", count: 5 },
+    ],
+    rewards: {
+      exp: 102,
+      items: [
+        { itemId: "hoi_linh_dan", qty: 3 },
+        { itemId: "hoi_huyet_dan", qty: 2 },
+      ],
+    },
+    minRealm: { realm: 2, tier: 1 },
+    talk: {
+      offer: [
+        "Gió Hắc Phong cắt da, người trong đoàn buôn ngã bệnh không ít. Áo da hổ chắn gió tốt nhất. Ngươi đã qua sơ kỳ Trúc Cơ thì vào sâu hạ tám con Hắc Hổ, mang năm tấm da về.",
+      ],
+      progress: ["Hắc Hổ đòn nặng, da dày. Mang đủ đan, đừng đứng yên chịu trận."],
+      complete: ["Da dày lại đều, may áo được ngay. Ta trả bằng đan dược, ngươi giữ lấy mà dùng."],
+    },
+  },
+  {
+    id: "hac_phong_don_duong",
+    title: "Dọn đường trạm",
+    giver: "tran_uy",
+    desc: "Việc phụ (không bắt buộc): Lôi Báo muốn dọn sạch đường trạm trước mùa gió đen. Đạt Trúc Cơ hậu kỳ, hạ 8 Hôi Lang rồi 5 Hắc Hổ.",
+    steps: [
+      { kind: "kill", monster: "lang", count: 8 },
+      { kind: "kill", monster: "ho", count: 5 },
+    ],
+    rewards: {
+      exp: 117,
+      items: [
+        { itemId: "kinh_ban_thach_ho_the", qty: 1 },
+        { itemId: "hoi_huyet_dan", qty: 3 },
+      ],
+    },
+    minRealm: { realm: 2, tier: 2 },
+    talk: {
+      offer: [
+        "Mùa gió đen sắp tới, xe vận chuyển phải đi sớm. Ngươi đã Trúc Cơ hậu kỳ, đủ sức dọn đường: hạ tám con Hôi Lang cho thông bìa cốc, rồi năm con Hắc Hổ ở sâu hơn.",
+      ],
+      progress: ["Làm từng đợt: lang trước, hổ sau. Hắc Hổ đòn nặng, mang đủ Hồi Huyết Đan."],
+      complete: [
+        "Đường thông rồi, xe đi kịp mùa. Ta có quyển Bàn Thạch Hộ Thể, chiêu giữ thân vững như đá, hợp kẻ hay đứng đầu đàn thú. Mở Túi đồ rồi bấm Học.",
+      ],
+    },
+  },
   {
     id: "thanh_lo_tram",
     title: "Thanh Lộ Trạm",
